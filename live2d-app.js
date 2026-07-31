@@ -1023,6 +1023,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('live2d_studio_v2', JSON.stringify({
             modelId: currentModelId,
             faceSensitivity, modelScale, offsetX, offsetY,
+            cameraTrack: cameraTrackToggle.checked,
             autoBlink: autoBlinkToggle.checked,
             idleAnim: idleAnimToggle.checked,
             cameraPreview: cameraPreviewToggle.checked,
@@ -1047,6 +1048,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (s.idleAnim != null)     idleAnimToggle.checked     = s.idleAnim;
             if (s.cameraPreview != null) cameraPreviewToggle.checked = s.cameraPreview;
             if (s.micSync != null)      micToggle.checked          = s.micSync;
+            if (s.cameraTrack != null) {
+                cameraTrackToggle.checked = s.cameraTrack;
+                if (s.cameraTrack) {
+                    setTimeout(() => startCamera(), 500);
+                }
+            }
             if (s.handTrack != null) {
                 handTrackToggle.checked = s.handTrack;
                 isHandTrackActive = s.handTrack;
