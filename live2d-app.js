@@ -967,7 +967,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!obsUrlInput) return;
         const isGreen = obsGreenToggle && obsGreenToggle.checked;
         const greenParam = isGreen ? '&green=true' : '';
-        obsUrlInput.value = `${window.location.origin}/live2d.html?obs=true&model=${currentModelId}${greenParam}`;
+        const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+        obsUrlInput.value = `${window.location.origin}${basePath}live2d.html?obs=true&model=${currentModelId}${greenParam}`;
     }
 
     if (obsGreenToggle) {
