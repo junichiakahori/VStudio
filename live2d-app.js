@@ -987,8 +987,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // 全画面・操作パネル表示非表示切替
-    const togglePanelBtn  = document.getElementById('toggle-panel-btn');
-    const togglePanelText = document.getElementById('toggle-panel-text');
+    const togglePanelBtn     = document.getElementById('toggle-panel-btn');
+    const togglePanelText    = document.getElementById('toggle-panel-text');
+    const hidePanelHeaderBtn = document.getElementById('hide-panel-header-btn');
+
+    if (hidePanelHeaderBtn && togglePanelBtn) {
+        hidePanelHeaderBtn.addEventListener('click', () => {
+            togglePanelBtn.click();
+        });
+    }
 
     if (togglePanelBtn) {
         togglePanelBtn.addEventListener('click', () => {

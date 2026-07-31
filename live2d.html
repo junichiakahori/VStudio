@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web Live2D Avatar Studio</title>
     <meta name="description" content="Live2Dモデルを使ったリアルタイムVTuberアバタースタジオ。">
-    <link rel="stylesheet" href="live2d-styles.css">
+    <link rel="stylesheet" href="live2d-styles.css?v=1.2">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+JP:wght@300;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -29,6 +29,9 @@
             <div class="panel-header">
                 <h2>Live2D Studio</h2>
                 <p>リアルタイム Live2D アバター</p>
+                <button class="hide-panel-action-btn" id="hide-panel-header-btn">
+                    <span>👁️ 全画面表示（設定を非表示）</span>
+                </button>
             </div>
             <div class="panel-section">
                 <h3><span class="icon">🎭</span>モデル選択</h3>
@@ -201,6 +204,6 @@
     <script src="live2dcubismcore.min.js"></script>
     <!-- pixi-live2d-display v0.4 -->
     <script src="pixi-live2d-display.min.js"></script>
-    <script src="live2d-app.js"></script>
+    <script src="live2d-app.js?v=1.2"></script>
 </body>
 </html>
