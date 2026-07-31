@@ -1,0 +1,1271 @@
+// Live2D Avatar Studio - Main Controller
+// Uses PixiJS v6 + pixi-live2d-display v0.4 (Cubism4 bundle) + MediaPipe
+
+document.addEventListener('DOMContentLoaded', () => {
+
+    // =====================================================================
+    // モデル定義
+    // =====================================================================
+    const MODELS = [
+        { id: 'hiyori', name: 'Hiyori', path: 'Live2DModels/hiyori_vts/hiyori.model3.json', icon: 'Live2DModels/hiyori_vts/icon.jpg' },
+        { id: 'akari',  name: 'Akari',  path: 'Live2DModels/akari_vts/akari.model3.json',   icon: 'Live2DModels/akari_vts/icon.jpg' },
+        { id: 'hijiki', name: 'Hijiki', path: 'Live2DModels/hijiki_vts/hijiki.model3.json', icon: 'Live2DModels/hijiki_vts/icon.jpg' },
+        { id: 'tororo', name: 'Tororo', path: 'Live2DModels/tororo_vts/tororo.model3.json', icon: 'Live2DModels/tororo_vts/icon.jpg' },
+        { id: 'wanko',  name: 'Wanko',  path: 'Live2DModels/wanko_vts/wanko.model3.json',  icon: 'Live2DModels/wanko_vts/icon.jpg' },
+    ];
+
+    // =====================================================================
+    // DOM
+    // =====================================================================
+    const viewport      = document.getElementById('avatar-viewport');
+    const canvas        = document.getElementById('live2d-canvas');
+    const modelGrid     = document.getElementById('model-grid');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const loadingText   = document.getElementById('loading-text');
+    const bgLayer       = document.getElementById('background-layer');
+
+    const cameraTrackToggle      = document.getElementById('camera-track-toggle');
+    const cameraStatus           = document.getElementById('camera-status');
+    const cameraPreviewToggle    = document.getElementById('camera-preview-toggle');
+    const cameraPreviewContainer = document.getElementById('camera-preview-container');
+    const micToggle              = document.getElementById('mic-sync-toggle');
+    const micStatus              = document.getElementById('mic-status');
+    const autoBlinkToggle        = document.getElementById('auto-blink-toggle');
+    const idleAnimToggle         = document.getElementById('idle-anim-toggle');
+    const video                  = document.getElementById('webcam');
+    const handTrackToggle        = document.getElementById('hand-track-toggle');
+    const handStatus             = document.getElementById('hand-status');
+
+    // 部位Tuber (AR顔被せ) DOM
+    const faceMaskToggle    = document.getElementById('face-mask-toggle');
+    const maskStatus        = document.getElementById('mask-status');
+    const maskScaleSlider   = document.getElementById('mask-scale-slider');
+    const maskScaleVal      = document.getElementById('mask-scale-val');
+    const maskOffsetYSlider = document.getElementById('mask-offset-y-slider');
+    const maskOffsetYVal    = document.getElementById('mask-offset-y-val');
+
+    const faceSensSlider = document.getElementById('face-sensitivity-slider');
+    const faceSensVal    = document.getElementById('face-sensitivity-val');
+    const scaleSlider    = document.getElementById('scale-slider');
+    const scaleVal       = document.getElementById('scale-val');
+    const offsetYSlider  = document.getElementById('offset-y-slider');
+    const offsetYVal     = document.getElementById('offset-y-val');
+    const offsetXSlider  = document.getElementById('offset-x-slider');
+    const offsetXVal     = document.getElementById('offset-x-val');
+    const obsUrlInput    = document.getElementById('obs-url-input');
+    const copyUrlBtn     = document.getElementById('copy-url-btn');
+    const obsGreenToggle = document.getElementById('obs-green-toggle');
+
+    // デバッグスライダーDOM
+    const debugArmLaSlider = document.getElementById('debug-arm-la');
+    const debugArmLaVal    = document.getElementById('debug-arm-la-val');
+    const debugArmLbSlider = document.getElementById('debug-arm-lb');
+    const debugArmLbVal    = document.getElementById('debug-arm-lb-val');
+    const debugArmRaSlider = document.getElementById('debug-arm-ra');
+    const debugArmRaVal    = document.getElementById('debug-arm-ra-val');
+    const debugArmRbSlider = document.getElementById('debug-arm-rb');
+    const debugArmRbVal    = document.getElementById('debug-arm-rb-val');
+
+    // =====================================================================
+    // 状態変数
+    // =====================================================================
+    let currentModelId = 'hiyori';
+    let pixiApp = null;
+    let live2dModel = null;
+
+    let isCameraActive = false;
+    let isFaceDetected = false;
+    let faceLandmarker = null;
+    let webcamStream = null;
+    let lastVideoTime = -1;
+    let audioContext = null;
+    let analyser = null;
+
+    // Live2D パラメータ (目標値)
+    let tAngleX = 0, tAngleY = 0, tAngleZ = 0;
+    let tEyeLOpen = 1, tEyeROpen = 1;
+    let tMouthOpen = 0;
+    let tEyeBallX = 0, tEyeBallY = 0;
+    let tBreath = 0;
+
+    // 補間済みの現在値
+    let cAngleX = 0, cAngleY = 0, cAngleZ = 0;
+    let cEyeLOpen = 1, cEyeROpen = 1;
+    let cMouthOpen = 0;
+    let cEyeBallX = 0, cEyeBallY = 0;
+    let cBreath = 0;
+
+    let isHandTrackActive = false;
+    let handLandmarker = null;
+
+    // 腕パラメータ目標値・現在値 (腕の切り替え A=下げ, B=上げ)
+    let tArmLA = 0.0, tArmLB = 0.0;
+    let tArmRA = 0.0, tArmRB = 0.0;
+    let cArmLA = 0.0, cArmLB = 0.0;
+    let cArmRA = 0.0, cArmRB = 0.0;
+
+    // 腕Bの角度・手の形目標値・現在値
+    let tHandLBVal = 0.0, cHandLBVal = 0.0;
+    let tHandRBVal = 0.0, cHandRBVal = 0.0;
+    let tHandLForm = 1.0, cHandLForm = 1.0; // 1.0 = パー, 0.0 = グー
+    let tHandRForm = 1.0, cHandRForm = 1.0;
+
+    let faceSensitivity = 1.0;
+    let modelScale = 1.0;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    // 部位Tuber (AR顔被せ) 状態変数
+    let isFaceMaskMode = false;
+    let maskScaleMultiplier = 1.2;
+    let maskOffsetY = 0;
+
+    let tMaskX = 0, tMaskY = 0;
+    let tMaskScale = 1.0;
+    let tMaskRotation = 0;
+
+    let cMaskX = 0, cMaskY = 0;
+    let cMaskScale = 1.0;
+    let cMaskRotation = 0;
+
+    // 瞬き
+    let isBlinking = false;
+    let blinkTimer = null;
+
+    // 待機アニメーション
+    let idleTime = 0;
+    let idleGazeX = 0, idleGazeY = 0;
+    let idleGazeTargetX = 0, idleGazeTargetY = 0;
+    let lastGazeChange = 0;
+
+    // マウス
+    let mouseX = 0, mouseY = 0;
+
+    // URLパラメータ
+    const urlParams   = new URLSearchParams(window.location.search);
+    const isObsMode   = urlParams.has('obs');
+    const isGreenMode = urlParams.has('green');
+    const urlModel    = urlParams.get('model');
+    if (urlModel && MODELS.find(m => m.id === urlModel)) currentModelId = urlModel;
+
+    // BroadcastChannel
+    const syncChannel = new BroadcastChannel('live2d-avatar-sync');
+    let lastSyncTime = 0;
+
+    // NDIストリーミング状態
+    let ndiWs = null;
+    let ndiEnabled = false;
+    let ndiFrameTimer = null;
+    let ndiRetryTimer = null;
+    const NDI_WS_URL = 'ws://localhost:8766';
+    const NDI_FPS = 30;
+
+    window.addEventListener('mousemove', (e) => {
+        if (isCameraActive) return;
+        mouseX = (e.clientX / window.innerWidth  - 0.5) * 2;
+        mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+    });
+
+    // =====================================================================
+    // PixiJS 初期化
+    // =====================================================================
+    function initPixi() {
+        const w = viewport.clientWidth  || window.innerWidth  - 320;
+        const h = viewport.clientHeight || window.innerHeight;
+
+        pixiApp = new PIXI.Application({
+            view: canvas,
+            width: w,
+            height: h,
+            backgroundAlpha: 0,
+            antialias: true,
+            resolution: window.devicePixelRatio || 1,
+            autoDensity: true,
+            preserveDrawingBuffer: true,
+        });
+
+        // pixi-live2d-displayにPixiJS Tickerを登録（アニメーションに必要）
+        if (window.PIXI && PIXI.live2d && PIXI.live2d.Live2DModel) {
+            PIXI.live2d.Live2DModel.registerTicker(PIXI.Ticker);
+            console.log('Live2D Ticker registered');
+        }
+
+        window.addEventListener('resize', () => {
+            const nw = viewport.clientWidth  || window.innerWidth  - 320;
+            const nh = viewport.clientHeight || window.innerHeight;
+            pixiApp.renderer.resize(nw, nh);
+            if (live2dModel) positionModel();
+        });
+
+        // メインループ
+        pixiApp.ticker.add((delta) => {
+            idleTime += delta;
+            updateLive2DParams(delta);
+            if (live2dModel) {
+                // 手動アップデートを実行（アニメーション/物理/ポーズの処理）
+                live2dModel.update(pixiApp.ticker.elapsedMS);
+
+                // アップデート後にHiyori의 腕の表示・非表示を強制的に上書き
+                if (currentModelId === 'hiyori' && live2dModel.internalModel) {
+                    try {
+                        const core = live2dModel.internalModel.coreModel;
+                        // 左右どちらかの上げ腕(B)が有効化されているなら、PartArmBをフェードイン表示。
+                        // cArmLB/RB の値の範囲は 0.0 〜 10.0 なので、10.0 で割って不透明度(0.0〜1.0)にします。
+                        const maxVal = !isHandTrackActive ? Math.max(tArmLB, tArmRB) : Math.max(cArmLB, cArmRB);
+                        const opB = Math.max(0.0, Math.min(1.0, maxVal / 10.0));
+                        try { core.setPartOpacityById('PartArmA', 1.0); } catch(e){}
+                        try { core.setPartOpacityById('PartArmB', opB); } catch(e){}
+                    } catch(e){}
+                }
+            }
+        });
+    }
+
+    // =====================================================================
+    // モデルポジション
+    // =====================================================================
+    function positionModel() {
+        if (!live2dModel || !pixiApp) return;
+        const w = pixiApp.screen.width  || (viewport.clientWidth  || window.innerWidth  - 320);
+        const h = pixiApp.screen.height || (viewport.clientHeight || window.innerHeight);
+
+        if (w === 0 || h === 0) {
+            console.warn('positionModel: screen size is 0, retrying...');
+            setTimeout(positionModel, 100);
+            return;
+        }
+
+        // Live2Dモデルの元サイズを取得
+        const mw = (live2dModel.internalModel && live2dModel.internalModel.originalWidth)  || 2048;
+        const mh = (live2dModel.internalModel && live2dModel.internalModel.originalHeight) || 2048;
+
+        // 画面に充てるスケールを計算
+        const fitScale = Math.min(w / mw, h / mh);
+        const finalScale = fitScale * modelScale;
+
+        if (!isFaceMaskMode) {
+            live2dModel.scale.set(finalScale);
+            live2dModel.pivot.set(mw / 2, mh / 2);
+            live2dModel.x = w / 2 + offsetX;
+            live2dModel.y = h / 2 + offsetY;
+        }
+
+        console.log(`Model positioned: scale=${finalScale.toFixed(3)}, x=${live2dModel.x}, y=${live2dModel.y}, mw=${mw}, mh=${mh}`);
+    }
+
+    // =====================================================================
+    // モデルロード
+    // =====================================================================
+    async function loadModel(modelDef) {
+        if (!pixiApp) { console.error('PixiJS not initialized'); return; }
+
+        loadingOverlay.classList.add('visible');
+        loadingText.textContent = `${modelDef.name} を読み込み中...`;
+
+        // pixi-live2d-display が利用可能か確認
+        if (!window.PIXI || !PIXI.live2d || !PIXI.live2d.Live2DModel) {
+            console.error('pixi-live2d-display が読み込まれていません', window.PIXI && PIXI.live2d);
+            loadingText.textContent = 'Live2Dライブラリの読み込みに失敗しました。ページを再読み込みしてください。';
+            return;
+        }
+
+        try {
+            // 既存モデルを削除
+            if (live2dModel) {
+                pixiApp.stage.removeChild(live2dModel);
+                live2dModel.destroy();
+                live2dModel = null;
+            }
+
+            console.log('Loading model:', modelDef.path);
+            const model = await PIXI.live2d.Live2DModel.from(modelDef.path, {
+                autoInteract: false,
+                autoUpdate: false,
+            });
+
+            console.log('Model loaded successfully:', model);
+            live2dModel = model;
+            window.live2dModel = model;
+            window.pixiApp = pixiApp;
+            pixiApp.stage.addChild(model);
+            positionModel();
+
+            // Hiyoriの腕が重複して表示される問題（Pose設定がないため両方の腕が表示される）の対策
+            if (modelDef.id === 'hiyori' && model.internalModel) {
+                try {
+                    const core = model.internalModel.coreModel;
+                    try { core.setParameterValueById('ParamArmLA', 0.0); } catch(e){}
+                    try { core.setParameterValueById('ParamArmRA', 0.0); } catch(e){}
+                    try { core.setParameterValueById('ParamArmLB', 0.0); } catch(e){}
+                    try { core.setParameterValueById('ParamArmRB', 0.0); } catch(e){}
+
+                    try { core.setPartOpacityById('PartArmA', 1.0); } catch(e){}
+                    try { core.setPartOpacityById('PartArmB', 0.0); } catch(e){}
+                } catch (e) {
+                    console.warn('Hiyori arm fix failed:', e);
+                }
+            }
+
+
+
+            loadingOverlay.classList.remove('visible');
+            currentModelId = modelDef.id;
+
+            document.querySelectorAll('.model-card').forEach(card => {
+                card.classList.toggle('active', card.dataset.modelId === currentModelId);
+            });
+
+            updateObsUrl();
+            saveSettings();
+
+        } catch (err) {
+            console.error('モデルロード失敗:', err);
+            loadingText.textContent = `エラー: ${err.message || '不明なエラー'} — コンソールを確認してください`;
+            setTimeout(() => loadingOverlay.classList.remove('visible'), 5000);
+        }
+    }
+
+    // =====================================================================
+    // Live2D パラメータ更新 (毎フレーム)
+    // =====================================================================
+    function updateLive2DParams(delta) {
+        if (!live2dModel) return;
+
+        const now = Date.now();
+        const isSyncActive = isObsMode && (now - lastSyncTime < 2000);
+
+        if (!isSyncActive) {
+            if (!isCameraActive || !isFaceDetected) {
+                if (idleAnimToggle.checked) {
+                    // 待機アニメーション
+                    if (now - lastGazeChange > 3000 + Math.random() * 4000) {
+                        idleGazeTargetX = (Math.random() - 0.5) * 14;
+                        idleGazeTargetY = (Math.random() - 0.5) * 8;
+                        lastGazeChange = now;
+                    }
+                    idleGazeX += (idleGazeTargetX - idleGazeX) * 0.03;
+                    idleGazeY += (idleGazeTargetY - idleGazeY) * 0.03;
+
+                    const t = idleTime * 0.01;
+                    tBreath  = (Math.sin(t * 0.2) + 1) * 0.5;
+                    tAngleX  = idleGazeX + Math.sin(t * 0.08) * 3;
+                    tAngleY  = idleGazeY + Math.cos(t * 0.12) * 2;
+                    tAngleZ  = Math.sin(t * 0.10) * 2;
+                    tEyeBallX = idleGazeX / 30;
+                    tEyeBallY = idleGazeY / 20;
+                } else {
+                    // マウス追従
+                    tAngleX   = mouseX  * 30 * faceSensitivity;
+                    tAngleY   = -mouseY * 20 * faceSensitivity;
+                    tAngleZ   = -mouseX * 5;
+                    tEyeBallX = mouseX  * 0.8;
+                    tEyeBallY = mouseY  * 0.8;
+                }
+            }
+
+            // BroadcastChannel 送信（コントロール側のみ）
+            if (!isObsMode) {
+                syncChannel.postMessage({
+                    type: 'live2d-state',
+                    angleX: tAngleX, angleY: tAngleY, angleZ: tAngleZ,
+                    eyeLOpen: tEyeLOpen, eyeROpen: tEyeROpen,
+                    mouthOpen: tMouthOpen,
+                    eyeBallX: tEyeBallX, eyeBallY: tEyeBallY,
+                    breath: tBreath,
+                    armLA: tArmLA, armLB: tArmLB,
+                    armRA: tArmRA, armRB: tArmRB,
+                    handLBVal: tHandLBVal, handRBVal: tHandRBVal,
+                    handLForm: tHandLForm, handRForm: tHandRForm,
+                    isHandTrackActive: isHandTrackActive,
+                    modelId: currentModelId,
+                });
+            }
+        }
+
+        // イージング補間
+        const ease = 0.12;
+        cAngleX    += (tAngleX    - cAngleX)    * ease;
+        cAngleY    += (tAngleY    - cAngleY)    * ease;
+        cAngleZ    += (tAngleZ    - cAngleZ)    * ease;
+        cEyeLOpen  += (tEyeLOpen  - cEyeLOpen)  * 0.2;
+        cEyeROpen  += (tEyeROpen  - cEyeROpen)  * 0.2;
+        cMouthOpen += (tMouthOpen - cMouthOpen) * 0.15;
+        cEyeBallX  += (tEyeBallX  - cEyeBallX)  * 0.1;
+        cEyeBallY  += (tEyeBallY  - cEyeBallY)  * 0.1;
+        cBreath    += (tBreath    - cBreath)    * 0.05;
+
+        // 腕のイージング補間 (手動デバッグスライダー操作時は直接代入)
+        if (!isHandTrackActive) {
+            cArmLA = tArmLA;
+            cArmLB = tArmLB;
+            cArmRA = tArmRA;
+            cArmRB = tArmRB;
+        } else {
+            cArmLA     += (tArmLA     - cArmLA)     * 0.15;
+            cArmLB     += (tArmLB     - cArmLB)     * 0.15;
+            cArmRA     += (tArmRA     - cArmRA)     * 0.15;
+            cArmRB     += (tArmRB     - cArmRB)     * 0.15;
+        }
+
+        // 手の形・腕角度のイージング補間
+        cHandLBVal += (tHandLBVal - cHandLBVal) * 0.15;
+        cHandRBVal += (tHandRBVal - cHandRBVal) * 0.15;
+        cHandLForm += (tHandLForm - cHandLForm) * 0.15;
+        cHandRForm += (tHandRForm - cHandRForm) * 0.15;
+
+        // Live2D coreModel にパラメータを書き込む
+        try {
+            const core = live2dModel.internalModel.coreModel;
+            const set  = (id, v) => { try { core.setParameterValueById(id, v); } catch(e){} };
+
+            set('PARAM_ANGLE_X',    cAngleX);
+            set('PARAM_ANGLE_Y',    cAngleY);
+            set('PARAM_ANGLE_Z',    cAngleZ);
+            set('PARAM_EYE_L_OPEN', cEyeLOpen);
+            set('PARAM_EYE_R_OPEN', cEyeROpen);
+            set('ParamEyeLOpen',    cEyeLOpen);
+            set('ParamEyeROpen',    cEyeROpen);
+            set('PARAM_MOUTH_OPEN_Y', cMouthOpen);
+            set('ParamMouthOpenY',    cMouthOpen);
+            set('PARAM_EYE_BALL_X', cEyeBallX);
+            set('PARAM_EYE_BALL_Y', cEyeBallY);
+            set('PARAM_BREATH',     cBreath);
+
+            // Hiyoriの腕・手パラメータの反映
+            if (currentModelId === 'hiyori') {
+                set('ParamArmLA', cArmLA);
+                set('ParamArmRA', cArmRA);
+                set('ParamArmLB', cArmLB);
+                set('ParamArmRB', cArmRB);
+                set('ParamHandLB', cHandLBVal);
+                set('ParamHandRB', cHandRBVal);
+                set('ParamHandL', cHandLForm);
+                set('ParamHandR', cHandRForm);
+            }
+        } catch(e) {}
+
+        // 部位Tuber (AR顔被せ) 追従位置計算
+        if (isFaceMaskMode && live2dModel) {
+            if (isCameraActive && isFaceDetected) {
+                const ease = 0.25;
+                cMaskX += (tMaskX - cMaskX) * ease;
+                cMaskY += (tMaskY - cMaskY) * ease;
+                cMaskScale += (tMaskScale - cMaskScale) * ease;
+                cMaskRotation += (tMaskRotation - cMaskRotation) * ease;
+
+                const mw = (live2dModel.internalModel && live2dModel.internalModel.originalWidth) || 2048;
+                const mh = (live2dModel.internalModel && live2dModel.internalModel.originalHeight) || 2048;
+
+                live2dModel.pivot.set(mw / 2, mh * 0.28);
+                live2dModel.x = cMaskX;
+                live2dModel.y = cMaskY + maskOffsetY;
+                live2dModel.scale.set(cMaskScale * maskScaleMultiplier);
+                live2dModel.rotation = cMaskRotation;
+            } else if (!isCameraActive || !isFaceDetected) {
+                live2dModel.rotation = 0;
+                positionModel();
+            }
+        }
+
+        // 背景パララックス
+        if (!isObsMode && !isFaceMaskMode) {
+            bgLayer.style.transform = `scale(1.08) translate(${cAngleX * -0.4}px, ${cAngleY * -0.4}px)`;
+        }
+    }
+
+    // =====================================================================
+    // 自動瞬き
+    // =====================================================================
+    function scheduleBlink() {
+        if (blinkTimer) clearTimeout(blinkTimer);
+        if (!autoBlinkToggle.checked) return;
+        if (isObsMode && (Date.now() - lastSyncTime < 2000)) return;
+        if (isCameraActive && isFaceDetected) return;
+
+        const delay = 2000 + Math.random() * 4000;
+        blinkTimer = setTimeout(() => {
+            if (!autoBlinkToggle.checked || isBlinking) return;
+            isBlinking = true;
+            tEyeLOpen = 0;
+            tEyeROpen = 0;
+            setTimeout(() => {
+                isBlinking = false;
+                tEyeLOpen = 1;
+                tEyeROpen = 1;
+                scheduleBlink();
+            }, 120);
+        }, delay);
+    }
+
+    autoBlinkToggle.addEventListener('change', () => {
+        if (autoBlinkToggle.checked && !isCameraActive) scheduleBlink();
+        else if (blinkTimer) clearTimeout(blinkTimer);
+        saveSettings();
+    });
+
+    idleAnimToggle.addEventListener('change', () => saveSettings());
+
+    // =====================================================================
+    // MediaPipe 顔トラッキング
+    // =====================================================================
+    async function initFaceLandmarker() {
+        loadingOverlay.classList.add('visible');
+        loadingText.textContent = 'AI認識モデルを読み込み中...';
+        try {
+            const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/vision_bundle.mjs');
+            const { FilesetResolver, FaceLandmarker } = vision;
+            const wasm = await FilesetResolver.forVisionTasks(
+                'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm'
+            );
+            faceLandmarker = await FaceLandmarker.createFromOptions(wasm, {
+                baseOptions: {
+                    modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+                    delegate: 'GPU'
+                },
+                outputFaceBlendshapes: true,
+                runningMode: 'VIDEO',
+                numFaces: 1
+            });
+            loadingOverlay.classList.remove('visible');
+        } catch (err) {
+            console.error('MediaPipe init failed:', err);
+            loadingText.textContent = '顔認識モデルのロード失敗。';
+            cameraTrackToggle.checked = false;
+            setTimeout(() => loadingOverlay.classList.remove('visible'), 3000);
+        }
+    }
+
+    // =====================================================================
+    // MediaPipe 手トラッキング
+    // =====================================================================
+    async function initHandLandmarker() {
+        if (handLandmarker) return;
+        loadingOverlay.classList.add('visible');
+        loadingText.textContent = '手認識モデルを読み込み中...';
+        try {
+            const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/vision_bundle.mjs');
+            const { FilesetResolver, HandLandmarker } = vision;
+            const wasm = await FilesetResolver.forVisionTasks(
+                'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm'
+            );
+            handLandmarker = await HandLandmarker.createFromOptions(wasm, {
+                baseOptions: {
+                    modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+                    delegate: 'GPU'
+                },
+                runningMode: 'VIDEO',
+                numHands: 2
+            });
+            loadingOverlay.classList.remove('visible');
+            console.log('HandLandmarker loaded successfully');
+        } catch (err) {
+            console.error('MediaPipe Hand init failed:', err);
+            loadingText.textContent = '手認識モデルのロード失敗。';
+            handTrackToggle.checked = false;
+            setTimeout(() => loadingOverlay.classList.remove('visible'), 3000);
+        }
+    }
+
+    async function startCamera() {
+        if (!faceLandmarker) await initFaceLandmarker();
+        if (!faceLandmarker) return;
+
+        if (isHandTrackActive && !handLandmarker) {
+            await initHandLandmarker();
+        }
+
+        cameraStatus.textContent = '起動中...';
+        if (micToggle.checked) { micToggle.checked = false; micStatus.textContent = 'カメラ優先中'; micStatus.classList.remove('active'); }
+
+        try {
+            webcamStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' }, audio: false });
+            video.srcObject = webcamStream;
+            video.onloadeddata = runCameraLoop;
+            isCameraActive = true;
+            cameraStatus.textContent = 'トラッキング中';
+            cameraStatus.classList.add('active');
+            if (isHandTrackActive && handLandmarker) {
+                handStatus.textContent = '手認識有効';
+                handStatus.classList.add('active');
+            }
+            if (blinkTimer) clearTimeout(blinkTimer);
+            if (cameraPreviewToggle.checked) cameraPreviewContainer.classList.add('visible');
+        } catch (err) {
+            cameraStatus.textContent = '許可エラー';
+            cameraStatus.classList.remove('active');
+            cameraTrackToggle.checked = false;
+            scheduleBlink();
+        }
+    }
+
+    function stopCamera() {
+        isCameraActive = false; isFaceDetected = false;
+        cameraStatus.textContent = 'カメラ無効'; cameraStatus.classList.remove('active');
+        if (webcamStream) { webcamStream.getTracks().forEach(t => t.stop()); webcamStream = null; }
+        video.srcObject = null;
+        video.onloadeddata = null;
+        cameraPreviewContainer.classList.remove('visible');
+        tEyeLOpen = 1; tEyeROpen = 1; tMouthOpen = 0;
+        
+        tArmLA = 0.0; tArmLB = 0.0;
+        tArmRA = 0.0; tArmRB = 0.0;
+        tHandLBVal = 0.0; tHandRBVal = 0.0;
+        tHandLForm = 1.0; tHandRForm = 1.0;
+        if (isHandTrackActive) {
+            handStatus.textContent = '手認識一時停止';
+            handStatus.classList.remove('active');
+        }
+
+        scheduleBlink();
+    }
+
+    async function runCameraLoop() {
+        if (!isCameraActive || !faceLandmarker) return;
+        if (video.currentTime !== lastVideoTime) {
+            lastVideoTime = video.currentTime;
+            const result = faceLandmarker.detectForVideo(video, Date.now());
+
+            if (result.faceLandmarks && result.faceLandmarks.length > 0) {
+                isFaceDetected = true;
+                if (blinkTimer) { clearTimeout(blinkTimer); blinkTimer = null; }
+
+                const lm = result.faceLandmarks[0];
+                const bs = result.faceBlendshapes[0].categories;
+
+                const nose = lm[4], faceL = lm[234], faceR = lm[454];
+                const forehead = lm[10], chin = lm[152];
+
+                const ld = Math.hypot(nose.x - faceL.x, nose.y - faceL.y);
+                const rd = Math.hypot(nose.x - faceR.x, nose.y - faceR.y);
+                const yaw = (ld - rd) / (ld + rd) * 3.5;
+                const td = Math.hypot(nose.x - forehead.x, nose.y - forehead.y);
+                const bd = Math.hypot(nose.x - chin.x, nose.y - chin.y);
+                const pitch = (td - bd) / (td + bd) * 3.5 + 0.15;
+
+                tAngleX   = -yaw   * 30 * faceSensitivity;
+                tAngleY   =  pitch * 30 * faceSensitivity;
+                tAngleZ   =  yaw   * 10;
+                tEyeBallX = -yaw   * 0.8;
+                tEyeBallY =  pitch * 0.8;
+
+                const getBS = name => { const c = bs.find(x => x.categoryName === name); return c ? c.score : 0; };
+                tEyeLOpen   = Math.max(0, 1 - getBS('eyeBlinkLeft')  * 2.5);
+                tEyeROpen   = Math.max(0, 1 - getBS('eyeBlinkRight') * 2.5);
+                tMouthOpen  = Math.min(1, Math.max(0, (getBS('jawOpen') - 0.05) / 0.4));
+                tBreath     = 0.5;
+
+                // 部位Tuber (AR顔被せ) リアルタイム座標・スケール計算
+                if (isFaceMaskMode && pixiApp) {
+                    const vw = pixiApp.screen.width  || viewport.clientWidth;
+                    const vh = pixiApp.screen.height || viewport.clientHeight;
+
+                    const videoW = video.videoWidth || 640;
+                    const videoH = video.videoHeight || 480;
+
+                    const videoAspect = videoW / videoH;
+                    const canvasAspect = vw / vh;
+
+                    let rendW = vw, rendH = vh;
+                    let offX = 0, offY = 0;
+
+                    if (canvasAspect > videoAspect) {
+                        rendW = vw;
+                        rendH = vw / videoAspect;
+                        offY = (rendH - vh) / 2;
+                    } else {
+                        rendH = vh;
+                        rendW = vh * videoAspect;
+                        offX = (rendW - vw) / 2;
+                    }
+
+                    // MediaPipe: lm[33]は本人の右目, lm[263]は本人の左目
+                    const eyeR = lm[33], eyeL = lm[263];
+                    const noseBridge = lm[6] || lm[4];
+                    const screenNormX = 1 - noseBridge.x;
+                    const screenNormY = noseBridge.y;
+
+                    tMaskX = screenNormX * rendW - offX;
+                    tMaskY = screenNormY * rendH - offY;
+
+                    // 鏡像画面上の左目から右目へのベクトル
+                    const dx = (1 - eyeR.x) - (1 - eyeL.x);
+                    const dy = eyeR.y - eyeL.y;
+                    tMaskRotation = Math.atan2(dy, dx);
+
+                    const faceHNorm = Math.hypot(chin.x - forehead.x, chin.y - forehead.y);
+                    const pixelFaceH = faceHNorm * rendH;
+                    const mw = (live2dModel && live2dModel.internalModel && live2dModel.internalModel.originalWidth) || 2048;
+                    const fitScale = Math.min(vw / mw, vh / mw);
+                    tMaskScale = (pixelFaceH / 220) * fitScale * 1.6;
+                }
+
+            } else {
+                if (isFaceDetected) {
+                    isFaceDetected = false;
+                    tEyeLOpen = 1; tEyeROpen = 1; tMouthOpen = 0;
+                    scheduleBlink();
+                }
+            }
+
+            // =====================================================================
+            // ハンドトラッキング処理
+            // =====================================================================
+            let leftHandDetected = false;
+            let rightHandDetected = false;
+
+            if (isHandTrackActive && handLandmarker) {
+                const handResult = handLandmarker.detectForVideo(video, Date.now());
+                
+                if (handResult.landmarks && handResult.landmarks.length > 0) {
+                    const info = [];
+                    for (let j = 0; j < handResult.landmarks.length; j++) {
+                        const w = handResult.landmarks[j][0];
+                        const side = w.x > 0.5 ? '左' : '右';
+                        info.push(`${side}(X:${w.x.toFixed(2)})`);
+                    }
+                    handStatus.textContent = `手認識中 (${handResult.landmarks.length}本) [${info.join(', ')}]`;
+                    
+                    for (let i = 0; i < handResult.landmarks.length; i++) {
+                        const landmarks = handResult.landmarks[i];
+                        const wrist = landmarks[0];
+                        
+                        // MediaPipeの handedness は誤判定でチャタリングしやすいため、
+                        // 画面上の手首のX座標(0.0=左端, 1.0=右端)を基準に物理的に左右を決定します。
+                        // 鏡像反転前提:
+                        // wrist.x > 0.5 (画面右側) -> ユーザーの左手 -> アバターの左手
+                        // wrist.x <= 0.5 (画面左側) -> ユーザーの右手 -> アバターの右手
+                        const isLeftHand = (wrist.x > 0.5);
+                        
+                        if (isLeftHand) {
+                            leftHandDetected = true;
+                            
+                            // 左手首の X 座標をマッピング (画面右側、アバターの左側)
+                            // 画面上 0.55 〜 0.85 の範囲を考慮
+                            const wristXNorm = (wrist.x - 0.7) / 0.15; // -1.0 〜 1.0 に近づける
+                            tHandLBVal = Math.max(-10.0, Math.min(10.0, wristXNorm * 10.0));
+                            
+                            // グーパー判定 (手首から指先までの距離と手首から指の付け根までの距離の比)
+                            let totalDist = 0;
+                            const fingerTips = [8, 12, 16, 20];
+                            fingerTips.forEach(tipIdx => {
+                                const tip = landmarks[tipIdx];
+                                totalDist += Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
+                            });
+                            const avgDist = totalDist / fingerTips.length;
+                            
+                            const mcp = landmarks[5];
+                            const baseDist = Math.hypot(mcp.x - wrist.x, mcp.y - wrist.y);
+                            const ratio = avgDist / (baseDist || 0.1);
+                            
+                            // 1.15(グー) 〜 1.6(パー) を 0.0 〜 1.0 にマッピング
+                            const formVal = (ratio - 1.15) / 0.45;
+                            tHandLForm = Math.max(0.0, Math.min(1.0, formVal));
+                        } else {
+                            rightHandDetected = true;
+                            const wrist = landmarks[0];
+                            
+                            // 右手首の X 座標をマッピング (画面左側、アバターの右側)
+                            // 画面上 0.15 〜 0.45 の範囲を考慮 (X座標が小さくなるほど外側)
+                            const wristXNorm = -(wrist.x - 0.3) / 0.15;
+                            tHandRBVal = Math.max(-10.0, Math.min(10.0, wristXNorm * 10.0));
+                            
+                            // グーパー判定
+                            let totalDist = 0;
+                            const fingerTips = [8, 12, 16, 20];
+                            fingerTips.forEach(tipIdx => {
+                                const tip = landmarks[tipIdx];
+                                totalDist += Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
+                            });
+                            const avgDist = totalDist / fingerTips.length;
+                            
+                            const mcp = landmarks[5];
+                            const baseDist = Math.hypot(mcp.x - wrist.x, mcp.y - wrist.y);
+                            const ratio = avgDist / (baseDist || 0.1);
+                            
+                            const formVal = (ratio - 1.15) / 0.45;
+                            tHandRForm = Math.max(0.0, Math.min(1.0, formVal));
+                        }
+                    }
+                } else {
+                    handStatus.textContent = '手検出なし';
+                }
+            }
+
+            // デバッグログ
+            if (isHandTrackActive && typeof handResult !== 'undefined' && handResult && handResult.landmarks && handResult.landmarks.length > 0) {
+                const wx = handResult.landmarks[0][0].x.toFixed(3);
+                console.log(`[HAND DEBUG] Landmarks: ${handResult.landmarks.length} | LeftDetected: ${leftHandDetected} | RightDetected: ${rightHandDetected} | WristX: ${wx}`);
+            }
+
+            // 検出状態の目標値への反映
+            if (isHandTrackActive) {
+                if (leftHandDetected) {
+                    tArmLA = -10.0;
+                    tArmLB = 10.0;
+                } else {
+                    tArmLA = 0.0;
+                    tArmLB = 0.0;
+                    tHandLBVal = 0.0;
+                    tHandLForm = 1.0;
+                }
+                if (rightHandDetected) {
+                    tArmRA = -10.0;
+                    tArmRB = 10.0;
+                } else {
+                    tArmRA = 0.0;
+                    tArmRB = 0.0;
+                    tHandRBVal = 0.0;
+                    tHandRForm = 1.0;
+                }
+            }
+        }
+        requestAnimationFrame(runCameraLoop);
+    }
+
+    cameraTrackToggle.addEventListener('change', () => {
+        if (cameraTrackToggle.checked) startCamera(); else stopCamera();
+        saveSettings();
+    });
+
+    cameraPreviewToggle.addEventListener('change', () => {
+        if (isCameraActive && cameraPreviewToggle.checked) cameraPreviewContainer.classList.add('visible');
+        else cameraPreviewContainer.classList.remove('visible');
+        saveSettings();
+    });
+
+    handTrackToggle.addEventListener('change', async () => {
+        if (handTrackToggle.checked) {
+            isHandTrackActive = true;
+            handStatus.textContent = '初期化中...';
+            handStatus.classList.add('active');
+            await initHandLandmarker();
+            if (handLandmarker) {
+                handStatus.textContent = '手認識有効';
+                if (!isCameraActive) {
+                    cameraTrackToggle.checked = true;
+                    await startCamera();
+                }
+            } else {
+                isHandTrackActive = false;
+                handTrackToggle.checked = false;
+                handStatus.textContent = '初期化失敗';
+                handStatus.classList.remove('active');
+            }
+        } else {
+            isHandTrackActive = false;
+            handStatus.textContent = '手認識無効';
+            handStatus.classList.remove('active');
+            tArmLA = 0.0; tArmLB = 0.0;
+            tArmRA = 0.0; tArmRB = 0.0;
+            tHandLBVal = 0.0; tHandRBVal = 0.0;
+            tHandLForm = 1.0; tHandRForm = 1.0;
+        }
+        saveSettings();
+    });
+
+    // =====================================================================
+    // マイク
+    // =====================================================================
+    async function initMic() {
+        if (isCameraActive) { micToggle.checked = false; return; }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            audioContext.createMediaStreamSource(stream).connect(analyser);
+            const data = new Uint8Array(analyser.frequencyBinCount);
+            micStatus.textContent = '接続中'; micStatus.classList.add('active');
+            function loop() {
+                if (!micToggle.checked || isCameraActive) {
+                    stream.getTracks().forEach(t => t.stop());
+                    micStatus.textContent = 'マイク無効'; micStatus.classList.remove('active');
+                    return;
+                }
+                analyser.getByteFrequencyData(data);
+                const avg = data.reduce((a, b) => a + b, 0) / data.length;
+                tMouthOpen = Math.min(1, Math.max(0, (avg - 12) / 50));
+                requestAnimationFrame(loop);
+            }
+            loop();
+        } catch (err) { micStatus.textContent = '許可エラー'; micToggle.checked = false; }
+    }
+
+    micToggle.addEventListener('change', () => {
+        if (micToggle.checked) initMic();
+        else { if (audioContext) audioContext.close(); micStatus.textContent = 'マイク無効'; micStatus.classList.remove('active'); tMouthOpen = 0; }
+        saveSettings();
+    });
+
+    // =====================================================================
+    // スライダー
+    // =====================================================================
+    faceSensSlider.addEventListener('input', () => { faceSensitivity = parseFloat(faceSensSlider.value); faceSensVal.textContent = faceSensitivity.toFixed(1); saveSettings(); });
+    scaleSlider.addEventListener('input',    () => { modelScale = parseFloat(scaleSlider.value); scaleVal.textContent = modelScale.toFixed(2); positionModel(); saveSettings(); });
+    offsetYSlider.addEventListener('input',  () => { offsetY = parseInt(offsetYSlider.value); offsetYVal.textContent = offsetY; positionModel(); saveSettings(); });
+    offsetXSlider.addEventListener('input',  () => { offsetX = parseInt(offsetXSlider.value); offsetXVal.textContent = offsetX; positionModel(); saveSettings(); });
+
+    // 部位Tuber (AR顔被せ) イベントリスナー
+    function toggleFaceMaskMode(active) {
+        isFaceMaskMode = active;
+        if (active) {
+            document.body.classList.add('face-mask-mode');
+            if (maskStatus) {
+                maskStatus.textContent = '部位モード有効';
+                maskStatus.classList.add('active');
+            }
+            if (!isCameraActive && cameraTrackToggle) {
+                cameraTrackToggle.checked = true;
+                startCamera();
+            }
+        } else {
+            document.body.classList.remove('face-mask-mode');
+            if (maskStatus) {
+                maskStatus.textContent = '部位モードオフ';
+                maskStatus.classList.remove('active');
+            }
+            if (live2dModel) {
+                live2dModel.rotation = 0;
+                positionModel();
+            }
+        }
+        saveSettings();
+    }
+
+    if (faceMaskToggle) {
+        faceMaskToggle.addEventListener('change', () => {
+            toggleFaceMaskMode(faceMaskToggle.checked);
+        });
+    }
+
+    if (maskScaleSlider) {
+        maskScaleSlider.addEventListener('input', () => {
+            maskScaleMultiplier = parseFloat(maskScaleSlider.value);
+            if (maskScaleVal) maskScaleVal.textContent = maskScaleMultiplier.toFixed(2);
+            saveSettings();
+        });
+    }
+
+    if (maskOffsetYSlider) {
+        maskOffsetYSlider.addEventListener('input', () => {
+            maskOffsetY = parseInt(maskOffsetYSlider.value);
+            if (maskOffsetYVal) maskOffsetYVal.textContent = maskOffsetY;
+            saveSettings();
+        });
+    }
+
+    // デバッグ用腕スライダーイベント
+    debugArmLaSlider.addEventListener('input', () => { debugArmLaVal.textContent = debugArmLaSlider.value; if (!isHandTrackActive) { tArmLA = parseFloat(debugArmLaSlider.value); } });
+    debugArmLbSlider.addEventListener('input', () => { debugArmLbVal.textContent = debugArmLbSlider.value; if (!isHandTrackActive) { tArmLB = parseFloat(debugArmLbSlider.value); } });
+    debugArmRaSlider.addEventListener('input', () => { debugArmRaVal.textContent = debugArmRaSlider.value; if (!isHandTrackActive) { tArmRA = parseFloat(debugArmRaSlider.value); } });
+    debugArmRbSlider.addEventListener('input', () => { debugArmRbVal.textContent = debugArmRbSlider.value; if (!isHandTrackActive) { tArmRB = parseFloat(debugArmRbSlider.value); } });
+
+    // =====================================================================
+    // OBS URL
+    // =====================================================================
+    function updateObsUrl() {
+        if (!obsUrlInput) return;
+        const isGreen = obsGreenToggle && obsGreenToggle.checked;
+        const greenParam = isGreen ? '&green=true' : '';
+        obsUrlInput.value = `${window.location.origin}/live2d.html?obs=true&model=${currentModelId}${greenParam}`;
+    }
+
+    if (obsGreenToggle) {
+        obsGreenToggle.addEventListener('change', () => {
+            updateObsUrl();
+            saveSettings();
+        });
+    }
+
+    copyUrlBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(obsUrlInput.value).then(() => {
+            copyUrlBtn.textContent = 'コピー完了!';
+            copyUrlBtn.style.background = '#00ff66';
+            setTimeout(() => { copyUrlBtn.textContent = 'コピー'; copyUrlBtn.style.background = ''; }, 1500);
+        });
+    });
+
+    // =====================================================================
+    // BroadcastChannel (OBS受信)
+    // =====================================================================
+    if (isObsMode) {
+        syncChannel.addEventListener('message', (e) => {
+            const d = e.data;
+            if (d && d.type === 'live2d-state') {
+                lastSyncTime = Date.now();
+                tAngleX = d.angleX; tAngleY = d.angleY; tAngleZ = d.angleZ;
+                tEyeLOpen = d.eyeLOpen; tEyeROpen = d.eyeROpen;
+                tMouthOpen = d.mouthOpen;
+                tEyeBallX = d.eyeBallX; tEyeBallY = d.eyeBallY;
+                tBreath = d.breath;
+                
+                tArmLA = d.armLA; tArmLB = d.armLB;
+                tArmRA = d.armRA; tArmRB = d.armRB;
+                tHandLBVal = d.handLBVal || 0.0;
+                tHandRBVal = d.handRBVal || 0.0;
+                tHandLForm = d.handLForm != null ? d.handLForm : 1.0;
+                tHandRForm = d.handRForm != null ? d.handRForm : 1.0;
+                isHandTrackActive = d.isHandTrackActive;
+
+                if (d.modelId && d.modelId !== currentModelId) {
+                    const def = MODELS.find(m => m.id === d.modelId);
+                    if (def) loadModel(def);
+                }
+            }
+        });
+    }
+
+    // =====================================================================
+    // 設定保存/読み込み
+    // =====================================================================
+    function saveSettings() {
+        localStorage.setItem('live2d_studio_v2', JSON.stringify({
+            modelId: currentModelId,
+            faceSensitivity, modelScale, offsetX, offsetY,
+            autoBlink: autoBlinkToggle.checked,
+            idleAnim: idleAnimToggle.checked,
+            cameraPreview: cameraPreviewToggle.checked,
+            micSync: micToggle.checked,
+            handTrack: handTrackToggle.checked,
+            obsGreen: obsGreenToggle ? obsGreenToggle.checked : false,
+            faceMask: faceMaskToggle ? faceMaskToggle.checked : false,
+            maskScale: maskScaleMultiplier,
+            maskOffsetY: maskOffsetY,
+        }));
+    }
+
+    function loadSettings() {
+        try {
+            const s = JSON.parse(localStorage.getItem('live2d_studio_v2') || '{}');
+            if (s.modelId) currentModelId = s.modelId;
+            if (s.faceSensitivity) { faceSensitivity = s.faceSensitivity; faceSensSlider.value = faceSensitivity; faceSensVal.textContent = faceSensitivity.toFixed(1); }
+            if (s.modelScale)      { modelScale = s.modelScale; scaleSlider.value = modelScale; scaleVal.textContent = modelScale.toFixed(2); }
+            if (s.offsetX != null) { offsetX = s.offsetX; offsetXSlider.value = offsetX; offsetXVal.textContent = offsetX; }
+            if (s.offsetY != null) { offsetY = s.offsetY; offsetYSlider.value = offsetY; offsetYVal.textContent = offsetY; }
+            if (s.autoBlink != null)    autoBlinkToggle.checked    = s.autoBlink;
+            if (s.idleAnim != null)     idleAnimToggle.checked     = s.idleAnim;
+            if (s.cameraPreview != null) cameraPreviewToggle.checked = s.cameraPreview;
+            if (s.micSync != null)      micToggle.checked          = s.micSync;
+            if (s.handTrack != null) {
+                handTrackToggle.checked = s.handTrack;
+                isHandTrackActive = s.handTrack;
+                if (s.handTrack) {
+                    handStatus.textContent = '手認識一時停止';
+                }
+            }
+            if (s.obsGreen != null && obsGreenToggle) {
+                obsGreenToggle.checked = s.obsGreen;
+            }
+            if (s.maskScale != null && maskScaleSlider) {
+                maskScaleMultiplier = s.maskScale;
+                maskScaleSlider.value = maskScaleMultiplier;
+                if (maskScaleVal) maskScaleVal.textContent = maskScaleMultiplier.toFixed(2);
+            }
+            if (s.maskOffsetY != null && maskOffsetYSlider) {
+                maskOffsetY = s.maskOffsetY;
+                maskOffsetYSlider.value = maskOffsetY;
+                if (maskOffsetYVal) maskOffsetYVal.textContent = maskOffsetY;
+            }
+            if (s.faceMask != null && faceMaskToggle) {
+                faceMaskToggle.checked = s.faceMask;
+                if (s.faceMask) {
+                    setTimeout(() => toggleFaceMaskMode(true), 500);
+                }
+            }
+        } catch(e) {}
+    }
+
+    // =====================================================================
+    // モデルグリッド構築
+    // =====================================================================
+    function buildModelGrid() {
+        MODELS.forEach(m => {
+            const card = document.createElement('div');
+            card.className = 'model-card' + (m.id === currentModelId ? ' active' : '');
+            card.dataset.modelId = m.id;
+            card.innerHTML = `<img src="${m.icon}" alt="${m.name}" loading="lazy"><div class="model-name">${m.name}</div>`;
+            card.addEventListener('click', () => loadModel(m));
+            modelGrid.appendChild(card);
+        });
+    }
+
+    // =====================================================================
+    // NDIストリーミング
+    // =====================================================================
+    function connectNdi() {
+        if (ndiWs && ndiWs.readyState <= 1) return; // 接続中または接続済み
+
+        const ndiStatus = document.getElementById('ndi-status');
+        if (ndiStatus) { ndiStatus.textContent = '接続中...'; ndiStatus.style.color = '#ffaa00'; }
+
+        try {
+            ndiWs = new WebSocket(NDI_WS_URL);
+            ndiWs.binaryType = 'arraybuffer';
+
+            ndiWs.onopen = () => {
+                console.log('[NDI] WebSocket connected to NDI server');
+                if (ndiStatus) { ndiStatus.textContent = '送信中'; ndiStatus.style.color = '#00f3ff'; }
+                // 按辺間隔でフレームを送信
+                startNdiFrameLoop();
+                ndiWs.send(JSON.stringify({ type: 'ping' }));
+            };
+
+            ndiWs.onclose = () => {
+                console.log('[NDI] WebSocket disconnected');
+                stopNdiFrameLoop();
+                if (ndiStatus) { ndiStatus.textContent = '切断'; ndiStatus.style.color = '#f44'; }
+                // 自動再接続
+                if (ndiEnabled) {
+                    ndiRetryTimer = setTimeout(() => {
+                        if (ndiEnabled) connectNdi();
+                    }, 3000);
+                }
+            };
+
+            ndiWs.onerror = (err) => {
+                console.warn('[NDI] WebSocket error - NDIサーバーが起動しているか確認: python3 ndi_server.py');
+                if (ndiStatus) { ndiStatus.textContent = 'サーバー未起動'; ndiStatus.style.color = '#f44'; }
+            };
+
+            ndiWs.onmessage = (e) => {
+                if (typeof e.data === 'string') {
+                    try {
+                        const msg = JSON.parse(e.data);
+                        if (msg.type === 'pong' && ndiStatus) {
+                            ndiStatus.textContent = `送信中 [${msg.ndi}]`;
+                        }
+                    } catch(er) {}
+                }
+            };
+        } catch(e) {
+            console.error('[NDI] Connection failed:', e);
+        }
+    }
+
+    function disconnectNdi() {
+        ndiEnabled = false;
+        if (ndiRetryTimer) { clearTimeout(ndiRetryTimer); ndiRetryTimer = null; }
+        stopNdiFrameLoop();
+        if (ndiWs) { ndiWs.close(); ndiWs = null; }
+        const ndiStatus = document.getElementById('ndi-status');
+        if (ndiStatus) { ndiStatus.textContent = ''; ndiStatus.style.color = ''; }
+    }
+
+    function startNdiFrameLoop() {
+        if (ndiFrameTimer) return;
+        const interval = Math.round(1000 / NDI_FPS);
+        ndiFrameTimer = setInterval(captureAndSendNdiFrame, interval);
+    }
+
+    function stopNdiFrameLoop() {
+        if (ndiFrameTimer) { clearInterval(ndiFrameTimer); ndiFrameTimer = null; }
+    }
+
+    let captureCanvas = null;
+    let captureCtx = null;
+
+    function captureAndSendNdiFrame() {
+        if (!ndiWs || ndiWs.readyState !== WebSocket.OPEN) return;
+        if (!pixiApp) return;
+
+        try {
+            const renderer = pixiApp.renderer;
+            const w = renderer.width;
+            const h = renderer.height;
+
+            // NDIの負荷を下げるため、最大解像度を640pxにリサイズしてキャプチャします
+            // これにより転送量が激減し、遅延がほぼ無くなります
+            const maxDim = 640;
+            let capW = w;
+            let capH = h;
+            if (w > maxDim || h > maxDim) {
+                if (w > h) {
+                    capW = maxDim;
+                    capH = Math.round((h * maxDim) / w);
+                } else {
+                    capH = maxDim;
+                    capW = Math.round((w * maxDim) / h);
+                }
+            }
+            // 4の倍数に丸める (NDIのアライメント要件)
+            capW = Math.floor(capW / 4) * 4;
+            capH = Math.floor(capH / 4) * 4;
+
+            if (capW <= 0 || capH <= 0) return;
+
+            if (!captureCanvas || captureCanvas.width !== capW || captureCanvas.height !== capH) {
+                captureCanvas = document.createElement('canvas');
+                captureCanvas.width = capW;
+                captureCanvas.height = capH;
+                captureCtx = captureCanvas.getContext('2d');
+            }
+
+            // WebGLキャンバスから2Dキャンバスに上下反転して描画（WebGLの上下逆座標を確実に補正）
+            captureCtx.clearRect(0, 0, capW, capH);
+            captureCtx.save();
+            captureCtx.translate(0, capH);
+            captureCtx.scale(1, -1);
+            captureCtx.drawImage(canvas, 0, 0, capW, capH);
+            captureCtx.restore();
+
+            // 2Dコンテキストからピクセルデータを高速抽出 (RGBA)
+            const imgData = captureCtx.getImageData(0, 0, capW, capH);
+            const pixels = imgData.data; // Uint8ClampedArray
+
+            // ヘッダー: width(4bytes) + height(4bytes) + timestamp(4bytes)
+            const header = new ArrayBuffer(12);
+            const view   = new DataView(header);
+            view.setUint32(0, capW, false);
+            view.setUint32(4, capH, false);
+            view.setUint32(8, Math.floor(Date.now() / 1000) & 0xFFFFFFFF, false);
+
+            // ヘッダー + RGBAピクセルデータを連結
+            const combined = new Uint8Array(12 + pixels.length);
+            combined.set(new Uint8Array(header), 0);
+            combined.set(new Uint8Array(pixels.buffer), 12);
+
+            ndiWs.send(combined.buffer);
+        } catch (e) {
+            console.error('[NDI] capture error:', e);
+            const ndiStatus = document.getElementById('ndi-status');
+            if (ndiStatus) {
+                ndiStatus.textContent = 'キャプチャエラー: ' + e.message;
+                ndiStatus.style.color = '#ff4444';
+            }
+        }
+    }
+
+    // NDIトグルイベント
+    const ndiToggle = document.getElementById('ndi-toggle');
+    if (ndiToggle) {
+        ndiToggle.addEventListener('change', () => {
+            if (ndiToggle.checked) {
+                ndiEnabled = true;
+                connectNdi();
+            } else {
+                disconnectNdi();
+            }
+        });
+    }
+
+    // =====================================================================
+    // OBSモード適用
+    // =====================================================================
+    if (isObsMode) {
+        document.body.classList.add('obs-mode');
+        if (isGreenMode) document.body.classList.add('green-mode');
+    }
+
+    // =====================================================================
+    // アプリ初期化
+    // =====================================================================
+    loadSettings();
+    buildModelGrid();
+    initPixi();
+
+    const initialModel = MODELS.find(m => m.id === currentModelId) || MODELS[0];
+    loadModel(initialModel);
+
+    if (autoBlinkToggle.checked && !isObsMode) scheduleBlink();
+    updateObsUrl();
+});

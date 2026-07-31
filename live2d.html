@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Live2D Avatar Studio</title>
+    <meta name="description" content="Live2Dモデルを使ったリアルタイムVTuberアバタースタジオ。">
+    <link rel="stylesheet" href="live2d-styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+JP:wght@300;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <div class="avatar-viewport" id="avatar-viewport">
+            <div class="background-layer" id="background-layer"></div>
+            <canvas id="live2d-canvas"></canvas>
+            <div class="camera-preview-container" id="camera-preview-container">
+                <video id="webcam" autoplay playsinline></video>
+                <div class="camera-label">Webcam</div>
+            </div>
+            <div class="loading-overlay" id="loading-overlay">
+                <div class="spinner"></div>
+                <p id="loading-text">Live2Dモデルを読み込み中...</p>
+            </div>
+        </div>
+        <div class="control-panel" id="control-panel">
+            <div class="panel-header">
+                <h2>Live2D Studio</h2>
+                <p>リアルタイム Live2D アバター</p>
+            </div>
+            <div class="panel-section">
+                <h3><span class="icon">🎭</span>モデル選択</h3>
+                <div class="model-grid" id="model-grid"></div>
+            </div>
+            <div class="panel-section">
+                <h3><span class="icon">🎙️</span>表情と連動</h3>
+                <div class="control-group">
+                    <label class="switch-label">
+                        <span>カメラで顔トラッキング</span>
+                        <input type="checkbox" id="camera-track-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <div class="camera-status" id="camera-status">カメラ無効</div>
+                </div>
+                <div class="control-group">
+                    <label class="switch-label">
+                        <span>カメラ映像を表示</span>
+                        <input type="checkbox" id="camera-preview-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label class="switch-label">
+                        <span>カメラでハンドトラッキング</span>
+                        <input type="checkbox" id="hand-track-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <div class="camera-status" id="hand-status">手認識無効</div>
+                </div>
+                <div class="control-group">
+                    <label class="switch-label">
+                        <span>マイク入力で口パク</span>
+                        <input type="checkbox" id="mic-sync-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <div class="mic-status" id="mic-status">マイク無効</div>
+                </div>
+                <div class="control-group">
+                    <label class="switch-label">
+                        <span>自動瞬き</span>
+                        <input type="checkbox" id="auto-blink-toggle" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label class="switch-label">
+                        <span>待機アニメーション</span>
+                        <input type="checkbox" id="idle-anim-toggle" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="panel-section">
+                <h3><span class="icon">👤</span>部位Tuber（AR顔被せ）</h3>
+                <div class="control-group">
+                    <label class="switch-label">
+                        <span>Webカメラ背景＆顔被せモード</span>
+                        <input type="checkbox" id="face-mask-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <div class="camera-status" id="mask-status">部位モードオフ</div>
+                </div>
+                <div class="slider-container">
+                    <label>顔マスク拡大率 <span id="mask-scale-val">1.2</span></label>
+                    <input type="range" id="mask-scale-slider" min="0.5" max="2.5" value="1.2" step="0.05">
+                </div>
+                <div class="slider-container">
+                    <label>顔マスク Y位置微調整 <span id="mask-offset-y-val">0</span></label>
+                    <input type="range" id="mask-offset-y-slider" min="-150" max="150" value="0" step="2">
+                </div>
+            </div>
+            <div class="panel-section">
+                <h3><span class="icon">✨</span>パラメーター調整</h3>
+                <div class="slider-container">
+                    <label>顔追従の感度</label>
+                    <input type="range" id="face-sensitivity-slider" min="0.1" max="3.0" value="1.0" step="0.1">
+                    <span class="value-display" id="face-sensitivity-val">1.0</span>
+                </div>
+                <div class="slider-container">
+                    <label>モデルスケール</label>
+                    <input type="range" id="scale-slider" min="0.3" max="2.5" value="1.0" step="0.05">
+                    <span class="value-display" id="scale-val">1.0</span>
+                </div>
+                <div class="slider-container">
+                    <label>Y位置オフセット</label>
+                    <input type="range" id="offset-y-slider" min="-300" max="300" value="0" step="5">
+                    <span class="value-display" id="offset-y-val">0</span>
+                </div>
+                <div class="slider-container">
+                    <label>X位置オフセット</label>
+                    <input type="range" id="offset-x-slider" min="-300" max="300" value="0" step="5">
+                    <span class="value-display" id="offset-x-val">0</span>
+                </div>
+                <!-- デバッグ用腕スライダー -->
+                <div class="slider-container" id="debug-arm-sliders" style="display: none; border-top:1px dashed var(--border-neon);padding-top:10px;margin-top:10px;">
+                    <label style="color:var(--secondary);font-weight:bold;">[デバッグ] Left Arm A (下げ)</label>
+                    <input type="range" id="debug-arm-la" min="-10" max="10" value="0" step="1">
+                    <span class="value-display" id="debug-arm-la-val">0</span>
+                </div>
+                <div class="slider-container">
+                    <label style="color:var(--secondary);font-weight:bold;">[デバッグ] Left Arm B (上げ)</label>
+                    <input type="range" id="debug-arm-lb" min="-10" max="10" value="0" step="1">
+                    <span class="value-display" id="debug-arm-lb-val">0</span>
+                </div>
+                <div class="slider-container">
+                    <label style="color:var(--secondary);font-weight:bold;">[デバッグ] Right Arm A (下げ)</label>
+                    <input type="range" id="debug-arm-ra" min="-10" max="10" value="0" step="1">
+                    <span class="value-display" id="debug-arm-ra-val">0</span>
+                </div>
+                <div class="slider-container">
+                    <label style="color:var(--secondary);font-weight:bold;">[デバッグ] Right Arm B (上げ)</label>
+                    <input type="range" id="debug-arm-rb" min="-10" max="10" value="0" step="1">
+                    <span class="value-display" id="debug-arm-rb-val">0</span>
+                </div>
+            </div>
+            <div class="panel-section">
+                <h3><span class="icon">🎬</span>OBS Studio 配信</h3>
+                <div class="control-group">
+                    <label class="switch-label">
+                        <span>グリーンバックにする</span>
+                        <input type="checkbox" id="obs-green-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <p style="font-size:0.65rem;color:var(--text-muted);margin-top:-2px;">ウィンドウキャプチャでクロマキー合成する場合にONにしてください。</p>
+                </div>
+                <div class="control-group">
+                    <label style="font-size:0.8rem;color:var(--text-muted);">配信用URL</label>
+                    <div style="display:flex;gap:0.5rem;margin-top:0.2rem;">
+                        <input type="text" id="obs-url-input" readonly style="flex:1;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.7rem;font-family:monospace;outline:none;">
+                        <button id="copy-url-btn" class="btn btn-copy">コピー</button>
+                    </div>
+                </div>
+                <div style="font-size:0.75rem;color:var(--text-muted);border-top:1px solid var(--border-neon);padding-top:0.8rem;line-height:1.5;margin-top:0.5rem;">
+                    <strong style="color:var(--secondary);display:block;margin-bottom:0.3rem;">💡 OBSでの使い方</strong>
+                    <strong>① 透過して配置したい場合（推奨）</strong><br>
+                    1. 「グリーンバックにする」をOFFにする<br>
+                    2. URLをコピーしてOBSの<strong>「ブラウザ」ソース</strong>に追加<br>
+                    3. Chromeで顔トラッキングをONにすると、OBS側と自動同期されます。<br><br>
+                    <strong>② ウィンドウキャプチャを使う場合</strong><br>
+                    1. 「グリーンバックにする」をONにしてURLをコピー<br>
+                    2. 新しいタブでそのURLを開き、OBSでウィンドウキャプチャする<br>
+                    3. OBSでソースを右クリック →「フィルタ」→「クロマキー」を追加
+                </div>
+            </div>
+            <div class="panel-section" id="ndi-section">
+                <h3><span class="icon">📡</span>NDI 出力</h3>
+                <div class="control-group">
+                    <label class="switch-label">
+                        <span>NDI送信を有効化</span>
+                        <input type="checkbox" id="ndi-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <div id="ndi-status" style="font-size:0.72rem;text-align:right;color:var(--text-muted);transition:color 0.3s;"></div>
+                </div>
+                <div style="font-size:0.75rem;color:var(--text-muted);border-top:1px solid var(--border-neon);padding-top:0.8rem;line-height:1.6;margin-top:0.5rem;">
+                    <strong style="color:#ff9900;display:block;margin-bottom:0.3rem;">⚙️ 事前準備（初回のみ）</strong>
+                    ターミナルで実行:<br>
+                    <code style="background:rgba(0,0,0,0.4);padding:3px 6px;border-radius:4px;font-size:0.65rem;display:block;margin:4px 0;color:#0f0;">python3 ndi_server.py</code>
+                    NDI受信ソフト（OBS等）で<br>
+                    <strong style="color:#00f3ff;">「Live2D Avatar」</strong>を選択
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PixiJS v6 -->
+    <script src="pixi.min.js"></script>
+    <!-- Cubism 4 Core (ローカルコピー) -->
+    <script src="live2dcubismcore.min.js"></script>
+    <!-- pixi-live2d-display v0.4 -->
+    <script src="pixi-live2d-display.min.js"></script>
+    <script src="live2d-app.js"></script>
+</body>
+</html>
