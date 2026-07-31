@@ -434,6 +434,43 @@ body.green-mode .avatar-viewport {
     background: #00ff00 !important;
 }
 
+/* フローティング全画面/設定トグルボタン */
+.floating-toggle-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 150;
+    background: rgba(18, 16, 35, 0.8);
+    border: 1px solid var(--secondary);
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 25px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4), 0 0 10px var(--secondary-glow);
+    transition: all 0.3s ease;
+}
+
+.floating-toggle-btn:active {
+    transform: scale(0.95);
+}
+
+/* パネル非表示・全画面モード */
+body.panel-hidden .control-panel {
+    display: none !important;
+}
+
+body.panel-hidden .avatar-viewport {
+    height: 100vh !important;
+    width: 100vw !important;
+}
+
 /* スマホ・モバイルレスポンシブ対応 */
 @media (max-width: 768px) {
     .app-container {

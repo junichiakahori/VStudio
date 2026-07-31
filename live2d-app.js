@@ -986,6 +986,38 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // 全画面・操作パネル表示非表示切替
+    const togglePanelBtn  = document.getElementById('toggle-panel-btn');
+    const togglePanelText = document.getElementById('toggle-panel-text');
+
+    if (togglePanelBtn) {
+        togglePanelBtn.addEventListener('click', () => {
+            const isHidden = document.body.classList.toggle('panel-hidden');
+            const iconSpan = togglePanelBtn.querySelector('.btn-icon');
+            if (isHidden) {
+                if (iconSpan) iconSpan.textContent = '⚙️';
+                if (togglePanelText) togglePanelText.textContent = '設定';
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                }
+            } else {
+                if (iconSpan) iconSpan.textContent = '👁️';
+                if (togglePanelText) togglePanelText.textContent = '全画面';
+                if (document.exitFullscreen && document.fullscreenElement) {
+                    document.exitFullscreen().catch(() => {});
+                }
+            }
+            if (pixiApp) {
+                setTimeout(() => {
+                    const nw = viewport.clientWidth  || window.innerWidth;
+                    const nh = viewport.clientHeight || window.innerHeight;
+                    pixiApp.renderer.resize(nw, nh);
+                    if (live2dModel) positionModel();
+                }, 100);
+            }
+        });
+    }
+
     // =====================================================================
     // BroadcastChannel (OBS受信)
     // =====================================================================
