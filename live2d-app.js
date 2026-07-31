@@ -43,6 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const maskScaleVal      = document.getElementById('mask-scale-val');
     const maskOffsetYSlider = document.getElementById('mask-offset-y-slider');
     const maskOffsetYVal    = document.getElementById('mask-offset-y-val');
+    const maskOffsetXSlider = document.getElementById('mask-offset-x-slider');
+    const maskOffsetXVal    = document.getElementById('mask-offset-x-val');
 
     const faceSensSlider = document.getElementById('face-sensitivity-slider');
     const faceSensVal    = document.getElementById('face-sensitivity-val');
@@ -118,6 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 部位Tuber (AR顔被せ) 状態変数
     let isFaceMaskMode = false;
     let maskScaleMultiplier = 1.2;
+    let maskOffsetX = 0;
     let maskOffsetY = 0;
 
     let tMaskX = 0, tMaskY = 0;
@@ -457,7 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const mh = (live2dModel.internalModel && live2dModel.internalModel.originalHeight) || 2048;
 
                 live2dModel.pivot.set(mw / 2, mh * 0.28);
-                live2dModel.x = cMaskX;
+                live2dModel.x = cMaskX + maskOffsetX;
                 live2dModel.y = cMaskY + maskOffsetY;
                 live2dModel.scale.set(cMaskScale * maskScaleMultiplier);
                 live2dModel.rotation = cMaskRotation;
@@ -954,6 +957,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    if (maskOffsetXSlider) {
+        maskOffsetXSlider.addEventListener('input', () => {
+            maskOffsetX = parseInt(maskOffsetXSlider.value);
+            if (maskOffsetXVal) maskOffsetXVal.textContent = maskOffsetX;
+            saveSettings();
+        });
+    }
+
     // デバッグ用腕スライダーイベント
     debugArmLaSlider.addEventListener('input', () => { debugArmLaVal.textContent = debugArmLaSlider.value; if (!isHandTrackActive) { tArmLA = parseFloat(debugArmLaSlider.value); } });
     debugArmLbSlider.addEventListener('input', () => { debugArmLbVal.textContent = debugArmLbSlider.value; if (!isHandTrackActive) { tArmLB = parseFloat(debugArmLbSlider.value); } });
@@ -1071,6 +1082,7 @@ document.addEventListener('DOMContentLoaded', () => {
             obsGreen: obsGreenToggle ? obsGreenToggle.checked : false,
             faceMask: faceMaskToggle ? faceMaskToggle.checked : false,
             maskScale: maskScaleMultiplier,
+            maskOffsetX: maskOffsetX,
             maskOffsetY: maskOffsetY,
         }));
     }
@@ -1112,6 +1124,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 maskOffsetY = s.maskOffsetY;
                 maskOffsetYSlider.value = maskOffsetY;
                 if (maskOffsetYVal) maskOffsetYVal.textContent = maskOffsetY;
+            }
+            if (s.maskOffsetX != null && maskOffsetXSlider) {
+                maskOffsetX = s.maskOffsetX;
+                maskOffsetXSlider.value = maskOffsetX;
+                if (maskOffsetXVal) maskOffsetXVal.textContent = maskOffsetX;
             }
             if (s.faceMask != null && faceMaskToggle) {
                 faceMaskToggle.checked = s.faceMask;
