@@ -7,6 +7,8 @@
     <meta name="description" content="Live2Dモデルを使ったリアルタイムVTuberアバタースタジオ。">
     <link rel="stylesheet" href="live2d-styles.css?v=1.2">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+JP:wght@300;500;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -36,6 +38,15 @@
             <div class="panel-section">
                 <h3><span class="icon">🎭</span>モデル選択</h3>
                 <div class="model-grid" id="model-grid"></div>
+            </div>
+            <div class="panel-section">
+                <h3><span class="icon">🖼️</span>背景設定</h3>
+                <div class="control-group">
+                    <label class="btn" style="width:100%;text-align:center;background:rgba(0,0,0,0.4);border:1px solid var(--border-neon);cursor:pointer;padding:0.6rem;border-radius:6px;color:var(--text-primary);display:block;transition:all 0.3s ease;">
+                        背景画像をアップロード
+                        <input type="file" id="bg-upload" accept="image/*" style="display:none;">
+                    </label>
+                </div>
             </div>
             <div class="panel-section">
                 <h3><span class="icon">🎙️</span>表情と連動</h3>
@@ -152,6 +163,85 @@
                     <span class="value-display" id="debug-arm-rb-val">0</span>
                 </div>
             </div>
+            <div class="panel-section" id="tiktok-section">
+                <h3><span class="icon">🎵</span>TikTok & VOICEVOX</h3>
+                <div class="control-group">
+                    <label style="font-size:0.8rem;color:var(--text-muted);">TikTok ID (@不要)</label>
+                    <div style="display:flex;gap:0.5rem;margin-top:0.2rem;">
+                        <input type="text" id="tiktok-username-input" placeholder="username" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.8rem;outline:none;">
+                        <button id="tiktok-connect-btn" class="btn" style="background:var(--primary);color:#000;border:none;border-radius:6px;padding:0 1rem;font-weight:bold;cursor:pointer;">接続</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label class="switch-label">
+                        <span>VOICEVOX 読み上げ</span>
+                        <input type="checkbox" id="voicevox-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <div id="tiktok-status" style="font-size:0.72rem;text-align:right;color:var(--text-muted);">未接続</div>
+                </div>
+                <div class="control-group" style="margin-top:10px;">
+                    <label style="font-size:0.8rem;color:var(--text-muted);">VOICEVOX 話者</label>
+                    <select id="voicevox-speaker-id" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.8rem;outline:none;margin-top:0.3rem;cursor:pointer;">
+                        <option value="3">ずんだもん (ノーマル)</option>
+                    </select>
+                </div>
+                <div class="control-group" style="margin-top:10px;">
+                    <label class="switch-label">
+                        <span style="font-size:0.75rem;">無言時(5秒)に適当に喋る</span>
+                        <input type="checkbox" id="idle-speech-toggle" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div style="font-size:0.75rem;color:var(--text-muted);border-top:1px solid var(--border-neon);padding-top:0.8rem;line-height:1.6;margin-top:0.5rem;">
+                    <strong style="color:#ff9900;display:block;margin-bottom:0.3rem;">⚙️ 事前準備</strong>
+                    1. ターミナルで実行:<br>
+                    <code style="background:rgba(0,0,0,0.4);padding:3px 6px;border-radius:4px;font-size:0.65rem;display:block;margin:4px 0;color:#0f0;">python3 tiktok_comment_server.py</code>
+                    2. <strong style="color:#00f3ff;">VOICEVOX</strong> を起動しておく
+                </div>
+            </div>
+            <div class="panel-section" id="ai-section">
+                <h3><span class="icon">🤖</span>AI コメント返信 (β)</h3>
+                <div class="control-group">
+                    <label class="switch-label">
+                        <span>AIによる自動返信を有効にする</span>
+                        <input type="checkbox" id="ai-reply-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div class="control-group" id="ai-settings-panel" style="display:none; margin-top:10px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
+                    <label style="font-size:0.8rem;color:var(--text-muted);">AI API プロバイダ</label>
+                    <select id="ai-provider-select" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.8rem;outline:none;margin-top:0.3rem;cursor:pointer;">
+                        <option value="gemini">Google Gemini (無料枠あり)</option>
+                        <option value="openai">OpenAI (ChatGPT)</option>
+                    </select>
+
+                    <label style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;display:block;">使用モデル名</label>
+                    <div style="display:flex;gap:0.5rem;margin-top:0.3rem;align-items:center;">
+                        <select id="ai-model-input" style="flex:1;min-width:0;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.4rem;color:var(--text-muted);font-size:0.8rem;outline:none;box-sizing:border-box;text-overflow:ellipsis;white-space:nowrap;">
+                            <option value="gemini-2.5-flash-latest">gemini-2.5-flash-latest</option>
+                            <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                            <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                            <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                        </select>
+                        <button id="ai-fetch-models-btn" class="btn" style="background:var(--secondary, #333);color:#fff;border:1px solid var(--border-neon);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.7rem;cursor:pointer;white-space:nowrap;">一覧を取得</button>
+                    </div>
+
+                    <label style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;display:block;">API キー</label>
+                    <div style="display:flex;gap:0.5rem;margin-top:0.3rem;">
+                        <input type="password" id="ai-api-key" placeholder="AIのAPIキーを入力" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.8rem;outline:none;box-sizing:border-box;">
+                        <button id="ai-test-btn" class="btn" style="background:var(--primary);color:#000;border:none;border-radius:6px;padding:0 0.8rem;font-weight:bold;cursor:pointer;font-size:0.75rem;">テスト</button>
+                    </div>
+                    <div id="ai-test-status" style="font-size:0.75rem; margin-top:0.4rem; float:left;"></div>
+                    <div style="font-size:0.7rem; margin-top:0.4rem; text-align:right; float:right;">
+                        <a id="ai-api-link" href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#00f3ff; text-decoration:none;">▶︎ Gemini APIキーを取得する</a>
+                    </div>
+                    <div style="clear:both;"></div>
+                    
+                    <label style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;display:block;">システムプロンプト (キャラ設定)</label>
+                    <textarea id="ai-system-prompt" rows="3" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.8rem;outline:none;margin-top:0.3rem;box-sizing:border-box;resize:vertical;">あなたは元気で明るい女の子のVTuberです。視聴者からのコメントに対して、タメ口で親しみやすく、かつ短く（30文字以内で）返答してください。</textarea>
+                </div>
+            </div>
             <div class="panel-section">
                 <h3><span class="icon">🎬</span>OBS Studio 配信</h3>
                 <div class="control-group">
@@ -198,6 +288,20 @@
                     NDI受信ソフト（OBS等）で<br>
                     <strong style="color:#00f3ff;">「Live2D Avatar」</strong>を選択
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cropper Modal -->
+    <div id="cropper-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3 style="margin-top:0; color:var(--text-primary);">画像のトリミング</h3>
+            <div class="cropper-container">
+                <img id="cropper-image" src="" alt="Cropper Image">
+            </div>
+            <div class="modal-actions">
+                <button id="cropper-cancel-btn" class="btn" style="background:var(--panel-bg); border:1px solid var(--border-neon); color:var(--text-primary);">キャンセル</button>
+                <button id="cropper-apply-btn" class="btn" style="background:var(--primary); color:#000;">適用する</button>
             </div>
         </div>
     </div>

@@ -58,6 +58,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyUrlBtn     = document.getElementById('copy-url-btn');
     const obsGreenToggle = document.getElementById('obs-green-toggle');
 
+    // TikTok & VOICEVOX DOM
+    const tiktokUserInput    = document.getElementById('tiktok-username-input');
+    const tiktokConnectBtn   = document.getElementById('tiktok-connect-btn');
+    const voicevoxToggle     = document.getElementById('voicevox-toggle');
+    const tiktokStatus       = document.getElementById('tiktok-status');
+    const voicevoxSpeakerId  = document.getElementById('voicevox-speaker-id');
+
     // デバッグスライダーDOM
     const debugArmLaSlider = document.getElementById('debug-arm-la');
     const debugArmLaVal    = document.getElementById('debug-arm-la-val');
@@ -130,6 +137,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let cMaskX = 0, cMaskY = 0;
     let cMaskScale = 1.0;
     let cMaskRotation = 0;
+
+    // TikTok & VOICEVOX 状態変数
+    let tiktokWs = null;
+    let isVoicevoxEnabled = false;
+    let voicevoxAudioQueue = [];
+    let isVoicevoxPlaying = false;
+    let voicevoxAnalyser = null;
+    let voicevoxAudioContext = null;
+    let tVoiceMouthOpen = 0;
 
     // 瞬き
     let isBlinking = false;
@@ -392,7 +408,20 @@ document.addEventListener('DOMContentLoaded', () => {
         cAngleZ    += (tAngleZ    - cAngleZ)    * ease;
         cEyeLOpen  += (tEyeLOpen  - cEyeLOpen)  * 0.2;
         cEyeROpen  += (tEyeROpen  - cEyeROpen)  * 0.2;
-        cMouthOpen += (tMouthOpen - cMouthOpen) * 0.15;
+
+        if (isVoicevoxPlaying && voicevoxAnalyser) {
+            const dataArray = new Uint8Array(voicevoxAnalyser.frequencyBinCount);
+            voicevoxAnalyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+            let avg = sum / dataArray.length;
+            tVoiceMouthOpen = Math.min(1.0, avg / 60.0);
+        } else {
+            tVoiceMouthOpen = 0;
+        }
+        let finalMouthOpen = Math.max(tMouthOpen, tVoiceMouthOpen);
+        cMouthOpen += (finalMouthOpen - cMouthOpen) * 0.15;
+
         cEyeBallX  += (tEyeBallX  - cEyeBallX)  * 0.1;
         cEyeBallY  += (tEyeBallY  - cEyeBallY)  * 0.1;
         cBreath    += (tBreath    - cBreath)    * 0.05;
@@ -1310,6 +1339,777 @@ document.addEventListener('DOMContentLoaded', () => {
                 disconnectNdi();
             }
         });
+    }
+
+    // =====================================================================
+    // 背景画像のアップロード
+    // =====================================================================
+    const bgUpload = document.getElementById('bg-upload');
+    const backgroundLayer = document.getElementById('background-layer');
+    let currentCropper = null;
+    const cropperModal = document.getElementById('cropper-modal');
+    const cropperImage = document.getElementById('cropper-image');
+    const cropperCancelBtn = document.getElementById('cropper-cancel-btn');
+    const cropperApplyBtn = document.getElementById('cropper-apply-btn');
+
+    if (bgUpload && backgroundLayer && cropperModal) {
+        // 保存された背景画像を復元
+        const savedBg = localStorage.getItem('savedBackgroundImage');
+        if (savedBg) {
+            backgroundLayer.style.backgroundImage = `url('${savedBg}')`;
+        }
+
+        bgUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                cropperImage.src = event.target.result;
+                cropperModal.style.display = 'flex';
+                
+                if (currentCropper) {
+                    currentCropper.destroy();
+                }
+                
+                // Cropperの初期化
+                currentCropper = new Cropper(cropperImage, {
+                    viewMode: 1,
+                    dragMode: 'move',
+                    autoCropArea: 1,
+                    restore: false,
+                    guides: true,
+                    center: true,
+                    highlight: false,
+                    cropBoxMovable: true,
+                    cropBoxResizable: true,
+                    toggleDragModeOnDblclick: false,
+                });
+            };
+            reader.readAsDataURL(file);
+            // 同じファイルを再度選べるようにリセット
+            e.target.value = '';
+        });
+
+        cropperCancelBtn.addEventListener('click', () => {
+            cropperModal.style.display = 'none';
+            if (currentCropper) {
+                currentCropper.destroy();
+                currentCropper = null;
+            }
+        });
+
+        cropperApplyBtn.addEventListener('click', () => {
+            if (!currentCropper) return;
+            // トリミングした画像のデータURLを取得
+            const croppedCanvas = currentCropper.getCroppedCanvas();
+            if (croppedCanvas) {
+                const croppedDataUrl = croppedCanvas.toDataURL('image/jpeg', 0.8);
+                backgroundLayer.style.backgroundImage = `url('${croppedDataUrl}')`;
+                // localStorageに保存してリロード後も保持する
+                try {
+                    localStorage.setItem('savedBackgroundImage', croppedDataUrl);
+                } catch (e) {
+                    console.warn("localStorage quota exceeded or unavailable:", e);
+                    alert("画像サイズが大きすぎるため、次回の表示用に保存できませんでした。もう少し小さくトリミングするか、解像度の低い画像をお試しください。");
+                }
+            }
+            cropperModal.style.display = 'none';
+            currentCropper.destroy();
+            currentCropper = null;
+        });
+    }
+
+    // =====================================================================
+    // TikTok & VOICEVOX 連携
+    // =====================================================================
+    // Populate VOICEVOX speakers
+    if (voicevoxSpeakerId) {
+        const savedSpeaker = localStorage.getItem('savedVoicevoxSpeaker');
+        
+        fetch('http://127.0.0.1:50021/speakers')
+            .then(res => res.json())
+            .then(speakers => {
+                voicevoxSpeakerId.innerHTML = ''; // clear default
+                let foundSaved = false;
+                speakers.forEach(speaker => {
+                    speaker.styles.forEach(style => {
+                        const option = document.createElement('option');
+                        option.value = style.id;
+                        option.textContent = `${speaker.name} (${style.name})`;
+                        if (savedSpeaker && style.id.toString() === savedSpeaker) {
+                            option.selected = true;
+                            foundSaved = true;
+                        } else if (!savedSpeaker && style.id === 3) {
+                            // Default to Zundamon normal (id 3) if nothing is saved
+                            option.selected = true;
+                        }
+                        voicevoxSpeakerId.appendChild(option);
+                    });
+                });
+                
+                // Save whenever it changes
+                voicevoxSpeakerId.addEventListener('change', () => {
+                    localStorage.setItem('savedVoicevoxSpeaker', voicevoxSpeakerId.value);
+                });
+            })
+            .catch(err => {
+                console.warn('Failed to fetch VOICEVOX speakers:', err);
+            });
+    }
+    if (voicevoxToggle) {
+        const savedToggle = localStorage.getItem('savedVoicevoxToggle');
+        if (savedToggle !== null) {
+            voicevoxToggle.checked = savedToggle === 'true';
+            isVoicevoxEnabled = voicevoxToggle.checked;
+        }
+        voicevoxToggle.addEventListener('change', () => {
+            isVoicevoxEnabled = voicevoxToggle.checked;
+            localStorage.setItem('savedVoicevoxToggle', voicevoxToggle.checked);
+        });
+    }
+
+    const idleSpeechToggle = document.getElementById('idle-speech-toggle');
+    let isIdleSpeechEnabled = true;
+
+    if (idleSpeechToggle) {
+        const savedIdleToggle = localStorage.getItem('savedIdleSpeechToggle');
+        if (savedIdleToggle !== null) {
+            idleSpeechToggle.checked = savedIdleToggle === 'true';
+            isIdleSpeechEnabled = idleSpeechToggle.checked;
+        }
+        idleSpeechToggle.addEventListener('change', () => {
+            isIdleSpeechEnabled = idleSpeechToggle.checked;
+            localStorage.setItem('savedIdleSpeechToggle', idleSpeechToggle.checked);
+            if (isIdleSpeechEnabled) {
+                if (typeof resetIdleTimer === 'function') resetIdleTimer();
+            } else {
+                if (typeof clearIdleTimer === 'function') clearIdleTimer();
+            }
+        });
+    }
+
+    // AI Settings
+    const aiReplyToggle = document.getElementById('ai-reply-toggle');
+    const aiSettingsPanel = document.getElementById('ai-settings-panel');
+    const aiProviderSelect = document.getElementById('ai-provider-select');
+    const aiApiKeyInput = document.getElementById('ai-api-key');
+    const aiSystemPromptInput = document.getElementById('ai-system-prompt');
+
+    let isAiReplyEnabled = false;
+    let aiChatHistory = []; // 過去のコンテキスト保持用
+
+    if (aiReplyToggle) {
+        const savedAiToggle = localStorage.getItem('savedAiReplyToggle');
+        if (savedAiToggle !== null) {
+            aiReplyToggle.checked = savedAiToggle === 'true';
+            isAiReplyEnabled = aiReplyToggle.checked;
+            aiSettingsPanel.style.display = isAiReplyEnabled ? 'block' : 'none';
+        }
+
+        const savedProvider = localStorage.getItem('savedAiProvider');
+        if (savedProvider) aiProviderSelect.value = savedProvider;
+
+        const savedApiKey = localStorage.getItem('savedAiApiKey');
+        if (savedApiKey) aiApiKeyInput.value = savedApiKey;
+
+        const savedPrompt = localStorage.getItem('savedAiPrompt');
+        if (savedPrompt) aiSystemPromptInput.value = savedPrompt;
+
+        aiReplyToggle.addEventListener('change', () => {
+            isAiReplyEnabled = aiReplyToggle.checked;
+            localStorage.setItem('savedAiReplyToggle', aiReplyToggle.checked);
+            aiSettingsPanel.style.display = isAiReplyEnabled ? 'block' : 'none';
+        });
+
+        const aiApiLink = document.getElementById('ai-api-link');
+        function updateAiLink() {
+            if (!aiApiLink) return;
+            if (aiProviderSelect.value === 'openai') {
+                aiApiLink.href = 'https://platform.openai.com/api-keys';
+                aiApiLink.textContent = '▶︎ OpenAI APIキーを取得する';
+                aiApiLink.style.color = '#ff6b6b';
+            } else {
+                aiApiLink.href = 'https://aistudio.google.com/app/apikey';
+                aiApiLink.textContent = '▶︎ Gemini APIキーを取得する';
+                aiApiLink.style.color = '#00f3ff';
+            }
+        }
+
+        const aiModelInput = document.getElementById('ai-model-input');
+        const savedModel = localStorage.getItem('savedAiModel');
+        if (savedModel && aiModelInput) aiModelInput.value = savedModel;
+
+        aiProviderSelect.addEventListener('change', () => {
+            localStorage.setItem('savedAiProvider', aiProviderSelect.value);
+            if (aiModelInput) {
+                aiModelInput.value = aiProviderSelect.value === 'openai' ? 'gpt-4o-mini' : 'gemini-1.5-flash';
+                localStorage.setItem('savedAiModel', aiModelInput.value);
+            }
+            updateAiLink();
+        });
+        aiApiKeyInput.addEventListener('input', () => localStorage.setItem('savedAiApiKey', aiApiKeyInput.value.trim()));
+        aiSystemPromptInput.addEventListener('input', () => localStorage.setItem('savedAiPrompt', aiSystemPromptInput.value.trim()));
+        if (aiModelInput) {
+            aiModelInput.addEventListener('input', () => localStorage.setItem('savedAiModel', aiModelInput.value.trim()));
+        }
+        
+        // 初期化
+        updateAiLink();
+
+        const aiFetchModelsBtn = document.getElementById('ai-fetch-models-btn');
+        if (aiFetchModelsBtn) {
+            aiFetchModelsBtn.addEventListener('click', async () => {
+                const apiKey = aiApiKeyInput.value.trim();
+                const provider = aiProviderSelect.value;
+                if (!apiKey) {
+                    alert('APIキーを入力してください');
+                    return;
+                }
+                
+                aiFetchModelsBtn.textContent = '取得中...';
+                aiFetchModelsBtn.disabled = true;
+
+                try {
+                    if (provider === 'openai') {
+                        const res = await fetch('https://api.openai.com/v1/models', {
+                            headers: { 'Authorization': `Bearer ${apiKey}` }
+                        });
+                        const json = await res.json();
+                        if (res.ok && json.data) {
+                            const chatModels = json.data.filter(m => m.id.includes('gpt')).map(m => m.id).sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
+                            if (chatModels.length > 0) {
+                                aiModelInput.innerHTML = '';
+                                chatModels.forEach(m => {
+                                    const option = document.createElement('option');
+                                    option.value = m;
+                                    option.textContent = m;
+                                    aiModelInput.appendChild(option);
+                                });
+                                aiModelInput.value = chatModels.includes('gpt-4o-mini') ? 'gpt-4o-mini' : chatModels[0];
+                                localStorage.setItem('savedAiModel', aiModelInput.value);
+                                alert(`利用可能なモデルの一覧を取得しました！`);
+                            } else {
+                                alert('利用可能なチャットモデルが見つかりません');
+                            }
+                        } else {
+                            throw new Error(json.error?.message || 'Invalid response');
+                        }
+                    } else if (provider === 'gemini') {
+                        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+                        const json = await res.json();
+                        if (res.ok && json.models) {
+                            const availableModels = json.models
+                                .filter(m => m.name && m.name.includes('gemini'))
+                                .map(m => m.name.replace('models/', ''))
+                                .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
+                            
+                            if (availableModels.length > 0) {
+                                aiModelInput.innerHTML = '';
+                                availableModels.forEach(m => {
+                                    const option = document.createElement('option');
+                                    option.value = m;
+                                    option.textContent = m;
+                                    aiModelInput.appendChild(option);
+                                });
+
+                                let bestModel = availableModels[0];
+                                if (availableModels.includes('gemini-1.5-flash')) bestModel = 'gemini-1.5-flash';
+                                else if (availableModels.includes('gemini-1.5-pro')) bestModel = 'gemini-1.5-pro';
+                                else if (availableModels.includes('gemini-1.0-pro')) bestModel = 'gemini-1.0-pro';
+                                else if (availableModels.includes('gemini-pro')) bestModel = 'gemini-pro';
+                                
+                                aiModelInput.value = bestModel;
+                                localStorage.setItem('savedAiModel', aiModelInput.value);
+                                alert(`利用可能なモデルの一覧を取得しました！\n左のリストからお好きなモデルを選べます。`);
+                            } else {
+                                alert('利用可能なモデルが見つかりませんでした');
+                            }
+                        } else {
+                            throw new Error(json.error?.message || 'Invalid response');
+                        }
+                    }
+                } catch (e) {
+                    console.error('Fetch Models Error:', e);
+                    alert(`モデル一覧の取得に失敗しました:\n${e.message}`);
+                } finally {
+                    aiFetchModelsBtn.textContent = '一覧を取得';
+                    aiFetchModelsBtn.disabled = false;
+                }
+            });
+        }
+
+        const aiTestBtn = document.getElementById('ai-test-btn');
+        const aiTestStatus = document.getElementById('ai-test-status');
+
+        if (aiTestBtn) {
+            aiTestBtn.addEventListener('click', async () => {
+                const apiKey = aiApiKeyInput.value.trim();
+                const provider = aiProviderSelect.value;
+                const aiModelInput = document.getElementById('ai-model-input');
+                const modelName = aiModelInput ? aiModelInput.value.trim() : (provider === 'openai' ? 'gpt-4o-mini' : 'gemini-1.5-flash');
+
+                if (!apiKey) {
+                    aiTestStatus.textContent = '❌ APIキーを入力してください';
+                    aiTestStatus.style.color = 'var(--danger, #ff4444)';
+                    return;
+                }
+                
+                aiTestStatus.textContent = '⏳ テスト中...';
+                aiTestStatus.style.color = 'var(--text-muted)';
+                aiTestBtn.disabled = true;
+
+                try {
+                    if (provider === 'openai') {
+                        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${apiKey}`
+                            },
+                            body: JSON.stringify({
+                                model: modelName || 'gpt-4o-mini',
+                                messages: [{ role: 'user', content: 'test' }],
+                                max_tokens: 5
+                            })
+                        });
+                        const json = await res.json();
+                        if (res.ok && json.choices) {
+                            aiTestStatus.textContent = '✅ 有効なAPIキーです';
+                            aiTestStatus.style.color = '#00f3ff';
+                        } else {
+                            throw new Error(json.error?.message || 'Invalid response');
+                        }
+                    } else if (provider === 'gemini') {
+                        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/interactions`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+                            body: JSON.stringify({
+                                model: modelName || 'gemini-1.5-flash',
+                                input: 'test'
+                            })
+                        });
+                        const json = await res.json();
+                        if (res.ok && json.id) {
+                            aiTestStatus.textContent = '✅ 有効なAPIキーです';
+                            aiTestStatus.style.color = '#00f3ff';
+                        } else {
+                            throw new Error(json.error?.message || 'Invalid response');
+                        }
+                    }
+                } catch (e) {
+                    console.error('API Test Error:', e);
+                    let errMsg = e.message || '不明なエラー';
+                    if (errMsg.includes('Failed to fetch')) {
+                        errMsg = '通信エラー (ネット未接続など)';
+                    }
+                    aiTestStatus.textContent = `❌ ${errMsg}`;
+                    aiTestStatus.style.color = 'var(--danger, #ff4444)';
+                } finally {
+                    aiTestBtn.disabled = false;
+                }
+            });
+        }
+    }
+
+    let joinedUsers = new Set();
+    if (tiktokConnectBtn) {
+        tiktokConnectBtn.addEventListener('click', () => {
+            const username = tiktokUserInput.value.trim();
+            if (!username) {
+                alert('TikTokのユーザー名を入力してください');
+                return;
+            }
+            localStorage.setItem('savedTiktokId', username);
+
+            if (tiktokWs && tiktokWs.readyState === WebSocket.OPEN) {
+                tiktokWs.send(JSON.stringify({ type: 'disconnect_tiktok' }));
+                tiktokWs.close();
+                tiktokWs = null;
+                tiktokConnectBtn.textContent = '接続';
+                tiktokConnectBtn.style.background = 'var(--primary)';
+                tiktokStatus.textContent = '未接続';
+                joinedUsers.clear();
+                return;
+            }
+
+            joinedUsers.clear();
+            tiktokStatus.textContent = '接続中...';
+            tiktokWs = new WebSocket('ws://localhost:8767');
+            
+            tiktokWs.onopen = () => {
+                tiktokWs.send(JSON.stringify({ type: 'connect_tiktok', username: username }));
+                tiktokConnectBtn.textContent = '切断';
+                tiktokConnectBtn.style.background = 'var(--danger, #ff4444)';
+                resetIdleTimer();
+            };
+
+            tiktokWs.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'status') {
+                        tiktokStatus.textContent = data.message;
+                        if (data.status === 'error') {
+                            if (tiktokWs) {
+                                tiktokWs.close();
+                                tiktokWs = null;
+                            }
+                            tiktokConnectBtn.textContent = '接続';
+                            tiktokConnectBtn.style.background = 'var(--primary)';
+                        }
+                    } else if (data.type === 'join') {
+                        console.log(`[TikTok] ${data.nickname} joined`);
+                        if (isVoicevoxEnabled) {
+                            const cleanName = data.nickname.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+                            if (cleanName.length > 0) {
+                                if (joinedUsers.has(cleanName)) {
+                                    // 2回目以降の入室（戻ってきた）
+                                    queueVoicevoxAudio(`${cleanName}さん、おかえりなさい！`);
+                                } else {
+                                    // 初回の入室
+                                    joinedUsers.add(cleanName);
+                                    const greetings = ["こんにちは！", "いらっしゃい！", "ゆっくりしていってね！", "遊びに来てくれてありがとう！"];
+                                    const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+                                    queueVoicevoxAudio(`${cleanName}さん、${randomGreeting}`);
+                                }
+                            }
+                        }
+                    } else if (data.type === 'gift') {
+                        console.log(`[TikTok] ${data.nickname} sent a gift`);
+                        if (isVoicevoxEnabled) {
+                            const cleanName = data.nickname.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+                            if (cleanName.length > 0) {
+                                queueVoicevoxAudio(`${cleanName}さん、ギフトありがとう！`);
+                            }
+                        }
+                    } else if (data.type === 'like') {
+                        console.log(`[TikTok] ${data.nickname} sent likes`);
+                        if (isVoicevoxEnabled) {
+                            const cleanName = data.nickname.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+                            if (cleanName.length > 0) {
+                                queueVoicevoxAudio(`${cleanName}さん、いいねありがとう！`);
+                            }
+                        }
+                    } else if (data.type === 'comment') {
+                        console.log(`[TikTok] ${data.nickname}: ${data.comment}`);
+                        if (isVoicevoxEnabled) {
+                            // 絵文字を除去してテンポ良く読み上げる
+                            const cleanNickname = data.nickname.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+                            const cleanComment = data.comment.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+                            if (cleanComment.length > 0) {
+                                // 1. コメントを読み上げる
+                                queueVoicevoxAudio(`${cleanNickname}さん、${cleanComment}`);
+
+                                if (isAiReplyEnabled && aiApiKeyInput && aiApiKeyInput.value.trim().length > 0) {
+                                    // 2A. AIによる自動返信
+                                    generateAIResponse(cleanNickname, cleanComment);
+                                } else {
+                                    // 2B. キーワードによる自動返信
+                                    const replies = [
+                                        { keywords: ["こんにちは", "こんちわ", "こんばん", "やっほ", "ハロー"], response: "こんにちはー！きてくれてありがとう！" },
+                                        { keywords: ["かわいい", "可愛い", "カワイイ", "かわちい", "美人", "きれい"], response: "えへへ、ほめられちゃった！ありがとう！" },
+                                        { keywords: ["初見", "しょけん"], response: "初見さん、はじめまして！ゆっくりしていってね！" },
+                                        { keywords: ["草", "w", "ｗ", "ウケる", "笑", "ワロタ"], response: "あはははっ！" },
+                                        { keywords: ["おつ", "お疲れ", "おつかれ", "バイバイ", "おやすみ", "寝る"], response: "おつかれさまー！またね！" },
+                                        { keywords: ["？", "?", "なんで", "どうして"], response: "んー、どうだろうねー？わたしにはわかんないや！" }
+                                    ];
+
+                                    let replied = false;
+                                    for (const rule of replies) {
+                                        if (rule.keywords.some(kw => cleanComment.includes(kw))) {
+                                            queueVoicevoxAudio(rule.response);
+                                            replied = true;
+                                            break;
+                                        }
+                                    }
+
+                                    // 3. キーワードに一致しなかった場合、たまに相槌を打つ（20%の確率）
+                                    if (!replied && Math.random() < 0.20) {
+                                        const genericReplies = ["なるほどなるほどー", "たしかにー！", "へぇー！", "そうなんだね！", "わかるわかるー"];
+                                        queueVoicevoxAudio(genericReplies[Math.floor(Math.random() * genericReplies.length)]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('TikTok WS parse error', e);
+                }
+            };
+
+            tiktokWs.onclose = () => {
+                tiktokStatus.textContent = '未接続';
+                tiktokConnectBtn.textContent = '接続';
+                tiktokConnectBtn.style.background = 'var(--primary)';
+                if (typeof clearIdleTimer === 'function') clearIdleTimer();
+            };
+
+            tiktokWs.onerror = (err) => {
+                console.error('TikTok WS error', err);
+                tiktokStatus.textContent = '接続エラー';
+                if (typeof clearIdleTimer === 'function') clearIdleTimer();
+            };
+        });
+
+        // 保存されたIDがあれば自動接続
+        const savedTiktokId = localStorage.getItem('savedTiktokId');
+        if (savedTiktokId && tiktokUserInput) {
+            tiktokUserInput.value = savedTiktokId;
+            // 少し待ってから自動接続（UIの初期化完了を待つ）
+            setTimeout(() => {
+                tiktokConnectBtn.click();
+            }, 500);
+        }
+    }
+
+    async function generateAIResponse(nickname, comment) {
+        if (!aiApiKeyInput || !aiProviderSelect || !aiSystemPromptInput) return;
+        const apiKey = aiApiKeyInput.value.trim();
+        const provider = aiProviderSelect.value;
+        const systemPrompt = aiSystemPromptInput.value.trim();
+        const aiModelInput = document.getElementById('ai-model-input');
+        const modelName = aiModelInput ? aiModelInput.value.trim() : (provider === 'openai' ? 'gpt-4o-mini' : 'gemini-1.5-flash');
+
+        if (!apiKey) return;
+
+        // 会話履歴にユーザーコメントを追加
+        aiChatHistory.push({ role: 'user', content: `${nickname} says: ${comment}` });
+        if (aiChatHistory.length > 10) aiChatHistory.shift(); // 直近10件のみ保持
+
+        let aiResponseText = "";
+
+        try {
+            if (provider === 'openai') {
+                const messages = [{ role: 'system', content: systemPrompt }, ...aiChatHistory];
+                const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: modelName || 'gpt-4o-mini',
+                        messages: messages,
+                        max_tokens: 60,
+                        temperature: 0.7
+                    })
+                });
+                const json = await res.json();
+                if (json.choices && json.choices.length > 0) {
+                    aiResponseText = json.choices[0].message.content.trim();
+                } else {
+                    throw new Error(JSON.stringify(json));
+                }
+            } else if (provider === 'gemini') {
+                const payload = {
+                    model: modelName || 'gemini-1.5-flash',
+                    input: `${nickname} says: ${comment}`,
+                    system_instruction: systemPrompt
+                };
+                
+                // Interactions APIはサーバー側で会話履歴を自動管理するため、
+                // 前回のIDを渡すだけで続きの会話ができます。
+                if (window.geminiInteractionId) {
+                    payload.previous_interaction_id = window.geminiInteractionId;
+                }
+
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/interactions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+                    body: JSON.stringify(payload)
+                });
+                
+                const json = await res.json();
+                let responseObj = Array.isArray(json) ? json[0] : json;
+                
+                if (res.ok) {
+                    if (responseObj.output_text) {
+                        aiResponseText = responseObj.output_text.trim();
+                    } else if (responseObj.steps && responseObj.steps.length > 0) {
+                        for (const step of responseObj.steps) {
+                            if (step.type === 'model_output' && step.content && step.content.length > 0) {
+                                aiResponseText = step.content[0].text.trim();
+                            }
+                        }
+                        if (!aiResponseText) {
+                            const lastStep = responseObj.steps[responseObj.steps.length - 1];
+                            if (lastStep.content && lastStep.content.length > 0 && lastStep.content[0].text) {
+                                aiResponseText = lastStep.content[0].text.trim();
+                            }
+                        }
+                    }
+                    if (aiResponseText) {
+                        window.geminiInteractionId = responseObj.id; // 次の会話のためにIDを保存
+                    } else {
+                        throw new Error("No text returned from API: " + JSON.stringify(responseObj));
+                    }
+                } else {
+                    throw new Error(responseObj.error?.message || JSON.stringify(responseObj));
+                }
+            }
+            
+            if (aiResponseText) {
+                // アシスタントの返答を履歴に追加
+                aiChatHistory.push({ role: 'assistant', content: aiResponseText });
+                
+                // 読み上げ用のクリーンアップ（絵文字除去など）
+                const cleanResponse = aiResponseText.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+                if (cleanResponse.length > 0) {
+                    queueVoicevoxAudio(cleanResponse);
+                }
+            }
+        } catch (error) {
+            console.error("AI Generation Error:", error);
+            // エラーを画面に表示するか読み上げる
+            const aiTestStatus = document.getElementById('ai-test-status');
+            if (aiTestStatus) {
+                aiTestStatus.textContent = `❌ AIエラー: ${error.message}`;
+                aiTestStatus.style.color = 'var(--danger, #ff4444)';
+            }
+            // 失敗時は履歴から直近のユーザーメッセージを削除してリトライ可能にする
+            aiChatHistory.pop();
+        }
+    }
+
+    let idleSpeechTimer = null;
+
+    function clearIdleTimer() {
+        if (idleSpeechTimer) {
+            clearTimeout(idleSpeechTimer);
+            idleSpeechTimer = null;
+        }
+    }
+
+    function resetIdleTimer() {
+        clearIdleTimer();
+        if (isVoicevoxEnabled && isIdleSpeechEnabled && tiktokWs && tiktokWs.readyState === WebSocket.OPEN) {
+            idleSpeechTimer = setTimeout(() => {
+                if (!isVoicevoxPlaying && voicevoxAudioQueue.length === 0 && isVoicevoxEnabled && isIdleSpeechEnabled) {
+                    const phrases = [
+                        // 定番の相槌・日常のつぶやき
+                        "んー？", "ふふっ", "ねえねえ", "なにかコメントしてね！", "あはは", "そういえばさー", "あくびでそう", "おちゃのみたいなぁ",
+                        "みんなげんきー？", "きょうはなにしてたの？", "かた、こってきたかも", "ストレッチしよっと",
+                        "ぼーっとしてた", "がめんのまえのあなた！みえてるよー", "コメントくれると、うれしいな",
+                        "よかったら、ハートおしてね", "シェアもだいかんげいだよ！", "しょけんさんも、ゆっくりしていってね", 
+                        
+                        // 配信者らしい、自然で親しみやすいセリフ
+                        "きょうのごはん、なににしようかなー",
+                        "みんなはもう、よるごはんたべたー？",
+                        "のどかわいたなー、おちゃのもうっと",
+                        "あした、はやくおきなきゃいけないんだよね……おきれるかな",
+                        "ずっとすわってると、こしがいたくなってくるかも",
+                        "なにか、おもしろいはなしない？",
+                        "コメントないとさみしいなー……チラッ",
+                        "みんな、さいきんはまってることとかある？",
+                        "おやすみのひは、なにすることがおおい？",
+                        "ああー、ねむくなってきたかも……だめだめ！",
+                        "みんな、いつもみにきてくれて、ほんとうにありがとうね",
+                        "つぎ、なんのはなししよっかー？",
+                        "あ、そうそう！きのうね……あ、なんでもない、わすれちゃった",
+                        "ちょっとそこのきみ！みてくれてるの、わかってるんだからねー",
+                        "はぁ……、なんかあまいものたべたくなってきたなぁ",
+                        "きょうもいちにち、おつかれさまだよー！",
+                        "なにかしつもんあったら、なんでもきいてね！",
+                        "フォローといいね、よろしくねー！",
+                        "このはいしん、たのしんでくれてるかな？",
+                        "そろそろのびしないと、からだがバキバキになりそう",
+                        "ねえねえ、いまヒマしてる？よかったらおはなししようよ",
+                        "なんだかおなかすいちゃった……グゥーってならないといいな",
+                        "いまのじかんって、みんないそがしいのかな？",
+                        "きょうもあいにきてくれて、うれしいよ",
+                        "あめとかふってない？おてんきだいじょうぶかな"
+                    ];
+                    
+                    const longStories = [
+                        "きょうね、みちをあるいてたら、おおきなネコがいてさ。ニャーってないたから、ニャーってかえしたら、すごいへんなかおでみられちゃった！……ひどくない？",
+                        "このあいだ、おかいものにいったとき、おさいふわすれちゃって。レジで『あ！』ってなって、ダッシュでいえにかえったんだよね。ほんと、はずかしかったなー",
+                        "むかしむかし、あるところに、とってもおおきなプリンがありました。そのプリンはまちのまんなかにドーンとあって、みんなのあこがれでした……っていうゆめをみたんだよね！",
+                        "さいきん、へやのかたづけをしてたら、むかしのおもちゃがでてきてさ。なつかしくて、ついついあそんじゃって、けっきょくかたづけがおわらなかったんだよねー",
+                        "あ！そういえば、きのうスーパーにいったとき、たまごがすごくやすくてさ。よっしゃー！ってかってかえったら、いえのれいぞうこにまだいっぱいあったの……あるあるだよね？",
+                        "きのうね、こわいゆめみたの。おおきなピーマンにおっかけられるゆめ！……わたし、ピーマンきらいじゃないのに、なんでだろう？",
+                        "あのね、もしわたしがまほうをつかえたら、みんなのきょうのゆうはんを、ぜんぶオムライスにするまほうをかけるよ！……えへへ、おいしそうでしょ？"
+                    ];
+
+                    let phrase = "";
+                    // 10%の確率で長めの作り話（雑談）をする
+                    if (Math.random() < 0.10) {
+                        phrase = longStories[Math.floor(Math.random() * longStories.length)];
+                    } else {
+                        phrase = phrases[Math.floor(Math.random() * phrases.length)];
+                    }
+                    
+                    queueVoicevoxAudio(phrase);
+                }
+            }, 5000);
+        }
+    }
+
+    async function queueVoicevoxAudio(text) {
+        voicevoxAudioQueue.push(text);
+        if (typeof clearIdleTimer === 'function') clearIdleTimer();
+        if (!isVoicevoxPlaying) {
+            playNextVoicevox();
+        }
+    }
+
+    async function playNextVoicevox() {
+        if (voicevoxAudioQueue.length === 0) {
+            isVoicevoxPlaying = false;
+            if (typeof resetIdleTimer === 'function') resetIdleTimer();
+            return;
+        }
+        isVoicevoxPlaying = true;
+        const text = voicevoxAudioQueue.shift();
+        const speakerId = voicevoxSpeakerId ? voicevoxSpeakerId.value : "3";
+        
+        try {
+            // 1. Audio Query
+            const queryRes = await fetch(`http://127.0.0.1:50021/audio_query?text=${encodeURIComponent(text)}&speaker=${speakerId}`, {
+                method: 'POST'
+            });
+            if (!queryRes.ok) throw new Error('Audio query failed');
+            const queryJson = await queryRes.json();
+
+            // 2. Synthesis
+            const synthRes = await fetch(`http://127.0.0.1:50021/synthesis?speaker=${speakerId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(queryJson)
+            });
+            if (!synthRes.ok) throw new Error('Synthesis failed');
+            const arrayBuffer = await synthRes.arrayBuffer();
+
+            // 3. Play Audio
+            if (!voicevoxAudioContext) {
+                voicevoxAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (voicevoxAudioContext.state === 'suspended') {
+                await voicevoxAudioContext.resume();
+            }
+
+            const audioBuffer = await voicevoxAudioContext.decodeAudioData(arrayBuffer);
+            const source = voicevoxAudioContext.createBufferSource();
+            source.buffer = audioBuffer;
+
+            if (!voicevoxAnalyser) {
+                voicevoxAnalyser = voicevoxAudioContext.createAnalyser();
+                voicevoxAnalyser.fftSize = 256;
+            }
+
+            source.connect(voicevoxAnalyser);
+            voicevoxAnalyser.connect(voicevoxAudioContext.destination);
+
+            source.onended = () => {
+                playNextVoicevox();
+            };
+
+            source.start(0);
+
+        } catch (e) {
+            console.error('VOICEVOX Error:', e);
+            playNextVoicevox(); // Skip to next
+        }
     }
 
     // =====================================================================
