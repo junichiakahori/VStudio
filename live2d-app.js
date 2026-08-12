@@ -1516,7 +1516,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (savedApiKey) aiApiKeyInput.value = savedApiKey;
 
         const savedPrompt = localStorage.getItem('savedAiPrompt');
-        if (savedPrompt) aiSystemPromptInput.value = savedPrompt;
+        if (savedPrompt) {
+            const oldDefault = 'あなたは元気で明るい女の子のVTuberです。視聴者からのコメントに対して、タメ口で親しみやすく、一言で短く返答してください。「文字」や「制限」などのAIの設定に関する言葉は絶対に口に出さないでください。';
+            const newDefault = 'あなたは元気で明るい女の子のVTuberです。視聴者からのコメントに対して、タメ口で親しみやすく返答してください。「文字」や「制限」などのAIの設定に関する言葉は絶対に口に出さないでください。';
+            if (savedPrompt === oldDefault) {
+                aiSystemPromptInput.value = newDefault;
+                localStorage.setItem('savedAiPrompt', newDefault);
+            } else {
+                aiSystemPromptInput.value = savedPrompt;
+            }
+        }
 
         if (aiSearchSelect) {
             const savedSearchSelect = localStorage.getItem('savedAiSearchSelect');
