@@ -1980,20 +1980,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isAiGenerating = true;
         lastAiRequestTime = nowMs;
 
-        // DuckDuckGo検索の実行（必要な場合）
         let searchContext = "";
-        if (!autoContext && aiSearchSelect && aiSearchSelect.value === 'ddg') {
-            const needsSearch = /天気|お天気|気温|ニュース|最新|トレンド|話題|どうなった|って何|とは|だれ|誰|何歳|何才|ドル円|為替|株価|円安|円高|ビットコイン|仮想通貨|教えて|調べて/i.test(comment);
-            if (needsSearch) {
-                // カッコ書きや「再送」などのノイズを除去して検索精度を高める
-                let cleanQuery = comment.replace(/[（\(][^）\)]*[）\)]/g, '');
-                cleanQuery = cleanQuery.replace(/再送\d*/g, '');
-                cleanQuery = cleanQuery.replace(/(教えて|しらべて|調べて|って|？|\?|ね|よ|な)+$/g, '').trim();
-                if (cleanQuery.length > 0) {
-                    searchContext = await fetchWebSearch(cleanQuery);
-                }
-            }
-        }
         
         const finalSearchContext = autoContext || searchContext;
 
