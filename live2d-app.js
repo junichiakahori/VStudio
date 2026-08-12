@@ -2113,6 +2113,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return "こんばんは";
     }
 
+    function guessEmotionFromText(text) {
+        const lowerText = text.toLowerCase();
+        if (/(嬉|うれしい|嬉しい|たのしい|楽しい|わーい|おめでとう|感謝|ありがとう|かわちい|かわいい|可愛い|カワイイ|えへへ|あはは|笑|草|w|ww|www|うける|ウケる|爆笑)/.test(lowerText)) {
+            return 'joy';
+        }
+        if (/(怒|おこ|怒る|おこる|ムカつく|むかつく|ひどい|サイテー|最悪|嫌い|きらい|うざい|ウザい|ちがう|違う|ダメ|だめ)/.test(lowerText)) {
+            return 'angry';
+        }
+        if (/(悲|かなしい|悲しい|つらい|辛い|さみしい|寂しい|泣|しくしく|えーん|ショック|がっかり|残念|ざんねん|すいません|すみません|ごめん)/.test(lowerText)) {
+            return 'sad';
+        }
+        return 'neutral';
+    }
+
     function adjustIdlePhraseForModel(phrase, modelId) {
         if (modelId === 'hiyori') {
             return phrase;
