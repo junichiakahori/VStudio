@@ -2078,15 +2078,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (aiResponseText) {
                 // Agentic Auto-Search Loop: もしAIが [search] キーワード と返してきた場合、検索して再帰実行
                 const autoSearchMatch = aiResponseText.match(/^\[search\]\s*(.*)/i);
-                if (autoSearchMatch && !autoContext && aiSearchSelect && aiSearchSelect.value === 'ddg') {
-                    const query = autoSearchMatch[1].trim();
-                    if (query) {
-                        console.log("[Agent] AI requested auto-search for:", query);
-                        aiChatHistory.pop(); // 追加したユーザーメッセージを一旦消す（再帰時にまた追加されるため）
-                        isAiGenerating = false;
-                        const newContext = await fetchWebSearch(query);
-                        // 再帰呼び出しで検索結果付きでリトライ
-                        return generateAIResponse(nickname, comment, newContext);
+                if (autoSearchMatch && aiSearchSelect && aiSearchSelect.value === 'ddg') {
+                    if (!autoContext) {
+                        const query = autoSearchMatch[1].trim();
+                        if (query) {
+                            console.log("[Agent] AI requested auto-search for:", query);
+                            aiChatHistory.pop(); // 追加したユーザーメッセージを一旦消す（再帰時にまた追加されるため）
+                            isAiGenerating = false;
+                            const newContext = await fetchWebSearch(query);
+                            // 再帰呼び出しで検索結果付きでリトライ
+                            return generateAIResponse(nickname, comment, newContext);
+                        }
+                    } else {
+                        // 検索結果を渡してもまだ [search] を返してきた場合（検索結果に答えがなかった）
+                        console.log("[Agent] AI still doesn't know. Fallback to apology.");
+                        aiResponseText = "[sad]ごめんにゃ、ネットで調べてみたんだけど、よくわからなかったにゃ…！";
                     }
                 }
 
