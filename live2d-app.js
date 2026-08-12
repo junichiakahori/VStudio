@@ -2256,13 +2256,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const speakerId = voicevoxSpeakerId ? voicevoxSpeakerId.value : "3";
         
         try {
+            console.log(`[VOICEVOX] 1. Audio query starting for: "${text}" (Speaker ID: ${speakerId})`);
             // 1. Audio Query
             const queryRes = await fetch(`http://127.0.0.1:50021/audio_query?text=${encodeURIComponent(text)}&speaker=${speakerId}`, {
                 method: 'POST'
             });
             if (!queryRes.ok) throw new Error('Audio query failed');
             const queryJson = await queryRes.json();
-
+            console.log('[VOICEVOX] 2. Audio query completed successfully.');
+ 
             // 語尾のイントネーション調整
             const cleanText = text.trim();
             if (cleanText.match(/のだ[！!ー…\.。]*$/) || cleanText.match(/なのだ[！!ー…\.。]*$/)) {
@@ -2280,7 +2282,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             }
-
+ 
+            console.log('[VOICEVOX] 3. Audio synthesis starting...');
             // 2. Synthesis
             const synthRes = await fetch(`http://127.0.0.1:50021/synthesis?speaker=${speakerId}`, {
                 method: 'POST',
@@ -2291,33 +2294,40 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!synthRes.ok) throw new Error('Synthesis failed');
             const arrayBuffer = await synthRes.arrayBuffer();
-
+            console.log(`[VOICEVOX] 4. Synthesis completed successfully. Size: ${arrayBuffer.byteLength} bytes.`);
+ 
             // 3. Play Audio
             if (!voicevoxAudioContext) {
                 voicevoxAudioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
+            console.log(`[VOICEVOX] 5. AudioContext current state: ${voicevoxAudioContext.state}`);
             if (voicevoxAudioContext.state === 'suspended') {
+                console.log('[VOICEVOX] 6. AudioContext is suspended. Attempting to resume (requires user gesture like clicking the page)...');
                 await voicevoxAudioContext.resume();
+                console.log(`[VOICEVOX] 7. AudioContext state after resume: ${voicevoxAudioContext.state}`);
             }
-
+ 
+            console.log('[VOICEVOX] 8. Decoding audio data...');
             const audioBuffer = await voicevoxAudioContext.decodeAudioData(arrayBuffer);
             const source = voicevoxAudioContext.createBufferSource();
             source.buffer = audioBuffer;
-
+ 
             if (!voicevoxAnalyser) {
                 voicevoxAnalyser = voicevoxAudioContext.createAnalyser();
                 voicevoxAnalyser.fftSize = 256;
             }
-
+ 
             source.connect(voicevoxAnalyser);
             voicevoxAnalyser.connect(voicevoxAudioContext.destination);
-
+ 
             source.onended = () => {
+                console.log('[VOICEVOX] 10. Playback finished.');
                 playNextVoicevox();
             };
-
+ 
+            console.log('[VOICEVOX] 9. Starting audio playback source...');
             source.start(0);
-
+ 
         } catch (e) {
             console.error('VOICEVOX Error:', e);
             playNextVoicevox(); // Skip to next
