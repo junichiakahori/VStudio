@@ -1945,6 +1945,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 youtubeWs.send(JSON.stringify({ type: 'connect_youtube', video_id: videoId }));
                 youtubeConnectBtn.textContent = '切断';
                 youtubeConnectBtn.style.background = 'var(--danger, #ff4444)';
+                if (typeof resetIdleTimer === 'function') resetIdleTimer();
             };
 
             youtubeWs.onmessage = (event) => {
