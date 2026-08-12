@@ -1,0 +1,186 @@
+{
+    "accent_phrases": [
+        {
+            "moras": [
+                {
+                    "text": "\u30b3",
+                    "consonant": "k",
+                    "consonant_length": 0.08186105638742447,
+                    "vowel": "o",
+                    "vowel_length": 0.08633174002170563,
+                    "pitch": 5.5879645347595215
+                },
+                {
+                    "text": "\u30e1",
+                    "consonant": "m",
+                    "consonant_length": 0.06135782599449158,
+                    "vowel": "e",
+                    "vowel_length": 0.13775232434272766,
+                    "pitch": 5.821728229522705
+                },
+                {
+                    "text": "\u30f3",
+                    "consonant": null,
+                    "consonant_length": null,
+                    "vowel": "N",
+                    "vowel_length": 0.07374975085258484,
+                    "pitch": 6.032985210418701
+                },
+                {
+                    "text": "\u30c8",
+                    "consonant": "t",
+                    "consonant_length": 0.045424312353134155,
+                    "vowel": "o",
+                    "vowel_length": 0.09087484329938889,
+                    "pitch": 6.050135135650635
+                }
+            ],
+            "accent": 4,
+            "pause_mora": null,
+            "is_interrogative": false
+        },
+        {
+            "moras": [
+                {
+                    "text": "\u30af",
+                    "consonant": "k",
+                    "consonant_length": 0.06860853731632233,
+                    "vowel": "u",
+                    "vowel_length": 0.057342760264873505,
+                    "pitch": 6.006655693054199
+                },
+                {
+                    "text": "\u30ec",
+                    "consonant": "r",
+                    "consonant_length": 0.039087146520614624,
+                    "vowel": "e",
+                    "vowel_length": 0.08709355443716049,
+                    "pitch": 6.00098180770874
+                },
+                {
+                    "text": "\u30eb",
+                    "consonant": "r",
+                    "consonant_length": 0.0373932346701622,
+                    "vowel": "u",
+                    "vowel_length": 0.09234930574893951,
+                    "pitch": 6.019257545471191
+                },
+                {
+                    "text": "\u30c8",
+                    "consonant": "t",
+                    "consonant_length": 0.07241877168416977,
+                    "vowel": "o",
+                    "vowel_length": 0.16603225469589233,
+                    "pitch": 5.68937873840332
+                }
+            ],
+            "accent": 4,
+            "pause_mora": {
+                "text": "\u3001",
+                "consonant": null,
+                "consonant_length": null,
+                "vowel": "pau",
+                "vowel_length": 0.40921154618263245,
+                "pitch": 0.0
+            },
+            "is_interrogative": false
+        },
+        {
+            "moras": [
+                {
+                    "text": "\u30b9",
+                    "consonant": "s",
+                    "consonant_length": 0.10846799612045288,
+                    "vowel": "u",
+                    "vowel_length": 0.05973724275827408,
+                    "pitch": 5.446296215057373
+                },
+                {
+                    "text": "\u30b4",
+                    "consonant": "g",
+                    "consonant_length": 0.05870656669139862,
+                    "vowel": "o",
+                    "vowel_length": 0.11817311495542526,
+                    "pitch": 5.627645015716553
+                },
+                {
+                    "text": "\u30af",
+                    "consonant": "k",
+                    "consonant_length": 0.07547573000192642,
+                    "vowel": "u",
+                    "vowel_length": 0.08936067670583725,
+                    "pitch": 6.025932788848877
+                },
+                {
+                    "text": "\u30a6",
+                    "consonant": null,
+                    "consonant_length": null,
+                    "vowel": "u",
+                    "vowel_length": 0.08743590116500854,
+                    "pitch": 6.05832052230835
+                },
+                {
+                    "text": "\u30ec",
+                    "consonant": "r",
+                    "consonant_length": 0.03693654388189316,
+                    "vowel": "e",
+                    "vowel_length": 0.07987295091152191,
+                    "pitch": 6.066280364990234
+                },
+                {
+                    "text": "\u30b7",
+                    "consonant": "sh",
+                    "consonant_length": 0.11212687939405441,
+                    "vowel": "i",
+                    "vowel_length": 0.08014877885580063,
+                    "pitch": 6.077925205230713
+                },
+                {
+                    "text": "\u30a4",
+                    "consonant": null,
+                    "consonant_length": null,
+                    "vowel": "i",
+                    "vowel_length": 0.0811300054192543,
+                    "pitch": 6.091587066650391
+                }
+            ],
+            "accent": 2,
+            "pause_mora": null,
+            "is_interrogative": false
+        },
+        {
+            "moras": [
+                {
+                    "text": "\u30ce",
+                    "consonant": "n",
+                    "consonant_length": 0.06198596954345703,
+                    "vowel": "o",
+                    "vowel_length": 0.10169203579425812,
+                    "pitch": 6.09307861328125
+                },
+                {
+                    "text": "\u30c0",
+                    "consonant": "d",
+                    "consonant_length": 0.04952076077461243,
+                    "vowel": "a",
+                    "vowel_length": 0.20662115514278412,
+                    "pitch": 6.046294689178467
+                }
+            ],
+            "accent": 2,
+            "pause_mora": null,
+            "is_interrogative": false
+        }
+    ],
+    "speedScale": 1.0,
+    "pitchScale": 0.0,
+    "intonationScale": 1.0,
+    "volumeScale": 1.0,
+    "prePhonemeLength": 0.1,
+    "postPhonemeLength": 0.1,
+    "pauseLength": null,
+    "pauseLengthScale": 1.0,
+    "outputSamplingRate": 24000,
+    "outputStereo": false,
+    "kana": "\u30b3\u30e1\u30f3\u30c8'/\u30af\u30ec\u30eb\u30c8'\u3001\u30b9\u30b4'\u30af\u30a6\u30ec\u30b7\u30a4/\u30ce\u30c0'"
+}
