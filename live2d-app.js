@@ -2302,9 +2302,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             console.log(`[VOICEVOX] 5. AudioContext current state: ${voicevoxAudioContext.state}`);
             if (voicevoxAudioContext.state === 'suspended') {
-                console.log('[VOICEVOX] 6. AudioContext is suspended. Attempting to resume (requires user gesture like clicking the page)...');
-                await voicevoxAudioContext.resume();
-                console.log(`[VOICEVOX] 7. AudioContext state after resume: ${voicevoxAudioContext.state}`);
+                console.log('[VOICEVOX] 6. AudioContext is suspended. Attempting to resume asynchronously...');
+                voicevoxAudioContext.resume().then(() => {
+                    console.log(`[VOICEVOX] 7. AudioContext state after background resume: ${voicevoxAudioContext.state}`);
+                }).catch(e => console.error('[VOICEVOX] Resume error:', e));
             }
  
             console.log('[VOICEVOX] 8. Decoding audio data...');
@@ -2354,4 +2355,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (autoBlinkToggle.checked && !isObsMode) scheduleBlink();
     updateObsUrl();
+
+    // Browser Autoplay Policy: unlock audio context on first user click/touch/keypress
+    const unlockAudio = () => {
+        if (!voicevoxAudioContext) {
+            voicevoxAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (voicevoxAudioContext.state === 'suspended') {
+            voicevoxAudioContext.resume().then(() => {
+                console.log('[VOICEVOX] AudioContext successfully resumed/unlocked via user interaction! State:', voicevoxAudioContext.state);
+            }).catch(e => {
+                console.error('[VOICEVOX] Failed to resume AudioContext on gesture:', e);
+            });
+        }
+    };
+    window.addEventListener('click', unlockAudio, { once: true });
+    window.addEventListener('touchend', unlockAudio, { once: true });
+    window.addEventListener('keydown', unlockAudio, { once: true });
 });
