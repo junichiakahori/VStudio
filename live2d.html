@@ -166,11 +166,12 @@
             <div class="panel-section" id="tiktok-section">
                 <h3><span class="icon">🎵</span>TikTok & VOICEVOX</h3>
                 <div class="control-group">
-                    <label style="font-size:0.8rem;color:var(--text-muted);">TikTok ID (@不要)</label>
-                    <div style="display:flex;gap:0.5rem;margin-top:0.2rem;">
+                    <label style="display:block;margin-bottom:0.5rem;font-size:0.8rem;color:var(--text-muted);">TikTok ID (@不要)</label>
+                    <div style="display:flex;gap:0.5rem;">
                         <input type="text" id="tiktok-username-input" placeholder="username" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.8rem;outline:none;">
                         <button id="tiktok-connect-btn" class="btn" style="background:var(--primary);color:#000;border:none;border-radius:6px;padding:0 1rem;font-weight:bold;cursor:pointer;">接続</button>
                     </div>
+                    <div id="tiktok-status" style="font-size:0.72rem;margin-top:0.5rem;color:var(--text-muted);">未接続</div>
                 </div>
                 <div class="control-group">
                     <label class="switch-label">
@@ -178,7 +179,6 @@
                         <input type="checkbox" id="voicevox-toggle">
                         <span class="slider round"></span>
                     </label>
-                    <div id="tiktok-status" style="font-size:0.72rem;text-align:right;color:var(--text-muted);">未接続</div>
                 </div>
                 <div class="control-group" style="margin-top:10px;">
                     <label style="font-size:0.8rem;color:var(--text-muted);">VOICEVOX 話者</label>
@@ -219,10 +219,11 @@
                     <label style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;display:block;">使用モデル名</label>
                     <div style="display:flex;gap:0.5rem;margin-top:0.3rem;align-items:center;">
                         <select id="ai-model-input" style="flex:1;min-width:0;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.4rem;color:var(--text-muted);font-size:0.8rem;outline:none;box-sizing:border-box;text-overflow:ellipsis;white-space:nowrap;">
-                            <option value="gemini-2.5-flash-latest">gemini-2.5-flash-latest</option>
-                            <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                            <option value="gemini-3.6-flash">gemini-3.6-flash</option>
+                            <option value="gemini-3.5-flash">gemini-3.5-flash</option>
+                            <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite</option>
+                            <option value="gemini-3.1-pro">gemini-3.1-pro</option>
                             <option value="gemini-1.5-flash">gemini-1.5-flash</option>
-                            <option value="gemini-1.5-pro">gemini-1.5-pro</option>
                         </select>
                         <button id="ai-fetch-models-btn" class="btn" style="background:var(--secondary, #333);color:#fff;border:1px solid var(--border-neon);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.7rem;cursor:pointer;white-space:nowrap;">一覧を取得</button>
                     </div>
@@ -238,8 +239,15 @@
                     </div>
                     <div style="clear:both;"></div>
                     
+                    <label style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;display:block;">リアルタイム検索機能</label>
+                    <select id="ai-search-select" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.8rem;outline:none;margin-top:0.3rem;cursor:pointer;">
+                        <option value="none">使用しない (完全無料)</option>
+                        <option value="ddg">DuckDuckGo 検索 (無料・無制限)</option>
+                        <option value="google">Google 検索 (有料・要残高)</option>
+                    </select>
+                    
                     <label style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;display:block;">システムプロンプト (キャラ設定)</label>
-                    <textarea id="ai-system-prompt" rows="3" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.8rem;outline:none;margin-top:0.3rem;box-sizing:border-box;resize:vertical;">あなたは元気で明るい女の子のVTuberです。視聴者からのコメントに対して、タメ口で親しみやすく、かつ短く（30文字以内で）返答してください。</textarea>
+                    <textarea id="ai-system-prompt" rows="3" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.8rem;outline:none;margin-top:0.3rem;box-sizing:border-box;resize:vertical;">あなたは元気で明るい女の子のVTuberです。視聴者からのコメントに対して、タメ口で親しみやすく、一言で短く返答してください。「文字」や「制限」などのAIの設定に関する言葉は絶対に口に出さないでください。</textarea>
                 </div>
             </div>
             <div class="panel-section">
@@ -312,6 +320,7 @@
     <script src="live2dcubismcore.min.js"></script>
     <!-- pixi-live2d-display v0.4 -->
     <script src="pixi-live2d-display.min.js"></script>
+    <script src="idle_phrases.js"></script>
     <script src="live2d-app.js?v=1.2"></script>
 </body>
 </html>

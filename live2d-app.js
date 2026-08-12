@@ -1494,9 +1494,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const aiProviderSelect = document.getElementById('ai-provider-select');
     const aiApiKeyInput = document.getElementById('ai-api-key');
     const aiSystemPromptInput = document.getElementById('ai-system-prompt');
+    const aiSearchSelect = document.getElementById('ai-search-select');
 
     let isAiReplyEnabled = false;
     let aiChatHistory = []; // 過去のコンテキスト保持用
+    let isAiGenerating = false;
+    let lastAiRequestTime = 0;
 
     if (aiReplyToggle) {
         const savedAiToggle = localStorage.getItem('savedAiReplyToggle');
@@ -1514,6 +1517,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const savedPrompt = localStorage.getItem('savedAiPrompt');
         if (savedPrompt) aiSystemPromptInput.value = savedPrompt;
+
+        if (aiSearchSelect) {
+            const savedSearchSelect = localStorage.getItem('savedAiSearchSelect');
+            if (savedSearchSelect) {
+                aiSearchSelect.value = savedSearchSelect;
+            } else {
+                aiSearchSelect.value = 'ddg';
+            }
+        }
 
         aiReplyToggle.addEventListener('change', () => {
             isAiReplyEnabled = aiReplyToggle.checked;
@@ -1549,6 +1561,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         aiApiKeyInput.addEventListener('input', () => localStorage.setItem('savedAiApiKey', aiApiKeyInput.value.trim()));
         aiSystemPromptInput.addEventListener('input', () => localStorage.setItem('savedAiPrompt', aiSystemPromptInput.value.trim()));
+        if (aiSearchSelect) {
+            aiSearchSelect.addEventListener('change', () => localStorage.setItem('savedAiSearchSelect', aiSearchSelect.value));
+        }
         if (aiModelInput) {
             aiModelInput.addEventListener('input', () => localStorage.setItem('savedAiModel', aiModelInput.value.trim()));
         }
@@ -1761,15 +1776,34 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (isVoicevoxEnabled) {
                             const cleanName = data.nickname.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
                             if (cleanName.length > 0) {
+                                const zunda = isZundamonSelected() && currentModelId === 'hiyori';
                                 if (joinedUsers.has(cleanName)) {
                                     // 2回目以降の入室（戻ってきた）
-                                    queueVoicevoxAudio(`${cleanName}さん、おかえりなさい！`);
+                                    let greet = zunda ? `${cleanName}さん、おかえりなさいなのだ！` : `${cleanName}さん、おかえりなさい！`;
+                                    greet = adjustIdlePhraseForModel(greet, currentModelId);
+                                    queueVoicevoxAudio(greet);
                                 } else {
                                     // 初回の入室
                                     joinedUsers.add(cleanName);
-                                    const greetings = ["こんにちは！", "いらっしゃい！", "ゆっくりしていってね！", "遊びに来てくれてありがとう！"];
-                                    const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
-                                    queueVoicevoxAudio(`${cleanName}さん、${randomGreeting}`);
+                                    const timeGreeting = getTimeGreeting();
+                                    const phrases = zunda ? [
+                                        "いらっしゃい！",
+                                        "ゆっくりしていってね！",
+                                        "遊びに来てくれてありがとうなのだ！"
+                                    ] : [
+                                        "いらっしゃい！",
+                                        "ゆっくりしていってね！",
+                                        "遊びに来てくれてありがとう！"
+                                    ];
+                                    const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
+                                    aiEmotion = 'joy';
+                                    
+                                    let fullGreeting = zunda 
+                                        ? `${cleanName}さん、${timeGreeting}なのだ！${randomPhrase}`
+                                        : `${cleanName}さん、${timeGreeting}！${randomPhrase}`;
+                                        
+                                    fullGreeting = adjustIdlePhraseForModel(fullGreeting, currentModelId);
+                                    queueVoicevoxAudio(fullGreeting);
                                 }
                             }
                         }
@@ -1778,17 +1812,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (isVoicevoxEnabled) {
                             const cleanName = data.nickname.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
                             if (cleanName.length > 0) {
-                                queueVoicevoxAudio(`${cleanName}さん、ギフトありがとう！`);
+                                aiEmotion = 'joy';
+                                const zunda = isZundamonSelected() && currentModelId === 'hiyori';
+                                let greet = zunda ? `${cleanName}さん、ギフトありがとうなのだ！` : `${cleanName}さん、ギフトありがとう！`;
+                                greet = adjustIdlePhraseForModel(greet, currentModelId);
+                                queueVoicevoxAudio(greet);
                             }
                         }
                     } else if (data.type === 'like') {
                         console.log(`[TikTok] ${data.nickname} sent likes`);
-                        if (isVoicevoxEnabled) {
-                            const cleanName = data.nickname.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
-                            if (cleanName.length > 0) {
-                                queueVoicevoxAudio(`${cleanName}さん、いいねありがとう！`);
-                            }
-                        }
+                        // いいね連打対策のため読み上げは行わない
                     } else if (data.type === 'comment') {
                         console.log(`[TikTok] ${data.nickname}: ${data.comment}`);
                         if (isVoicevoxEnabled) {
@@ -1796,6 +1829,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             const cleanNickname = data.nickname.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
                             const cleanComment = data.comment.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
                             if (cleanComment.length > 0) {
+                                // ユーザーのコメントから感情を推測して即座に表情を変える
+                                aiEmotion = guessEmotionFromText(cleanComment);
+                                
                                 // 1. コメントを読み上げる
                                 queueVoicevoxAudio(`${cleanNickname}さん、${cleanComment}`);
 
@@ -1804,19 +1840,22 @@ document.addEventListener('DOMContentLoaded', () => {
                                     generateAIResponse(cleanNickname, cleanComment);
                                 } else {
                                     // 2B. キーワードによる自動返信
+                                    const timeGreeting = getTimeGreeting();
+                                    const zunda = isZundamonSelected() && currentModelId === 'hiyori';
                                     const replies = [
-                                        { keywords: ["こんにちは", "こんちわ", "こんばん", "やっほ", "ハロー"], response: "こんにちはー！きてくれてありがとう！" },
-                                        { keywords: ["かわいい", "可愛い", "カワイイ", "かわちい", "美人", "きれい"], response: "えへへ、ほめられちゃった！ありがとう！" },
-                                        { keywords: ["初見", "しょけん"], response: "初見さん、はじめまして！ゆっくりしていってね！" },
-                                        { keywords: ["草", "w", "ｗ", "ウケる", "笑", "ワロタ"], response: "あはははっ！" },
-                                        { keywords: ["おつ", "お疲れ", "おつかれ", "バイバイ", "おやすみ", "寝る"], response: "おつかれさまー！またね！" },
-                                        { keywords: ["？", "?", "なんで", "どうして"], response: "んー、どうだろうねー？わたしにはわかんないや！" }
+                                        { keywords: ["おはよう", "おは", "こんにちは", "こんちわ", "こんばん", "やっほ", "ハロー"], response: zunda ? `${timeGreeting}ー！来てくれてありがとうなのだ！` : `${timeGreeting}ー！来てくれてありがとう！` },
+                                        { keywords: ["かわいい", "可愛い", "カワイイ", "かわちい", "美人", "きれい"], response: zunda ? "えへへ、褒められちゃったのだ！ありがとうなのだ！" : "えへへ、褒められちゃった！ありがとう！" },
+                                        { keywords: ["初見", "しょけん"], response: zunda ? "初見さん、初めましてなのだ！ゆっくりしていってほしいのだ！" : "初見さん、初めまして！ゆっくりしていってね！" },
+                                        { keywords: ["草", "w", "ｗ", "ウケる", "笑", "ワロタ"], response: zunda ? "あはははなのだっ！" : "あはははっ！" },
+                                        { keywords: ["おつ", "お疲れ", "おつかれ", "バイバイ", "おやすみ", "寝る"], response: zunda ? "お疲れ様なのだー！またねなのだ！" : "お疲れ様ー！またね！" },
+                                        { keywords: ["？", "?", "なんで", "どうして"], response: zunda ? "んー、どうだろうねー？私には分かんないのだ！" : "んー、どうだろうねー？私には分かんないや！" }
                                     ];
 
                                     let replied = false;
                                     for (const rule of replies) {
                                         if (rule.keywords.some(kw => cleanComment.includes(kw))) {
-                                            queueVoicevoxAudio(rule.response);
+                                            const adjustedReply = adjustIdlePhraseForModel(rule.response, currentModelId);
+                                            queueVoicevoxAudio(adjustedReply);
                                             replied = true;
                                             break;
                                         }
@@ -1824,8 +1863,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                                     // 3. キーワードに一致しなかった場合、たまに相槌を打つ（20%の確率）
                                     if (!replied && Math.random() < 0.20) {
-                                        const genericReplies = ["なるほどなるほどー", "たしかにー！", "へぇー！", "そうなんだね！", "わかるわかるー"];
-                                        queueVoicevoxAudio(genericReplies[Math.floor(Math.random() * genericReplies.length)]);
+                                        const genericReplies = ["なるほどなるほどー", "たしかにー！", "へぇー！", "そうんだね！", "わかるわかるー"];
+                                        const adjustedReply = adjustIdlePhraseForModel(genericReplies[Math.floor(Math.random() * genericReplies.length)], currentModelId);
+                                        queueVoicevoxAudio(adjustedReply);
                                     }
                                 }
                             }
@@ -1836,7 +1876,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
 
-            tiktokWs.onclose = () => {
+                        tiktokWs.onclose = () => {
                 tiktokStatus.textContent = '未接続';
                 tiktokConnectBtn.textContent = '接続';
                 tiktokConnectBtn.style.background = 'var(--primary)';
@@ -1861,15 +1901,79 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function fetchWebSearch(query) {
+        try {
+            const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.results && data.results.length > 0) {
+                    return data.results.map(r => `・${r.title}: ${r.body}`).join('\n');
+                }
+            }
+        } catch (e) {
+            console.error('Search API error:', e);
+        }
+        return '';
+    }
+
     async function generateAIResponse(nickname, comment) {
         if (!aiApiKeyInput || !aiProviderSelect || !aiSystemPromptInput) return;
         const apiKey = aiApiKeyInput.value.trim();
         const provider = aiProviderSelect.value;
-        const systemPrompt = aiSystemPromptInput.value.trim();
+        const systemPromptRaw = aiSystemPromptInput.value.trim();
+        let modelCharacterInstruction = "";
+        if (typeof currentModelId !== 'undefined') {
+            if (currentModelId === 'hiyori') {
+                modelCharacterInstruction = "\n\n【キャラクター設定】あなたは元気で明るい女子高生の「ひより」です。親しみやすく、語尾には「〜だよ！」「〜だね！」などをつけて元気いっぱいに話してください。";
+            } else if (currentModelId === 'akari') {
+                modelCharacterInstruction = "\n\n【キャラクター設定】あなたは落ち着いた優しいお姉さんキャラの「あかり」です。丁寧な口調で、少し大人っぽく「〜ね」「〜かしら」などを交えて話してください。";
+            } else if (currentModelId === 'hijiki') {
+                modelCharacterInstruction = "\n\n【キャラクター設定】あなたは黒猫の「ひじき」です。人間の言葉を話す猫として振る舞い、語尾に「〜にゃ」「〜にゃん」をつけて可愛く話してください。";
+            } else if (currentModelId === 'tororo') {
+                modelCharacterInstruction = "\n\n【キャラクター設定】あなたは白猫の「とろろ」です。人間の言葉を話す猫として振る舞い、語尾に「〜にゃ」「〜にゃん」をつけてマイペースに話してください。";
+            } else if (currentModelId === 'wanko') {
+                modelCharacterInstruction = "\n\n【キャラクター設定】あなたは元気な犬の「わんこ」です。人間の言葉を話す犬として振る舞い、語尾に「〜だワン」「〜ワン！」をつけて人懐っこく話してください。";
+            }
+        }
+
+        const zundamonInstruction = isZundamonSelected() && !modelCharacterInstruction ? "\n\n【重要】あなたは「ずんだもん」です。語尾には必ず「〜のだ」や「〜なのだ」をつけて話してください。ただし、質問や疑問形の場合は「〜のだ？」や「〜なの？」は使わず、自然な疑問形（例：〜する？、〜かな？）にしてください。" : "";
+        
+        const activeCharacterInstruction = modelCharacterInstruction || zundamonInstruction;
+
+        const emotionInstruction = "\n\n【重要】返答の先頭に必ず [joy], [angry], [sad], [neutral] のいずれかの感情タグをつけてください。例: [joy]わーい！\nまた、音声読み上げのエラーを完全に防ぐため、出力はすべて【ひらがなとカタカナのみ】で記述し、漢字は絶対に使わないでください。助詞の「は」は「わ」、「へ」は「え」と発音通りに書いてください。（例：こんにちわ、わたしわ）" + activeCharacterInstruction;
+        
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+        const currentDate = now.getDate();
+        const days = ['にちようび', 'げつようび', 'かようび', 'すいようび', 'もくようび', 'きんようび', 'どようび'];
+        const currentDay = days[now.getDay()];
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const timeContext = `\n\n【現在日時】きょうは ${currentMonth}月${currentDate}日（${currentDay}）、現在は ${currentHour}時${currentMinute}分 です。日付や時間、曜日を聞かれた場合は「〜がつ〜にち」「〜ようび」「〜じ〜ふん」と自然なひらがなで答えてください。ユーザーへの挨拶が必要な場合は、この時刻に合わせた自然な挨拶（例：おはよう、こんにちわ、こんばんわ 等）を使用してください。`;
+        
+        const roleplayInstruction = "\n\n【配信者としての振る舞い（超重要）】あなたはバーチャル空間から配信しているVTuber（配信者）です。「私はAIなので…」といった機械的な発言やAIだと自称することは絶対にやめてください。\n・天気や最新ニュースなどを聞かれた場合は、最新の情報を参考にして答えてください。それでも分からない事を聞かれた場合は「AIだから分からない」と答えるのではなく、「ずっと部屋でゲームしてるから分からないよ〜！」のように人間の配信者らしいユーモアで切り返してください。\n・どんな質問に対しても、リスナーと仲良く会話を楽しむ人間（配信者）として振る舞ってください。";
+        
+        const systemPrompt = systemPromptRaw + emotionInstruction + timeContext + roleplayInstruction;
         const aiModelInput = document.getElementById('ai-model-input');
         const modelName = aiModelInput ? aiModelInput.value.trim() : (provider === 'openai' ? 'gpt-4o-mini' : 'gemini-1.5-flash');
 
         if (!apiKey) return;
+
+        // API制限（429エラー）防止：AIが考え中、または前回の送信から5秒以内ならスキップ
+        if (isAiGenerating) return;
+        const nowMs = Date.now();
+        if (nowMs - lastAiRequestTime < 5000) return;
+        isAiGenerating = true;
+        lastAiRequestTime = nowMs;
+
+        // DuckDuckGo検索の実行（必要な場合）
+        let searchContext = "";
+        if (aiSearchSelect && aiSearchSelect.value === 'ddg') {
+            const needsSearch = /天気|お天気|気温|ニュース|最新|トレンド|話題|どうなった|って何|とは|だれ|誰|何歳|何才/i.test(comment);
+            if (needsSearch) {
+                searchContext = await fetchWebSearch(comment);
+            }
+        }
 
         // 会話履歴にユーザーコメントを追加
         aiChatHistory.push({ role: 'user', content: `${nickname} says: ${comment}` });
@@ -1879,7 +1983,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             if (provider === 'openai') {
-                const messages = [{ role: 'system', content: systemPrompt }, ...aiChatHistory];
+                const tempHistory = [...aiChatHistory];
+                if (searchContext && tempHistory.length > 0) {
+                    const lastMsg = tempHistory[tempHistory.length - 1];
+                    tempHistory[tempHistory.length - 1] = {
+                        role: lastMsg.role,
+                        content: lastMsg.content + `\n\n[検索結果の参考情報]:\n${searchContext}\n\n上記の検索結果（最新情報）に基づいて答えてください。`
+                    };
+                }
+                const messages = [{ role: 'system', content: systemPrompt }, ...tempHistory];
                 const res = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
                     headers: {
@@ -1900,50 +2012,44 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error(JSON.stringify(json));
                 }
             } else if (provider === 'gemini') {
-                const payload = {
-                    model: modelName || 'gemini-1.5-flash',
-                    input: `${nickname} says: ${comment}`,
-                    system_instruction: systemPrompt
-                };
+                const targetModel = modelName || 'gemini-1.5-flash';
                 
-                // Interactions APIはサーバー側で会話履歴を自動管理するため、
-                // 前回のIDを渡すだけで続きの会話ができます。
-                if (window.geminiInteractionId) {
-                    payload.previous_interaction_id = window.geminiInteractionId;
+                // aiChatHistoryをGemini用のフォーマットに変換
+                const geminiContents = aiChatHistory.map(msg => ({
+                    role: msg.role === 'assistant' ? 'model' : 'user',
+                    parts: [{ text: msg.content }]
+                }));
+
+                if (searchContext && geminiContents.length > 0) {
+                    const lastMsg = geminiContents[geminiContents.length - 1];
+                    lastMsg.parts[0].text += `\n\n[検索結果의参考情報]:\n${searchContext}\n\n上記の検索結果（最新情報）に基づいて答えてください。`;
                 }
 
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/interactions`, {
+                const payload = {
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                    contents: geminiContents
+                };
+
+                if (aiSearchSelect && aiSearchSelect.value === 'google') {
+                    payload.tools = [{ googleSearch: {} }]; // Google検索を有効化（グラウンディング）
+                }
+
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
                     body: JSON.stringify(payload)
                 });
                 
                 const json = await res.json();
-                let responseObj = Array.isArray(json) ? json[0] : json;
                 
                 if (res.ok) {
-                    if (responseObj.output_text) {
-                        aiResponseText = responseObj.output_text.trim();
-                    } else if (responseObj.steps && responseObj.steps.length > 0) {
-                        for (const step of responseObj.steps) {
-                            if (step.type === 'model_output' && step.content && step.content.length > 0) {
-                                aiResponseText = step.content[0].text.trim();
-                            }
-                        }
-                        if (!aiResponseText) {
-                            const lastStep = responseObj.steps[responseObj.steps.length - 1];
-                            if (lastStep.content && lastStep.content.length > 0 && lastStep.content[0].text) {
-                                aiResponseText = lastStep.content[0].text.trim();
-                            }
-                        }
-                    }
-                    if (aiResponseText) {
-                        window.geminiInteractionId = responseObj.id; // 次の会話のためにIDを保存
+                    if (json.candidates && json.candidates.length > 0) {
+                        aiResponseText = json.candidates[0].content.parts[0].text.trim();
                     } else {
-                        throw new Error("No text returned from API: " + JSON.stringify(responseObj));
+                        throw new Error("No text returned from API: " + JSON.stringify(json));
                     }
                 } else {
-                    throw new Error(responseObj.error?.message || JSON.stringify(responseObj));
+                    throw new Error(json.error?.message || JSON.stringify(json));
                 }
             }
             
@@ -1959,18 +2065,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error("AI Generation Error:", error);
-            // エラーを画面に表示するか読み上げる
+            // 失敗時は履歴から直近のユーザーメッセージを削除してリトライ可能にする
+            aiChatHistory.pop();
             const aiTestStatus = document.getElementById('ai-test-status');
             if (aiTestStatus) {
                 aiTestStatus.textContent = `❌ AIエラー: ${error.message}`;
                 aiTestStatus.style.color = 'var(--danger, #ff4444)';
             }
-            // 失敗時は履歴から直近のユーザーメッセージを削除してリトライ可能にする
-            aiChatHistory.pop();
+        } finally {
+            isAiGenerating = false;
         }
     }
 
-    let idleSpeechTimer = null;
+        let idleSpeechTimer = null;
 
     function clearIdleTimer() {
         if (idleSpeechTimer) {
@@ -1979,64 +2086,124 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function adjustIdlePhraseForModel(phrase, modelId) {
+        if (modelId === 'hiyori') {
+            return phrase;
+        }
+        
+        if (modelId === 'akari') {
+            let newPhrase = phrase;
+            newPhrase = newPhrase.replace(/あたし/g, 'わたし');
+            newPhrase = newPhrase.replace(/だよ/g, 'ね');
+            newPhrase = newPhrase.replace(/だよね/g, 'でしょ');
+            newPhrase = newPhrase.replace(/だぞ/g, 'ですよ');
+            newPhrase = newPhrase.replace(/だよー/g, 'ですよ〜');
+            newPhrase = newPhrase.replace(/かね/g, 'かしら');
+            newPhrase = newPhrase.replace(/かな？/g, 'かしら？');
+            newPhrase = newPhrase.replace(/ない？/g, 'ないかしら？');
+            newPhrase = newPhrase.replace(/の？/g, 'のね？');
+            newPhrase = newPhrase.replace(/じゃん/g, 'ですわ');
+            return newPhrase;
+        }
+        
+        if (modelId === 'hijiki' || modelId === 'tororo') {
+            let newPhrase = phrase;
+            newPhrase = newPhrase.replace(/わたし/g, 'ぼく');
+            newPhrase = newPhrase.replace(/あたし/g, 'ぼく');
+            newPhrase = newPhrase.replace(/ねえねえ/g, 'にゃーにゃー');
+            newPhrase = newPhrase.replace(/ねえ/g, 'にゃー');
+            newPhrase = newPhrase.replace(/だよ/g, 'にゃ');
+            newPhrase = newPhrase.replace(/だよね/g, 'にゃね');
+            newPhrase = newPhrase.replace(/だぞ/g, 'にゃぞ');
+            newPhrase = newPhrase.replace(/だよー/g, 'にゃー');
+            
+            // 文末や句読点の手前の「ね」「な」のみ置換
+            newPhrase = newPhrase.replace(/ねー(?=[。！!？\?、,…\s]|$)/g, 'にゃー');
+            newPhrase = newPhrase.replace(/ね(?=[。！!？\?、,…\s]|$)/g, 'にゃ');
+            newPhrase = newPhrase.replace(/なー(?=[。！!？\?、,…\s]|$)/g, 'にゃー');
+            newPhrase = newPhrase.replace(/な(?=[。！!？\?、,…\s]|$)/g, 'にゃ');
+            
+            newPhrase = newPhrase.replace(/([。！!？\?]|ー+)?$/g, (match) => {
+                if (!match) return 'にゃ';
+                if (match.includes('！') || match.includes('!')) return 'にゃ！';
+                if (match.includes('？') || match.includes('?')) return 'にゃ？';
+                return 'にゃ' + match;
+            });
+            return newPhrase;
+        }
+        
+        if (modelId === 'wanko') {
+            let newPhrase = phrase;
+            newPhrase = newPhrase.replace(/わたし/g, 'ぼく');
+            newPhrase = newPhrase.replace(/あたし/g, 'ぼく');
+            newPhrase = newPhrase.replace(/ねえねえ/g, 'わんわん');
+            newPhrase = newPhrase.replace(/ねえ/g, 'ワン');
+            newPhrase = newPhrase.replace(/だよ/g, 'だワン');
+            newPhrase = newPhrase.replace(/だよね/g, 'ワンね');
+            newPhrase = newPhrase.replace(/だぞ/g, 'ワンぞ');
+            newPhrase = newPhrase.replace(/だよー/g, 'ワンー');
+            
+            // 文末や句読点の手前の「ね」「な」のみ置換
+            newPhrase = newPhrase.replace(/ねー(?=[。！!？\?、,…\s]|$)/g, 'ワンー');
+            newPhrase = newPhrase.replace(/ね(?=[。！!？\?、,…\s]|$)/g, 'ワン');
+            newPhrase = newPhrase.replace(/なー(?=[。！!？\?、,…\s]|$)/g, 'ワンー');
+            newPhrase = newPhrase.replace(/な(?=[。！!？\?、,…\s]|$)/g, 'ワン');
+            
+            newPhrase = newPhrase.replace(/([。！!？\?]|ー+)?$/g, (match) => {
+                if (!match) return 'ワン';
+                if (match.includes('！') || match.includes('!')) return 'ワン！';
+                if (match.includes('？') || match.includes('?')) return 'ワン？';
+                return 'ワン' + match;
+            });
+            return newPhrase;
+        }
+        
+        return phrase;
+    }
+
     function resetIdleTimer() {
         clearIdleTimer();
         if (isVoicevoxEnabled && isIdleSpeechEnabled && tiktokWs && tiktokWs.readyState === WebSocket.OPEN) {
             idleSpeechTimer = setTimeout(() => {
                 if (!isVoicevoxPlaying && voicevoxAudioQueue.length === 0 && isVoicevoxEnabled && isIdleSpeechEnabled) {
-                    const phrases = [
-                        // 定番の相槌・日常のつぶやき
-                        "んー？", "ふふっ", "ねえねえ", "なにかコメントしてね！", "あはは", "そういえばさー", "あくびでそう", "おちゃのみたいなぁ",
-                        "みんなげんきー？", "きょうはなにしてたの？", "かた、こってきたかも", "ストレッチしよっと",
-                        "ぼーっとしてた", "がめんのまえのあなた！みえてるよー", "コメントくれると、うれしいな",
-                        "よかったら、ハートおしてね", "シェアもだいかんげいだよ！", "しょけんさんも、ゆっくりしていってね", 
-                        
-                        // 配信者らしい、自然で親しみやすいセリフ
-                        "きょうのごはん、なににしようかなー",
-                        "みんなはもう、よるごはんたべたー？",
-                        "のどかわいたなー、おちゃのもうっと",
-                        "あした、はやくおきなきゃいけないんだよね……おきれるかな",
-                        "ずっとすわってると、こしがいたくなってくるかも",
-                        "なにか、おもしろいはなしない？",
-                        "コメントないとさみしいなー……チラッ",
-                        "みんな、さいきんはまってることとかある？",
-                        "おやすみのひは、なにすることがおおい？",
-                        "ああー、ねむくなってきたかも……だめだめ！",
-                        "みんな、いつもみにきてくれて、ほんとうにありがとうね",
-                        "つぎ、なんのはなししよっかー？",
-                        "あ、そうそう！きのうね……あ、なんでもない、わすれちゃった",
-                        "ちょっとそこのきみ！みてくれてるの、わかってるんだからねー",
-                        "はぁ……、なんかあまいものたべたくなってきたなぁ",
-                        "きょうもいちにち、おつかれさまだよー！",
-                        "なにかしつもんあったら、なんでもきいてね！",
-                        "フォローといいね、よろしくねー！",
-                        "このはいしん、たのしんでくれてるかな？",
-                        "そろそろのびしないと、からだがバキバキになりそう",
-                        "ねえねえ、いまヒマしてる？よかったらおはなししようよ",
-                        "なんだかおなかすいちゃった……グゥーってならないといいな",
-                        "いまのじかんって、みんないそがしいのかな？",
-                        "きょうもあいにきてくれて、うれしいよ",
-                        "あめとかふってない？おてんきだいじょうぶかな"
-                    ];
-                    
-                    const longStories = [
-                        "きょうね、みちをあるいてたら、おおきなネコがいてさ。ニャーってないたから、ニャーってかえしたら、すごいへんなかおでみられちゃった！……ひどくない？",
-                        "このあいだ、おかいものにいったとき、おさいふわすれちゃって。レジで『あ！』ってなって、ダッシュでいえにかえったんだよね。ほんと、はずかしかったなー",
-                        "むかしむかし、あるところに、とってもおおきなプリンがありました。そのプリンはまちのまんなかにドーンとあって、みんなのあこがれでした……っていうゆめをみたんだよね！",
-                        "さいきん、へやのかたづけをしてたら、むかしのおもちゃがでてきてさ。なつかしくて、ついついあそんじゃって、けっきょくかたづけがおわらなかったんだよねー",
-                        "あ！そういえば、きのうスーパーにいったとき、たまごがすごくやすくてさ。よっしゃー！ってかってかえったら、いえのれいぞうこにまだいっぱいあったの……あるあるだよね？",
-                        "きのうね、こわいゆめみたの。おおきなピーマンにおっかけられるゆめ！……わたし、ピーマンきらいじゃないのに、なんでだろう？",
-                        "あのね、もしわたしがまほうをつかえたら、みんなのきょうのゆうはんを、ぜんぶオムライスにするまほうをかけるよ！……えへへ、おいしそうでしょ？"
-                    ];
-
+                    const isZunda = isZundamonSelected() && currentModelId === 'hiyori';
                     let phrase = "";
-                    // 10%の確率で長めの作り話（雑談）をする
-                    if (Math.random() < 0.10) {
-                        phrase = longStories[Math.floor(Math.random() * longStories.length)];
+                    const getValidPhrase = (categoryObj) => {
+                        const h = new Date().getHours();
+                        let timeCategory = "night";
+                        if (h >= 5 && h < 11) timeCategory = "morning";
+                        else if (h >= 11 && h < 18) timeCategory = "afternoon";
+                        
+                        const availablePhrases = [...categoryObj.general, ...categoryObj[timeCategory]];
+                        return availablePhrases[Math.floor(Math.random() * availablePhrases.length)];
+                    };
+
+                    if (isZunda) {
+                        phrase = Math.random() < 0.15 ? getValidPhrase(ZUNDA_LONG_STORIES) : getValidPhrase(ZUNDA_PHRASES);
                     } else {
-                        phrase = phrases[Math.floor(Math.random() * phrases.length)];
+                        phrase = Math.random() < 0.15 ? getValidPhrase(NORMAL_LONG_STORIES) : getValidPhrase(NORMAL_PHRASES);
                     }
+
+                    // 感情アニメーションの設定
+                    if (phrase.includes("チラッ")) {
+                        aiEmotion = 'glance';
+                    } else if (phrase.includes("だめだめ") || phrase.includes("ひどくない") || phrase.includes("はずかしかった")) {
+                        aiEmotion = 'sad';
+                    } else {
+                        aiEmotion = 'joy';
+                    }
+
+                    // モデルに応じた語尾の調整
+                    phrase = adjustIdlePhraseForModel(phrase, currentModelId);
                     
+                    console.log(`[独り言] ${phrase}`);
+                    
+                    // 独り言も会話履歴に追加し、視聴者が独り言に反応した時に文脈が繋がるようにする
+                    if (typeof aiChatHistory !== 'undefined') {
+                        aiChatHistory.push({ role: 'assistant', content: phrase });
+                        if (aiChatHistory.length > 10) aiChatHistory.shift();
+                    }
+
                     queueVoicevoxAudio(phrase);
                 }
             }, 5000);
@@ -2068,6 +2235,24 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!queryRes.ok) throw new Error('Audio query failed');
             const queryJson = await queryRes.json();
+
+            // 語尾のイントネーション調整
+            const cleanText = text.trim();
+            if (cleanText.match(/のだ[！!ー…\.。]*$/) || cleanText.match(/なのだ[！!ー…\.。]*$/)) {
+                // ずんだもんの「のだ」：語尾を自然に下げるため、最後の文字（だ）のピッチを静かに落とす
+                const phrases = queryJson.accent_phrases;
+                if (phrases && phrases.length > 0) {
+                    const lastPhrase = phrases[phrases.length - 1];
+                    if (lastPhrase.moras && lastPhrase.moras.length > 0) {
+                        const len = lastPhrase.moras.length;
+                        // 「の」が跳ね上がるのを防ぐため、アクセントは変更せずピッチの数値だけを滑らかに下げる
+                        lastPhrase.moras[len - 1].pitch -= 0.8;
+                        if (len > 1) {
+                            lastPhrase.moras[len - 2].pitch -= 0.2;
+                        }
+                    }
+                }
+            }
 
             // 2. Synthesis
             const synthRes = await fetch(`http://127.0.0.1:50021/synthesis?speaker=${speakerId}`, {
