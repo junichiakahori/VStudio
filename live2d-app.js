@@ -2076,9 +2076,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (aiResponseText) {
                 // アシスタントの返答を履歴に追加
                 aiChatHistory.push({ role: 'assistant', content: aiResponseText });
+                // 感情タグの抽出と除去
+                let finalSpokenText = aiResponseText;
+                const emotionMatch = finalSpokenText.match(/^\[(.*?)\]/);
+                if (emotionMatch) {
+                    finalSpokenText = finalSpokenText.replace(/^\[.*?\]\s*/, '');
+                }
                 
                 // 読み上げ用のクリーンアップ（絵文字除去など）
-                const cleanResponse = aiResponseText.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+                const cleanResponse = finalSpokenText.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
                 if (cleanResponse.length > 0) {
                     queueVoicevoxAudio(cleanResponse);
                 }
