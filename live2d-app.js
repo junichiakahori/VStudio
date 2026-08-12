@@ -92,14 +92,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Live2D パラメータ (目標値)
     let tAngleX = 0, tAngleY = 0, tAngleZ = 0;
-    let tEyeLOpen = 1, tEyeROpen = 1;
+    let tEyeLOpen = 0.85, tEyeROpen = 0.85;
     let tMouthOpen = 0;
     let tEyeBallX = 0, tEyeBallY = 0;
     let tBreath = 0;
 
     // 補間済みの現在値
     let cAngleX = 0, cAngleY = 0, cAngleZ = 0;
-    let cEyeLOpen = 1, cEyeROpen = 1;
+    let cEyeLOpen = 0.85, cEyeROpen = 0.85;
     let cMouthOpen = 0;
     let cEyeBallX = 0, cEyeBallY = 0;
     let cBreath = 0;
@@ -473,6 +473,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 set('ParamHandRB', cHandRBVal);
                 set('ParamHandL', cHandLForm);
                 set('ParamHandR', cHandRForm);
+            } else if (currentModelId === 'tororo' || currentModelId === 'hijiki') {
+                // とろろ・ひじき用のリラックス表情（黒目を太く、少しトロッと）
+                set('PARAM_EYE_FORM', 1.0); 
+                set('PARAM_EYE_L_OPEN', cEyeLOpen * 0.7);
+                set('PARAM_EYE_R_OPEN', cEyeROpen * 0.7);
             }
         } catch(e) {}
 
@@ -522,8 +527,8 @@ document.addEventListener('DOMContentLoaded', () => {
             tEyeROpen = 0;
             setTimeout(() => {
                 isBlinking = false;
-                tEyeLOpen = 1;
-                tEyeROpen = 1;
+                tEyeLOpen = 0.85;
+                tEyeROpen = 0.85;
                 scheduleBlink();
             }, 120);
         }, delay);
@@ -637,7 +642,7 @@ document.addEventListener('DOMContentLoaded', () => {
         video.srcObject = null;
         video.onloadeddata = null;
         cameraPreviewContainer.classList.remove('visible');
-        tEyeLOpen = 1; tEyeROpen = 1; tMouthOpen = 0;
+        tEyeLOpen = 0.85; tEyeROpen = 0.85; tMouthOpen = 0;
         
         tArmLA = 0.0; tArmLB = 0.0;
         tArmRA = 0.0; tArmRB = 0.0;
@@ -681,8 +686,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 tEyeBallY =  pitch * 0.8;
 
                 const getBS = name => { const c = bs.find(x => x.categoryName === name); return c ? c.score : 0; };
-                tEyeLOpen   = Math.max(0, 1 - getBS('eyeBlinkLeft')  * 2.5);
-                tEyeROpen   = Math.max(0, 1 - getBS('eyeBlinkRight') * 2.5);
+                tEyeLOpen   = Math.min(0.85, Math.max(0, 1 - getBS('eyeBlinkLeft')  * 2.5));
+                tEyeROpen   = Math.min(0.85, Math.max(0, 1 - getBS('eyeBlinkRight') * 2.5));
                 tMouthOpen  = Math.min(1, Math.max(0, (getBS('jawOpen') - 0.05) / 0.4));
                 tBreath     = 0.5;
 
@@ -734,7 +739,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 if (isFaceDetected) {
                     isFaceDetected = false;
-                    tEyeLOpen = 1; tEyeROpen = 1; tMouthOpen = 0;
+                    tEyeLOpen = 0.85; tEyeROpen = 0.85; tMouthOpen = 0;
                     scheduleBlink();
                 }
             }
