@@ -58,11 +58,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyUrlBtn     = document.getElementById('copy-url-btn');
     const obsGreenToggle = document.getElementById('obs-green-toggle');
 
-    // TikTok & VOICEVOX DOM
+    // TikTok & YouTube & VOICEVOX DOM
     const tiktokUserInput    = document.getElementById('tiktok-username-input');
     const tiktokConnectBtn   = document.getElementById('tiktok-connect-btn');
-    const voicevoxToggle     = document.getElementById('voicevox-toggle');
     const tiktokStatus       = document.getElementById('tiktok-status');
+    const youtubeUserInput   = document.getElementById('youtube-video-input');
+    const youtubeConnectBtn  = document.getElementById('youtube-connect-btn');
+    const youtubeStatus      = document.getElementById('youtube-status');
+    const voicevoxToggle     = document.getElementById('voicevox-toggle');
     const voicevoxSpeakerId  = document.getElementById('voicevox-speaker-id');
 
     // デバッグスライダーDOM
@@ -138,8 +141,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let cMaskScale = 1.0;
     let cMaskRotation = 0;
 
-    // TikTok & VOICEVOX 状態変数
+    // TikTok & YouTube & VOICEVOX 状態変数
     let tiktokWs = null;
+    let youtubeWs = null;
     let isVoicevoxEnabled = false;
     let voicevoxAudioQueue = [];
     let isVoicevoxPlaying = false;
@@ -1915,6 +1919,91 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    if (youtubeConnectBtn) {
+        youtubeConnectBtn.addEventListener('click', () => {
+            const videoId = youtubeUserInput.value.trim();
+            if (!videoId) {
+                alert('YouTubeの動画IDを入力してください');
+                return;
+            }
+            localStorage.setItem('savedYoutubeId', videoId);
+
+            if (youtubeWs && youtubeWs.readyState === WebSocket.OPEN) {
+                youtubeWs.send(JSON.stringify({ type: 'disconnect_youtube' }));
+                youtubeWs.close();
+                youtubeWs = null;
+                youtubeConnectBtn.textContent = '接続';
+                youtubeConnectBtn.style.background = '#ff0000';
+                youtubeStatus.textContent = '未接続';
+                return;
+            }
+
+            youtubeStatus.textContent = '接続中...';
+            youtubeWs = new WebSocket('ws://localhost:8768');
+
+            youtubeWs.onopen = () => {
+                youtubeWs.send(JSON.stringify({ type: 'connect_youtube', video_id: videoId }));
+                youtubeConnectBtn.textContent = '切断';
+                youtubeConnectBtn.style.background = 'var(--danger, #ff4444)';
+            };
+
+            youtubeWs.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'status') {
+                        youtubeStatus.textContent = data.message;
+                        if (data.status === 'error' || data.status === 'disconnected') {
+                            if (youtubeWs) {
+                                youtubeWs.close();
+                                youtubeWs = null;
+                            }
+                            youtubeConnectBtn.textContent = '接続';
+                            youtubeConnectBtn.style.background = '#ff0000';
+                        }
+                    } else if (data.type === 'comment') {
+                        console.log(`[YouTube] ${data.nickname}: ${data.comment}`);
+                        addCommentToUI(data.nickname, data.comment, 'youtube');
+                        if (isVoicevoxEnabled && !isVoicevoxPlaying && voicevoxAudioQueue.length === 0 && !isVoicevoxFetching) {
+                            speakText(data.comment);
+                        } else if (isVoicevoxEnabled) {
+                            voicevoxAudioQueue.push(data.comment);
+                        }
+                    } else if (data.type === 'gift') {
+                        console.log(`[YouTube SuperChat] ${data.nickname} sent ${data.amount}`);
+                        addCommentToUI(data.nickname, `【スパチャ】${data.amount}`, 'youtube');
+                        if (isVoicevoxEnabled) {
+                            speakText(`${data.nickname}さん、スーパーチャットありがとう！`);
+                        }
+                        const rIndex = Math.floor(Math.random() * EXPRESSIONS.length);
+                        setExpression(EXPRESSIONS[rIndex]);
+                        setTimeout(() => { setExpression(null); }, 3000);
+                    }
+                } catch (e) {
+                    console.error('YouTube WS parse error', e);
+                }
+            };
+
+            youtubeWs.onclose = () => {
+                youtubeStatus.textContent = '未接続';
+                youtubeConnectBtn.textContent = '接続';
+                youtubeConnectBtn.style.background = '#ff0000';
+                if (typeof clearIdleTimer === 'function') clearIdleTimer();
+            };
+
+            youtubeWs.onerror = (err) => {
+                console.error('YouTube WS error', err);
+                youtubeStatus.textContent = '接続エラー';
+                if (typeof clearIdleTimer === 'function') clearIdleTimer();
+            };
+        });
+
+        const savedYoutubeId = localStorage.getItem('savedYoutubeId');
+        if (savedYoutubeId && youtubeUserInput) {
+            youtubeUserInput.value = savedYoutubeId;
+        }
+    }
+
+
     async function fetchWebSearch(query) {
         try {
             const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
@@ -2241,7 +2330,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resetIdleTimer() {
         clearIdleTimer();
-        if (isVoicevoxEnabled && isIdleSpeechEnabled && tiktokWs && tiktokWs.readyState === WebSocket.OPEN) {
+        const isTiktokActive = tiktokWs && tiktokWs.readyState === WebSocket.OPEN;
+        const isYoutubeActive = youtubeWs && youtubeWs.readyState === WebSocket.OPEN;
+        
+        if (isVoicevoxEnabled && isIdleSpeechEnabled && (isTiktokActive || isYoutubeActive)) {
             idleSpeechTimer = setTimeout(() => {
                 if (!isVoicevoxPlaying && voicevoxAudioQueue.length === 0 && isVoicevoxEnabled && isIdleSpeechEnabled) {
                     const isZunda = isZundamonSelected() && currentModelId === 'hiyori';

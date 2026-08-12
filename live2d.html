@@ -168,7 +168,7 @@
                 </div>
             </div>
             <div class="panel-section" id="tiktok-section">
-                <h3><span class="icon">🎵</span>TikTok & VOICEVOX</h3>
+                <h3><span class="icon">🎵</span>Live Chat & VOICEVOX</h3>
                 <div class="control-group">
                     <label style="display:block;margin-bottom:0.5rem;font-size:0.8rem;color:var(--text-muted);">TikTok ID (@不要)</label>
                     <div style="display:flex;gap:0.5rem;">
@@ -176,6 +176,14 @@
                         <button id="tiktok-connect-btn" class="btn" style="background:var(--primary);color:#000;border:none;border-radius:6px;padding:0 1rem;font-weight:bold;cursor:pointer;">接続</button>
                     </div>
                     <div id="tiktok-status" style="font-size:0.72rem;margin-top:0.5rem;color:var(--text-muted);">未接続</div>
+                </div>
+                <div class="control-group" style="margin-top:10px;">
+                    <label style="display:block;margin-bottom:0.5rem;font-size:0.8rem;color:var(--text-muted);">YouTube Video ID (URLのv=以降)</label>
+                    <div style="display:flex;gap:0.5rem;">
+                        <input type="text" id="youtube-video-input" placeholder="Video ID (e.g. dQw4w9WgXcQ)" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.8rem;outline:none;">
+                        <button id="youtube-connect-btn" class="btn" style="background:#ff0000;color:#fff;border:none;border-radius:6px;padding:0 1rem;font-weight:bold;cursor:pointer;">接続</button>
+                    </div>
+                    <div id="youtube-status" style="font-size:0.72rem;margin-top:0.5rem;color:var(--text-muted);">未接続</div>
                 </div>
                 <div class="control-group">
                     <label class="switch-label">
@@ -201,6 +209,7 @@
                     <strong style="color:#ff9900;display:block;margin-bottom:0.3rem;">⚙️ 事前準備</strong>
                     1. ターミナルで実行:<br>
                     <code style="background:rgba(0,0,0,0.4);padding:3px 6px;border-radius:4px;font-size:0.65rem;display:block;margin:4px 0;color:#0f0;">python3 tiktok_comment_server.py</code>
+                    <code style="background:rgba(0,0,0,0.4);padding:3px 6px;border-radius:4px;font-size:0.65rem;display:block;margin:4px 0;color:#0f0;">python3 youtube_comment_server.py</code>
                     2. <strong style="color:#00f3ff;">VOICEVOX</strong> を起動しておく
                 </div>
             </div>
@@ -325,7 +334,7 @@
     <script src="live2dcubismcore.min.js"></script>
     <!-- pixi-live2d-display v0.4 -->
     <script src="pixi-live2d-display.min.js"></script>
-    <script src="idle_phrases.js?v=3.8"></script>
-    <script src="live2d-app.js?v=3.8"></script>
+    <script src="idle_phrases.js?v=3.9"></script>
+    <script src="live2d-app.js?v=3.9"></script>
 </body>
 </html>
