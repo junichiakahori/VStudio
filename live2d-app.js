@@ -2101,6 +2101,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function isZundamonSelected() {
+        const voicevoxSpeakerId = document.getElementById('voicevox-speaker-id');
+        return voicevoxSpeakerId && voicevoxSpeakerId.options[voicevoxSpeakerId.selectedIndex]?.text.includes("ずんだもん");
+    }
+
+    function getTimeGreeting() {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 11) return "おはよう";
+        if (hour >= 11 && hour < 18) return "こんにちは";
+        return "こんばんは";
+    }
+
     function adjustIdlePhraseForModel(phrase, modelId) {
         if (modelId === 'hiyori') {
             return phrase;
