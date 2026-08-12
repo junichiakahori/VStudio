@@ -1898,7 +1898,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 tiktokStatus.textContent = '未接続';
                 tiktokConnectBtn.textContent = '接続';
                 tiktokConnectBtn.style.background = 'var(--primary)';
-                if (typeof clearIdleTimer === 'function') clearIdleTimer();
             };
 
             tiktokWs.onerror = (err) => {
@@ -2024,7 +2023,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 youtubeStatus.textContent = '未接続';
                 youtubeConnectBtn.textContent = '接続';
                 youtubeConnectBtn.style.background = '#ff0000';
-                if (typeof clearIdleTimer === 'function') clearIdleTimer();
             };
 
             youtubeWs.onerror = (err) => {
@@ -2520,6 +2518,10 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSettings();
     buildModelGrid();
     initPixi();
+
+    if (isIdleSpeechEnabled && typeof resetIdleTimer === 'function') {
+        resetIdleTimer();
+    }
 
     const initialModel = MODELS.find(m => m.id === currentModelId) || MODELS[0];
     loadModel(initialModel);
