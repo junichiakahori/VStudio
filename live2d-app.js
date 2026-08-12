@@ -2069,7 +2069,10 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (aiResponseText) {
                 // Agentic Auto-Search Loop: もしAIが [search] キーワード と返してきた場合、検索して再帰実行
-                const autoSearchMatch = aiResponseText.match(/^\[search\]\s*(.*)/i);
+                // 感情タグ（[neutral]など）が先頭に付いている場合を考慮して除去してから判定する
+                const textForSearchCheck = aiResponseText.replace(/^\[.*?\]\s*/, '');
+                const autoSearchMatch = textForSearchCheck.match(/^\[search\]\s*(.*)/i);
+                
                 if (autoSearchMatch && aiSearchSelect && aiSearchSelect.value === 'ddg') {
                     if (!autoContext) {
                         const query = autoSearchMatch[1].trim();
