@@ -1960,23 +1960,59 @@ document.addEventListener('DOMContentLoaded', () => {
                             youtubeConnectBtn.textContent = '接続';
                             youtubeConnectBtn.style.background = '#ff0000';
                         }
-                    } else if (data.type === 'comment') {
-                        console.log(`[YouTube] ${data.nickname}: ${data.comment}`);
-                        addCommentToUI(data.nickname, data.comment, 'youtube');
-                        if (isVoicevoxEnabled && !isVoicevoxPlaying && voicevoxAudioQueue.length === 0 && !isVoicevoxFetching) {
-                            speakText(data.comment);
-                        } else if (isVoicevoxEnabled) {
-                            voicevoxAudioQueue.push(data.comment);
-                        }
                     } else if (data.type === 'gift') {
                         console.log(`[YouTube SuperChat] ${data.nickname} sent ${data.amount}`);
-                        addCommentToUI(data.nickname, `【スパチャ】${data.amount}`, 'youtube');
                         if (isVoicevoxEnabled) {
-                            speakText(`${data.nickname}さん、スーパーチャットありがとう！`);
+                            const cleanName = data.nickname.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+                            if (cleanName.length > 0) {
+                                aiEmotion = 'joy';
+                                const zunda = isZundamonSelected() && currentModelId === 'hiyori';
+                                let greet = zunda ? `${cleanName}さん、スーパーチャットありがとうなのだ！` : `${cleanName}さん、スーパーチャットありがとう！`;
+                                greet = adjustIdlePhraseForModel(greet, currentModelId);
+                                queueVoicevoxAudio(greet);
+                            }
                         }
-                        const rIndex = Math.floor(Math.random() * EXPRESSIONS.length);
-                        setExpression(EXPRESSIONS[rIndex]);
-                        setTimeout(() => { setExpression(null); }, 3000);
+                    } else if (data.type === 'comment') {
+                        console.log(`[YouTube] @${data.nickname}: ${data.comment}`);
+                        if (isVoicevoxEnabled) {
+                            const cleanNickname = data.nickname.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+                            const cleanComment = data.comment.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+                            if (cleanComment.length > 0) {
+                                aiEmotion = guessEmotionFromText(cleanComment);
+                                queueVoicevoxAudio(`${cleanNickname}さん、${cleanComment}`);
+
+                                if (isAiReplyEnabled && aiApiKeyInput && aiApiKeyInput.value.trim().length > 0) {
+                                    generateAIResponse(cleanNickname, cleanComment);
+                                } else {
+                                    const timeGreeting = getTimeGreeting();
+                                    const zunda = isZundamonSelected() && currentModelId === 'hiyori';
+                                    const replies = [
+                                        { keywords: ["おはよう", "おは", "こんにちは", "こんちわ", "こんばん", "やっほ", "ハロー"], response: zunda ? `${timeGreeting}ー！来てくれてありがとうなのだ！` : `${timeGreeting}ー！来てくれてありがとう！` },
+                                        { keywords: ["かわいい", "可愛い", "カワイイ", "かわちい", "美人", "きれい"], response: zunda ? "えへへ、褒められちゃったのだ！ありがとうなのだ！" : "えへへ、褒められちゃった！ありがとう！" },
+                                        { keywords: ["初見", "しょけん"], response: zunda ? "初見さん、初めましてなのだ！ゆっくりしていってほしいのだ！" : "初見さん、初めまして！ゆっくりしていってね！" },
+                                        { keywords: ["草", "w", "ｗ", "ウケる", "笑", "ワロタ"], response: zunda ? "あはははなのだっ！" : "あはははっ！" },
+                                        { keywords: ["おつ", "お疲れ", "おつかれ", "バイバイ", "おやすみ", "寝る"], response: zunda ? "お疲れ様なのだー！またねなのだ！" : "お疲れ様ー！またね！" },
+                                        { keywords: ["？", "?", "なんで", "どうして"], response: zunda ? "んー、どうだろうねー？私には分かんないのだ！" : "んー、どうだろうねー？私には分かんないや！" }
+                                    ];
+
+                                    let replied = false;
+                                    for (const rule of replies) {
+                                        if (rule.keywords.some(kw => cleanComment.includes(kw))) {
+                                            const adjustedReply = adjustIdlePhraseForModel(rule.response, currentModelId);
+                                            queueVoicevoxAudio(adjustedReply);
+                                            replied = true;
+                                            break;
+                                        }
+                                    }
+
+                                    if (!replied && Math.random() < 0.20) {
+                                        const genericReplies = ["なるほどなるほどー", "たしかにー！", "へぇー！", "そうんだね！", "わかるわかるー"];
+                                        const adjustedReply = adjustIdlePhraseForModel(genericReplies[Math.floor(Math.random() * genericReplies.length)], currentModelId);
+                                        queueVoicevoxAudio(adjustedReply);
+                                    }
+                                }
+                            }
+                        }
                     }
                 } catch (e) {
                     console.error('YouTube WS parse error', e);
