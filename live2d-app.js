@@ -1976,7 +1976,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // API制限（429エラー）防止：AIが考え中、または前回の送信から5秒以内ならスキップ
         if (isAiGenerating) return;
         const nowMs = Date.now();
-        if (nowMs - lastAiRequestTime < 5000) return;
+        if (!autoContext && nowMs - lastAiRequestTime < 5000) return;
         isAiGenerating = true;
         lastAiRequestTime = nowMs;
 
