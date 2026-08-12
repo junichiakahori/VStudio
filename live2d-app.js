@@ -1930,7 +1930,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return '';
     }
 
-    async function generateAIResponse(nickname, comment) {
+    async function generateAIResponse(nickname, comment, autoContext = "") {
         if (!aiApiKeyInput || !aiProviderSelect || !aiSystemPromptInput) return;
         const apiKey = aiApiKeyInput.value.trim();
         const provider = aiProviderSelect.value;
