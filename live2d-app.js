@@ -2357,6 +2357,11 @@ document.addEventListener('DOMContentLoaded', () => {
     updateObsUrl();
 
     // Browser Autoplay Policy: unlock audio context on first user click/touch/keypress
+    const audioUnlockBanner = document.getElementById('audio-unlock-banner');
+    if (audioUnlockBanner && !isObsMode) {
+        audioUnlockBanner.style.display = 'block';
+    }
+
     const unlockAudio = () => {
         if (!voicevoxAudioContext) {
             voicevoxAudioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -2364,9 +2369,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (voicevoxAudioContext.state === 'suspended') {
             voicevoxAudioContext.resume().then(() => {
                 console.log('[VOICEVOX] AudioContext successfully resumed/unlocked via user interaction! State:', voicevoxAudioContext.state);
+                if (audioUnlockBanner) audioUnlockBanner.style.display = 'none';
             }).catch(e => {
                 console.error('[VOICEVOX] Failed to resume AudioContext on gesture:', e);
             });
+        } else {
+            if (audioUnlockBanner) audioUnlockBanner.style.display = 'none';
         }
     };
     window.addEventListener('click', unlockAudio, { once: true });

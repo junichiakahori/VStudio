@@ -12,6 +12,10 @@
 </head>
 <body>
     <div class="app-container">
+        <!-- 音声ロック解除用警告バナー -->
+        <div id="audio-unlock-banner" style="display:none; position:fixed; top:20px; left:50%; transform:translateX(-50%); background:rgba(255, 68, 68, 0.95); color:#fff; padding:12px 24px; border-radius:30px; font-weight:bold; font-size:0.85rem; z-index:9999; box-shadow:0 8px 25px rgba(0,0,0,0.4); cursor:pointer; pointer-events:auto; border:2px solid #fff; font-family:'Noto Sans JP', sans-serif; letter-spacing: 0.5px;">
+            🔊 画面をどこでもクリックして、音声（VOICEVOX）を有効にしてください！
+        </div>
         <div class="avatar-viewport" id="avatar-viewport">
             <div class="background-layer" id="background-layer"></div>
             <canvas id="live2d-canvas"></canvas>
