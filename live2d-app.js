@@ -1982,7 +1982,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // DuckDuckGo検索の実行（必要な場合）
         let searchContext = "";
-        if (aiSearchSelect && aiSearchSelect.value === 'ddg') {
+        if (!autoContext && aiSearchSelect && aiSearchSelect.value === 'ddg') {
             const needsSearch = /天気|お天気|気温|ニュース|最新|トレンド|話題|どうなった|って何|とは|だれ|誰|何歳|何才|ドル円|為替|株価|円安|円高|ビットコイン|仮想通貨|教えて|調べて/i.test(comment);
             if (needsSearch) {
                 // カッコ書きや「再送」などのノイズを除去して検索精度を高める
@@ -1994,6 +1994,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
+        
+        const finalSearchContext = autoContext || searchContext;
 
         // 会話履歴にユーザーコメントを追加
         aiChatHistory.push({ role: 'user', content: `${nickname} says: ${comment}` });
@@ -2004,11 +2006,11 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             if (provider === 'openai') {
                 const tempHistory = [...aiChatHistory];
-                if (searchContext && tempHistory.length > 0) {
+                if (finalSearchContext && tempHistory.length > 0) {
                     const lastMsg = tempHistory[tempHistory.length - 1];
                     tempHistory[tempHistory.length - 1] = {
                         role: lastMsg.role,
-                        content: lastMsg.content + `\n\n[検索結果の参考情報]:\n${searchContext}\n\n上記の検索結果（最新情報）から具体的な情報を読み取り、必ずその内容（具体的な曲名、天気、ニュース内容など）を【すべてひらがな・カタカナ】でユーザーに教えてあげてください。`
+                        content: lastMsg.content + `\n\n[検索結果の参考情報]:\n${finalSearchContext}\n\n上記の検索結果（最新情報）から具体的な情報を読み取り、必ずその内容（具体的な曲名、天気、ニュース内容など）を【すべてひらがな・カタカナ】でユーザーに教えてあげてください。`
                     };
                 }
                 const messages = [{ role: 'system', content: systemPrompt }, ...tempHistory];
@@ -2040,9 +2042,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     parts: [{ text: msg.content }]
                 }));
 
-                if (searchContext && geminiContents.length > 0) {
+                if (finalSearchContext && geminiContents.length > 0) {
                     const lastMsg = geminiContents[geminiContents.length - 1];
-                    lastMsg.parts[0].text += `\n\n[検索結果の参考情報]:\n${searchContext}\n\n上記の検索結果（最新情報）から具体的な情報を読み取り、必ずその内容（具体的な曲名、天気、ニュース内容など）を【すべてひらがな・カタカナ】でユーザーに教えてあげてください。`;
+                    lastMsg.parts[0].text += `\n\n[検索結果の参考情報]:\n${finalSearchContext}\n\n上記の検索結果（最新情報）から具体的な情報を読み取り、必ずその内容（具体的な曲名、天気、ニュース内容など）を【すべてひらがな・カタカナ】でユーザーに教えてあげてください。`;
                 }
 
                 const payload = {
@@ -2074,6 +2076,20 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             if (aiResponseText) {
+                // Agentic Auto-Search Loop: もしAIが [search] キーワード と返してきた場合、検索して再帰実行
+                const autoSearchMatch = aiResponseText.match(/^\[search\]\s*(.*)/i);
+                if (autoSearchMatch && !autoContext && aiSearchSelect && aiSearchSelect.value === 'ddg') {
+                    const query = autoSearchMatch[1].trim();
+                    if (query) {
+                        console.log("[Agent] AI requested auto-search for:", query);
+                        aiChatHistory.pop(); // 追加したユーザーメッセージを一旦消す（再帰時にまた追加されるため）
+                        isAiGenerating = false;
+                        const newContext = await fetchWebSearch(query);
+                        // 再帰呼び出しで検索結果付きでリトライ
+                        return generateAIResponse(nickname, comment, newContext);
+                    }
+                }
+
                 // アシスタントの返答を履歴に追加
                 aiChatHistory.push({ role: 'assistant', content: aiResponseText });
                 // 感情タグの抽出と除去
