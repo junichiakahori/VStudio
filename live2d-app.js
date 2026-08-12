@@ -1954,7 +1954,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const activeCharacterInstruction = modelCharacterInstruction || zundamonInstruction;
 
-        const emotionInstruction = "\n\n【重要】返答の先頭に必ず [joy], [angry], [sad], [neutral] のいずれかの感情タグをつけてください。例: [joy]わーい！\nまた、音声読み上げのエラーを完全に防ぐため、出力はすべて【ひらがなとカタカナのみ】で記述し、漢字は絶対に使わないでください。助詞の「は」は「わ」、「へ」は「え」と発音通りに書いてください。（例：こんにちわ、わたしわ）" + activeCharacterInstruction;
+        const emotionInstruction = "\n\n【重要】返答の先頭に必ず [joy], [angry], [sad], [neutral] のいずれかの感情タグをつけてください。例: [joy]わーい！\nまた、音声読み上げのエラーを完全に防ぐため、数字は算用数字（例: 67,044）のまま出力し、それ以外の文章はすべて【ひらがなとカタカナのみ】で記述し、漢字は絶対に使わないでください。助詞の「は」は「わ」、「へ」は「え」と発音通りに書いてください。（例：こんにちわ、わたしわ）" + activeCharacterInstruction;
         
         const now = new Date();
         const currentMonth = now.getMonth() + 1;
