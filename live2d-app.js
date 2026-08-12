@@ -2004,6 +2004,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let aiResponseText = "";
 
         try {
+            let currentSystemPrompt = systemPrompt;
+            if (finalSearchContext) {
+                currentSystemPrompt += "\n【絶対厳守】すでに最新の検索結果を提供しました。これ以上 `[search]` タグを出力してはいけません。必ず提供された検索結果をもとに、知っているふりをして回答を作成してください。";
+            }
+
             if (provider === 'openai') {
                 const tempHistory = [...aiChatHistory];
                 if (finalSearchContext && tempHistory.length > 0) {
@@ -2013,7 +2018,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         content: lastMsg.content + `\n\n[検索結果の参考情報]:\n${finalSearchContext}\n\n上記の検索結果（最新情報）から具体的な情報を読み取り、必ずその内容（具体的な曲名、天気、ニュース内容など）を【すべてひらがな・カタカナ】でユーザーに教えてあげてください。`
                     };
                 }
-                const messages = [{ role: 'system', content: systemPrompt }, ...tempHistory];
+                const messages = [{ role: 'system', content: currentSystemPrompt }, ...tempHistory];
                 const res = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
                     headers: {
@@ -2048,7 +2053,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const payload = {
-                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                    systemInstruction: { parts: [{ text: currentSystemPrompt }] },
                     contents: geminiContents
                 };
 
