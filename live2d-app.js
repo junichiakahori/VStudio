@@ -2015,7 +2015,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const lastMsg = tempHistory[tempHistory.length - 1];
                     tempHistory[tempHistory.length - 1] = {
                         role: lastMsg.role,
-                        content: lastMsg.content + `\n\n[検索結果の参考情報]:\n${finalSearchContext}\n\n上記の検索結果（最新情報）から具体的な情報を読み取り、必ずその内容（具体的な曲名、天気、ニュース内容など）を【すべてひらがな・カタカナ】でユーザーに教えてあげてください。`
+                        content: lastMsg.content + `\n\n[検索結果の参考情報]:\n${finalSearchContext}\n\n上記の検索結果（最新情報）から具体的な情報を読み取り、必ずその内容をユーザーに教えてあげてください。その際、数字は算用数字（例: 67,044）のまま出力し、それ以外の文章を【すべてひらがな・カタカナ】で出力してください。`
                     };
                 }
                 const messages = [{ role: 'system', content: currentSystemPrompt }, ...tempHistory];
@@ -2049,7 +2049,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (finalSearchContext && geminiContents.length > 0) {
                     const lastMsg = geminiContents[geminiContents.length - 1];
-                    lastMsg.parts[0].text += `\n\n[検索結果の参考情報]:\n${finalSearchContext}\n\n上記の検索結果（最新情報）から具体的な情報を読み取り、必ずその内容（具体的な曲名、天気、ニュース内容など）を【すべてひらがな・カタカナ】でユーザーに教えてあげてください。`;
+                    lastMsg.parts[0].text += `\n\n[検索結果の参考情報]:\n${finalSearchContext}\n\n上記の検索結果（最新情報）から具体的な情報を読み取り、必ずその内容をユーザーに教えてあげてください。その際、数字は算用数字（例: 67,044）のまま出力し、それ以外の文章を【すべてひらがな・カタカナ】で出力してください。`;
                 }
 
                 const payload = {
