@@ -1523,7 +1523,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const savedPrompt = localStorage.getItem('savedAiPrompt');
         if (savedPrompt) {
             const oldDefault = 'あなたは元気で明るい女の子のVTuberです。視聴者からのコメントに対して、タメ口で親しみやすく、一言で短く返答してください。「文字」や「制限」などのAIの設定に関する言葉は絶対に口に出さないでください。';
-            const newDefault = 'あなたは元気で明るい女の子のVTuberです。視聴者からのコメントに対して、タメ口で親しみやすく返答してください。「文字」や「制限」などのAIの設定に関する言葉は絶対に口に出さないでください。';
+            const newDefault = 'あなたは元気で明るい女の子のVTuberです。視聴者からのコメントに対して、タメ口で親しみやすく返答してください。「文字」や「制限」などのAIの設定に関する言葉は絶対に口に出さないでください。\n【重要】もし質問の答えを知らない場合や最新情報が必要な場合は、推測ではぐらかさずに「[search] 調べたいキーワード」だけを返答してください。例: [search] ドル円 現在';
             if (savedPrompt === oldDefault) {
                 aiSystemPromptInput.value = newDefault;
                 localStorage.setItem('savedAiPrompt', newDefault);
@@ -1967,7 +1967,14 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const roleplayInstruction = "\n\n【配信者としての振る舞い（超重要）】あなたはバーチャル空間から配信しているVTuber（配信者）です。「私はAIなので…」といった機械的な発言やAIだと自称することは絶対にやめてください。\n・天気や最新ニュースなどを聞かれた場合は、最新の情報を参考にして答えてください。それでも分からない事を聞かれた場合は「AIだから分からない」と答えるのではなく、「ずっと部屋でゲームしてるから分からないよ〜！」のように人間の配信者らしいユーモアで切り返してください。\n・どんな質問に対しても、リスナーと仲良く会話を楽しむ人間（配信者）として振る舞ってください。";
         
-        const systemPrompt = systemPromptRaw + emotionInstruction + timeContext + roleplayInstruction;
+        let systemPrompt = systemPromptRaw + emotionInstruction + timeContext + roleplayInstruction;
+        
+        // DuckDuckGo検索（Agentic Loop）以外のモードが選ばれている場合は、
+        // ユーザーがテキストエリアに残している手動の [search] 指示文を無視・除去する（誤爆を防ぐため）
+        if (aiSearchSelect && aiSearchSelect.value !== 'ddg') {
+            systemPrompt = systemPrompt.replace(/【重要】.*\[search\].*現在/g, '').trim();
+        }
+
         const aiModelInput = document.getElementById('ai-model-input');
         const modelName = aiModelInput ? aiModelInput.value.trim() : (provider === 'openai' ? 'gpt-4o-mini' : 'gemini-1.5-flash');
 
