@@ -1971,7 +1971,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (aiSearchSelect && aiSearchSelect.value === 'ddg') {
             const needsSearch = /天気|お天気|気温|ニュース|最新|トレンド|話題|どうなった|って何|とは|だれ|誰|何歳|何才/i.test(comment);
             if (needsSearch) {
-                searchContext = await fetchWebSearch(comment);
+                // カッコ書きや「再送」などのノイズを除去して検索精度を高める
+                let cleanQuery = comment.replace(/[（\(][^）\)]*[）\)]/g, '');
+                cleanQuery = cleanQuery.replace(/再送\d*/g, '');
+                cleanQuery = cleanQuery.replace(/(教えて|しらべて|調べて|って|？|\?|ね|よ|な)+$/g, '').trim();
+                if (cleanQuery.length > 0) {
+                    searchContext = await fetchWebSearch(cleanQuery);
+                }
             }
         }
 
@@ -1988,7 +1994,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const lastMsg = tempHistory[tempHistory.length - 1];
                     tempHistory[tempHistory.length - 1] = {
                         role: lastMsg.role,
-                        content: lastMsg.content + `\n\n[検索結果の参考情報]:\n${searchContext}\n\n上記の検索結果（最新情報）に基づいて答えてください。`
+                        content: lastMsg.content + `\n\n[検索結果の参考情報]:\n${searchContext}\n\n上記の検索結果（最新情報）から具体的な情報を読み取り、必ずその内容（具体的な曲名、天気、ニュース内容など）を【すべてひらがな・カタカナ】でユーザーに教えてあげてください。`
                     };
                 }
                 const messages = [{ role: 'system', content: systemPrompt }, ...tempHistory];
@@ -2022,7 +2028,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (searchContext && geminiContents.length > 0) {
                     const lastMsg = geminiContents[geminiContents.length - 1];
-                    lastMsg.parts[0].text += `\n\n[検索結果의参考情報]:\n${searchContext}\n\n上記の検索結果（最新情報）に基づいて答えてください。`;
+                    lastMsg.parts[0].text += `\n\n[検索結果の参考情報]:\n${searchContext}\n\n上記の検索結果（最新情報）から具体的な情報を読み取り、必ずその内容（具体的な曲名、天気、ニュース内容など）を【すべてひらがな・カタカナ】でユーザーに教えてあげてください。`;
                 }
 
                 const payload = {
