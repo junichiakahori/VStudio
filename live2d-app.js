@@ -2066,16 +2066,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error(json.error?.message || JSON.stringify(json));
                 }
             }
-            
             if (aiResponseText) {
                 // Agentic Auto-Search Loop: もしAIが [search] キーワード と返してきた場合、検索して再帰実行
-                // 感情タグ（[neutral]など）が先頭に付いている場合を考慮して除去してから判定する
-                const textForSearchCheck = aiResponseText.replace(/^\[.*?\]\s*/, '');
-                const autoSearchMatch = textForSearchCheck.match(/^\[search\]\s*(.*)/i);
+                const autoSearchMatch = aiResponseText.match(/\[search\]\s*(.+)/i);
                 
                 if (autoSearchMatch && aiSearchSelect && aiSearchSelect.value === 'ddg') {
                     if (!autoContext) {
-                        const query = autoSearchMatch[1].trim();
+                        let query = autoSearchMatch[1].replace(/\[.*?\]/g, '').trim();
                         if (query) {
                             console.log("[Agent] AI requested auto-search for:", query);
                             aiChatHistory.pop(); // 追加したユーザーメッセージを一旦消す（再帰時にまた追加されるため）
