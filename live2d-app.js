@@ -3186,7 +3186,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // 1. 背景の描画
             const drawBackground = () => {
                 return new Promise((resolve) => {
-                    const bgDiv = document.querySelector('.bg');
+                    const bgDiv = document.getElementById('background-layer');
                     const bgImageStyle = bgDiv ? getComputedStyle(bgDiv).backgroundImage : 'none';
                     if (bgImageStyle && bgImageStyle !== 'none') {
                         // url("...") からURLを抽出
