@@ -2499,7 +2499,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
                     body: JSON.stringify({
-                        systemInstruction: { parts: [{ text: "ユーザーが入力したテキストの読み仮名を推測し、ひらがなのみで出力してください。ただし、読点（、）や句点（。）などの句読点は音声の自然な間のために必ず残してください。その他の余計な記号や文章は一切含めないでください。" }] },
+                        systemInstruction: { parts: [{ text: "あなたは読み仮名変換アシスタントです。ユーザーが入力したテキストの漢字をひらがなに変換し、全体をひらがなとカタカナのみの文章として出力してください。元のひらがなやカタカナの部分は不自然に変更・省略しないでください（例: 「そこの君の」→「そこのきみの」）。読点（、）や句点（。）などの句読点は音声の自然な間のために必ず残してください。その他の余計な記号や文章は一切含めないでください。" }] },
                         contents: [{ role: 'user', parts: [{ text: text }] }]
                     })
                 });
@@ -2519,7 +2519,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({
                         model: targetModel,
                         messages: [
-                            { role: 'system', content: "ユーザーが入力したテキストの読み仮名を推測し、ひらがなのみで出力してください。ただし、読点（、）や句点（。）などの句読点は音声の自然な間のために必ず残してください。その他の余計な記号や文章は一切含めないでください。" },
+                            { role: 'system', content: "あなたは読み仮名変換アシスタントです。ユーザーが入力したテキストの漢字をひらがなに変換し、全体をひらがなとカタカナのみの文章として出力してください。元のひらがなやカタカナの部分は不自然に変更・省略しないでください（例: 「そこの君の」→「そこのきみの」）。読点（、）や句点（。）などの句読点は音声の自然な間のために必ず残してください。その他の余計な記号や文章は一切含めないでください。" },
                             { role: 'user', content: text }
                         ],
                         max_tokens: 60,
