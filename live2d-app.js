@@ -3197,6 +3197,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const thumbDescSize = document.getElementById('thumb-desc-size');
     const thumbDescX = document.getElementById('thumb-desc-x');
     const thumbDescY = document.getElementById('thumb-desc-y');
+    
+    const thumbEditTitle = document.getElementById('thumb-edit-title');
+    const thumbEditDesc = document.getElementById('thumb-edit-desc');
 
     const thumbSettings = [
         thumbSizeSelect, thumbShowBg, thumbShowAvatar, thumbShowTitle, thumbShowDesc,
@@ -3271,8 +3274,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 3. テキスト描画
-        const titleText = streamTitleInput ? streamTitleInput.value : '';
-        const descText = streamDescInput ? streamDescInput.value : '';
+        const titleText = thumbEditTitle ? thumbEditTitle.value : '';
+        const descText = thumbEditDesc ? thumbEditDesc.value : '';
 
         ctx.lineJoin = 'round';
         ctx.miterLimit = 2;
@@ -3321,6 +3324,28 @@ document.addEventListener('DOMContentLoaded', () => {
     if (openThumbEditorBtn) {
         openThumbEditorBtn.addEventListener('click', () => {
             if (thumbEditorModal) thumbEditorModal.style.display = 'flex';
+            if (thumbEditTitle && streamTitleInput) thumbEditTitle.value = streamTitleInput.value;
+            if (thumbEditDesc && streamDescInput) thumbEditDesc.value = streamDescInput.value;
+            drawThumbPreview();
+        });
+    }
+
+    if (thumbEditTitle) {
+        thumbEditTitle.addEventListener('input', () => {
+            if (streamTitleInput) {
+                streamTitleInput.value = thumbEditTitle.value;
+                localStorage.setItem('savedStreamTitle', streamTitleInput.value);
+            }
+            drawThumbPreview();
+        });
+    }
+
+    if (thumbEditDesc) {
+        thumbEditDesc.addEventListener('input', () => {
+            if (streamDescInput) {
+                streamDescInput.value = thumbEditDesc.value;
+                localStorage.setItem('savedStreamDesc', streamDescInput.value);
+            }
             drawThumbPreview();
         });
     }

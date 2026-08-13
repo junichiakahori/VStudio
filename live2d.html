@@ -452,6 +452,11 @@
                 </div>
 
                 <div class="control-group">
+                    <label style="font-size: 0.85rem; color:var(--text-muted); display:block; margin-bottom:5px;">サムネイル用タイトル (改行で反映)</label>
+                    <textarea id="thumb-edit-title" rows="2" style="width:100%; padding:0.5rem; border-radius:4px; border:1px solid var(--border-neon); background:#1a1a2e; color:#fff; font-size:0.9rem; resize:vertical;"></textarea>
+                </div>
+
+                <div class="control-group">
                     <label style="font-size: 0.85rem; color:var(--text-muted); display:block; margin-bottom:5px;">タイトル文字色</label>
                     <div style="display:flex; gap:10px;">
                         <div style="flex:1;"><span style="font-size:0.75rem;">塗り</span><input type="color" id="thumb-title-color" value="#ffffff" style="width:100%;"></div>
@@ -468,6 +473,11 @@
                     <label style="font-size: 0.85rem; color:var(--text-muted); display:block; margin-bottom:5px;">タイトル位置 (X / Y)</label>
                     <input type="range" id="thumb-title-x" min="0" max="100" value="10" style="width:100%; margin-bottom:5px;">
                     <input type="range" id="thumb-title-y" min="0" max="100" value="15" style="width:100%;">
+                </div>
+
+                <div class="control-group">
+                    <label style="font-size: 0.85rem; color:var(--text-muted); display:block; margin-bottom:5px;">サムネイル用概要文 (改行で反映)</label>
+                    <textarea id="thumb-edit-desc" rows="3" style="width:100%; padding:0.5rem; border-radius:4px; border:1px solid var(--border-neon); background:#1a1a2e; color:#fff; font-size:0.8rem; resize:vertical;"></textarea>
                 </div>
 
                 <div class="control-group">
@@ -505,7 +515,7 @@
     <script src="live2dcubismcore.min.js"></script>
     <!-- pixi-live2d-display v0.4 -->
     <script src="pixi-live2d-display.min.js"></script>
-    <script src="idle_phrases.js?v=3.38"></script>
-    <script src="live2d-app.js?v=3.38"></script>
+    <script src="idle_phrases.js?v=3.39"></script>
+    <script src="live2d-app.js?v=3.39"></script>
 </body>
 </html>
