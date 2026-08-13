@@ -3615,7 +3615,7 @@ document.addEventListener('DOMContentLoaded', () => {
 3. SNSリンク（Twitterなど、ダミーURL可）
 4. 関連するハッシュタグ（5〜8個）
 5. 素材・モデルのクレジット表記（以下の内容を必ず含めてください）
-   - Live2Dモデル: 「とろろ」（山山胡）© Live2D Inc.
+   - Live2Dモデル: 「とろろ」© Live2D Inc. (Live2D Creative Studio サンプルモデル)
    - BGMやその他素材（ダミーで構いません）
 
 マークダウンやJSONは不要です。そのままYouTubeに貼れる形式のプレーンテキストだけを返してください。`;
@@ -3682,7 +3682,7 @@ document.addEventListener('DOMContentLoaded', () => {
 3. X(Twitter)などのSNSへのリンク（URLは https://twitter.com/... のようなダミーでOK）
 4. 視聴者へのお願い・配信のルール（「話題に出ていない他の配信者の名前を出さない」「伝書鳩NG」「荒らしはブロック＆スルー」など）
 5. 素材・モデルのクレジット表記（以下の内容を必ず含めてください）
-   - Live2Dモデル: 「とろろ」（山山胡）© Live2D Inc.
+   - Live2Dモデル: 「とろろ」© Live2D Inc. (Live2D Creative Studio サンプルモデル)
    - BGMやその他素材（ダミーで構いません）
 
 必ず以下のJSONフォーマットのみを返してください（マークダウンやバッククォート、説明などは一切不要です）。
