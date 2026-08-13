@@ -452,6 +452,13 @@
                     </select>
                 </div>
 
+                <div class="control-group">
+                    <label style="font-size: 0.85rem; color:var(--text-muted); display:block; margin-bottom:5px;">🎨 AI で背景を生成</label>
+                    <textarea id="thumb-ai-bg-prompt" rows="2" placeholder="例: アニメ風のVTuberスタジオ、ネオン照明、未来的な配信背景" style="width:100%; padding:0.5rem; border-radius:4px; border:1px solid var(--border-neon); background:#1a1a2e; color:#fff; font-size:0.8rem; resize:vertical; box-sizing:border-box; margin-bottom:5px;"></textarea>
+                    <button id="thumb-ai-bg-generate-btn" class="btn" style="width:100%; background:#6c5ce7; color:#fff; font-weight:bold; font-size:0.82rem;">✨ 背景をAI生成</button>
+                    <div id="thumb-ai-bg-status" style="font-size:0.72rem; color:var(--text-muted); margin-top:4px; text-align:center;"></div>
+                </div>
+
                 <div class="control-group" style="display:flex; flex-direction:column; gap:5px;">
                     <label style="font-size: 0.85rem; color:var(--text-muted); display:block;">表示項目</label>
                     <label class="switch-label" style="justify-content: flex-start; gap: 10px;">
@@ -548,7 +555,7 @@
     <script src="live2dcubismcore.min.js"></script>
     <!-- pixi-live2d-display v0.4 -->
     <script src="pixi-live2d-display.min.js"></script>
-    <script src="idle_phrases.js?v=3.43"></script>
-    <script src="live2d-app.js?v=3.43"></script>
+    <script src="idle_phrases.js?v=3.44"></script>
+    <script src="live2d-app.js?v=3.44"></script>
 </body>
 </html>

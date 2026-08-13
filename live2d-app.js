@@ -3229,6 +3229,94 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // AI背景生成
+    let cachedAiBgImage = null; // AI生成した背景画像を保持
+
+    const thumbAiBgPromptEl = document.getElementById('thumb-ai-bg-prompt');
+    const thumbAiBgGenerateBtn = document.getElementById('thumb-ai-bg-generate-btn');
+    const thumbAiBgStatus = document.getElementById('thumb-ai-bg-status');
+
+    if (thumbAiBgGenerateBtn) {
+        thumbAiBgGenerateBtn.addEventListener('click', async () => {
+            const apiKey = localStorage.getItem('savedAiApiKey');
+            const provider = localStorage.getItem('savedAiProvider') || 'gemini';
+            const aiModel = localStorage.getItem('savedAiModel') || (provider === 'openai' ? 'dall-e-3' : 'gemini-2.0-flash-preview-image-generation');
+
+            if (!apiKey) {
+                alert('AI設定タブでAPIキーを設定してください。');
+                return;
+            }
+
+            const userPrompt = thumbAiBgPromptEl ? thumbAiBgPromptEl.value.trim() : '';
+            const prompt = userPrompt || 'VTuber配信背景、アニメスタイル、ネオン照明のゲームルーム、明るくポップ、横長ワイド';
+
+            thumbAiBgGenerateBtn.textContent = '⏳ 生成中...';
+            thumbAiBgGenerateBtn.disabled = true;
+            if (thumbAiBgStatus) thumbAiBgStatus.textContent = 'AIが背景を描いています...（30秒ほどかかる場合があります）';
+
+            try {
+                let imageUrl = null;
+                let imageBase64 = null;
+
+                if (provider === 'openai') {
+                    // DALL-E 3
+                    const sizeMode = thumbSizeSelect ? thumbSizeSelect.value : 'youtube';
+                    const dalleSize = sizeMode === 'tiktok' ? '1024x1792' : sizeMode === 'square' ? '1024x1024' : '1792x1024';
+                    const res = await fetch('https://api.openai.com/v1/images/generations', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                        body: JSON.stringify({ model: 'dall-e-3', prompt, n: 1, size: dalleSize, response_format: 'url' })
+                    });
+                    if (!res.ok) {
+                        const errData = await res.json();
+                        throw new Error(errData.error?.message || 'DALL-E API Error');
+                    }
+                    const data = await res.json();
+                    imageUrl = data.data[0].url;
+                } else {
+                    // Gemini Imagen
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
+                        })
+                    });
+                    if (!res.ok) {
+                        const errData = await res.json();
+                        throw new Error(errData.error?.message || 'Gemini API Error');
+                    }
+                    const data = await res.json();
+                    const parts = data.candidates?.[0]?.content?.parts || [];
+                    const imgPart = parts.find(p => p.inlineData);
+                    if (!imgPart) throw new Error('画像が返ってきませんでした');
+                    imageBase64 = `data:${imgPart.inlineData.mimeType};base64,${imgPart.inlineData.data}`;
+                }
+
+                // 画像をキャッシュ
+                const finalSrc = imageBase64 || imageUrl;
+                await new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = () => { cachedAiBgImage = img; resolve(); };
+                    img.onerror = () => reject(new Error('画像の読み込みに失敗しました'));
+                    img.src = finalSrc;
+                });
+
+                if (thumbAiBgStatus) thumbAiBgStatus.textContent = '✅ 生成完了！プレビューに反映しました';
+                drawThumbPreview();
+
+            } catch (err) {
+                console.error('[AI BG]', err);
+                if (thumbAiBgStatus) thumbAiBgStatus.textContent = `❌ エラー: ${err.message}`;
+            } finally {
+                thumbAiBgGenerateBtn.textContent = '✨ 背景をAI生成';
+                thumbAiBgGenerateBtn.disabled = false;
+            }
+        });
+    }
+
     const thumbSettings = [
         thumbSizeSelect, thumbShowBg, thumbShowAvatar, thumbShowTitle, thumbShowDesc,
         thumbTitleColor, thumbTitleStroke, thumbTitleSize, thumbTitleX, thumbTitleY,
@@ -3268,24 +3356,32 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fillRect(0, 0, targetWidth, targetHeight);
         
         if (thumbShowBg.checked) {
-            const bgDiv = document.getElementById('background-layer');
-            const bgImageStyle = bgDiv ? getComputedStyle(bgDiv).backgroundImage : 'none';
-            if (bgImageStyle && bgImageStyle !== 'none') {
-                const urlMatch = bgImageStyle.match(/url\(['"]?(.*?)['"]?\)/);
-                if (urlMatch && urlMatch[1]) {
-                    await new Promise((resolve) => {
-                        const img = new Image();
-                        img.crossOrigin = 'anonymous';
-                        img.onload = () => {
-                            const scale = Math.max(targetWidth / img.width, targetHeight / img.height);
-                            const x = (targetWidth - img.width * scale) / 2;
-                            const y = (targetHeight - img.height * scale) / 2;
-                            ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-                            resolve();
-                        };
-                        img.onerror = resolve;
-                        img.src = urlMatch[1];
-                    });
+            // AI生成背景画像を優先して使う
+            if (cachedAiBgImage) {
+                const scale = Math.max(targetWidth / cachedAiBgImage.width, targetHeight / cachedAiBgImage.height);
+                const x = (targetWidth - cachedAiBgImage.width * scale) / 2;
+                const y = (targetHeight - cachedAiBgImage.height * scale) / 2;
+                ctx.drawImage(cachedAiBgImage, x, y, cachedAiBgImage.width * scale, cachedAiBgImage.height * scale);
+            } else {
+                const bgDiv = document.getElementById('background-layer');
+                const bgImageStyle = bgDiv ? getComputedStyle(bgDiv).backgroundImage : 'none';
+                if (bgImageStyle && bgImageStyle !== 'none') {
+                    const urlMatch = bgImageStyle.match(/url\(['"]?(.*?)['"]?\)/);
+                    if (urlMatch && urlMatch[1]) {
+                        await new Promise((resolve) => {
+                            const img = new Image();
+                            img.crossOrigin = 'anonymous';
+                            img.onload = () => {
+                                const scale = Math.max(targetWidth / img.width, targetHeight / img.height);
+                                const x = (targetWidth - img.width * scale) / 2;
+                                const y = (targetHeight - img.height * scale) / 2;
+                                ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+                                resolve();
+                            };
+                            img.onerror = resolve;
+                            img.src = urlMatch[1];
+                        });
+                    }
                 }
             }
         }
