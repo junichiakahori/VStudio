@@ -2115,7 +2115,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const aiHiraganaToggle = document.getElementById('ai-hiragana-toggle');
         if (aiHiraganaToggle && aiHiraganaToggle.checked) {
-            systemPrompt += "\n\n【重要：ひらがな出力】音声読み上げシステムの仕様上、漢字の誤読を防ぐため、あなたの返信はすべて「ひらがなのみ」で出力してください。漢字やカタカナ、英語、記号などは一切使わないでください。";
+            systemPrompt += "\n\n【重要：ひらがな出力】音声読み上げシステムの仕様上、漢字の誤読を防ぐため、あなたの返信はすべて「ひらがなのみ」で出力してください。ただし、自然な間のために読点（、）や句点（。）は必ず残してください。その他の記号やカタカナ、英語などは使わないでください。";
         }
         
         // DuckDuckGo検索（Agentic Loop）以外のモードが選ばれている場合は、
@@ -2450,7 +2450,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
                     body: JSON.stringify({
-                        systemInstruction: { parts: [{ text: "ユーザーが入力したテキストの読み仮名を推測し、ひらがなのみで出力してください。元のテキストの意味や記号は無視し、音声読み上げに必要な「ひらがな」だけを返してください。余計な文章や記号は一切含めないでください。" }] },
+                        systemInstruction: { parts: [{ text: "ユーザーが入力したテキストの読み仮名を推測し、ひらがなのみで出力してください。ただし、読点（、）や句点（。）などの句読点は音声の自然な間のために必ず残してください。その他の余計な記号や文章は一切含めないでください。" }] },
                         contents: [{ role: 'user', parts: [{ text: text }] }]
                     })
                 });
@@ -2470,7 +2470,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({
                         model: targetModel,
                         messages: [
-                            { role: 'system', content: "ユーザーが入力したテキストの読み仮名を推測し、ひらがなのみで出力してください。元のテキストの意味や記号は無視し、音声読み上げに必要な「ひらがな」だけを返してください。余計な文章や記号は一切含めないでください。" },
+                            { role: 'system', content: "ユーザーが入力したテキストの読み仮名を推測し、ひらがなのみで出力してください。ただし、読点（、）や句点（。）などの句読点は音声の自然な間のために必ず残してください。その他の余計な記号や文章は一切含めないでください。" },
                             { role: 'user', content: text }
                         ],
                         max_tokens: 60,
