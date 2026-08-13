@@ -2365,10 +2365,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resetIdleTimer() {
         clearIdleTimer();
-        const isTiktokActive = tiktokWs && tiktokWs.readyState === WebSocket.OPEN;
-        const isYoutubeActive = youtubeWs && youtubeWs.readyState === WebSocket.OPEN;
         
-        if (isVoicevoxEnabled && isIdleSpeechEnabled && (isTiktokActive || isYoutubeActive)) {
+        if (isVoicevoxEnabled && isIdleSpeechEnabled) {
             idleSpeechTimer = setTimeout(() => {
                 if (!isVoicevoxPlaying && voicevoxAudioQueue.length === 0 && isVoicevoxEnabled && isIdleSpeechEnabled) {
                     const isZunda = isZundamonSelected() && currentModelId === 'hiyori';
