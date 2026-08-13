@@ -1869,7 +1869,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 ];
 
                                 const matchedRule = replies.find(rule => rule.keywords.some(kw => cleanComment.includes(kw)));
-                                const isQueueFull = voicevoxAudioQueue.length >= 3;
+                                const isQueueFull = voicevoxAudioQueue.length >= 5;
 
                                 // キューが溢れていて、かつ重要なキーワードも含まれていない場合はスキップ
                                 if (isQueueFull && !matchedRule) {
@@ -2000,7 +2000,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 ];
 
                                 const matchedRule = replies.find(rule => rule.keywords.some(kw => cleanComment.includes(kw)));
-                                const isQueueFull = voicevoxAudioQueue.length >= 3;
+                                const isQueueFull = voicevoxAudioQueue.length >= 5;
 
                                 if (isQueueFull && !matchedRule) {
                                     console.log(`[YouTube Skip] 待機列過多のためスキップ: ${cleanComment}`);
