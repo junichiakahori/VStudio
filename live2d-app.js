@@ -2106,6 +2106,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const roleplayInstruction = "\n\n【配信者としての振る舞い（超重要）】あなたはバーチャル空間から配信しているVTuber（配信者）です。「私はAIなので…」といった機械的な発言やAIだと自称することは絶対にやめてください。\n・天気や最新ニュースなどを聞かれた場合は、必ず最新の情報を検索・調査して答えてください。\n・【重要】最新情報を検索しても分からない場合や、全く知識がない場合にのみ、「ずっと部屋でゲームしてるから分からないよ〜！」のように人間の配信者らしいユーモアで切り返してください。最初から検索せずにはぐらかすのは厳禁です。\n・どんな質問に対しても、リスナーと仲良く会話を楽しむ人間（配信者）として振る舞ってください。";
         
         let systemPrompt = systemPromptRaw + emotionInstruction + timeContext + roleplayInstruction;
+
+        const aiHiraganaToggle = document.getElementById('ai-hiragana-toggle');
+        if (aiHiraganaToggle && aiHiraganaToggle.checked) {
+            systemPrompt += "\n\n【重要：ひらがな出力】音声読み上げシステムの仕様上、漢字の誤読を防ぐため、あなたの返信はすべて「ひらがなのみ」で出力してください。漢字やカタカナ、英語、記号などは一切使わないでください。";
+        }
         
         // DuckDuckGo検索（Agentic Loop）以外のモードが選ばれている場合は、
         // ユーザーがテキストエリアに残している手動の [search] 指示文を無視・除去する（誤爆を防ぐため）
@@ -2422,8 +2427,69 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function convertToHiraganaWithAI(text) {
+        if (!text) return text;
+        const aiApiKeyInput = document.getElementById('ai-api-key');
+        const apiKey = aiApiKeyInput ? aiApiKeyInput.value.trim() : null;
+        if (!apiKey) return text;
+
+        const aiProviderSelect = document.getElementById('ai-provider-select');
+        const provider = aiProviderSelect ? aiProviderSelect.value : 'gemini';
+        
+        try {
+            if (provider === 'gemini') {
+                const aiModelInput = document.getElementById('ai-model-input');
+                const targetModel = (aiModelInput && aiModelInput.value.trim()) || 'gemini-1.5-flash';
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+                    body: JSON.stringify({
+                        systemInstruction: { parts: [{ text: "ユーザーが入力したテキストの読み仮名を推測し、ひらがなのみで出力してください。元のテキストの意味や記号は無視し、音声読み上げに必要な「ひらがな」だけを返してください。余計な文章や記号は一切含めないでください。" }] },
+                        contents: [{ role: 'user', parts: [{ text: text }] }]
+                    })
+                });
+                const json = await res.json();
+                if (res.ok && json.candidates && json.candidates.length > 0) {
+                    return json.candidates[0].content.parts[0].text.trim().replace(/\s+/g, '');
+                }
+            } else if (provider === 'openai') {
+                const aiModelInput = document.getElementById('ai-model-input');
+                const targetModel = (aiModelInput && aiModelInput.value.trim()) || 'gpt-4o-mini';
+                const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: targetModel,
+                        messages: [
+                            { role: 'system', content: "ユーザーが入力したテキストの読み仮名を推測し、ひらがなのみで出力してください。元のテキストの意味や記号は無視し、音声読み上げに必要な「ひらがな」だけを返してください。余計な文章や記号は一切含めないでください。" },
+                            { role: 'user', content: text }
+                        ],
+                        max_tokens: 60,
+                        temperature: 0.0
+                    })
+                });
+                const json = await res.json();
+                if (res.ok && json.choices && json.choices.length > 0) {
+                    return json.choices[0].message.content.trim().replace(/\s+/g, '');
+                }
+            }
+        } catch (e) {
+            console.error("AI Hiragana Conversion Error:", e);
+        }
+        return text;
+    }
+
     async function queueVoicevoxAudio(text) {
-        voicevoxAudioQueue.push(text);
+        const aiHiraganaToggle = document.getElementById('ai-hiragana-toggle');
+        if (aiHiraganaToggle && aiHiraganaToggle.checked) {
+            voicevoxAudioQueue.push({ original: text, promise: convertToHiraganaWithAI(text) });
+        } else {
+            voicevoxAudioQueue.push({ original: text, promise: Promise.resolve(text) });
+        }
+
         if (typeof clearIdleTimer === 'function') clearIdleTimer();
         if (!isVoicevoxPlaying) {
             playNextVoicevox();
@@ -2437,7 +2503,16 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         isVoicevoxPlaying = true;
-        const text = voicevoxAudioQueue.shift();
+        const item = voicevoxAudioQueue.shift();
+        
+        let text = item;
+        if (typeof item === 'object' && item !== null && item.promise) {
+            try {
+                text = await item.promise;
+            } catch (e) {
+                text = item.original;
+            }
+        }
         const speakerId = voicevoxSpeakerId ? voicevoxSpeakerId.value : "3";
         
         try {
