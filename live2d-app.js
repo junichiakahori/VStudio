@@ -2684,6 +2684,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =====================================================================
+    // 画面オーバーレイ (配信準備中 / 離席中)
+    // =====================================================================
+    const overlayPrepBtn = document.getElementById('overlay-prep-btn');
+    const overlayAfkBtn = document.getElementById('overlay-afk-btn');
+    const overlayClearBtn = document.getElementById('overlay-clear-btn');
+    const streamOverlay = document.getElementById('stream-overlay');
+
+    if (overlayPrepBtn && streamOverlay) {
+        overlayPrepBtn.addEventListener('click', () => {
+            streamOverlay.textContent = '配信準備中';
+            streamOverlay.classList.add('active');
+        });
+    }
+    if (overlayAfkBtn && streamOverlay) {
+        overlayAfkBtn.addEventListener('click', () => {
+            streamOverlay.textContent = '離席中';
+            streamOverlay.classList.add('active');
+        });
+    }
+    if (overlayClearBtn && streamOverlay) {
+        overlayClearBtn.addEventListener('click', () => {
+            streamOverlay.classList.remove('active');
+        });
+    }
+
+    // =====================================================================
     // OBSモード適用
     // =====================================================================
     if (isObsMode) {
