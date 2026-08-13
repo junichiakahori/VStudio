@@ -1552,6 +1552,17 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem('savedAiReplyToggle', aiReplyToggle.checked);
             aiSettingsPanel.style.display = isAiReplyEnabled ? 'block' : 'none';
         });
+        
+        const aiHiraganaToggle = document.getElementById('ai-hiragana-toggle');
+        if (aiHiraganaToggle) {
+            const savedAiHiragana = localStorage.getItem('savedAiHiraganaToggle');
+            if (savedAiHiragana !== null) {
+                aiHiraganaToggle.checked = savedAiHiragana === 'true';
+            }
+            aiHiraganaToggle.addEventListener('change', () => {
+                localStorage.setItem('savedAiHiraganaToggle', aiHiraganaToggle.checked);
+            });
+        }
 
         const aiApiLink = document.getElementById('ai-api-link');
         function updateAiLink() {
