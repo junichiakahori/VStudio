@@ -3175,114 +3175,165 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (generateThumbBtn) {
-        generateThumbBtn.addEventListener('click', () => {
-            // 1280x720のCanvasを作成
-            const thumbCanvas = document.createElement('canvas');
-            thumbCanvas.width = 1280;
-            thumbCanvas.height = 720;
-            const ctx = thumbCanvas.getContext('2d');
+    // サムネイルエディタ
+    const openThumbEditorBtn = document.getElementById('open-thumb-editor-btn');
+    const thumbEditorModal = document.getElementById('thumbnail-editor-modal');
+    const thumbEditorCancelBtn = document.getElementById('thumb-editor-cancel-btn');
+    const thumbDownloadBtn = document.getElementById('thumb-download-btn');
+    const thumbPreviewCanvas = document.getElementById('thumb-preview-canvas');
 
-            // 1. 背景の描画
-            const drawBackground = () => {
-                return new Promise((resolve) => {
-                    const bgDiv = document.getElementById('background-layer');
-                    const bgImageStyle = bgDiv ? getComputedStyle(bgDiv).backgroundImage : 'none';
-                    if (bgImageStyle && bgImageStyle !== 'none') {
-                        // url("...") からURLを抽出
-                        const urlMatch = bgImageStyle.match(/url\(['"]?(.*?)['"]?\)/);
-                        if (urlMatch && urlMatch[1]) {
-                            const img = new Image();
-                            img.crossOrigin = 'anonymous'; // 必要に応じて
-                            img.onload = () => {
-                                // アスペクト比を保ってcover
-                                const scale = Math.max(1280 / img.width, 720 / img.height);
-                                const x = (1280 - img.width * scale) / 2;
-                                const y = (720 - img.height * scale) / 2;
-                                ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-                                resolve();
-                            };
-                            img.onerror = () => {
-                                // エラー時は単色塗りつぶし
-                                ctx.fillStyle = '#1a1a2e';
-                                ctx.fillRect(0, 0, 1280, 720);
-                                resolve();
-                            };
-                            img.src = urlMatch[1];
-                            return;
-                        }
-                    }
-                    // 画像がない場合
-                    ctx.fillStyle = '#1a1a2e';
-                    ctx.fillRect(0, 0, 1280, 720);
-                    resolve();
-                });
-            };
+    const thumbSizeSelect = document.getElementById('thumb-size-select');
+    const thumbShowBg = document.getElementById('thumb-show-bg');
+    const thumbShowAvatar = document.getElementById('thumb-show-avatar');
+    const thumbShowTitle = document.getElementById('thumb-show-title');
+    const thumbShowDesc = document.getElementById('thumb-show-desc');
+    const thumbTitleColor = document.getElementById('thumb-title-color');
+    const thumbTitleStroke = document.getElementById('thumb-title-stroke');
+    const thumbTitleX = document.getElementById('thumb-title-x');
+    const thumbTitleY = document.getElementById('thumb-title-y');
+    const thumbDescColor = document.getElementById('thumb-desc-color');
+    const thumbDescStroke = document.getElementById('thumb-desc-stroke');
+    const thumbDescX = document.getElementById('thumb-desc-x');
+    const thumbDescY = document.getElementById('thumb-desc-y');
 
-            // 2. アバターとテキストを描画する処理
-            const drawContent = () => {
-                // Live2Dの描画 (右側に寄せて大きく表示)
-                if (pixiApp && pixiApp.view) {
-                    const view = pixiApp.view;
-                    // アバターのCanvasを縦720pxに合わせてスケール
-                    const scale = 720 / view.height;
-                    const w = view.width * scale;
-                    const h = 720;
-                    const x = 1280 - w; // 右寄せ
-                    const y = 0;
-                    ctx.drawImage(view, x, y, w, h);
+    const thumbSettings = [
+        thumbSizeSelect, thumbShowBg, thumbShowAvatar, thumbShowTitle, thumbShowDesc,
+        thumbTitleColor, thumbTitleStroke, thumbTitleX, thumbTitleY,
+        thumbDescColor, thumbDescStroke, thumbDescX, thumbDescY
+    ];
+
+    // Load saved settings
+    thumbSettings.forEach(el => {
+        if (!el) return;
+        const saved = localStorage.getItem('savedThumb_' + el.id);
+        if (saved !== null) {
+            if (el.type === 'checkbox') el.checked = saved === 'true';
+            else el.value = saved;
+        }
+        el.addEventListener('input', () => {
+            if (el.type === 'checkbox') localStorage.setItem('savedThumb_' + el.id, el.checked);
+            else localStorage.setItem('savedThumb_' + el.id, el.value);
+            drawThumbPreview();
+        });
+    });
+
+    const drawThumbPreview = async () => {
+        if (!thumbPreviewCanvas) return;
+        const ctx = thumbPreviewCanvas.getContext('2d');
+        
+        let targetWidth = 1280;
+        let targetHeight = 720;
+        if (thumbSizeSelect.value === 'tiktok') { targetWidth = 1080; targetHeight = 1920; }
+        else if (thumbSizeSelect.value === 'square') { targetWidth = 1080; targetHeight = 1080; }
+
+        thumbPreviewCanvas.width = targetWidth;
+        thumbPreviewCanvas.height = targetHeight;
+
+        // 1. 背景描画
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, targetWidth, targetHeight);
+        
+        if (thumbShowBg.checked) {
+            const bgDiv = document.getElementById('background-layer');
+            const bgImageStyle = bgDiv ? getComputedStyle(bgDiv).backgroundImage : 'none';
+            if (bgImageStyle && bgImageStyle !== 'none') {
+                const urlMatch = bgImageStyle.match(/url\(['"]?(.*?)['"]?\)/);
+                if (urlMatch && urlMatch[1]) {
+                    await new Promise((resolve) => {
+                        const img = new Image();
+                        img.crossOrigin = 'anonymous';
+                        img.onload = () => {
+                            const scale = Math.max(targetWidth / img.width, targetHeight / img.height);
+                            const x = (targetWidth - img.width * scale) / 2;
+                            const y = (targetHeight - img.height * scale) / 2;
+                            ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+                            resolve();
+                        };
+                        img.onerror = resolve;
+                        img.src = urlMatch[1];
+                    });
                 }
+            }
+        }
 
-                // テキスト描画 (左側)
-                const titleText = streamTitleInput ? streamTitleInput.value : '';
-                const descText = streamDescInput ? streamDescInput.value : '';
+        // 2. アバター描画
+        if (thumbShowAvatar.checked && pixiApp && pixiApp.view) {
+            const view = pixiApp.view;
+            // 高さ合わせ（必要に応じて調整可能にする仕組みも後で考えられるが、一旦は高さいっぱい）
+            const scale = targetHeight / view.height;
+            const w = view.width * scale;
+            const h = targetHeight;
+            const x = targetWidth - w; // 右寄せ
+            const y = 0;
+            ctx.drawImage(view, x, y, w, h);
+        }
 
-                // 文字の縁取り設定
-                ctx.lineJoin = 'round';
-                ctx.miterLimit = 2;
+        // 3. テキスト描画
+        const titleText = streamTitleInput ? streamTitleInput.value : '';
+        const descText = streamDescInput ? streamDescInput.value : '';
 
-                // タイトル描画 (折り返し対応・簡易版)
-                if (titleText) {
-                    ctx.font = 'bold 72px sans-serif';
-                    ctx.textAlign = 'left';
-                    ctx.textBaseline = 'top';
-                    const lines = titleText.split('\n'); // ユーザーの改行を尊重
-                    let textY = 100;
-                    
-                    for (let line of lines) {
-                        ctx.lineWidth = 12;
-                        ctx.strokeStyle = '#000000';
-                        ctx.strokeText(line, 80, textY);
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillText(line, 80, textY);
-                        textY += 90;
-                    }
+        ctx.lineJoin = 'round';
+        ctx.miterLimit = 2;
 
-                    // 概要描画
-                    if (descText) {
-                        ctx.font = 'bold 40px sans-serif';
-                        const descLines = descText.split('\n');
-                        textY += 40; // タイトルとの間隔
-                        for (let line of descLines) {
-                            ctx.lineWidth = 8;
-                            ctx.strokeStyle = '#000000';
-                            ctx.strokeText(line, 80, textY);
-                            ctx.fillStyle = '#f0f0f0';
-                            ctx.fillText(line, 80, textY);
-                            textY += 60;
-                        }
-                    }
-                }
+        if (thumbShowTitle.checked && titleText) {
+            const lines = titleText.split('\n');
+            const baseX = targetWidth * (parseFloat(thumbTitleX.value) / 100);
+            let baseY = targetHeight * (parseFloat(thumbTitleY.value) / 100);
+            
+            ctx.font = 'bold 72px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            
+            for (let line of lines) {
+                ctx.lineWidth = 12;
+                ctx.strokeStyle = thumbTitleStroke.value;
+                ctx.strokeText(line, baseX, baseY);
+                ctx.fillStyle = thumbTitleColor.value;
+                ctx.fillText(line, baseX, baseY);
+                baseY += 90;
+            }
+        }
 
-                // 画像のダウンロード
-                const link = document.createElement('a');
-                link.download = 'thumbnail.png';
-                link.href = thumbCanvas.toDataURL('image/png');
-                link.click();
-            };
+        if (thumbShowDesc.checked && descText) {
+            const descLines = descText.split('\n');
+            const baseX = targetWidth * (parseFloat(thumbDescX.value) / 100);
+            let baseY = targetHeight * (parseFloat(thumbDescY.value) / 100);
 
-            // 背景描画完了後にコンテンツを描画
-            drawBackground().then(drawContent);
+            ctx.font = 'bold 40px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+
+            for (let line of descLines) {
+                ctx.lineWidth = 8;
+                ctx.strokeStyle = thumbDescStroke.value;
+                ctx.strokeText(line, baseX, baseY);
+                ctx.fillStyle = thumbDescColor.value;
+                ctx.fillText(line, baseX, baseY);
+                baseY += 60;
+            }
+        }
+    };
+
+    if (openThumbEditorBtn) {
+        openThumbEditorBtn.addEventListener('click', () => {
+            if (thumbEditorModal) thumbEditorModal.style.display = 'flex';
+            drawThumbPreview();
+        });
+    }
+
+    if (thumbEditorCancelBtn) {
+        thumbEditorCancelBtn.addEventListener('click', () => {
+            if (thumbEditorModal) thumbEditorModal.style.display = 'none';
+        });
+    }
+
+    if (thumbDownloadBtn) {
+        thumbDownloadBtn.addEventListener('click', () => {
+            if (!thumbPreviewCanvas) return;
+            const link = document.createElement('a');
+            link.download = 'thumbnail.png';
+            link.href = thumbPreviewCanvas.toDataURL('image/png');
+            link.click();
         });
     }
 
