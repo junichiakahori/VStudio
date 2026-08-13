@@ -3201,10 +3201,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const thumbEditTitle = document.getElementById('thumb-edit-title');
     const thumbEditDesc = document.getElementById('thumb-edit-desc');
 
+    const thumbAvatarScale = document.getElementById('thumb-avatar-scale');
+    const thumbAvatarX = document.getElementById('thumb-avatar-x');
+    const thumbAvatarY = document.getElementById('thumb-avatar-y');
+
     const thumbSettings = [
         thumbSizeSelect, thumbShowBg, thumbShowAvatar, thumbShowTitle, thumbShowDesc,
         thumbTitleColor, thumbTitleStroke, thumbTitleSize, thumbTitleX, thumbTitleY,
-        thumbDescColor, thumbDescStroke, thumbDescSize, thumbDescX, thumbDescY
+        thumbDescColor, thumbDescStroke, thumbDescSize, thumbDescX, thumbDescY,
+        thumbAvatarScale, thumbAvatarX, thumbAvatarY
     ];
 
     // Load saved settings
@@ -3264,12 +3269,24 @@ document.addEventListener('DOMContentLoaded', () => {
         // 2. アバター描画
         if (thumbShowAvatar.checked && pixiApp && pixiApp.view) {
             const view = pixiApp.view;
-            // 高さ合わせ（必要に応じて調整可能にする仕組みも後で考えられるが、一旦は高さいっぱい）
-            const scale = targetHeight / view.height;
-            const w = view.width * scale;
-            const h = targetHeight;
-            const x = targetWidth - w; // 右寄せ
-            const y = 0;
+            
+            const userScale = thumbAvatarScale ? parseFloat(thumbAvatarScale.value) / 100 : 1;
+            const alignX = thumbAvatarX ? parseFloat(thumbAvatarX.value) / 100 : 1;
+            const alignY = thumbAvatarY ? parseFloat(thumbAvatarY.value) / 100 : 1;
+            
+            // ベースは高さいっぱいのスケール
+            const baseScale = targetHeight / view.height;
+            const finalScale = baseScale * userScale;
+            
+            const w = view.width * finalScale;
+            const h = view.height * finalScale;
+            
+            const baseX = targetWidth * alignX;
+            const baseY = targetHeight * alignY;
+            
+            const x = baseX - (w * alignX);
+            const y = baseY - (h * alignY);
+
             ctx.drawImage(view, x, y, w, h);
         }
 
