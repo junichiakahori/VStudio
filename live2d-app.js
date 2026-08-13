@@ -149,6 +149,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let isVoicevoxPlaying = false;
     let voicevoxAnalyser = null;
     let voicevoxAudioContext = null;
+    let currentVoicevoxSource = null;
+    let currentPlayingIsIdle = false;
     let tVoiceMouthOpen = 0;
 
     // 瞬き
@@ -2488,18 +2490,26 @@ document.addEventListener('DOMContentLoaded', () => {
         return text;
     }
 
-    async function queueVoicevoxAudio(text) {
+    async function queueVoicevoxAudio(text, isIdle = false) {
         const aiHiraganaToggle = document.getElementById('ai-hiragana-toggle');
         if (aiHiraganaToggle && aiHiraganaToggle.checked) {
-            voicevoxAudioQueue.push({ original: text, promise: convertToHiraganaWithAI(text) });
+            voicevoxAudioQueue.push({ original: text, promise: convertToHiraganaWithAI(text), isIdle });
         } else {
-            voicevoxAudioQueue.push({ original: text, promise: Promise.resolve(text) });
+            voicevoxAudioQueue.push({ original: text, promise: Promise.resolve(text), isIdle });
+        }
+
+        if (!isIdle && currentVoicevoxSource && isVoicevoxPlaying && currentPlayingIsIdle) {
+            console.log('[VOICEVOX] 独り言を中断してコメントを優先します！');
+            try {
+                currentVoicevoxSource.stop(); // This triggers onended -> playNextVoicevox()
+            } catch (e) {
+                console.warn('Failed to stop current source', e);
+            }
+        } else if (!isVoicevoxPlaying) {
+            playNextVoicevox();
         }
 
         if (typeof clearIdleTimer === 'function') clearIdleTimer();
-        if (!isVoicevoxPlaying) {
-            playNextVoicevox();
-        }
     }
 
     async function playNextVoicevox() {
@@ -2512,7 +2522,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const item = voicevoxAudioQueue.shift();
         
         let text = item;
+        currentPlayingIsIdle = false;
+        
         if (typeof item === 'object' && item !== null && item.promise) {
+            currentPlayingIsIdle = item.isIdle || false;
             try {
                 text = await item.promise;
             } catch (e) {
@@ -2568,23 +2581,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
  
             const audioBuffer = await voicevoxAudioContext.decodeAudioData(arrayBuffer);
-            const source = voicevoxAudioContext.createBufferSource();
-            source.buffer = audioBuffer;
+            currentVoicevoxSource = voicevoxAudioContext.createBufferSource();
+            currentVoicevoxSource.buffer = audioBuffer;
  
             if (!voicevoxAnalyser) {
                 voicevoxAnalyser = voicevoxAudioContext.createAnalyser();
                 voicevoxAnalyser.fftSize = 256;
             }
  
-            source.connect(voicevoxAnalyser);
+            currentVoicevoxSource.connect(voicevoxAnalyser);
             voicevoxAnalyser.connect(voicevoxAudioContext.destination);
  
-            source.onended = () => {
+            currentVoicevoxSource.onended = () => {
+                currentVoicevoxSource = null;
                 playNextVoicevox();
             };
  
             console.log(`[VOICEVOX] Playing: "${text}" (Speaker ID: ${speakerId})`);
-            source.start(0);
+            currentVoicevoxSource.start(0);
  
         } catch (e) {
             console.error('VOICEVOX Error:', e);
