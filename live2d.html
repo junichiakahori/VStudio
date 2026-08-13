@@ -460,6 +460,11 @@
                 </div>
 
                 <div class="control-group">
+                    <label style="font-size: 0.85rem; color:var(--text-muted); display:block; margin-bottom:5px;">タイトル文字サイズ</label>
+                    <input type="range" id="thumb-title-size" min="20" max="200" value="72" style="width:100%;">
+                </div>
+
+                <div class="control-group">
                     <label style="font-size: 0.85rem; color:var(--text-muted); display:block; margin-bottom:5px;">タイトル位置 (X / Y)</label>
                     <input type="range" id="thumb-title-x" min="0" max="100" value="10" style="width:100%; margin-bottom:5px;">
                     <input type="range" id="thumb-title-y" min="0" max="100" value="15" style="width:100%;">
@@ -471,6 +476,11 @@
                         <div style="flex:1;"><span style="font-size:0.75rem;">塗り</span><input type="color" id="thumb-desc-color" value="#f0f0f0" style="width:100%;"></div>
                         <div style="flex:1;"><span style="font-size:0.75rem;">フチ</span><input type="color" id="thumb-desc-stroke" value="#000000" style="width:100%;"></div>
                     </div>
+                </div>
+
+                <div class="control-group">
+                    <label style="font-size: 0.85rem; color:var(--text-muted); display:block; margin-bottom:5px;">概要文文字サイズ</label>
+                    <input type="range" id="thumb-desc-size" min="10" max="150" value="40" style="width:100%;">
                 </div>
 
                 <div class="control-group">
@@ -495,7 +505,7 @@
     <script src="live2dcubismcore.min.js"></script>
     <!-- pixi-live2d-display v0.4 -->
     <script src="pixi-live2d-display.min.js"></script>
-    <script src="idle_phrases.js?v=3.37"></script>
-    <script src="live2d-app.js?v=3.37"></script>
+    <script src="idle_phrases.js?v=3.38"></script>
+    <script src="live2d-app.js?v=3.38"></script>
 </body>
 </html>

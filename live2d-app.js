@@ -3189,17 +3189,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const thumbShowDesc = document.getElementById('thumb-show-desc');
     const thumbTitleColor = document.getElementById('thumb-title-color');
     const thumbTitleStroke = document.getElementById('thumb-title-stroke');
+    const thumbTitleSize = document.getElementById('thumb-title-size');
     const thumbTitleX = document.getElementById('thumb-title-x');
     const thumbTitleY = document.getElementById('thumb-title-y');
     const thumbDescColor = document.getElementById('thumb-desc-color');
     const thumbDescStroke = document.getElementById('thumb-desc-stroke');
+    const thumbDescSize = document.getElementById('thumb-desc-size');
     const thumbDescX = document.getElementById('thumb-desc-x');
     const thumbDescY = document.getElementById('thumb-desc-y');
 
     const thumbSettings = [
         thumbSizeSelect, thumbShowBg, thumbShowAvatar, thumbShowTitle, thumbShowDesc,
-        thumbTitleColor, thumbTitleStroke, thumbTitleX, thumbTitleY,
-        thumbDescColor, thumbDescStroke, thumbDescX, thumbDescY
+        thumbTitleColor, thumbTitleStroke, thumbTitleSize, thumbTitleX, thumbTitleY,
+        thumbDescColor, thumbDescStroke, thumbDescSize, thumbDescX, thumbDescY
     ];
 
     // Load saved settings
@@ -3279,18 +3281,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const lines = titleText.split('\n');
             const baseX = targetWidth * (parseFloat(thumbTitleX.value) / 100);
             let baseY = targetHeight * (parseFloat(thumbTitleY.value) / 100);
+            const tSize = thumbTitleSize ? parseFloat(thumbTitleSize.value) : 72;
             
-            ctx.font = 'bold 72px sans-serif';
+            ctx.font = `bold ${tSize}px sans-serif`;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
             
             for (let line of lines) {
-                ctx.lineWidth = 12;
+                ctx.lineWidth = Math.max(4, tSize / 6);
                 ctx.strokeStyle = thumbTitleStroke.value;
                 ctx.strokeText(line, baseX, baseY);
                 ctx.fillStyle = thumbTitleColor.value;
                 ctx.fillText(line, baseX, baseY);
-                baseY += 90;
+                baseY += tSize * 1.25;
             }
         }
 
@@ -3298,18 +3301,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const descLines = descText.split('\n');
             const baseX = targetWidth * (parseFloat(thumbDescX.value) / 100);
             let baseY = targetHeight * (parseFloat(thumbDescY.value) / 100);
+            const dSize = thumbDescSize ? parseFloat(thumbDescSize.value) : 40;
 
-            ctx.font = 'bold 40px sans-serif';
+            ctx.font = `bold ${dSize}px sans-serif`;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
 
             for (let line of descLines) {
-                ctx.lineWidth = 8;
+                ctx.lineWidth = Math.max(3, dSize / 5);
                 ctx.strokeStyle = thumbDescStroke.value;
                 ctx.strokeText(line, baseX, baseY);
                 ctx.fillStyle = thumbDescColor.value;
                 ctx.fillText(line, baseX, baseY);
-                baseY += 60;
+                baseY += dSize * 1.5;
             }
         }
     };
