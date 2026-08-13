@@ -154,6 +154,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentPlayingIsIdle = false;
     let tVoiceMouthOpen = 0;
 
+    // BGM状態変数
+    let bgmAudioContext = null;
+    let bgmBuffer = null;
+    let bgmSource = null;
+    let bgmGainNode = null;
+    let bgmIsPlaying = false;
+
     // 瞬き
     let isBlinking = false;
     let blinkTimer = null;
@@ -2708,6 +2715,119 @@ document.addEventListener('DOMContentLoaded', () => {
             streamOverlay.classList.remove('active');
         });
     }
+
+    // =====================================================================
+    // BGM制御
+    // =====================================================================
+    const bgmUpload = document.getElementById('bgm-upload');
+    const bgmFileName = document.getElementById('bgm-file-name');
+    const bgmPlayBtn = document.getElementById('bgm-play-btn');
+    const bgmStopBtn = document.getElementById('bgm-stop-btn');
+    const bgmVolumeSlider = document.getElementById('bgm-volume-slider');
+    const bgmVolumeVal = document.getElementById('bgm-volume-val');
+    const bgmLoopStart = document.getElementById('bgm-loop-start');
+    const bgmLoopEnd = document.getElementById('bgm-loop-end');
+
+    if (bgmUpload) {
+        bgmUpload.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            bgmFileName.textContent = file.name;
+
+            if (!bgmAudioContext) {
+                bgmAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (bgmAudioContext.state === 'suspended') {
+                await bgmAudioContext.resume();
+            }
+
+            const arrayBuffer = await file.arrayBuffer();
+            try {
+                bgmBuffer = await bgmAudioContext.decodeAudioData(arrayBuffer);
+                bgmPlayBtn.disabled = false;
+                bgmStopBtn.disabled = false;
+            } catch (error) {
+                console.error("BGM decode error:", error);
+                bgmFileName.textContent = "読み込みエラー";
+            }
+        });
+    }
+
+    function stopBgm() {
+        if (bgmSource) {
+            try { bgmSource.stop(); } catch (e) {}
+            bgmSource.disconnect();
+            bgmSource = null;
+        }
+        bgmIsPlaying = false;
+    }
+
+    if (bgmPlayBtn) {
+        bgmPlayBtn.addEventListener('click', () => {
+            if (!bgmBuffer || !bgmAudioContext) return;
+            
+            stopBgm(); // 既に再生中なら停止
+
+            if (!bgmGainNode) {
+                bgmGainNode = bgmAudioContext.createGain();
+                bgmGainNode.connect(bgmAudioContext.destination);
+            }
+            const vol = parseFloat(bgmVolumeSlider.value) / 100.0;
+            bgmGainNode.gain.value = vol;
+
+            bgmSource = bgmAudioContext.createBufferSource();
+            bgmSource.buffer = bgmBuffer;
+            bgmSource.loop = true;
+
+            const startVal = parseFloat(bgmLoopStart.value);
+            const endVal = parseFloat(bgmLoopEnd.value);
+            if (!isNaN(startVal) && startVal >= 0) {
+                bgmSource.loopStart = startVal;
+            }
+            if (!isNaN(endVal) && endVal > 0 && endVal <= bgmBuffer.duration) {
+                bgmSource.loopEnd = endVal;
+            }
+
+            bgmSource.connect(bgmGainNode);
+            bgmSource.start();
+            bgmIsPlaying = true;
+        });
+    }
+
+    if (bgmStopBtn) {
+        bgmStopBtn.addEventListener('click', stopBgm);
+    }
+
+    if (bgmVolumeSlider) {
+        bgmVolumeSlider.addEventListener('input', () => {
+            const vol = parseFloat(bgmVolumeSlider.value);
+            bgmVolumeVal.textContent = Math.round(vol);
+            if (bgmGainNode) {
+                bgmGainNode.gain.value = vol / 100.0;
+            }
+        });
+    }
+
+    const updateLoopPoints = () => {
+        if (bgmSource && bgmIsPlaying) {
+            const startVal = parseFloat(bgmLoopStart.value);
+            const endVal = parseFloat(bgmLoopEnd.value);
+            if (!isNaN(startVal) && startVal >= 0) {
+                bgmSource.loopStart = startVal;
+            } else {
+                bgmSource.loopStart = 0;
+            }
+            if (!isNaN(endVal) && endVal > 0 && endVal <= bgmBuffer.duration) {
+                bgmSource.loopEnd = endVal;
+            } else {
+                bgmSource.loopEnd = bgmBuffer.duration;
+            }
+        }
+    };
+
+    if (bgmLoopStart) bgmLoopStart.addEventListener('change', updateLoopPoints);
+    if (bgmLoopEnd) bgmLoopEnd.addEventListener('change', updateLoopPoints);
+
 
     // =====================================================================
     // OBSモード適用

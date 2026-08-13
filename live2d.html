@@ -64,6 +64,32 @@
                 </div>
             </div>
             <div class="panel-section">
+                <h3><span class="icon">🎵</span>BGM設定</h3>
+                <div class="control-group">
+                    <label class="btn" style="width:100%;text-align:center;background:rgba(0,0,0,0.4);border:1px solid var(--border-neon);cursor:pointer;padding:0.6rem;border-radius:6px;color:var(--text-primary);display:block;transition:all 0.3s ease;">
+                        BGM (mp3/wav) を読み込む
+                        <input type="file" id="bgm-upload" accept="audio/mp3, audio/wav, audio/mpeg, audio/x-wav" style="display:none;">
+                    </label>
+                    <div id="bgm-file-name" style="font-size: 0.75rem; color: var(--text-muted); text-align: center; word-break: break-all;">ファイル未選択</div>
+                </div>
+                <div class="control-group" style="display: flex; flex-direction: row; gap: 10px;">
+                    <button class="btn" id="bgm-play-btn" style="flex:1; background:var(--primary); color:#000; font-weight:bold;" disabled>▶ 再生</button>
+                    <button class="btn" id="bgm-stop-btn" style="flex:1; background:var(--danger, #ff4444); color:#fff; border:none;" disabled>■ 停止</button>
+                </div>
+                <div class="slider-container">
+                    <label>音量: <span id="bgm-volume-val">20</span>%</label>
+                    <input type="range" id="bgm-volume-slider" min="0" max="100" value="20">
+                </div>
+                <div class="control-group" style="margin-top: 0.3rem;">
+                    <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">ループ範囲（秒数で指定・未指定なら全編ループ）</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="number" id="bgm-loop-start" placeholder="開始(秒)" min="0" step="1" style="flex:1; padding:0.4rem; border-radius:4px; border:1px solid var(--border-neon); background:#1a1a2e; color:#fff;">
+                        <span style="color:var(--text-muted);">〜</span>
+                        <input type="number" id="bgm-loop-end" placeholder="終了(秒)" min="0" step="1" style="flex:1; padding:0.4rem; border-radius:4px; border:1px solid var(--border-neon); background:#1a1a2e; color:#fff;">
+                    </div>
+                </div>
+            </div>
+            <div class="panel-section">
                 <h3><span class="icon">🎙️</span>表情と連動</h3>
                 <div class="control-group">
                     <label class="switch-label">
@@ -356,7 +382,7 @@
     <script src="live2dcubismcore.min.js"></script>
     <!-- pixi-live2d-display v0.4 -->
     <script src="pixi-live2d-display.min.js"></script>
-    <script src="idle_phrases.js?v=3.27"></script>
-    <script src="live2d-app.js?v=3.27"></script>
+    <script src="idle_phrases.js?v=3.28"></script>
+    <script src="live2d-app.js?v=3.28"></script>
 </body>
 </html>
