@@ -2792,6 +2792,54 @@ document.addEventListener('DOMContentLoaded', () => {
     const bgmVolumeVal = document.getElementById('bgm-volume-val');
     const bgmLoopStart = document.getElementById('bgm-loop-start');
     const bgmLoopEnd = document.getElementById('bgm-loop-end');
+    const bgmWaveformContainer = document.getElementById('bgm-waveform-container');
+    const bgmWaveformCanvas = document.getElementById('bgm-waveform-canvas');
+    const bgmLoopHighlight = document.getElementById('bgm-loop-highlight');
+
+    function drawBgmWaveform(buffer) {
+        if (!bgmWaveformContainer || !bgmWaveformCanvas) return;
+        bgmWaveformContainer.style.display = 'block';
+        
+        // Canvasのリサイズ (CSSのサイズに合わせる)
+        const rect = bgmWaveformContainer.getBoundingClientRect();
+        bgmWaveformCanvas.width = rect.width;
+        bgmWaveformCanvas.height = rect.height;
+
+        const ctx = bgmWaveformCanvas.getContext('2d');
+        const data = buffer.getChannelData(0); // Lチャンネル
+        const step = Math.ceil(data.length / bgmWaveformCanvas.width);
+        const amp = bgmWaveformCanvas.height / 2;
+        
+        ctx.fillStyle = '#00f3ff';
+        ctx.clearRect(0, 0, bgmWaveformCanvas.width, bgmWaveformCanvas.height);
+        
+        for (let i = 0; i < bgmWaveformCanvas.width; i++) {
+            let min = 1.0, max = -1.0;
+            for (let j = 0; j < step; j++) {
+                const datum = data[i * step + j];
+                if (datum < min) min = datum;
+                if (datum > max) max = datum;
+            }
+            ctx.fillRect(i, (1 + min) * amp, 1, Math.max(1, (max - min) * amp));
+        }
+        updateHighlightUI();
+    }
+
+    function updateHighlightUI() {
+        if (!bgmBuffer || !bgmLoopHighlight || !bgmWaveformContainer) return;
+        const dur = bgmBuffer.duration;
+        let startVal = parseFloat(bgmLoopStart.value);
+        let endVal = parseFloat(bgmLoopEnd.value);
+        if (isNaN(startVal) || startVal < 0) startVal = 0;
+        if (isNaN(endVal) || endVal <= 0 || endVal > dur) endVal = dur;
+        if (startVal > endVal) startVal = endVal;
+
+        const startPct = (startVal / dur) * 100;
+        const endPct = (endVal / dur) * 100;
+        bgmLoopHighlight.style.display = 'block';
+        bgmLoopHighlight.style.left = startPct + '%';
+        bgmLoopHighlight.style.width = (endPct - startPct) + '%';
+    }
 
     // Load saved settings
     if (bgmVolumeSlider) {
@@ -2830,6 +2878,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 bgmPlayBtn.disabled = false;
                 bgmStopBtn.disabled = false;
                 
+                drawBgmWaveform(bgmBuffer);
+
                 // 再度 arrayBuffer を取得して保存 (decodeAudioDataで消費されることがあるため)
                 const arrayBufferToSave = await file.arrayBuffer();
                 await saveBgmToDB(arrayBufferToSave, file.name);
@@ -2854,6 +2904,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log(`[BGM] DBから復元完了: ${savedBGM.name} (長さ: ${bgmBuffer.duration.toFixed(2)}秒)`);
                 if (bgmPlayBtn) bgmPlayBtn.disabled = false;
                 if (bgmStopBtn) bgmStopBtn.disabled = false;
+                drawBgmWaveform(bgmBuffer);
             } catch (error) {
                 console.error("BGM decode error on restore:", error);
                 if (bgmFileName) bgmFileName.textContent = "復元エラー";
@@ -2933,6 +2984,8 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('savedBgmLoopStart', isNaN(startVal) ? '' : startVal);
         localStorage.setItem('savedBgmLoopEnd', isNaN(endVal) ? '' : endVal);
 
+        updateHighlightUI();
+
         if (bgmSource && bgmIsPlaying) {
             if (!isNaN(startVal) && startVal >= 0) {
                 bgmSource.loopStart = startVal;
@@ -2950,6 +3003,46 @@ document.addEventListener('DOMContentLoaded', () => {
     if (bgmLoopStart) bgmLoopStart.addEventListener('change', updateLoopPoints);
     if (bgmLoopEnd) bgmLoopEnd.addEventListener('change', updateLoopPoints);
 
+    // キャンバス上のマウスドラッグによる範囲選択
+    if (bgmWaveformContainer) {
+        let isDraggingWaveform = false;
+        let dragStartX = 0;
+
+        const updateRangeFromMouse = (e, isStart) => {
+            if (!bgmBuffer) return;
+            const rect = bgmWaveformContainer.getBoundingClientRect();
+            let x = e.clientX - rect.left;
+            x = Math.max(0, Math.min(x, rect.width));
+            const dur = bgmBuffer.duration;
+            const time = (x / rect.width) * dur;
+            
+            if (isStart) {
+                dragStartX = x;
+                bgmLoopStart.value = time.toFixed(2);
+                bgmLoopEnd.value = ''; // ドラッグ開始時は終了を一旦クリア
+            } else {
+                const startTime = (Math.min(dragStartX, x) / rect.width) * dur;
+                const endTime = (Math.max(dragStartX, x) / rect.width) * dur;
+                bgmLoopStart.value = startTime.toFixed(2);
+                bgmLoopEnd.value = endTime.toFixed(2);
+            }
+            updateLoopPoints();
+        };
+
+        bgmWaveformContainer.addEventListener('mousedown', (e) => {
+            isDraggingWaveform = true;
+            updateRangeFromMouse(e, true);
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (!isDraggingWaveform) return;
+            updateRangeFromMouse(e, false);
+        });
+        window.addEventListener('mouseup', () => {
+            if (isDraggingWaveform) {
+                isDraggingWaveform = false;
+            }
+        });
+    }
 
     // =====================================================================
     // OBSモード適用
