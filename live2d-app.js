@@ -3423,6 +3423,145 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // =====================================================================
+    // YouTube概要欄エディタ
+    // =====================================================================
+    const ytDescModal = document.getElementById('yt-desc-modal');
+    const ytDescTextarea = document.getElementById('yt-desc-textarea');
+    const ytDescCharcount = document.getElementById('yt-desc-charcount');
+    const ytDescCancelBtn = document.getElementById('yt-desc-cancel-btn');
+    const ytDescCopyBtn = document.getElementById('yt-desc-copy-btn');
+    const editYtDescBtn = document.getElementById('edit-yt-desc-btn');
+    const copyYtDescBtn = document.getElementById('copy-yt-desc-btn');
+    const aiGenerateYtDescBtn = document.getElementById('ai-generate-yt-desc-btn');
+
+    const updateYtDescCount = () => {
+        if (ytDescCharcount && ytDescTextarea) {
+            ytDescCharcount.textContent = `${ytDescTextarea.value.length}文字`;
+        }
+    };
+
+    // ローカルストレージで保存
+    if (ytDescTextarea) {
+        const saved = localStorage.getItem('savedYtDescription');
+        if (saved) ytDescTextarea.value = saved;
+        ytDescTextarea.addEventListener('input', () => {
+            localStorage.setItem('savedYtDescription', ytDescTextarea.value);
+            updateYtDescCount();
+        });
+        updateYtDescCount();
+    }
+
+    // 編集ボタン → モーダルを開く
+    if (editYtDescBtn && ytDescModal) {
+        editYtDescBtn.addEventListener('click', () => {
+            ytDescModal.style.display = 'flex';
+            updateYtDescCount();
+        });
+    }
+
+    // パネル側のコピーボタン
+    if (copyYtDescBtn && ytDescTextarea) {
+        copyYtDescBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(ytDescTextarea.value).then(() => {
+                copyYtDescBtn.textContent = '✅ コピー済';
+                setTimeout(() => { copyYtDescBtn.textContent = 'コピー'; }, 2000);
+            });
+        });
+    }
+
+    // モーダル内コピーボタン
+    if (ytDescCopyBtn && ytDescTextarea) {
+        ytDescCopyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(ytDescTextarea.value).then(() => {
+                ytDescCopyBtn.textContent = '✅ コピー済み';
+                setTimeout(() => { ytDescCopyBtn.textContent = '📋 コピー'; }, 2000);
+            });
+        });
+    }
+
+    // モーダルを閉じる
+    if (ytDescCancelBtn) {
+        ytDescCancelBtn.addEventListener('click', () => {
+            ytDescModal.style.display = 'none';
+        });
+    }
+
+    // AI生成（概要欄向け詳細文）
+    if (aiGenerateYtDescBtn) {
+        aiGenerateYtDescBtn.addEventListener('click', async () => {
+            const apiKey = localStorage.getItem('savedAiApiKey');
+            const provider = localStorage.getItem('savedAiProvider') || 'gemini';
+            const aiModel = localStorage.getItem('savedAiModel') || (provider === 'openai' ? 'gpt-4o-mini' : 'gemini-1.5-flash');
+
+            if (!apiKey) {
+                alert('AI設定タブでAPIキーを設定してください。');
+                return;
+            }
+
+            const title = streamTitleInput ? streamTitleInput.value.trim() : '';
+            const shortDesc = streamDescInput ? streamDescInput.value.trim() : '';
+            const theme = aiStreamThemeInput ? aiStreamThemeInput.value.trim() : '';
+
+            const prompt = `あなたはプロのVTuber配信マネージャーです。
+以下の配信情報をもとに、YouTubeの概要欄（説明欄）に書く長文テキストを1本だけ作成してください。
+
+配信タイトル: ${title || '（未設定）'}
+配信テーマ: ${theme || shortDesc || '（未設定）'}
+
+【概要欄の構成】
+1. 元気な挨拶と配信の見どころ（2〜3文）
+2. 配信のルール・お願い
+   - 話題に出ていない他の配信者の名前を出さないでください
+   - 伝書鳩NG
+   - 荒らし・アンチはブロック＆スルー
+   - 不快なコメントは非表示・ブロックします
+3. SNSリンク（Twitterなど、ダミーURL可）
+4. 関連するハッシュタグ（5〜8個）
+5. BGMや素材のクレジット表記（ダミーで構いません）
+
+マークダウンやJSONは不要です。そのままYouTubeに貼れる形式のプレーンテキストだけを返してください。`;
+
+            aiGenerateYtDescBtn.textContent = '⏳ 生成中...';
+            aiGenerateYtDescBtn.disabled = true;
+
+            try {
+                let result = '';
+                if (provider === 'openai') {
+                    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                        body: JSON.stringify({ model: aiModel, messages: [{ role: 'user', content: prompt }], temperature: 0.7 })
+                    });
+                    if (!res.ok) throw new Error('OpenAI API Error');
+                    const data = await res.json();
+                    result = data.choices[0].message.content;
+                } else {
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${aiModel}:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7 } })
+                    });
+                    if (!res.ok) throw new Error('Gemini API Error');
+                    const data = await res.json();
+                    result = data.candidates[0].content.parts[0].text;
+                }
+
+                if (ytDescTextarea) {
+                    ytDescTextarea.value = result;
+                    localStorage.setItem('savedYtDescription', result);
+                    updateYtDescCount();
+                }
+            } catch (err) {
+                console.error(err);
+                alert('AI生成に失敗しました。\n' + err.message);
+            } finally {
+                aiGenerateYtDescBtn.textContent = '✨ AI で概要欄を生成';
+                aiGenerateYtDescBtn.disabled = false;
+            }
+        });
+    }
+
     if (aiGenerateStreamBtn) {
         aiGenerateStreamBtn.addEventListener('click', async () => {
             const apiKey = localStorage.getItem('savedAiApiKey');
