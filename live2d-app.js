@@ -1788,6 +1788,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     const data = JSON.parse(event.data);
                     if (data.type === 'status') {
                         tiktokStatus.textContent = data.message;
+                        if (data.status === 'connected') {
+                            console.log('[TikTok] コメント読み上げの準備が完了しました！');
+                        }
                         if (data.status === 'error') {
                             if (tiktokWs) {
                                 tiktokWs.close();
@@ -1960,6 +1963,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     const data = JSON.parse(event.data);
                     if (data.type === 'status') {
                         youtubeStatus.textContent = data.message;
+                        if (data.status === 'connected') {
+                            console.log('[YouTube] コメント読み上げの準備が完了しました！');
+                        }
                         if (data.status === 'error' || data.status === 'disconnected') {
                             if (youtubeWs) {
                                 youtubeWs.close();
