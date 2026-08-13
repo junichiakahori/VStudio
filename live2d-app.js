@@ -2744,6 +2744,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const arrayBuffer = await file.arrayBuffer();
             try {
                 bgmBuffer = await bgmAudioContext.decodeAudioData(arrayBuffer);
+                console.log(`[BGM] 読み込み完了: ${file.name} (長さ: ${bgmBuffer.duration.toFixed(2)}秒)`);
                 bgmPlayBtn.disabled = false;
                 bgmStopBtn.disabled = false;
             } catch (error) {
@@ -2758,6 +2759,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try { bgmSource.stop(); } catch (e) {}
             bgmSource.disconnect();
             bgmSource = null;
+            console.log('[BGM] 停止しました');
         }
         bgmIsPlaying = false;
     }
@@ -2791,6 +2793,7 @@ document.addEventListener('DOMContentLoaded', () => {
             bgmSource.connect(bgmGainNode);
             bgmSource.start();
             bgmIsPlaying = true;
+            console.log(`[BGM] 再生開始 (ループ: ${bgmSource.loopStart}s 〜 ${bgmSource.loopEnd}s, 音量: ${bgmGainNode.gain.value})`);
         });
     }
 
