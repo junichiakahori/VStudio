@@ -149,6 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isVoicevoxPlaying = false;
     let voicevoxAnalyser = null;
     let voicevoxAudioContext = null;
+    let voicevoxGainNode = null;
     let currentVoicevoxSource = null;
     let currentPlayingIsIdle = false;
     let tVoiceMouthOpen = 0;
@@ -1582,6 +1583,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const savedModel = localStorage.getItem('savedAiModel');
         if (savedModel && aiModelInput) aiModelInput.value = savedModel;
 
+        const voicevoxVolumeSlider = document.getElementById('voicevox-volume-slider');
+        const voicevoxVolumeVal = document.getElementById('voicevox-volume-val');
+        if (voicevoxVolumeSlider) {
+            const savedVol = localStorage.getItem('savedVoicevoxVolume');
+            if (savedVol !== null) {
+                voicevoxVolumeSlider.value = savedVol;
+                if (voicevoxVolumeVal) voicevoxVolumeVal.textContent = savedVol;
+            }
+            voicevoxVolumeSlider.addEventListener('input', () => {
+                const vol = parseFloat(voicevoxVolumeSlider.value);
+                if (voicevoxVolumeVal) voicevoxVolumeVal.textContent = Math.round(vol);
+                localStorage.setItem('savedVoicevoxVolume', vol);
+                if (voicevoxGainNode) {
+                    voicevoxGainNode.gain.value = vol / 100.0;
+                }
+            });
+        }
+
         aiProviderSelect.addEventListener('change', () => {
             localStorage.setItem('savedAiProvider', aiProviderSelect.value);
             if (aiModelInput) {
@@ -2638,8 +2657,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 voicevoxAnalyser = voicevoxAudioContext.createAnalyser();
                 voicevoxAnalyser.fftSize = 256;
             }
+            if (!voicevoxGainNode) {
+                voicevoxGainNode = voicevoxAudioContext.createGain();
+                const volSlider = document.getElementById('voicevox-volume-slider');
+                if (volSlider) {
+                    voicevoxGainNode.gain.value = parseFloat(volSlider.value) / 100.0;
+                }
+            }
  
-            currentVoicevoxSource.connect(voicevoxAnalyser);
+            currentVoicevoxSource.connect(voicevoxGainNode);
+            voicevoxGainNode.connect(voicevoxAnalyser);
             voicevoxAnalyser.connect(voicevoxAudioContext.destination);
  
             currentVoicevoxSource.onended = () => {
