@@ -2717,7 +2717,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =====================================================================
-    // BGM制御
+    // BGM制御 (IndexedDB 記憶対応)
+    // =====================================================================
+    const DB_NAME = 'Live2DBGMDB';
+    const STORE_NAME = 'bgmStore';
+
+    function initBgmDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 1);
+            request.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME);
+                }
+            };
+            request.onsuccess = (e) => resolve(e.target.result);
+            request.onerror = (e) => reject(e.target.error);
+        });
+    }
+
+    async function saveBgmToDB(arrayBuffer, fileName) {
+        try {
+            const db = await initBgmDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                store.put({ buffer: arrayBuffer, name: fileName }, 'currentBGM');
+                tx.oncomplete = () => resolve();
+                tx.onerror = (e) => reject(e.target.error);
+            });
+        } catch (e) {
+            console.error('BGM Save Error:', e);
+        }
+    }
+
+    async function loadBgmFromDB() {
+        try {
+            const db = await initBgmDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.get('currentBGM');
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = (e) => reject(e.target.error);
+            });
+        } catch (e) {
+            console.error('BGM Load Error:', e);
+            return null;
+        }
+    }
     // =====================================================================
     const bgmUpload = document.getElementById('bgm-upload');
     const bgmFileName = document.getElementById('bgm-file-name');
@@ -2727,6 +2775,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const bgmVolumeVal = document.getElementById('bgm-volume-val');
     const bgmLoopStart = document.getElementById('bgm-loop-start');
     const bgmLoopEnd = document.getElementById('bgm-loop-end');
+
+    // Load saved settings
+    if (bgmVolumeSlider) {
+        const savedVol = localStorage.getItem('savedBgmVolume');
+        if (savedVol !== null) {
+            bgmVolumeSlider.value = savedVol;
+            if (bgmVolumeVal) bgmVolumeVal.textContent = Math.round(parseFloat(savedVol));
+        }
+    }
+    if (bgmLoopStart) {
+        const savedStart = localStorage.getItem('savedBgmLoopStart');
+        if (savedStart !== null) bgmLoopStart.value = savedStart;
+    }
+    if (bgmLoopEnd) {
+        const savedEnd = localStorage.getItem('savedBgmLoopEnd');
+        if (savedEnd !== null) bgmLoopEnd.value = savedEnd;
+    }
 
     if (bgmUpload) {
         bgmUpload.addEventListener('change', async (e) => {
@@ -2747,12 +2812,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log(`[BGM] 読み込み完了: ${file.name} (長さ: ${bgmBuffer.duration.toFixed(2)}秒)`);
                 bgmPlayBtn.disabled = false;
                 bgmStopBtn.disabled = false;
+                
+                // 再度 arrayBuffer を取得して保存 (decodeAudioDataで消費されることがあるため)
+                const arrayBufferToSave = await file.arrayBuffer();
+                await saveBgmToDB(arrayBufferToSave, file.name);
+                console.log(`[BGM] IndexedDBに保存しました`);
             } catch (error) {
                 console.error("BGM decode error:", error);
                 bgmFileName.textContent = "読み込みエラー";
             }
         });
     }
+
+    // 初期ロード時にDBからBGMを復元
+    (async () => {
+        const savedBGM = await loadBgmFromDB();
+        if (savedBGM && savedBGM.buffer) {
+            if (!bgmAudioContext) {
+                bgmAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            try {
+                if (bgmFileName) bgmFileName.textContent = savedBGM.name;
+                bgmBuffer = await bgmAudioContext.decodeAudioData(savedBGM.buffer);
+                console.log(`[BGM] DBから復元完了: ${savedBGM.name} (長さ: ${bgmBuffer.duration.toFixed(2)}秒)`);
+                if (bgmPlayBtn) bgmPlayBtn.disabled = false;
+                if (bgmStopBtn) bgmStopBtn.disabled = false;
+            } catch (error) {
+                console.error("BGM decode error on restore:", error);
+                if (bgmFileName) bgmFileName.textContent = "復元エラー";
+            }
+        }
+    })();
 
     function stopBgm() {
         if (bgmSource) {
@@ -2805,6 +2895,7 @@ document.addEventListener('DOMContentLoaded', () => {
         bgmVolumeSlider.addEventListener('input', () => {
             const vol = parseFloat(bgmVolumeSlider.value);
             bgmVolumeVal.textContent = Math.round(vol);
+            localStorage.setItem('savedBgmVolume', vol);
             if (bgmGainNode) {
                 bgmGainNode.gain.value = vol / 100.0;
             }
@@ -2812,9 +2903,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const updateLoopPoints = () => {
+        const startVal = parseFloat(bgmLoopStart.value);
+        const endVal = parseFloat(bgmLoopEnd.value);
+        
+        localStorage.setItem('savedBgmLoopStart', isNaN(startVal) ? '' : startVal);
+        localStorage.setItem('savedBgmLoopEnd', isNaN(endVal) ? '' : endVal);
+
         if (bgmSource && bgmIsPlaying) {
-            const startVal = parseFloat(bgmLoopStart.value);
-            const endVal = parseFloat(bgmLoopEnd.value);
             if (!isNaN(startVal) && startVal >= 0) {
                 bgmSource.loopStart = startVal;
             } else {
