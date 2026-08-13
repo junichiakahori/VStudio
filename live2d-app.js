@@ -2399,7 +2399,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (h >= 5 && h < 11) timeCategory = "morning";
                         else if (h >= 11 && h < 18) timeCategory = "afternoon";
                         
+                        const month = new Date().getMonth() + 1;
+                        let seasonCategory = "winter";
+                        if (month >= 3 && month <= 5) seasonCategory = "spring";
+                        else if (month >= 6 && month <= 8) seasonCategory = "summer";
+                        else if (month >= 9 && month <= 11) seasonCategory = "autumn";
+                        
                         const availablePhrases = [...categoryObj.general, ...categoryObj[timeCategory]];
+                        if (categoryObj[seasonCategory]) {
+                            availablePhrases.push(...categoryObj[seasonCategory]);
+                        }
                         return availablePhrases[Math.floor(Math.random() * availablePhrases.length)];
                     };
 
