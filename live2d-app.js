@@ -3437,11 +3437,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const theme = aiStreamThemeInput.value.trim() || 'おまかせ（今日の配信）';
             const prompt = `あなたはプロのVTuber配信マネージャーです。
 以下のキーワードやテーマを元に、YouTube配信用の「配信タイトル」と「概要文」のセットを10通り作成してください。
+
+【概要文の要件】
+他の人気VTuberがよくやっているように、以下の要素を盛り込んでリッチな概要文にしてください：
+1. 配信のあらすじ・見どころ（元気な挨拶を含む）
+2. 関連するハッシュタグ（例: #水森りんご 等）
+3. X(Twitter)などのSNSへのリンク（URLは https://twitter.com/... のようなダミーでOK）
+4. 視聴者へのお願い・配信のルール（「話題に出ていない他の配信者の名前を出さない」「伝書鳩NG」「荒らしはブロック＆スルー」など）
+5. 使用BGMや素材のクレジット表記
+
 必ず以下のJSONフォーマットのみを返してください（マークダウンやバッククォート、説明などは一切不要です）。
 [
   { "title": "タイトル1", "description": "概要1" },
   { "title": "タイトル2", "description": "概要2" }
 ]
+
 キーワード・テーマ: ${theme}`;
 
             aiGenerateStreamBtn.textContent = '✨ 生成中...';
