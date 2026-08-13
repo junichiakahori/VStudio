@@ -586,6 +586,41 @@ body.panel-hidden .avatar-viewport {
     gap: 1rem;
 }
 
+.ai-candidate-item {
+    background: #1a1a2e;
+    border: 1px solid var(--border-neon);
+    border-radius: 6px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.ai-candidate-item h4 {
+    margin: 0;
+    color: var(--primary);
+    font-size: 1rem;
+}
+.ai-candidate-item p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    white-space: pre-wrap;
+}
+.ai-candidate-item .apply-btn {
+    align-self: flex-end;
+    background: var(--secondary);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+.ai-candidate-item .apply-btn:hover {
+    background: var(--secondary-glow);
+}
+
 /* コメントビューアー */
 .comment-viewer {
     position: absolute;

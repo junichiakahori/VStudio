@@ -3287,6 +3287,127 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =====================================================================
+    // AI配信タイトル生成
+    // =====================================================================
+    const aiStreamThemeInput = document.getElementById('ai-stream-theme');
+    const aiGenerateStreamBtn = document.getElementById('ai-generate-stream-info-btn');
+    const aiCandidatesModal = document.getElementById('ai-candidates-modal');
+    const aiCandidatesList = document.getElementById('ai-candidates-list');
+    const aiCandidatesCancelBtn = document.getElementById('ai-candidates-cancel-btn');
+
+    if (aiCandidatesCancelBtn) {
+        aiCandidatesCancelBtn.addEventListener('click', () => {
+            aiCandidatesModal.style.display = 'none';
+        });
+    }
+
+    if (aiGenerateStreamBtn) {
+        aiGenerateStreamBtn.addEventListener('click', async () => {
+            const apiKey = localStorage.getItem('savedAiApiKey');
+            const provider = localStorage.getItem('savedAiProvider') || 'gemini';
+            const aiModel = localStorage.getItem('savedAiModel') || (provider === 'openai' ? 'gpt-4o-mini' : 'gemini-1.5-flash');
+
+            if (!apiKey) {
+                alert('AI設定タブでAPIキーを設定してください。');
+                return;
+            }
+
+            const theme = aiStreamThemeInput.value.trim() || 'おまかせ（今日の配信）';
+            const prompt = `あなたはプロのVTuber配信マネージャーです。
+以下のキーワードやテーマを元に、YouTube配信用の「配信タイトル」と「概要文」のセットを10通り作成してください。
+必ず以下のJSONフォーマットのみを返してください（マークダウンやバッククォート、説明などは一切不要です）。
+[
+  { "title": "タイトル1", "description": "概要1" },
+  { "title": "タイトル2", "description": "概要2" }
+]
+キーワード・テーマ: ${theme}`;
+
+            aiGenerateStreamBtn.textContent = '✨ 生成中...';
+            aiGenerateStreamBtn.disabled = true;
+
+            try {
+                let jsonText = '';
+                if (provider === 'openai') {
+                    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: aiModel,
+                            messages: [{ role: 'user', content: prompt }],
+                            temperature: 0.7
+                        })
+                    });
+                    if (!res.ok) throw new Error('OpenAI API Error');
+                    const data = await res.json();
+                    jsonText = data.choices[0].message.content;
+                } else {
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${aiModel}:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            generationConfig: { temperature: 0.7 }
+                        })
+                    });
+                    if (!res.ok) throw new Error('Gemini API Error');
+                    const data = await res.json();
+                    jsonText = data.candidates[0].content.parts[0].text;
+                }
+
+                // JSONの抽出 (マークダウンがあった場合を考慮)
+                if (jsonText.includes('```json')) {
+                    jsonText = jsonText.split('```json')[1].split('```')[0].trim();
+                } else if (jsonText.includes('```')) {
+                    jsonText = jsonText.split('```')[1].split('```')[0].trim();
+                }
+
+                const candidates = JSON.parse(jsonText);
+                
+                // モーダルにレンダリング
+                aiCandidatesList.innerHTML = '';
+                candidates.forEach((cand, i) => {
+                    const div = document.createElement('div');
+                    div.className = 'ai-candidate-item';
+                    
+                    const title = document.createElement('h4');
+                    title.textContent = `${i + 1}. ${cand.title}`;
+                    
+                    const desc = document.createElement('p');
+                    desc.textContent = cand.description;
+                    
+                    const applyBtn = document.createElement('button');
+                    applyBtn.className = 'apply-btn';
+                    applyBtn.textContent = '適用する';
+                    applyBtn.onclick = () => {
+                        if (streamTitleInput) streamTitleInput.value = cand.title;
+                        if (streamDescInput) streamDescInput.value = cand.description;
+                        localStorage.setItem('savedStreamTitle', cand.title);
+                        localStorage.setItem('savedStreamDesc', cand.description);
+                        aiCandidatesModal.style.display = 'none';
+                    };
+                    
+                    div.appendChild(title);
+                    div.appendChild(desc);
+                    div.appendChild(applyBtn);
+                    aiCandidatesList.appendChild(div);
+                });
+                
+                aiCandidatesModal.style.display = 'flex';
+                
+            } catch (err) {
+                console.error(err);
+                alert('AI生成に失敗しました。\n' + err.message);
+            } finally {
+                aiGenerateStreamBtn.textContent = '✨ AI生成';
+                aiGenerateStreamBtn.disabled = false;
+            }
+        });
+    }
+
+    // =====================================================================
     // OBSモード適用
     // =====================================================================
     if (isObsMode) {
