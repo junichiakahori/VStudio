@@ -82,7 +82,9 @@
                 </div>
                 <div class="control-group" id="bgm-waveform-container" style="display:none; margin-top:0.5rem; position:relative; width:100%; height:60px; background:rgba(0,0,0,0.5); border:1px solid var(--border-neon); border-radius:4px; overflow:hidden; cursor:crosshair;">
                     <canvas id="bgm-waveform-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%;"></canvas>
-                    <div id="bgm-loop-highlight" style="position:absolute; top:0; bottom:0; background:rgba(0, 243, 255, 0.3); border-left:2px solid var(--primary); border-right:2px solid var(--primary); pointer-events:none; display:none;"></div>
+                    <div id="bgm-loop-highlight" style="position:absolute; top:0; bottom:0; background:rgba(0, 243, 255, 0.3); pointer-events:none; display:none;"></div>
+                    <div id="bgm-handle-start" class="bgm-handle" style="display:none;"></div>
+                    <div id="bgm-handle-end" class="bgm-handle" style="display:none;"></div>
                 </div>
                 <div class="control-group" style="margin-top: 0.3rem;">
                     <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">ループ範囲（秒数で指定・未指定なら全編ループ）</label>
@@ -386,7 +388,7 @@
     <script src="live2dcubismcore.min.js"></script>
     <!-- pixi-live2d-display v0.4 -->
     <script src="pixi-live2d-display.min.js"></script>
-    <script src="idle_phrases.js?v=3.32"></script>
-    <script src="live2d-app.js?v=3.32"></script>
+    <script src="idle_phrases.js?v=3.33"></script>
+    <script src="live2d-app.js?v=3.33"></script>
 </body>
 </html>

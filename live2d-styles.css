@@ -258,12 +258,38 @@ input:checked + .slider:before { transform: translateX(21px); }
     border-radius: 50%;
     background: var(--primary);
     cursor: pointer;
-    box-shadow: 0 0 8px var(--primary-glow);
-    transition: transform 0.1s;
+    box-shadow: 0 0 5px var(--primary-glow);
+    transition: transform 0.2s;
 }
 
 .slider-container input[type="range"]::-webkit-slider-thumb:hover {
     transform: scale(1.2);
+}
+
+.bgm-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 14px;
+    margin-left: -7px;
+    cursor: ew-resize;
+    z-index: 10;
+    /* 中心に赤い線を描画 */
+    background: transparent;
+}
+.bgm-handle::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: var(--danger, #ff4444);
+    box-shadow: 0 0 4px var(--danger, #ff4444);
+}
+
+.icon {
+    margin-right: 0.3rem;
 }
 
 .value-display {

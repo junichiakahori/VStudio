@@ -2795,6 +2795,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const bgmWaveformContainer = document.getElementById('bgm-waveform-container');
     const bgmWaveformCanvas = document.getElementById('bgm-waveform-canvas');
     const bgmLoopHighlight = document.getElementById('bgm-loop-highlight');
+    const bgmHandleStart = document.getElementById('bgm-handle-start');
+    const bgmHandleEnd = document.getElementById('bgm-handle-end');
+
+    let bgmViewZoom = 1.0;
+    let bgmViewOffset = 0.0; // 表示開始位置（秒）
 
     function drawBgmWaveform(buffer) {
         if (!bgmWaveformContainer || !bgmWaveformCanvas) return;
@@ -2807,7 +2812,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const ctx = bgmWaveformCanvas.getContext('2d');
         const data = buffer.getChannelData(0); // Lチャンネル
-        const step = Math.ceil(data.length / bgmWaveformCanvas.width);
+        const dur = buffer.duration;
+        
+        // 表示範囲の計算
+        let visibleDuration = dur / bgmViewZoom;
+        if (bgmViewOffset < 0) bgmViewOffset = 0;
+        if (bgmViewOffset + visibleDuration > dur) bgmViewOffset = dur - visibleDuration;
+        if (bgmViewOffset < 0) bgmViewOffset = 0; // fallback if zoom < 1 (should not happen)
+        
+        const startSample = Math.floor((bgmViewOffset / dur) * data.length);
+        const endSample = Math.min(data.length, Math.floor(((bgmViewOffset + visibleDuration) / dur) * data.length));
+        const samplesToDraw = endSample - startSample;
+        
+        const step = Math.max(1, Math.ceil(samplesToDraw / bgmWaveformCanvas.width));
         const amp = bgmWaveformCanvas.height / 2;
         
         ctx.fillStyle = '#00f3ff';
@@ -2815,8 +2832,12 @@ document.addEventListener('DOMContentLoaded', () => {
         
         for (let i = 0; i < bgmWaveformCanvas.width; i++) {
             let min = 1.0, max = -1.0;
+            const dataOffset = startSample + (i * step);
+            if (dataOffset >= data.length) break;
+            
             for (let j = 0; j < step; j++) {
-                const datum = data[i * step + j];
+                if (dataOffset + j >= data.length) break;
+                const datum = data[dataOffset + j];
                 if (datum < min) min = datum;
                 if (datum > max) max = datum;
             }
@@ -2826,19 +2847,46 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateHighlightUI() {
-        if (!bgmBuffer || !bgmLoopHighlight || !bgmWaveformContainer) return;
+        if (!bgmBuffer || !bgmLoopHighlight || !bgmWaveformContainer || !bgmHandleStart || !bgmHandleEnd) return;
         const dur = bgmBuffer.duration;
+        const visibleDuration = dur / bgmViewZoom;
+        
         let startVal = parseFloat(bgmLoopStart.value);
         let endVal = parseFloat(bgmLoopEnd.value);
         if (isNaN(startVal) || startVal < 0) startVal = 0;
         if (isNaN(endVal) || endVal <= 0 || endVal > dur) endVal = dur;
         if (startVal > endVal) startVal = endVal;
 
-        const startPct = (startVal / dur) * 100;
-        const endPct = (endVal / dur) * 100;
-        bgmLoopHighlight.style.display = 'block';
-        bgmLoopHighlight.style.left = startPct + '%';
-        bgmLoopHighlight.style.width = (endPct - startPct) + '%';
+        // 表示範囲に対する相対的なパーセンテージを計算
+        const startPct = ((startVal - bgmViewOffset) / visibleDuration) * 100;
+        const endPct = ((endVal - bgmViewOffset) / visibleDuration) * 100;
+        
+        // クリップ処理
+        const displayStartPct = Math.max(0, Math.min(100, startPct));
+        const displayEndPct = Math.max(0, Math.min(100, endPct));
+        
+        if (displayStartPct < 100 && displayEndPct > 0 && displayStartPct < displayEndPct) {
+            bgmLoopHighlight.style.display = 'block';
+            bgmLoopHighlight.style.left = displayStartPct + '%';
+            bgmLoopHighlight.style.width = (displayEndPct - displayStartPct) + '%';
+        } else {
+            bgmLoopHighlight.style.display = 'none';
+        }
+
+        // ハンドルの表示・非表示と位置調整
+        if (startPct >= 0 && startPct <= 100) {
+            bgmHandleStart.style.display = 'block';
+            bgmHandleStart.style.left = startPct + '%';
+        } else {
+            bgmHandleStart.style.display = 'none';
+        }
+
+        if (endPct >= 0 && endPct <= 100) {
+            bgmHandleEnd.style.display = 'block';
+            bgmHandleEnd.style.left = endPct + '%';
+        } else {
+            bgmHandleEnd.style.display = 'none';
+        }
     }
 
     // Load saved settings
@@ -3003,35 +3051,94 @@ document.addEventListener('DOMContentLoaded', () => {
     if (bgmLoopStart) bgmLoopStart.addEventListener('change', updateLoopPoints);
     if (bgmLoopEnd) bgmLoopEnd.addEventListener('change', updateLoopPoints);
 
-    // キャンバス上のマウスドラッグによる範囲選択
+    // キャンバス上のマウスドラッグによる範囲選択・ハンドルのドラッグ・ズーム・パン
     if (bgmWaveformContainer) {
+        // ズーム・パン処理
+        bgmWaveformContainer.addEventListener('wheel', (e) => {
+            if (!bgmBuffer) return;
+            e.preventDefault();
+            
+            const dur = bgmBuffer.duration;
+            const rect = bgmWaveformContainer.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseTimeRatio = mouseX / rect.width;
+            
+            // 現在のマウス位置が指している時間を計算
+            const visibleDuration = dur / bgmViewZoom;
+            const mouseTime = bgmViewOffset + (mouseTimeRatio * visibleDuration);
+
+            // 縦スクロールでズーム
+            if (e.deltaY !== 0) {
+                const zoomFactor = e.deltaY < 0 ? 1.2 : (1 / 1.2);
+                bgmViewZoom = Math.max(1.0, bgmViewZoom * zoomFactor);
+                
+                // ズーム後の新しい表示範囲を計算し、マウス位置の時間をキープする
+                const newVisibleDuration = dur / bgmViewZoom;
+                bgmViewOffset = mouseTime - (mouseTimeRatio * newVisibleDuration);
+            }
+            
+            // 横スクロールでパン
+            if (e.deltaX !== 0) {
+                const panFactor = e.deltaX * 0.005; // 適当な感度
+                bgmViewOffset += visibleDuration * panFactor;
+            }
+
+            drawBgmWaveform(bgmBuffer);
+        }, { passive: false });
+
         let isDraggingWaveform = false;
+        let draggingHandle = null; // 'start', 'end', or null
         let dragStartX = 0;
+        let dragStartOffset = 0;
+        let dragStartVal = 0;
+        let dragEndVal = 0;
+
+        const getTimeFromX = (x, rect) => {
+            const ratio = Math.max(0, Math.min(x / rect.width, 1));
+            const visibleDuration = bgmBuffer.duration / bgmViewZoom;
+            return bgmViewOffset + (ratio * visibleDuration);
+        };
 
         const updateRangeFromMouse = (e, isStart) => {
             if (!bgmBuffer) return;
             const rect = bgmWaveformContainer.getBoundingClientRect();
             let x = e.clientX - rect.left;
-            x = Math.max(0, Math.min(x, rect.width));
-            const dur = bgmBuffer.duration;
-            const time = (x / rect.width) * dur;
+            const time = getTimeFromX(x, rect);
             
-            if (isStart) {
-                dragStartX = x;
-                bgmLoopStart.value = time.toFixed(2);
-                bgmLoopEnd.value = ''; // ドラッグ開始時は終了を一旦クリア
+            if (draggingHandle === 'start') {
+                const endV = parseFloat(bgmLoopEnd.value) || bgmBuffer.duration;
+                bgmLoopStart.value = Math.min(time, endV - 0.01).toFixed(3);
+            } else if (draggingHandle === 'end') {
+                const startV = parseFloat(bgmLoopStart.value) || 0;
+                bgmLoopEnd.value = Math.max(time, startV + 0.01).toFixed(3);
             } else {
-                const startTime = (Math.min(dragStartX, x) / rect.width) * dur;
-                const endTime = (Math.max(dragStartX, x) / rect.width) * dur;
-                bgmLoopStart.value = startTime.toFixed(2);
-                bgmLoopEnd.value = endTime.toFixed(2);
+                // 新規選択
+                if (isStart) {
+                    dragStartX = x;
+                    bgmLoopStart.value = time.toFixed(3);
+                    bgmLoopEnd.value = ''; 
+                } else {
+                    const time1 = getTimeFromX(dragStartX, rect);
+                    const time2 = time;
+                    bgmLoopStart.value = Math.min(time1, time2).toFixed(3);
+                    bgmLoopEnd.value = Math.max(time1, time2).toFixed(3);
+                }
             }
             updateLoopPoints();
         };
 
         bgmWaveformContainer.addEventListener('mousedown', (e) => {
+            if (!bgmBuffer) return;
             isDraggingWaveform = true;
-            updateRangeFromMouse(e, true);
+            
+            if (e.target === bgmHandleStart) {
+                draggingHandle = 'start';
+            } else if (e.target === bgmHandleEnd) {
+                draggingHandle = 'end';
+            } else {
+                draggingHandle = null;
+                updateRangeFromMouse(e, true);
+            }
         });
         window.addEventListener('mousemove', (e) => {
             if (!isDraggingWaveform) return;
@@ -3040,6 +3147,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.addEventListener('mouseup', () => {
             if (isDraggingWaveform) {
                 isDraggingWaveform = false;
+                draggingHandle = null;
             }
         });
     }
