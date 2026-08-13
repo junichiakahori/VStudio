@@ -1857,40 +1857,41 @@ document.addEventListener('DOMContentLoaded', () => {
                                 // ユーザーのコメントから感情を推測して即座に表情を変える
                                 aiEmotion = guessEmotionFromText(cleanComment);
                                 
-                                // 1. コメントを読み上げる
-                                queueVoicevoxAudio(`${cleanNickname}さん、${cleanComment}`);
+                                const timeGreeting = getTimeGreeting();
+                                const zunda = isZundamonSelected() && currentModelId === 'hiyori';
+                                const replies = [
+                                    { keywords: ["おはよう", "おは", "こんにちは", "こんちわ", "こんばん", "やっほ", "ハロー"], response: zunda ? `${timeGreeting}ー！来てくれてありがとうなのだ！` : `${timeGreeting}ー！来てくれてありがとう！` },
+                                    { keywords: ["かわいい", "可愛い", "カワイイ", "かわちい", "美人", "きれい"], response: zunda ? "えへへ、褒められちゃったのだ！ありがとうなのだ！" : "えへへ、褒められちゃった！ありがとう！" },
+                                    { keywords: ["初見", "しょけん"], response: zunda ? "初見さん、初めましてなのだ！ゆっくりしていってほしいのだ！" : "初見さん、初めまして！ゆっくりしていってね！" },
+                                    { keywords: ["草", "w", "ｗ", "ウケる", "笑", "ワロタ"], response: zunda ? "あはははなのだっ！" : "あはははっ！" },
+                                    { keywords: ["おつ", "お疲れ", "おつかれ", "バイバイ", "おやすみ", "寝る"], response: zunda ? "お疲れ様なのだー！またねなのだ！" : "お疲れ様ー！またね！" },
+                                    { keywords: ["？", "?", "なんで", "どうして"], response: zunda ? "んー、どうだろうねー？私には分かんないのだ！" : "んー、どうだろうねー？私には分かんないや！" }
+                                ];
 
-                                if (isAiReplyEnabled && aiApiKeyInput && aiApiKeyInput.value.trim().length > 0) {
-                                    // 2A. AIによる自動返信
-                                    generateAIResponse(cleanNickname, cleanComment);
+                                const matchedRule = replies.find(rule => rule.keywords.some(kw => cleanComment.includes(kw)));
+                                const isQueueFull = voicevoxAudioQueue.length >= 3;
+
+                                // キューが溢れていて、かつ重要なキーワードも含まれていない場合はスキップ
+                                if (isQueueFull && !matchedRule) {
+                                    console.log(`[TikTok Skip] 待機列過多のためスキップ: ${cleanComment}`);
                                 } else {
-                                    // 2B. キーワードによる自動返信
-                                    const timeGreeting = getTimeGreeting();
-                                    const zunda = isZundamonSelected() && currentModelId === 'hiyori';
-                                    const replies = [
-                                        { keywords: ["おはよう", "おは", "こんにちは", "こんちわ", "こんばん", "やっほ", "ハロー"], response: zunda ? `${timeGreeting}ー！来てくれてありがとうなのだ！` : `${timeGreeting}ー！来てくれてありがとう！` },
-                                        { keywords: ["かわいい", "可愛い", "カワイイ", "かわちい", "美人", "きれい"], response: zunda ? "えへへ、褒められちゃったのだ！ありがとうなのだ！" : "えへへ、褒められちゃった！ありがとう！" },
-                                        { keywords: ["初見", "しょけん"], response: zunda ? "初見さん、初めましてなのだ！ゆっくりしていってほしいのだ！" : "初見さん、初めまして！ゆっくりしていってね！" },
-                                        { keywords: ["草", "w", "ｗ", "ウケる", "笑", "ワロタ"], response: zunda ? "あはははなのだっ！" : "あはははっ！" },
-                                        { keywords: ["おつ", "お疲れ", "おつかれ", "バイバイ", "おやすみ", "寝る"], response: zunda ? "お疲れ様なのだー！またねなのだ！" : "お疲れ様ー！またね！" },
-                                        { keywords: ["？", "?", "なんで", "どうして"], response: zunda ? "んー、どうだろうねー？私には分かんないのだ！" : "んー、どうだろうねー？私には分かんないや！" }
-                                    ];
+                                    // 1. コメントを読み上げる
+                                    queueVoicevoxAudio(`${cleanNickname}さん、${cleanComment}`);
 
-                                    let replied = false;
-                                    for (const rule of replies) {
-                                        if (rule.keywords.some(kw => cleanComment.includes(kw))) {
-                                            const adjustedReply = adjustIdlePhraseForModel(rule.response, currentModelId);
+                                    if (isAiReplyEnabled && aiApiKeyInput && aiApiKeyInput.value.trim().length > 0) {
+                                        // 2A. AIによる自動返信
+                                        generateAIResponse(cleanNickname, cleanComment);
+                                    } else {
+                                        // 2B. キーワードによる自動返信
+                                        if (matchedRule) {
+                                            const adjustedReply = adjustIdlePhraseForModel(matchedRule.response, currentModelId);
                                             queueVoicevoxAudio(adjustedReply);
-                                            replied = true;
-                                            break;
+                                        } else if (Math.random() < 0.20) {
+                                            // 3. キーワードに一致しなかった場合、たまに相槌を打つ（20%の確率）
+                                            const genericReplies = ["なるほどなるほどー", "たしかにー！", "へぇー！", "そうんだね！", "わかるわかるー"];
+                                            const adjustedReply = adjustIdlePhraseForModel(genericReplies[Math.floor(Math.random() * genericReplies.length)], currentModelId);
+                                            queueVoicevoxAudio(adjustedReply);
                                         }
-                                    }
-
-                                    // 3. キーワードに一致しなかった場合、たまに相槌を打つ（20%の確率）
-                                    if (!replied && Math.random() < 0.20) {
-                                        const genericReplies = ["なるほどなるほどー", "たしかにー！", "へぇー！", "そうんだね！", "わかるわかるー"];
-                                        const adjustedReply = adjustIdlePhraseForModel(genericReplies[Math.floor(Math.random() * genericReplies.length)], currentModelId);
-                                        queueVoicevoxAudio(adjustedReply);
                                     }
                                 }
                             }
@@ -1986,36 +1987,37 @@ document.addEventListener('DOMContentLoaded', () => {
                             const cleanComment = removeEmojis(data.comment);
                             if (cleanComment.length > 0) {
                                 aiEmotion = guessEmotionFromText(cleanComment);
-                                queueVoicevoxAudio(`${cleanNickname}さん、${cleanComment}`);
+                                
+                                const timeGreeting = getTimeGreeting();
+                                const zunda = isZundamonSelected() && currentModelId === 'hiyori';
+                                const replies = [
+                                    { keywords: ["おはよう", "おは", "こんにちは", "こんちわ", "こんばん", "やっほ", "ハロー"], response: zunda ? `${timeGreeting}ー！来てくれてありがとうなのだ！` : `${timeGreeting}ー！来てくれてありがとう！` },
+                                    { keywords: ["かわいい", "可愛い", "カワイイ", "かわちい", "美人", "きれい"], response: zunda ? "えへへ、褒められちゃったのだ！ありがとうなのだ！" : "えへへ、褒められちゃった！ありがとう！" },
+                                    { keywords: ["初見", "しょけん"], response: zunda ? "初見さん、初めましてなのだ！ゆっくりしていってほしいのだ！" : "初見さん、初めまして！ゆっくりしていってね！" },
+                                    { keywords: ["草", "w", "ｗ", "ウケる", "笑", "ワロタ"], response: zunda ? "あはははなのだっ！" : "あはははっ！" },
+                                    { keywords: ["おつ", "お疲れ", "おつかれ", "バイバイ", "おやすみ", "寝る"], response: zunda ? "お疲れ様なのだー！またねなのだ！" : "お疲れ様ー！またね！" },
+                                    { keywords: ["？", "?", "なんで", "どうして"], response: zunda ? "んー、どうだろうねー？私には分かんないのだ！" : "んー、どうだろうねー？私には分かんないや！" }
+                                ];
 
-                                if (isAiReplyEnabled && aiApiKeyInput && aiApiKeyInput.value.trim().length > 0) {
-                                    generateAIResponse(cleanNickname, cleanComment);
+                                const matchedRule = replies.find(rule => rule.keywords.some(kw => cleanComment.includes(kw)));
+                                const isQueueFull = voicevoxAudioQueue.length >= 3;
+
+                                if (isQueueFull && !matchedRule) {
+                                    console.log(`[YouTube Skip] 待機列過多のためスキップ: ${cleanComment}`);
                                 } else {
-                                    const timeGreeting = getTimeGreeting();
-                                    const zunda = isZundamonSelected() && currentModelId === 'hiyori';
-                                    const replies = [
-                                        { keywords: ["おはよう", "おは", "こんにちは", "こんちわ", "こんばん", "やっほ", "ハロー"], response: zunda ? `${timeGreeting}ー！来てくれてありがとうなのだ！` : `${timeGreeting}ー！来てくれてありがとう！` },
-                                        { keywords: ["かわいい", "可愛い", "カワイイ", "かわちい", "美人", "きれい"], response: zunda ? "えへへ、褒められちゃったのだ！ありがとうなのだ！" : "えへへ、褒められちゃった！ありがとう！" },
-                                        { keywords: ["初見", "しょけん"], response: zunda ? "初見さん、初めましてなのだ！ゆっくりしていってほしいのだ！" : "初見さん、初めまして！ゆっくりしていってね！" },
-                                        { keywords: ["草", "w", "ｗ", "ウケる", "笑", "ワロタ"], response: zunda ? "あはははなのだっ！" : "あはははっ！" },
-                                        { keywords: ["おつ", "お疲れ", "おつかれ", "バイバイ", "おやすみ", "寝る"], response: zunda ? "お疲れ様なのだー！またねなのだ！" : "お疲れ様ー！またね！" },
-                                        { keywords: ["？", "?", "なんで", "どうして"], response: zunda ? "んー、どうだろうねー？私には分かんないのだ！" : "んー、どうだろうねー？私には分かんないや！" }
-                                    ];
+                                    queueVoicevoxAudio(`${cleanNickname}さん、${cleanComment}`);
 
-                                    let replied = false;
-                                    for (const rule of replies) {
-                                        if (rule.keywords.some(kw => cleanComment.includes(kw))) {
-                                            const adjustedReply = adjustIdlePhraseForModel(rule.response, currentModelId);
+                                    if (isAiReplyEnabled && aiApiKeyInput && aiApiKeyInput.value.trim().length > 0) {
+                                        generateAIResponse(cleanNickname, cleanComment);
+                                    } else {
+                                        if (matchedRule) {
+                                            const adjustedReply = adjustIdlePhraseForModel(matchedRule.response, currentModelId);
                                             queueVoicevoxAudio(adjustedReply);
-                                            replied = true;
-                                            break;
+                                        } else if (Math.random() < 0.20) {
+                                            const genericReplies = ["なるほどなるほどー", "たしかにー！", "へぇー！", "そうんだね！", "わかるわかるー"];
+                                            const adjustedReply = adjustIdlePhraseForModel(genericReplies[Math.floor(Math.random() * genericReplies.length)], currentModelId);
+                                            queueVoicevoxAudio(adjustedReply);
                                         }
-                                    }
-
-                                    if (!replied && Math.random() < 0.20) {
-                                        const genericReplies = ["なるほどなるほどー", "たしかにー！", "へぇー！", "そうんだね！", "わかるわかるー"];
-                                        const adjustedReply = adjustIdlePhraseForModel(genericReplies[Math.floor(Math.random() * genericReplies.length)], currentModelId);
-                                        queueVoicevoxAudio(adjustedReply);
                                     }
                                 }
                             }
