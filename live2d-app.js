@@ -2719,6 +2719,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // =====================================================================
     // BGM制御 (IndexedDB 記憶対応)
     // =====================================================================
+    function safeDecodeAudioData(audioCtx, arrayBuffer) {
+        return new Promise((resolve, reject) => {
+            try {
+                const promise = audioCtx.decodeAudioData(
+                    arrayBuffer,
+                    (decodedData) => resolve(decodedData),
+                    (e) => reject(e)
+                );
+                if (promise && typeof promise.catch === 'function') {
+                    promise.catch(reject);
+                }
+            } catch (err) {
+                reject(err);
+            }
+        });
+    }
+
     const DB_NAME = 'Live2DBGMDB';
     const STORE_NAME = 'bgmStore';
 
@@ -2808,7 +2825,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const arrayBuffer = await file.arrayBuffer();
             try {
-                bgmBuffer = await bgmAudioContext.decodeAudioData(arrayBuffer);
+                bgmBuffer = await safeDecodeAudioData(bgmAudioContext, arrayBuffer);
                 console.log(`[BGM] 読み込み完了: ${file.name} (長さ: ${bgmBuffer.duration.toFixed(2)}秒)`);
                 bgmPlayBtn.disabled = false;
                 bgmStopBtn.disabled = false;
@@ -2833,7 +2850,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             try {
                 if (bgmFileName) bgmFileName.textContent = savedBGM.name;
-                bgmBuffer = await bgmAudioContext.decodeAudioData(savedBGM.buffer);
+                bgmBuffer = await safeDecodeAudioData(bgmAudioContext, savedBGM.buffer);
                 console.log(`[BGM] DBから復元完了: ${savedBGM.name} (長さ: ${bgmBuffer.duration.toFixed(2)}秒)`);
                 if (bgmPlayBtn) bgmPlayBtn.disabled = false;
                 if (bgmStopBtn) bgmStopBtn.disabled = false;
@@ -2855,9 +2872,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (bgmPlayBtn) {
-        bgmPlayBtn.addEventListener('click', () => {
-            if (!bgmBuffer || !bgmAudioContext) return;
+        bgmPlayBtn.addEventListener('click', async () => {
+            if (!bgmBuffer || !bgmAudioContext) {
+                console.warn("[BGM] バッファがないかAudioContextが初期化されていません");
+                return;
+            }
             
+            if (bgmAudioContext.state === 'suspended') {
+                await bgmAudioContext.resume();
+            }
+
             stopBgm(); // 既に再生中なら停止
 
             if (!bgmGainNode) {
