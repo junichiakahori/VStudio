@@ -3204,6 +3204,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const thumbAvatarScale = document.getElementById('thumb-avatar-scale');
     const thumbAvatarX = document.getElementById('thumb-avatar-x');
     const thumbAvatarY = document.getElementById('thumb-avatar-y');
+    const thumbRecaptureBtn = document.getElementById('thumb-recapture-btn');
+
+    let cachedAvatarCanvas = null;
+
+    const captureAvatarFrame = () => {
+        if (pixiApp && pixiApp.view) {
+            const view = pixiApp.view;
+            if (!cachedAvatarCanvas) {
+                cachedAvatarCanvas = document.createElement('canvas');
+            }
+            cachedAvatarCanvas.width = view.width;
+            cachedAvatarCanvas.height = view.height;
+            const ctx = cachedAvatarCanvas.getContext('2d');
+            ctx.clearRect(0, 0, view.width, view.height);
+            ctx.drawImage(view, 0, 0);
+        }
+    };
+
+    if (thumbRecaptureBtn) {
+        thumbRecaptureBtn.addEventListener('click', () => {
+            captureAvatarFrame();
+            drawThumbPreview();
+        });
+    }
 
     const thumbSettings = [
         thumbSizeSelect, thumbShowBg, thumbShowAvatar, thumbShowTitle, thumbShowDesc,
@@ -3267,8 +3291,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 2. アバター描画
-        if (thumbShowAvatar.checked && pixiApp && pixiApp.view) {
-            const view = pixiApp.view;
+        if (thumbShowAvatar.checked && cachedAvatarCanvas) {
+            const view = cachedAvatarCanvas;
             
             const userScale = thumbAvatarScale ? parseFloat(thumbAvatarScale.value) / 100 : 1;
             const alignX = thumbAvatarX ? parseFloat(thumbAvatarX.value) / 100 : 1;
@@ -3343,6 +3367,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (thumbEditorModal) thumbEditorModal.style.display = 'flex';
             if (thumbEditTitle && streamTitleInput) thumbEditTitle.value = streamTitleInput.value;
             if (thumbEditDesc && streamDescInput) thumbEditDesc.value = streamDescInput.value;
+            captureAvatarFrame(); // 初回表示時に今のポーズを取得
             drawThumbPreview();
         });
     }
