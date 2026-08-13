@@ -1745,6 +1745,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let joinedUsers = new Set();
+    function removeEmojis(text) {
+        if (!text) return text;
+        let clean = text.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '');
+        clean = clean.replace(/:[^:\s]+:/g, '');
+        return clean.trim();
+    }
+
     if (tiktokConnectBtn) {
         tiktokConnectBtn.addEventListener('click', () => {
             const username = tiktokUserInput.value.trim();
@@ -1828,7 +1835,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else if (data.type === 'gift') {
                         console.log(`[TikTok] ${data.nickname} sent a gift`);
                         if (isVoicevoxEnabled) {
-                            const cleanName = data.nickname.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+                            const cleanName = removeEmojis(data.nickname);
                             if (cleanName.length > 0) {
                                 aiEmotion = 'joy';
                                 const zunda = isZundamonSelected() && currentModelId === 'hiyori';
@@ -1844,8 +1851,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         console.log(`[TikTok] ${data.nickname}: ${data.comment}`);
                         if (isVoicevoxEnabled) {
                             // 絵文字を除去してテンポ良く読み上げる
-                            const cleanNickname = data.nickname.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
-                            const cleanComment = data.comment.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+                            const cleanNickname = removeEmojis(data.nickname);
+                            const cleanComment = removeEmojis(data.comment);
                             if (cleanComment.length > 0) {
                                 // ユーザーのコメントから感情を推測して即座に表情を変える
                                 aiEmotion = guessEmotionFromText(cleanComment);
@@ -1963,7 +1970,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else if (data.type === 'gift') {
                         console.log(`[YouTube SuperChat] ${data.nickname} sent ${data.amount}`);
                         if (isVoicevoxEnabled) {
-                            const cleanName = data.nickname.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+                            const cleanName = removeEmojis(data.nickname);
                             if (cleanName.length > 0) {
                                 aiEmotion = 'joy';
                                 const zunda = isZundamonSelected() && currentModelId === 'hiyori';
@@ -1975,8 +1982,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else if (data.type === 'comment') {
                         console.log(`[YouTube] @${data.nickname}: ${data.comment}`);
                         if (isVoicevoxEnabled) {
-                            const cleanNickname = data.nickname.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
-                            const cleanComment = data.comment.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+                            const cleanNickname = removeEmojis(data.nickname);
+                            const cleanComment = removeEmojis(data.comment);
                             if (cleanComment.length > 0) {
                                 aiEmotion = guessEmotionFromText(cleanComment);
                                 queueVoicevoxAudio(`${cleanNickname}さん、${cleanComment}`);
