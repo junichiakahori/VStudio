@@ -1765,6 +1765,29 @@ document.addEventListener('DOMContentLoaded', () => {
         return clean.trim();
     }
 
+    // コメントビューアー用関数
+    function addCommentToViewer(nickname, comment, platform, isGift = false) {
+        const viewer = document.getElementById('comment-viewer');
+        if (!viewer) return;
+        
+        const el = document.createElement('div');
+        el.className = `comment-item ${platform}-comment`;
+        if (isGift) el.classList.add('gift-comment');
+        
+        const icon = platform === 'youtube' ? '🔴' : platform === 'tiktok' ? '🎵' : '💬';
+        
+        el.innerHTML = `<div class="comment-author">${icon} ${nickname}</div><div class="comment-text">${comment}</div>`;
+        viewer.appendChild(el);
+        
+        // 最新のコメントが見えるようにスクロール
+        viewer.scrollTop = viewer.scrollHeight;
+        
+        // 最大100件まで保持
+        while (viewer.children.length > 100) {
+            viewer.removeChild(viewer.firstChild);
+        }
+    }
+
     if (tiktokConnectBtn) {
         tiktokConnectBtn.addEventListener('click', () => {
             const username = tiktokUserInput.value.trim();
@@ -1850,6 +1873,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     } else if (data.type === 'gift') {
                         console.log(`[TikTok] ${data.nickname} sent a gift`);
+                        addCommentToViewer(data.nickname, `🎁 ギフトを送りました！`, 'tiktok', true);
                         if (isVoicevoxEnabled) {
                             const cleanName = removeEmojis(data.nickname);
                             if (cleanName.length > 0) {
@@ -1864,7 +1888,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         console.log(`[TikTok] ${data.nickname} sent likes`);
                         // いいね連打対策のため読み上げは行わない
                     } else if (data.type === 'comment') {
-                        console.log(`[TikTok] ${data.nickname}: ${data.comment}`);
+                        console.log(`[TikTok] @${data.nickname}: ${data.comment}`);
+                        addCommentToViewer(data.nickname, data.comment, 'tiktok', false);
                         if (isVoicevoxEnabled) {
                             // 絵文字を除去してテンポ良く読み上げる
                             const cleanNickname = removeEmojis(data.nickname);
@@ -1989,6 +2014,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     } else if (data.type === 'gift') {
                         console.log(`[YouTube SuperChat] ${data.nickname} sent ${data.amount}`);
+                        addCommentToViewer(data.nickname, `💰 スーパーチャット: ${data.amount}`, 'youtube', true);
                         if (isVoicevoxEnabled) {
                             const cleanName = removeEmojis(data.nickname);
                             if (cleanName.length > 0) {
@@ -2001,6 +2027,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     } else if (data.type === 'comment') {
                         console.log(`[YouTube] @${data.nickname}: ${data.comment}`);
+                        addCommentToViewer(data.nickname, data.comment, 'youtube', false);
                         if (isVoicevoxEnabled) {
                             const cleanNickname = removeEmojis(data.nickname);
                             const cleanComment = removeEmojis(data.comment);
@@ -2511,11 +2538,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function queueVoicevoxAudio(text, isIdle = false) {
+        // スペース（半角・全角）を読点（、）に変換して、VOICEVOXが適切に区切って読めるようにする
+        const processedText = text.replace(/[ 　]+/g, '、');
+        
         const aiHiraganaToggle = document.getElementById('ai-hiragana-toggle');
         if (aiHiraganaToggle && aiHiraganaToggle.checked) {
-            voicevoxAudioQueue.push({ original: text, promise: convertToHiraganaWithAI(text), isIdle });
+            voicevoxAudioQueue.push({ original: processedText, promise: convertToHiraganaWithAI(processedText), isIdle });
         } else {
-            voicevoxAudioQueue.push({ original: text, promise: Promise.resolve(text), isIdle });
+            voicevoxAudioQueue.push({ original: processedText, promise: Promise.resolve(processedText), isIdle });
         }
 
         if (!isIdle && currentVoicevoxSource && isVoicevoxPlaying && currentPlayingIsIdle) {

@@ -559,3 +559,76 @@ body.panel-hidden .avatar-viewport {
     justify-content: flex-end;
     gap: 1rem;
 }
+
+/* コメントビューアー */
+.comment-viewer {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: 350px;
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none; /* クリックをすり抜ける */
+    mask-image: linear-gradient(to bottom, transparent, black 10%, black);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black);
+}
+
+/* スクロールバー非表示 */
+.comment-viewer::-webkit-scrollbar {
+    display: none;
+}
+.comment-viewer {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.comment-item {
+    background: rgba(10, 9, 21, 0.75);
+    border-left: 3px solid var(--secondary);
+    border-radius: 4px 12px 12px 4px;
+    padding: 10px 14px;
+    color: var(--text-main);
+    font-size: 14px;
+    line-height: 1.4;
+    animation: comment-slide-in 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    word-break: break-word;
+}
+
+.comment-item .comment-author {
+    font-weight: bold;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.comment-item.youtube-comment {
+    border-left-color: #ff0000;
+}
+.comment-item.tiktok-comment {
+    border-left-color: #00f2fe;
+}
+.comment-item.gift-comment {
+    border-left-color: #ffd700;
+    background: rgba(40, 30, 0, 0.85);
+}
+
+@keyframes comment-slide-in {
+    from {
+        opacity: 0;
+        transform: translateX(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
