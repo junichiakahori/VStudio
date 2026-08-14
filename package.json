@@ -1,0 +1,29 @@
+{
+  "name": "vstudio",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "dev": "vite",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/junichiakahori/VStudio.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/junichiakahori/VStudio/issues"
+  },
+  "homepage": "https://github.com/junichiakahori/VStudio#readme",
+  "devDependencies": {
+    "vite": "^8.2.1"
+  },
+  "dependencies": {
+    "escodegen": "^2.1.0",
+    "esprima": "^4.0.1"
+  }
+}

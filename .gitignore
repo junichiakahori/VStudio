@@ -2,3 +2,11 @@ node_modules/
 scratch/
 __pycache__/
 *.pyc
+client_secret.json
+token.pickle
+*.pem
+fix_hiragana*.py
+patch_youtube.py
+test_*.py
+test_*.js
+generate_procedural.py
