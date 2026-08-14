@@ -73,6 +73,14 @@ async def ws_handler(websocket):
                 video_id = data.get('videoId')
                 if video_id:
                     await handle_end_stream(video_id, websocket)
+            elif data.get('type') == 'start_youtube_stream':
+                video_id = data.get('videoId')
+                if video_id:
+                    await handle_start_stream(video_id, websocket)
+            elif data.get('type') == 'check_stream_status':
+                video_id = data.get('videoId')
+                if video_id:
+                    await check_youtube_stream_status(video_id, websocket)
     except websockets.exceptions.ConnectionClosed:
         logging.info(f"WebSocket client disconnected: {websocket.remote_address}")
     finally:
@@ -117,6 +125,57 @@ async def handle_end_stream(video_id, websocket):
     except Exception as e:
         logging.error(f"Failed to end stream: {e}")
         await websocket.send(json.dumps({'type': 'error', 'message': f'配信の終了に失敗しました: {e}'}))
+
+async def handle_start_stream(video_id, websocket):
+    """YouTube APIを叩いて配信をLive状態に遷移させる"""
+    global youtube_api_client
+    if not youtube_api_client:
+        logging.error("YouTube API Client is not authenticated. Cannot start stream.")
+        await websocket.send(json.dumps({'type': 'error', 'message': 'YouTube API未認証のため、配信開始できません。'}))
+        return
+        
+    try:
+        logging.info(f"Starting YouTube stream: {video_id}")
+        # statusをliveにする
+        request = youtube_api_client.liveBroadcasts().transition(
+            broadcastStatus="live",
+            id=video_id,
+            part="id,status"
+        )
+        response = await asyncio.to_thread(request.execute)
+        logging.info(f"Stream started successfully. API Response: {response}")
+        await websocket.send(json.dumps({'type': 'stream_started', 'videoId': video_id, 'message': '✅ YouTube配信を開始しました！'}))
+    except Exception as e:
+        logging.error(f"Failed to start stream: {e}")
+        await websocket.send(json.dumps({'type': 'error', 'message': f'配信の開始に失敗しました。OBSから映像が送信されているか確認してください。({e})'}))
+
+async def check_youtube_stream_status(video_id, websocket):
+    """YouTube APIで動画の予約時間と現在の状態を取得する"""
+    global youtube_api_client
+    if not youtube_api_client:
+        return
+    
+    try:
+        request = youtube_api_client.videos().list(
+            part="snippet,liveStreamingDetails",
+            id=video_id
+        )
+        response = await asyncio.to_thread(request.execute)
+        if response.get('items'):
+            item = response['items'][0]
+            snippet = item.get('snippet', {})
+            live_broadcast_content = snippet.get('liveBroadcastContent') # 'live', 'upcoming', 'none'
+            live_streaming_details = item.get('liveStreamingDetails', {})
+            scheduled_start_time = live_streaming_details.get('scheduledStartTime')
+            
+            await websocket.send(json.dumps({
+                'type': 'stream_info',
+                'videoId': video_id,
+                'liveBroadcastContent': live_broadcast_content,
+                'scheduledStartTime': scheduled_start_time
+            }))
+    except Exception as e:
+        logging.error(f"Failed to fetch stream status: {e}")
 
 async def send_history(websocket):
     """接続したクライアントに履歴を送信する"""
