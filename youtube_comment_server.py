@@ -3,20 +3,58 @@ import json
 import logging
 import websockets
 import pytchat
+import requests
+import re
+import os
+import pickle
 from typing import Optional
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
 
 logging.basicConfig(level=logging.INFO)
+
+# YouTube API scopes
+SCOPES = ['https://www.googleapis.com/auth/youtube']
+youtube_api_client = None
+
+def get_authenticated_service():
+    """OAuth認証を行いYouTube APIクライアントを返す"""
+    creds = None
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+            
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            if not os.path.exists('client_secret.json'):
+                logging.warning("client_secret.jsonが見つからないため、YouTube API(配信終了など)は利用できません。")
+                return None
+            flow = InstalledAppFlow.from_client_secrets_file('client_secret.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+            
+        with open('token.pickle', 'wb') as token:
+            pickle.dump(creds, token)
+            
+    return build('youtube', 'v3', credentials=creds)
+
+# 初回起動時に認証を試みる
+youtube_api_client = get_authenticated_service()
 
 # 接続中のWebSocketクライアントを保持するセット
 connected_clients = set()
 
 # pytchatのチャット取得ループタスク
 chat_task: Optional[asyncio.Task] = None
+stats_task: Optional[asyncio.Task] = None
 # 現在接続中の動画ID
-current_video_id: Optional[str] = None
+current_video_id = None
 # pytchat インスタンス
-chat: Optional[pytchat.LiveChat] = None
+chat = None
 recent_comments = []
+comment_history = [] # 実際のメッセージJSONを保持する履歴 (最大100件)
 
 async def ws_handler(websocket):
     """WebSocketのハンドラ。ブラウザからの接続を受け付ける"""
@@ -31,10 +69,14 @@ async def ws_handler(websocket):
                     await start_youtube_client(video_id, websocket)
             elif data.get('type') == 'disconnect_youtube':
                 await stop_youtube_client()
+            elif data.get('type') == 'end_youtube_stream':
+                video_id = data.get('videoId')
+                if video_id:
+                    await handle_end_stream(video_id, websocket)
     except websockets.exceptions.ConnectionClosed:
         logging.info(f"WebSocket client disconnected: {websocket.remote_address}")
     finally:
-        connected_clients.remove(websocket)
+        connected_clients.discard(websocket)
 
 async def broadcast_to_clients(message_dict):
     """全ての接続済みWebSocketクライアントにメッセージを送信"""
@@ -53,18 +95,156 @@ async def broadcast_to_clients(message_dict):
     for ws in disconnected:
         connected_clients.remove(ws)
 
+async def handle_end_stream(video_id, websocket):
+    """YouTube APIを叩いて配信を終了させる"""
+    global youtube_api_client
+    if not youtube_api_client:
+        logging.error("YouTube API Client is not authenticated. Cannot end stream.")
+        await websocket.send(json.dumps({'type': 'error', 'message': 'YouTube API未認証のため、配信終了できません。'}))
+        return
+        
+    try:
+        logging.info(f"Ending YouTube stream: {video_id}")
+        request = youtube_api_client.liveBroadcasts().transition(
+            broadcastStatus="complete",
+            id=video_id,
+            part="id,status"
+        )
+        # ネットワークリクエストはブロックするので別スレッドで実行するかrun_in_executorを使う
+        response = await asyncio.to_thread(request.execute)
+        logging.info(f"Stream ended successfully. API Response: {response}")
+        await websocket.send(json.dumps({'type': 'system', 'message': '✅ YouTubeの配信を正常に終了しました。'}))
+    except Exception as e:
+        logging.error(f"Failed to end stream: {e}")
+        await websocket.send(json.dumps({'type': 'error', 'message': f'配信の終了に失敗しました: {e}'}))
+
+async def send_history(websocket):
+    """接続したクライアントに履歴を送信する"""
+    for msg in comment_history:
+        try:
+            history_msg = dict(msg)
+            history_msg['isHistory'] = True
+            await websocket.send(json.dumps(history_msg))
+        except websockets.exceptions.ConnectionClosed:
+            break
+
+
+async def fetch_stats(video_id):
+    try:
+        while True:
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                "Accept-Language": "en-US,en;q=0.9"
+            }
+            try:
+                html = requests.get(url, headers=headers, timeout=10).text
+                viewers = ""
+                subscribers = ""
+                
+                player_match = re.search(r'ytInitialPlayerResponse\s*=\s*(\{.*?\});(?:var|</script>)', html)
+                if player_match:
+                    import json
+                    try:
+                        player = json.loads(player_match.group(1))
+                        videoDetails = player.get("videoDetails", {})
+                        viewers = videoDetails.get("viewCount", "")
+                    except Exception as e:
+                        logging.error(f"Error parsing player response: {e}")
+
+                data_match = re.search(r'ytInitialData\s*=\s*(\{.*?\});(?:var|</script>)', html)
+                if data_match:
+                    try:
+                        sub_match1 = re.search(r'"subscriberCountText":\{"accessibility":\{"accessibilityData":\{"label":"([^"]+)"\}\}', html)
+                        if sub_match1:
+                            subscribers = sub_match1.group(1)
+                        else:
+                            sub_match2 = re.search(r'"subscriberCountText":\{"simpleText":"([^"]+)"\}', html)
+                            if sub_match2:
+                                subscribers = sub_match2.group(1)
+                    except Exception as e:
+                        pass
+                
+                await broadcast_to_clients({
+                    "type": "stats",
+                    "viewers": viewers,
+                    "subscribers": subscribers
+                })
+            except Exception as e:
+                logging.error(f"Error fetching stats: {e}")
+                
+            await asyncio.sleep(30)
+    except asyncio.CancelledError:
+        pass
+
 async def start_youtube_client(video_id: str, websocket):
-    global chat_task, current_video_id, chat
+    global chat_task, current_video_id, chat, recent_comments, comment_history
     
-    # すでに実行中なら停止
+    # すでに同じ動画IDで実行中なら履歴だけ送って終了
+    if chat_task is not None and current_video_id == video_id:
+        logging.info(f"Already connected to {video_id}. Sending history to new client.")
+        await websocket.send(json.dumps({
+            "type": "status",
+            "status": "connected",
+            "message": f"Connected to YouTube Live (ID: {video_id})"
+        }))
+        await send_history(websocket)
+        return
+
+    # 違う動画IDなら停止して再接続
     if chat_task is not None:
-        await stop_youtube_client()
+        await stop_youtube_client(broadcast=False)
+
+    recent_comments.clear()
+    comment_history.clear()
 
     logging.info(f"Connecting to YouTube Live video: {video_id}")
     current_video_id = video_id
+    
+    # --- ここで初期履歴をスクレイピング ---
+    try:
+        chat_url = f"https://www.youtube.com/live_chat?is_popout=1&v={video_id}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9"
+        }
+        html = requests.get(chat_url, headers=headers, timeout=10).text
+        match = re.search(r'window\["ytInitialData"\]\s*=\s*(\{.*?\});\s*</script>', html)
+        if match:
+            data = json.loads(match.group(1))
+            actions = data.get("contents", {}).get("liveChatRenderer", {}).get("actions", [])
+            for action in actions:
+                item = action.get("addChatItemAction", {}).get("item", {})
+                if "liveChatTextMessageRenderer" in item:
+                    renderer = item["liveChatTextMessageRenderer"]
+                    author = renderer.get("authorName", {}).get("simpleText", "")
+                    message = "".join([r.get("text", "") for r in renderer.get("message", {}).get("runs", [])])
+                    icon_url = ""
+                    thumbnails = renderer.get("authorPhoto", {}).get("thumbnails", [])
+                    if thumbnails:
+                        icon_url = thumbnails[0].get("url", "")
+                    
+                    comment_sig = f"{author}:{message}"
+                    recent_comments.append(comment_sig)
+                    msg = {
+                        "type": "comment",
+                        "nickname": author,
+                        "comment": message,
+                        "iconUrl": icon_url
+                    }
+                    comment_history.append(msg)
+            
+            logging.info(f"Scraped {len(comment_history)} initial comments from history.")
+            await send_history(websocket)
+        else:
+            logging.warning("ytInitialData not found during initial scrape.")
+    except Exception as e:
+        logging.error(f"Error scraping initial history: {e}")
+    # ----------------------------------
 
     try:
-        chat = pytchat.create(video_id=video_id)
+        loop = asyncio.get_event_loop()
+        chat = await loop.run_in_executor(None, lambda: pytchat.create(video_id=video_id, interruptable=False))
         if not chat.is_alive():
             raise Exception("Chat is not alive. Invalid Video ID or not a live stream.")
     except Exception as e:
@@ -82,12 +262,13 @@ async def start_youtube_client(video_id: str, websocket):
         "message": f"Connected to YouTube Live (ID: {video_id})"
     })
 
-    async def fetch_chat():
-        global recent_comments
+    async def fetch_chat(local_chat):
+        global recent_comments, comment_history
         try:
-            while chat.is_alive():
-                # pytchat is synchronous in fetching, so we wrap it slightly or just poll it with sleep
-                for c in chat.get().sync_items():
+            loop = asyncio.get_event_loop()
+            while local_chat.is_alive() and chat_task is not None:
+                chat_data = await loop.run_in_executor(None, local_chat.get)
+                for c in chat_data.sync_items():
                     comment_sig = f"{c.author.name}:{c.message}"
                     if comment_sig in recent_comments:
                         continue
@@ -101,17 +282,25 @@ async def start_youtube_client(video_id: str, websocket):
                     # You can also handle SuperChats here by checking c.amountValue
                     if c.amountValue > 0:
                         logging.info(f"[SuperChat] {c.author.name} sent {c.amountString}")
-                        await broadcast_to_clients({
+                        msg = {
                             "type": "gift",
                             "nickname": c.author.name,
-                            "amount": c.amountString
-                        })
+                            "amount": c.amountString,
+                            "iconUrl": c.author.imageUrl
+                        }
+                        comment_history.append(msg)
+                        if len(comment_history) > 100: comment_history.pop(0)
+                        await broadcast_to_clients(msg)
                     
-                    await broadcast_to_clients({
+                    msg = {
                         "type": "comment",
                         "nickname": c.author.name,
-                        "comment": c.message
-                    })
+                        "comment": c.message,
+                        "iconUrl": c.author.imageUrl
+                    }
+                    comment_history.append(msg)
+                    if len(comment_history) > 100: comment_history.pop(0)
+                    await broadcast_to_clients(msg)
                 
                 await asyncio.sleep(1) # wait 1 second before polling again
         except asyncio.CancelledError:
@@ -119,28 +308,33 @@ async def start_youtube_client(video_id: str, websocket):
         except Exception as e:
             logging.error(f"Chat fetch error: {e}")
         finally:
-            if chat:
-                chat.terminate()
+            pass
 
-    chat_task = asyncio.create_task(fetch_chat())
+    chat_task = asyncio.create_task(fetch_chat(chat))
+    global stats_task
+    stats_task = asyncio.create_task(fetch_stats(video_id))
 
-async def stop_youtube_client():
+async def stop_youtube_client(broadcast=True):
     global chat_task, current_video_id, chat
     if chat_task is not None:
         logging.info("Stopping YouTube Live client...")
         chat_task.cancel()
         chat_task = None
+    if stats_task:
+        stats_task.cancel()
+        stats_task = None
     
     if chat:
         chat.terminate()
         chat = None
         
     current_video_id = None
-    await broadcast_to_clients({
-        "type": "status",
-        "status": "disconnected",
-        "message": "Disconnected from YouTube Live"
-    })
+    if broadcast:
+        await broadcast_to_clients({
+            "type": "status",
+            "status": "disconnected",
+            "message": "Disconnected from YouTube Live"
+        })
 
 async def main():
     host = "localhost"

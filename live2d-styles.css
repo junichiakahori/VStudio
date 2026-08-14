@@ -638,6 +638,36 @@ body.panel-hidden .avatar-viewport {
     -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black);
 }
 
+.stream-stats {
+    position: absolute;
+    top: 60px;
+    right: 20px;
+    background: rgba(10, 9, 21, 0.7);
+    border: 1px solid var(--border-neon);
+    border-radius: 8px;
+    padding: 10px 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 10;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #fff;
+    font-size: 1.2rem;
+    font-weight: bold;
+    font-family: 'Inter', sans-serif;
+    text-shadow: 0 0 5px rgba(0,0,0,0.8);
+}
+.stat-icon {
+    font-size: 1.2rem;
+}
+
 /* スクロールバー非表示 */
 .comment-viewer::-webkit-scrollbar {
     display: none;
@@ -660,6 +690,24 @@ body.panel-hidden .avatar-viewport {
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
     word-break: break-word;
+}
+
+.comment-author {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.comment-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--primary-color);
 }
 
 .comment-item .comment-author {
@@ -717,3 +765,57 @@ body.panel-hidden .avatar-viewport {
 .overlay-screen.active {
     opacity: 1;
 }
+
+.stream-clock {
+    position: absolute;
+    z-index: 10;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* 中央揃え */
+    justify-content: center;
+    white-space: nowrap; /* テキストの折り返しを防止 */
+    font-variant-numeric: tabular-nums;
+    width: 300px; /* ★固定幅にすることで、1秒ごとの横幅増減による translate のガタつきを完全に防止 */
+}
+
+/* Styles */
+.stream-clock.style-neon {
+    color: #fff;
+    font-family: 'Outfit', sans-serif;
+    text-shadow: 0 0 10px rgba(0, 243, 255, 0.8), 0 0 20px rgba(0, 243, 255, 0.4);
+    letter-spacing: 2px;
+}
+.stream-clock.style-neon .clock-time { font-size: 2.5rem; font-weight: 700; }
+.stream-clock.style-neon .clock-date { font-size: 1.2rem; font-weight: 500; color: rgba(255,255,255,0.9); }
+
+.stream-clock.style-minimal {
+    color: rgba(255, 255, 255, 0.8);
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    text-shadow: 1px 1px 4px rgba(0,0,0,0.8);
+    letter-spacing: 1px;
+}
+.stream-clock.style-minimal .clock-time { font-size: 2.2rem; font-weight: 300; }
+.stream-clock.style-minimal .clock-date { font-size: 1rem; font-weight: 300; }
+
+.stream-clock.style-retro {
+    color: #0f0;
+    font-family: 'Courier New', Courier, monospace;
+    text-shadow: 0 0 5px #0f0;
+    letter-spacing: 0;
+    background: rgba(0,0,0,0.6);
+    padding: 10px 15px;
+    border: 2px solid #0f0;
+    border-radius: 4px;
+}
+.stream-clock.style-retro .clock-time { font-size: 2.2rem; font-weight: bold; }
+.stream-clock.style-retro .clock-date { font-size: 1rem; font-weight: bold; }
+
+.stream-clock.style-pop {
+    color: #ff6b6b;
+    font-family: 'M PLUS Rounded 1c', 'Comic Sans MS', sans-serif;
+    text-shadow: 2px 2px 0px #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+    letter-spacing: 1px;
+}
+.stream-clock.style-pop .clock-time { font-size: 2.8rem; font-weight: 900; }
+.stream-clock.style-pop .clock-date { font-size: 1.4rem; font-weight: 700; color: #4ecdc4; text-shadow: 2px 2px 0px #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; }

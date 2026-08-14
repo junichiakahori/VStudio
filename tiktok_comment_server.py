@@ -103,13 +103,15 @@ async def start_tiktok_client(username: str, websocket):
         if len(recent_comments) > 100:
             recent_comments.pop(0)
 
+        icon_url = event.user.avatar.urls[0] if event.user.avatar and event.user.avatar.urls else ""
         # ログにも出す
         logging.info(f"[Comment] {event.user.nickname}: {event.comment}")
         # ブラウザに送信
         await broadcast_to_clients({
             "type": "comment",
             "nickname": event.user.nickname,
-            "comment": event.comment
+            "comment": event.comment,
+            "iconUrl": icon_url
         })
 
     @tiktok_client.on(JoinEvent)
@@ -127,12 +129,14 @@ async def start_tiktok_client(username: str, websocket):
 
     @tiktok_client.on(GiftEvent)
     async def on_gift(event: GiftEvent):
+        icon_url = event.user.avatar.urls[0] if event.user.avatar and event.user.avatar.urls else ""
         # コンボ中（streaking）の途中経過はスキップし、最後に1回だけ処理するか、単純に全部「ギフトありがとう」とするか
         # ここでは連続ギフトの度に喋るとうるさいので、とりあえず全部拾うがJS側で少し間引くかシンプルに扱う
         logging.info(f"[Gift] {event.user.nickname} sent a gift")
         await broadcast_to_clients({
             "type": "gift",
-            "nickname": event.user.nickname
+            "nickname": event.user.nickname,
+            "iconUrl": icon_url
         })
 
     @tiktok_client.on(LikeEvent)

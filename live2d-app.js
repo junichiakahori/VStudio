@@ -1046,43 +1046,45 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // 全画面・操作パネル表示非表示切替
-    const togglePanelBtn     = document.getElementById('toggle-panel-btn');
-    const togglePanelText    = document.getElementById('toggle-panel-text');
+    const togglePanelBtn = document.getElementById('toggle-panel-btn');
+    if (togglePanelBtn) togglePanelBtn.style.display = 'none'; // ボタンを非表示にする
+    
     const hidePanelHeaderBtn = document.getElementById('hide-panel-header-btn');
 
-    if (hidePanelHeaderBtn && togglePanelBtn) {
+    const triggerResize = () => {
+        if (pixiApp) {
+            setTimeout(() => {
+                const nw = viewport.clientWidth  || window.innerWidth;
+                const nh = viewport.clientHeight || window.innerHeight;
+                pixiApp.renderer.resize(nw, nh);
+                if (live2dModel) positionModel();
+            }, 100);
+        }
+    };
+
+    if (hidePanelHeaderBtn) {
         hidePanelHeaderBtn.addEventListener('click', () => {
-            togglePanelBtn.click();
+            document.body.classList.add('panel-hidden');
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            }
+            triggerResize();
         });
     }
 
-    if (togglePanelBtn) {
-        togglePanelBtn.addEventListener('click', () => {
-            const isHidden = document.body.classList.toggle('panel-hidden');
-            const iconSpan = togglePanelBtn.querySelector('.btn-icon');
-            if (isHidden) {
-                if (iconSpan) iconSpan.textContent = '⚙️';
-                if (togglePanelText) togglePanelText.textContent = '設定';
-                if (document.documentElement.requestFullscreen) {
-                    document.documentElement.requestFullscreen().catch(() => {});
-                }
-            } else {
-                if (iconSpan) iconSpan.textContent = '👁️';
-                if (togglePanelText) togglePanelText.textContent = '全画面';
-                if (document.exitFullscreen && document.fullscreenElement) {
-                    document.exitFullscreen().catch(() => {});
-                }
-            }
-            if (pixiApp) {
-                setTimeout(() => {
-                    const nw = viewport.clientWidth  || window.innerWidth;
-                    const nh = viewport.clientHeight || window.innerHeight;
-                    pixiApp.renderer.resize(nw, nh);
-                    if (live2dModel) positionModel();
-                }, 100);
-            }
-        });
-    }
+    // フルスクリーン解除時、またはESCキー押下時にパネルを復元する
+    document.addEventListener('fullscreenchange', () => {
+        if (!document.fullscreenElement) {
+            document.body.classList.remove('panel-hidden');
+            triggerResize();
+        }
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            document.body.classList.remove('panel-hidden');
+            triggerResize();
+        }
+    });
 
     // =====================================================================
     // BroadcastChannel (OBS受信)
@@ -1507,6 +1509,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 一人称・二人称の設定保存
+    const idleFirstPersonEl = document.getElementById('idle-first-person');
+    const idleSecondPersonEl = document.getElementById('idle-second-person');
+    if (idleFirstPersonEl) {
+        const saved = localStorage.getItem('savedIdleFirstPerson');
+        if (saved) idleFirstPersonEl.value = saved;
+        idleFirstPersonEl.addEventListener('change', () => {
+            localStorage.setItem('savedIdleFirstPerson', idleFirstPersonEl.value);
+        });
+    }
+    if (idleSecondPersonEl) {
+        const saved = localStorage.getItem('savedIdleSecondPerson');
+        if (saved) idleSecondPersonEl.value = saved;
+        idleSecondPersonEl.addEventListener('change', () => {
+            localStorage.setItem('savedIdleSecondPerson', idleSecondPersonEl.value);
+        });
+    }
+
     // AI Settings
     const aiReplyToggle = document.getElementById('ai-reply-toggle');
     const aiSettingsPanel = document.getElementById('ai-settings-panel');
@@ -1788,11 +1808,104 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!text) return text;
         let clean = text.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '');
         clean = clean.replace(/:[^:\s]+:/g, '');
+        clean = clean.replace(/@/g, ''); // 読み上げ時の「アット」を省略するため @ を全削除
         return clean.trim();
     }
 
+    // コメント履歴の保存と復元
+    let commentHistory = [];
+    let totalCommentsCount = 0;
+    function clearAllComments() {
+        commentHistory = [];
+        totalCommentsCount = 0;
+        localStorage.setItem('savedCommentHistory', JSON.stringify([]));
+        localStorage.setItem('savedTotalCommentsCount', 0);
+        const el = document.getElementById('stat-comments');
+        if (el) el.textContent = 0;
+        
+        // 統計情報もクリア
+        const statSubscribers = document.getElementById('stat-subscribers');
+        if (statSubscribers) statSubscribers.textContent = '0';
+        const statViewers = document.getElementById('stat-viewers');
+        if (statViewers) statViewers.textContent = '0';
+        
+        renderAllComments();
+    }
+
+    try {
+        const saved = localStorage.getItem('savedCommentHistory');
+        if (saved) {
+            commentHistory = JSON.parse(saved);
+        }
+        const savedCount = localStorage.getItem('savedTotalCommentsCount');
+        if (savedCount) {
+            totalCommentsCount = parseInt(savedCount, 10);
+        }
+        if (totalCommentsCount < commentHistory.length) {
+            totalCommentsCount = commentHistory.length;
+        }
+        const el = document.getElementById('stat-comments');
+        if (el) el.textContent = totalCommentsCount;
+    } catch (e) {
+        console.warn('Failed to load comment history', e);
+    }
+
+    function renderAllComments() {
+        const viewer = document.getElementById('comment-viewer');
+        if (!viewer) return;
+        viewer.innerHTML = '';
+        // 履歴をそのままレンダリング (古い順、最新が下になるように)
+        commentHistory.forEach(c => {
+            const el = document.createElement('div');
+            el.className = `comment-item ${c.platform}-comment`;
+            if (c.isGift) el.classList.add('gift-comment');
+            
+            const icon = c.platform === 'youtube' ? '🔴' : c.platform === 'tiktok' ? '🎵' : '💬';
+            
+            let avatarHtml = '';
+            if (c.iconUrl) {
+                avatarHtml = `<img src="${c.iconUrl}" class="comment-avatar" alt="${c.nickname}" crossorigin="anonymous">`;
+            }
+            el.innerHTML = `<div class="comment-author">${avatarHtml}<span>${icon} ${c.nickname}</span></div><div class="comment-text">${c.comment}</div>`;
+            viewer.appendChild(el);
+        });
+        viewer.scrollTop = viewer.scrollHeight; // 一番下(最新)にスクロール
+    }
+    
+    // リセットボタンの登録
+    const clearCommentsBtn = document.getElementById('clear-comments-btn');
+    if (clearCommentsBtn) {
+        clearCommentsBtn.addEventListener('click', () => {
+            clearAllComments();
+        });
+    }
+
+    // 初回レンダリング
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', renderAllComments);
+    } else {
+        renderAllComments();
+    }
+
     // コメントビューアー用関数
-    function addCommentToViewer(nickname, comment, platform, isGift = false) {
+    function addCommentToViewer(nickname, comment, platform, isGift = false, iconUrl = "") {
+        // サーバーから送られてきた履歴の重複表示・二重カウントを防ぐ
+        const checkRange = commentHistory.slice(-50);
+        const isDuplicate = checkRange.some(c => c.nickname === nickname && c.comment === comment && c.platform === platform);
+        
+        if (isDuplicate) return;
+
+        commentHistory.push({ nickname, comment, platform, isGift, iconUrl });
+        if (commentHistory.length > 100) {
+            commentHistory.shift();
+        }
+        localStorage.setItem('savedCommentHistory', JSON.stringify(commentHistory));
+        
+        totalCommentsCount++;
+        localStorage.setItem('savedTotalCommentsCount', totalCommentsCount);
+        const statCommentsEl = document.getElementById('stat-comments');
+        if (statCommentsEl) statCommentsEl.textContent = totalCommentsCount;
+
         const viewer = document.getElementById('comment-viewer');
         if (!viewer) return;
         
@@ -1802,7 +1915,12 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const icon = platform === 'youtube' ? '🔴' : platform === 'tiktok' ? '🎵' : '💬';
         
-        el.innerHTML = `<div class="comment-author">${icon} ${nickname}</div><div class="comment-text">${comment}</div>`;
+        let avatarHtml = '';
+        if (iconUrl) {
+            avatarHtml = `<img src="${iconUrl}" class="comment-avatar" alt="${nickname}" crossorigin="anonymous">`;
+        }
+        
+        el.innerHTML = `<div class="comment-author">${avatarHtml}<span>${icon} ${nickname}</span></div><div class="comment-text">${comment}</div>`;
         viewer.appendChild(el);
         
         // 最新のコメントが見えるようにスクロール
@@ -1814,6 +1932,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    let isTiktokIntendedConnect = false;
+    let tiktokReconnectTimer = null;
+
     if (tiktokConnectBtn) {
         tiktokConnectBtn.addEventListener('click', () => {
             const username = tiktokUserInput.value.trim();
@@ -1821,12 +1942,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('TikTokのユーザー名を入力してください');
                 return;
             }
+            const savedTiktokId = localStorage.getItem('savedTiktokId');
+            if (savedTiktokId && savedTiktokId !== username) {
+                if (typeof clearAllComments === 'function') clearAllComments();
+            }
             localStorage.setItem('savedTiktokId', username);
 
-            if (tiktokWs && tiktokWs.readyState === WebSocket.OPEN) {
-                tiktokWs.send(JSON.stringify({ type: 'disconnect_tiktok' }));
-                tiktokWs.close();
-                tiktokWs = null;
+            if (isTiktokIntendedConnect) {
+                isTiktokIntendedConnect = false;
+                clearTimeout(tiktokReconnectTimer);
+                if (tiktokWs) {
+                    if (tiktokWs.readyState === WebSocket.OPEN) {
+                        tiktokWs.send(JSON.stringify({ type: 'disconnect_tiktok' }));
+                    }
+                    tiktokWs.close();
+                    tiktokWs = null;
+                }
                 tiktokConnectBtn.textContent = '接続';
                 tiktokConnectBtn.style.background = 'var(--primary)';
                 tiktokStatus.textContent = '未接続';
@@ -1834,6 +1965,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            isTiktokIntendedConnect = true;
             joinedUsers.clear();
             tiktokStatus.textContent = '接続中...';
             tiktokWs = new WebSocket('ws://localhost:8767');
@@ -1863,7 +1995,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     } else if (data.type === 'join') {
                         console.log(`[TikTok] ${data.nickname} joined`);
-                        if (isVoicevoxEnabled) {
+                        if (isVoicevoxEnabled && (typeof isStreamEndedState === 'undefined' || !isStreamEndedState)) {
                             const cleanName = data.nickname.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
                             if (cleanName.length > 0) {
                                 const zunda = isZundamonSelected() && currentModelId === 'hiyori';
@@ -1899,8 +2031,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     } else if (data.type === 'gift') {
                         console.log(`[TikTok] ${data.nickname} sent a gift`);
-                        addCommentToViewer(data.nickname, `🎁 ギフトを送りました！`, 'tiktok', true);
-                        if (isVoicevoxEnabled) {
+                        addCommentToViewer(data.nickname, `🎁 ギフトを送りました！`, 'tiktok', true, data.iconUrl);
+                        if (isVoicevoxEnabled && (typeof isStreamEndedState === 'undefined' || !isStreamEndedState)) {
                             const cleanName = removeEmojis(data.nickname);
                             if (cleanName.length > 0) {
                                 aiEmotion = 'joy';
@@ -1915,8 +2047,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         // いいね連打対策のため読み上げは行わない
                     } else if (data.type === 'comment') {
                         console.log(`[TikTok] @${data.nickname}: ${data.comment}`);
-                        addCommentToViewer(data.nickname, data.comment, 'tiktok', false);
-                        if (isVoicevoxEnabled) {
+                        addCommentToViewer(data.nickname, data.comment, 'tiktok', false, data.iconUrl);
+                        if (isVoicevoxEnabled && (typeof isStreamEndedState === 'undefined' || !isStreamEndedState)) {
                             // 絵文字を除去してテンポ良く読み上げる
                             const cleanNickname = removeEmojis(data.nickname);
                             const cleanComment = removeEmojis(data.comment);
@@ -1969,10 +2101,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
 
-                        tiktokWs.onclose = () => {
-                tiktokStatus.textContent = '未接続';
-                tiktokConnectBtn.textContent = '接続';
-                tiktokConnectBtn.style.background = 'var(--primary)';
+            tiktokWs.onclose = () => {
+                if (isTiktokIntendedConnect) {
+                    tiktokStatus.textContent = '再接続中...';
+                    tiktokConnectBtn.textContent = '再接続';
+                    tiktokConnectBtn.style.background = '#ff8800';
+                    clearTimeout(tiktokReconnectTimer);
+                    tiktokReconnectTimer = setTimeout(() => {
+                        if (isTiktokIntendedConnect) tiktokConnectBtn.click();
+                    }, 5000);
+                } else {
+                    tiktokStatus.textContent = '未接続';
+                    tiktokConnectBtn.textContent = '接続';
+                    tiktokConnectBtn.style.background = 'var(--primary)';
+                }
             };
 
             tiktokWs.onerror = (err) => {
@@ -1993,6 +2135,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    let isYoutubeIntendedConnect = false;
+    let youtubeReconnectTimer = null;
+
     if (youtubeConnectBtn) {
         youtubeConnectBtn.addEventListener('click', () => {
             const videoId = youtubeUserInput.value.trim();
@@ -2000,18 +2145,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('YouTubeの動画IDを入力してください');
                 return;
             }
+            
+            const savedYoutubeId = localStorage.getItem('savedYoutubeId');
+            if (savedYoutubeId && savedYoutubeId !== videoId) {
+                if (typeof clearAllComments === 'function') clearAllComments();
+            }
             localStorage.setItem('savedYoutubeId', videoId);
 
-            if (youtubeWs && youtubeWs.readyState === WebSocket.OPEN) {
-                youtubeWs.send(JSON.stringify({ type: 'disconnect_youtube' }));
-                youtubeWs.close();
-                youtubeWs = null;
+            if (isYoutubeIntendedConnect) {
+                isYoutubeIntendedConnect = false;
+                clearTimeout(youtubeReconnectTimer);
+                if (youtubeWs) {
+                    if (youtubeWs.readyState === WebSocket.OPEN) {
+                        youtubeWs.send(JSON.stringify({ type: 'disconnect_youtube' }));
+                    }
+                    youtubeWs.close();
+                    youtubeWs = null;
+                }
                 youtubeConnectBtn.textContent = '接続';
                 youtubeConnectBtn.style.background = '#ff0000';
                 youtubeStatus.textContent = '未接続';
                 return;
             }
 
+            isYoutubeIntendedConnect = true;
             youtubeStatus.textContent = '接続中...';
             youtubeWs = new WebSocket('ws://localhost:8768');
 
@@ -2038,10 +2195,32 @@ document.addEventListener('DOMContentLoaded', () => {
                             youtubeConnectBtn.textContent = '接続';
                             youtubeConnectBtn.style.background = '#ff0000';
                         }
+                    } else if (data.type === 'stats') {
+                        const statSubEl = document.getElementById('stat-subscribers');
+                        const statViewEl = document.getElementById('stat-viewers');
+                        if (statSubEl && data.subscribers) {
+                            function formatStatNumber(str) {
+                                if (!str) return "0";
+                                let cleanStr = str.replace(/チャンネル登録者数/g, '').replace(/subscribers/ig, '').trim().replace(/,/g, '');
+                                let numMatch = cleanStr.match(/^([0-9\.]+)\s*(.*)$/);
+                                if (!numMatch) return str;
+                                let num = parseFloat(numMatch[1]);
+                                let suffix = numMatch[2].toLowerCase();
+                                if (suffix.startsWith('k') || suffix.startsWith('thousand')) num *= 1000;
+                                else if (suffix.startsWith('m') || suffix.startsWith('million')) num *= 1000000;
+                                else if (suffix.startsWith('万')) num *= 10000;
+                                else if (suffix.startsWith('億')) num *= 100000000;
+                                return num.toLocaleString();
+                            }
+                            statSubEl.textContent = formatStatNumber(data.subscribers);
+                        }
+                        if (statViewEl && data.viewers) {
+                            statViewEl.textContent = data.viewers;
+                        }
                     } else if (data.type === 'gift') {
                         console.log(`[YouTube SuperChat] ${data.nickname} sent ${data.amount}`);
-                        addCommentToViewer(data.nickname, `💰 スーパーチャット: ${data.amount}`, 'youtube', true);
-                        if (isVoicevoxEnabled) {
+                        addCommentToViewer(data.nickname, `💰 スーパーチャット: ${data.amount}`, 'youtube', true, data.iconUrl);
+                        if (isVoicevoxEnabled && !data.isHistory && typeof isStreamEndedState !== 'undefined' && !isStreamEndedState) {
                             const cleanName = removeEmojis(data.nickname);
                             if (cleanName.length > 0) {
                                 aiEmotion = 'joy';
@@ -2053,8 +2232,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     } else if (data.type === 'comment') {
                         console.log(`[YouTube] @${data.nickname}: ${data.comment}`);
-                        addCommentToViewer(data.nickname, data.comment, 'youtube', false);
-                        if (isVoicevoxEnabled) {
+                        addCommentToViewer(data.nickname, data.comment, 'youtube', false, data.iconUrl);
+                        if (isVoicevoxEnabled && !data.isHistory && typeof isStreamEndedState !== 'undefined' && !isStreamEndedState) {
                             const cleanNickname = removeEmojis(data.nickname);
                             const cleanComment = removeEmojis(data.comment);
                             if (cleanComment.length > 0) {
@@ -2101,9 +2280,19 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             youtubeWs.onclose = () => {
-                youtubeStatus.textContent = '未接続';
-                youtubeConnectBtn.textContent = '接続';
-                youtubeConnectBtn.style.background = '#ff0000';
+                if (isYoutubeIntendedConnect) {
+                    youtubeStatus.textContent = '再接続中...';
+                    youtubeConnectBtn.textContent = '再接続';
+                    youtubeConnectBtn.style.background = '#ff8800';
+                    clearTimeout(youtubeReconnectTimer);
+                    youtubeReconnectTimer = setTimeout(() => {
+                        if (isYoutubeIntendedConnect) youtubeConnectBtn.click();
+                    }, 5000);
+                } else {
+                    youtubeStatus.textContent = '未接続';
+                    youtubeConnectBtn.textContent = '接続';
+                    youtubeConnectBtn.style.background = '#ff0000';
+                }
             };
 
             youtubeWs.onerror = (err) => {
@@ -2116,7 +2305,108 @@ document.addEventListener('DOMContentLoaded', () => {
         const savedYoutubeId = localStorage.getItem('savedYoutubeId');
         if (savedYoutubeId && youtubeUserInput) {
             youtubeUserInput.value = savedYoutubeId;
+            if (youtubeConnectBtn) {
+                setTimeout(() => {
+                    youtubeConnectBtn.click();
+                }, 1500); // 起動時の負荷分散のため遅延させる
+            }
         }
+    }
+
+    // --- Google OAuth (YouTube Data API) Logic ---
+    const oauthClientIdInput = document.getElementById('youtube-oauth-client-id');
+    const oauthApiKeyInput = document.getElementById('youtube-api-key');
+    const oauthLoginBtn = document.getElementById('youtube-oauth-login-btn');
+    const oauthLogoutBtn = document.getElementById('youtube-oauth-logout-btn');
+    const oauthStatus = document.getElementById('youtube-oauth-status');
+    let tokenClient = null;
+    let oauthAccessToken = null;
+    let oauthStatInterval = null;
+
+    if (oauthClientIdInput && oauthLoginBtn) {
+        // Load saved credentials
+        const savedClientId = localStorage.getItem('savedYoutubeClientId');
+        const savedApiKey = localStorage.getItem('savedYoutubeApiKey');
+        if (savedClientId) oauthClientIdInput.value = savedClientId;
+        if (savedApiKey) oauthApiKeyInput.value = savedApiKey;
+
+        // Dynamically load Google Identity Services
+        const gisScript = document.createElement('script');
+        gisScript.src = 'https://accounts.google.com/gsi/client';
+        gisScript.async = true;
+        gisScript.defer = true;
+        gisScript.onload = () => {
+            console.log("Google Identity Services loaded.");
+        };
+        document.head.appendChild(gisScript);
+
+        async function fetchYoutubeApiStats() {
+            if (!oauthAccessToken || !oauthApiKeyInput.value.trim()) return;
+            try {
+                const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=statistics&mine=true&key=${oauthApiKeyInput.value.trim()}`, {
+                    headers: {
+                        'Authorization': `Bearer ${oauthAccessToken}`
+                    }
+                });
+                const data = await res.json();
+                if (data.items && data.items.length > 0) {
+                    const stats = data.items[0].statistics;
+                    const statSubEl = document.getElementById('stat-subscribers');
+                    if (statSubEl && stats.subscriberCount) {
+                        const num = parseInt(stats.subscriberCount, 10);
+                        if (!isNaN(num)) statSubEl.textContent = num.toLocaleString();
+                    }
+                }
+            } catch (e) {
+                console.error("YouTube Data API fetch error:", e);
+                oauthStatus.textContent = 'APIフェッチエラー';
+            }
+        }
+
+        oauthLoginBtn.addEventListener('click', () => {
+            const clientId = oauthClientIdInput.value.trim();
+            const apiKey = oauthApiKeyInput.value.trim();
+            if (!clientId || !apiKey) {
+                alert("クライアントIDとAPIキーを入力してください。");
+                return;
+            }
+            localStorage.setItem('savedYoutubeClientId', clientId);
+            localStorage.setItem('savedYoutubeApiKey', apiKey);
+
+            if (!tokenClient) {
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: clientId,
+                    scope: 'https://www.googleapis.com/auth/youtube.readonly',
+                    callback: (tokenResponse) => {
+                        if (tokenResponse && tokenResponse.access_token) {
+                            oauthAccessToken = tokenResponse.access_token;
+                            oauthStatus.textContent = '認証成功（統計取得中）';
+                            oauthLoginBtn.style.display = 'none';
+                            oauthLogoutBtn.style.display = 'block';
+                            
+                            // Fetch stats immediately and then periodically
+                            fetchYoutubeApiStats();
+                            if (oauthStatInterval) clearInterval(oauthStatInterval);
+                            oauthStatInterval = setInterval(fetchYoutubeApiStats, 60000); // 1 minute interval
+                        }
+                    },
+                });
+            }
+            tokenClient.requestAccessToken();
+        });
+
+        oauthLogoutBtn.addEventListener('click', () => {
+            if (oauthAccessToken) {
+                google.accounts.oauth2.revoke(oauthAccessToken, () => {
+                    console.log('Access token revoked');
+                });
+            }
+            oauthAccessToken = null;
+            if (oauthStatInterval) clearInterval(oauthStatInterval);
+            oauthStatus.textContent = '未認証';
+            oauthLoginBtn.style.display = 'block';
+            oauthLogoutBtn.style.display = 'none';
+        });
     }
 
 
@@ -2411,11 +2701,12 @@ document.addEventListener('DOMContentLoaded', () => {
             newPhrase = newPhrase.replace(/なー(?=[。！!？\?、,…\s]|$)/g, 'にゃー');
             newPhrase = newPhrase.replace(/な(?=[。！!？\?、,…\s]|$)/g, 'にゃ');
             
-            newPhrase = newPhrase.replace(/([。！!？\?]|ー+)?$/g, (match) => {
-                if (!match) return 'にゃ';
-                if (match.includes('！') || match.includes('!')) return 'にゃ！';
-                if (match.includes('？') || match.includes('?')) return 'にゃ？';
-                return 'にゃ' + match;
+            newPhrase = newPhrase.replace(/(にゃー?)?([。！!？\?]|ー+)?$/, (match, nya, punc) => {
+                if (nya) return match; // すでに「にゃ」がある場合は追加しない
+                if (!punc) return 'にゃ';
+                if (punc.includes('！') || punc.includes('!')) return 'にゃ！';
+                if (punc.includes('？') || punc.includes('?')) return 'にゃ？';
+                return 'にゃ' + punc;
             });
             return newPhrase;
         }
@@ -2437,11 +2728,12 @@ document.addEventListener('DOMContentLoaded', () => {
             newPhrase = newPhrase.replace(/なー(?=[。！!？\?、,…\s]|$)/g, 'ワンー');
             newPhrase = newPhrase.replace(/な(?=[。！!？\?、,…\s]|$)/g, 'ワン');
             
-            newPhrase = newPhrase.replace(/([。！!？\?]|ー+)?$/g, (match) => {
-                if (!match) return 'ワン';
-                if (match.includes('！') || match.includes('!')) return 'ワン！';
-                if (match.includes('？') || match.includes('?')) return 'ワン？';
-                return 'ワン' + match;
+            newPhrase = newPhrase.replace(/(ワンー?)?([。！!？\?]|ー+)?$/, (match, wan, punc) => {
+                if (wan) return match; // すでに「ワン」がある場合は追加しない
+                if (!punc) return 'ワン';
+                if (punc.includes('！') || punc.includes('!')) return 'ワン！';
+                if (punc.includes('？') || punc.includes('?')) return 'ワン？';
+                return 'ワン' + punc;
             });
             return newPhrase;
         }
@@ -2449,62 +2741,81 @@ document.addEventListener('DOMContentLoaded', () => {
         return phrase;
     }
 
+    function triggerIdleSpeech() {
+        if (!isIdleSpeechEnabled || !isVoicevoxEnabled || (typeof isStreamEndedState !== 'undefined' && isStreamEndedState) || (typeof isPreparing !== 'undefined' && isPreparing)) {
+            resetIdleTimer();
+            return;
+        }
+        
+        const isZunda = isZundamonSelected() && currentModelId === 'hiyori';
+        let phrase = "";
+        const getValidPhrase = (categoryObj) => {
+            const h = new Date().getHours();
+            let timeCategory = "night";
+            if (h >= 5 && h < 11) timeCategory = "morning";
+            else if (h >= 11 && h < 18) timeCategory = "afternoon";
+            
+            const month = new Date().getMonth() + 1;
+            let seasonCategory = "winter";
+            if (month >= 3 && month <= 5) seasonCategory = "spring";
+            else if (month >= 6 && month <= 8) seasonCategory = "summer";
+            else if (month >= 9 && month <= 11) seasonCategory = "autumn";
+            
+            const availablePhrases = [...categoryObj.general, ...categoryObj[timeCategory]];
+            if (categoryObj[seasonCategory]) {
+                availablePhrases.push(...categoryObj[seasonCategory]);
+            }
+            return availablePhrases[Math.floor(Math.random() * availablePhrases.length)];
+        };
+
+        if (isZunda) {
+            phrase = Math.random() < 0.15 ? getValidPhrase(ZUNDA_LONG_STORIES) : getValidPhrase(ZUNDA_PHRASES);
+        } else {
+            phrase = Math.random() < 0.15 ? getValidPhrase(NORMAL_LONG_STORIES) : getValidPhrase(NORMAL_PHRASES);
+        }
+
+        // 感情アニメーションの設定
+        if (phrase.includes("チラッ")) {
+            aiEmotion = 'glance';
+        } else if (phrase.includes("だめだめ") || phrase.includes("ひどくない") || phrase.includes("はずかしかった")) {
+            aiEmotion = 'sad';
+        } else {
+            aiEmotion = 'joy';
+        }
+
+        // モデルに応じた語尾の調整
+        phrase = adjustIdlePhraseForModel(phrase, currentModelId);
+
+        // 一人称・二人称の置換
+        const idleFirstPerson = document.getElementById('idle-first-person');
+        const idleSecondPerson = document.getElementById('idle-second-person');
+        if (idleFirstPerson && idleFirstPerson.value) {
+            const fp = idleFirstPerson.value;
+            phrase = phrase.replace(/わたし|あたし|私|ぼく|僕|おれ|俺|うち/g, fp);
+        }
+        if (idleSecondPerson && idleSecondPerson.value) {
+            const sp = idleSecondPerson.value;
+            phrase = phrase.replace(/みんな|あなた|君|きみ|お前|リスナーさん|リスナー|視聴者さん/g, sp);
+        }
+        
+        console.log(`[独り言] ${phrase}`);
+        
+        // 独り言も会話履歴に追加し、視聴者が独り言に反応した時に文脈が繋がるようにする
+        if (typeof aiChatHistory !== 'undefined') {
+            aiChatHistory.push({ role: 'assistant', content: phrase });
+            if (aiChatHistory.length > 10) aiChatHistory.shift();
+        }
+
+        queueVoicevoxAudio(phrase, true);
+        // 音声の再生完了後に playNextVoicevox 内でリセットするため、ここでの即時リセットは削除
+    }
+
     function resetIdleTimer() {
         clearIdleTimer();
-        
         if (isVoicevoxEnabled && isIdleSpeechEnabled) {
-            idleSpeechTimer = setTimeout(() => {
-                if (!isVoicevoxPlaying && voicevoxAudioQueue.length === 0 && isVoicevoxEnabled && isIdleSpeechEnabled) {
-                    const isZunda = isZundamonSelected() && currentModelId === 'hiyori';
-                    let phrase = "";
-                    const getValidPhrase = (categoryObj) => {
-                        const h = new Date().getHours();
-                        let timeCategory = "night";
-                        if (h >= 5 && h < 11) timeCategory = "morning";
-                        else if (h >= 11 && h < 18) timeCategory = "afternoon";
-                        
-                        const month = new Date().getMonth() + 1;
-                        let seasonCategory = "winter";
-                        if (month >= 3 && month <= 5) seasonCategory = "spring";
-                        else if (month >= 6 && month <= 8) seasonCategory = "summer";
-                        else if (month >= 9 && month <= 11) seasonCategory = "autumn";
-                        
-                        const availablePhrases = [...categoryObj.general, ...categoryObj[timeCategory]];
-                        if (categoryObj[seasonCategory]) {
-                            availablePhrases.push(...categoryObj[seasonCategory]);
-                        }
-                        return availablePhrases[Math.floor(Math.random() * availablePhrases.length)];
-                    };
-
-                    if (isZunda) {
-                        phrase = Math.random() < 0.15 ? getValidPhrase(ZUNDA_LONG_STORIES) : getValidPhrase(ZUNDA_PHRASES);
-                    } else {
-                        phrase = Math.random() < 0.15 ? getValidPhrase(NORMAL_LONG_STORIES) : getValidPhrase(NORMAL_PHRASES);
-                    }
-
-                    // 感情アニメーションの設定
-                    if (phrase.includes("チラッ")) {
-                        aiEmotion = 'glance';
-                    } else if (phrase.includes("だめだめ") || phrase.includes("ひどくない") || phrase.includes("はずかしかった")) {
-                        aiEmotion = 'sad';
-                    } else {
-                        aiEmotion = 'joy';
-                    }
-
-                    // モデルに応じた語尾の調整
-                    phrase = adjustIdlePhraseForModel(phrase, currentModelId);
-                    
-                    console.log(`[独り言] ${phrase}`);
-                    
-                    // 独り言も会話履歴に追加し、視聴者が独り言に反応した時に文脈が繋がるようにする
-                    if (typeof aiChatHistory !== 'undefined') {
-                        aiChatHistory.push({ role: 'assistant', content: phrase });
-                        if (aiChatHistory.length > 10) aiChatHistory.shift();
-                    }
-
-                    queueVoicevoxAudio(phrase);
-                }
-            }, 5000);
+            // UI上の設定(5秒)に合わせる (5秒〜10秒のランダム)
+            const delay = 5000 + Math.random() * 5000;
+            idleSpeechTimer = setTimeout(triggerIdleSpeech, delay);
         }
     }
 
@@ -2525,7 +2836,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
                     body: JSON.stringify({
-                        systemInstruction: { parts: [{ text: "あなたは読み仮名変換アシスタントです。ユーザーが入力したテキストの漢字をひらがなに変換し、全体をひらがなとカタカナのみの文章として出力してください。元のひらがなやカタカナの部分は不自然に変更・省略しないでください（例: 「そこの君の」→「そこのきみの」）。読点（、）や句点（。）などの句読点は音声の自然な間のために必ず残してください。また、日付や時間など、意味の区切りが良いところには積極的に読点（、）を補って、音声合成が自然な息継ぎをできるようにしてください（例：「8月13日木曜日の9時53分」→「はちがつじゅうさんにち、もくようびの、くじごじゅうさんふん」）。その他の余計な記号や文章は一切含めないでください。" }] },
+                        systemInstruction: { parts: [{ text: "あなたは読み仮名変換アシスタントです。ユーザーが入力したテキストの漢字をひらがなに変換し、全体をひらがなとカタカナのみの文章として出力してください。非常に重要なルールとして、元の文章の単語、助詞（てにをは）、動詞などの文字を【絶対に】省略・変更・削除しないでください（例: 「夢を見たんだ」→「ゆめをみたんだ」、「そこの君の」→「そこのきみの」）。読点（、）や句点（。）などの句読点は音声の自然な間のために必ず残してください。日付や時間など、意味の区切りが良いところには積極的に読点（、）を補って、音声合成が自然な息継ぎをできるようにしてください（例：「8月13日木曜日の9時53分」→「はちがつじゅうさんにち、もくようびの、くじごじゅうさんふん」）。その他の余計な記号や文章は一切含めないでください。" }] },
                         contents: [{ role: 'user', parts: [{ text: text }] }]
                     })
                 });
@@ -2691,17 +3002,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =====================================================================
-    // 画面オーバーレイ (配信準備中 / 離席中)
+    // 画面オーバーレイ (配信準備中 / 離席中 / 配信終了)
     // =====================================================================
     const overlayPrepBtn = document.getElementById('overlay-prep-btn');
     const overlayAfkBtn = document.getElementById('overlay-afk-btn');
+    const overlayEndBtn = document.getElementById('overlay-end-btn');
     const overlayClearBtn = document.getElementById('overlay-clear-btn');
     const streamOverlay = document.getElementById('stream-overlay');
+    let isPreparing = false;
+    let isStreamEndedState = false;
 
     if (overlayPrepBtn && streamOverlay) {
         overlayPrepBtn.addEventListener('click', () => {
             streamOverlay.textContent = '配信準備中';
             streamOverlay.classList.add('active');
+            isPreparing = true;
+            
+            // 配信準備中も独り言を止めるためにキューとタイマーをクリア
+            if (typeof voicevoxAudioQueue !== 'undefined') {
+                voicevoxAudioQueue.length = 0;
+            }
+            if (typeof clearIdleTimer === 'function') {
+                clearIdleTimer();
+            }
         });
     }
     if (overlayAfkBtn && streamOverlay) {
@@ -2710,10 +3033,387 @@ document.addEventListener('DOMContentLoaded', () => {
             streamOverlay.classList.add('active');
         });
     }
+    if (overlayEndBtn && streamOverlay) {
+        overlayEndBtn.addEventListener('click', () => {
+            streamOverlay.textContent = '配信終了';
+            streamOverlay.classList.add('active');
+            isStreamEndedState = true;
+            
+            // 配信終了時には、残っている読み上げキューをクリアして即座に黙るようにする
+            if (typeof voicevoxAudioQueue !== 'undefined') {
+                voicevoxAudioQueue.length = 0;
+            }
+            if (typeof clearIdleTimer === 'function') {
+                clearIdleTimer();
+            }
+        });
+    }
     if (overlayClearBtn && streamOverlay) {
         overlayClearBtn.addEventListener('click', () => {
             streamOverlay.classList.remove('active');
+            isStreamEndedState = false;
+            
+            // 配信準備中を解除したときに挨拶
+            if (isPreparing) {
+                isPreparing = false;
+                if (isVoicevoxEnabled) {
+                    queueVoicevoxAudio("配信を開始しました！皆さんよろしくお願いします！", false).catch(e => console.warn(e));
+                }
+            } else {
+                // 配信終了状態からの解除などの場合は、独り言タイマーを即座に再開する
+                if (typeof resetIdleTimer === 'function') resetIdleTimer();
+            }
         });
+    }
+
+    // 統計情報の表示機能
+    const statsToggle = document.getElementById('stats-toggle');
+    const streamStats = document.getElementById('stream-stats');
+    const statsSettingsContainer = document.getElementById('stats-settings-container');
+    const statsPosX = document.getElementById('stats-pos-x');
+    const statsPosY = document.getElementById('stats-pos-y');
+    const statsXVal = document.getElementById('stats-x-val');
+    const statsYVal = document.getElementById('stats-y-val');
+
+    if (statsToggle && streamStats) {
+        const savedStatsToggle = localStorage.getItem('savedStatsToggle');
+        if (savedStatsToggle !== null) {
+            statsToggle.checked = (savedStatsToggle === 'true');
+        }
+        streamStats.style.display = statsToggle.checked ? 'flex' : 'none';
+        if (statsSettingsContainer) {
+            statsSettingsContainer.style.display = statsToggle.checked ? 'flex' : 'none';
+        }
+        
+        statsToggle.addEventListener('change', () => {
+            streamStats.style.display = statsToggle.checked ? 'flex' : 'none';
+            if (statsSettingsContainer) {
+                statsSettingsContainer.style.display = statsToggle.checked ? 'flex' : 'none';
+            }
+            localStorage.setItem('savedStatsToggle', statsToggle.checked);
+        });
+
+        // 座標保存
+        const savedStatsX = localStorage.getItem('savedStatsX');
+        const savedStatsY = localStorage.getItem('savedStatsY');
+        
+        // 元のCSS設定をリセット
+        streamStats.style.right = 'auto';
+        
+        if (savedStatsX && statsPosX) {
+            statsPosX.value = savedStatsX;
+            if (statsXVal) statsXVal.textContent = savedStatsX;
+            streamStats.style.left = `${savedStatsX}%`;
+            streamStats.style.transform = 'translate(-50%, -50%)';
+        } else {
+            // 初期値
+            streamStats.style.left = `95%`;
+            streamStats.style.transform = 'translate(-50%, -50%)';
+        }
+        if (savedStatsY && statsPosY) {
+            statsPosY.value = savedStatsY;
+            if (statsYVal) statsYVal.textContent = savedStatsY;
+            streamStats.style.top = `${savedStatsY}%`;
+        } else {
+            // 初期値
+            streamStats.style.top = `15%`;
+        }
+
+        if (statsPosX && statsPosY) {
+            statsPosX.addEventListener('input', () => {
+                streamStats.style.left = `${statsPosX.value}%`;
+                streamStats.style.transform = 'translate(-50%, -50%)';
+                if (statsXVal) statsXVal.textContent = statsPosX.value;
+                localStorage.setItem('savedStatsX', statsPosX.value);
+            });
+            statsPosY.addEventListener('input', () => {
+                streamStats.style.top = `${statsPosY.value}%`;
+                if (statsYVal) statsYVal.textContent = statsPosY.value;
+                localStorage.setItem('savedStatsY', statsPosY.value);
+            });
+        }
+    }
+
+    // コメントビューアーの表示機能
+    const commentViewerToggle = document.getElementById('comment-viewer-toggle');
+    const commentSettingsContainer = document.getElementById('comment-settings-container');
+    const commentPosX = document.getElementById('comment-pos-x');
+    const commentPosY = document.getElementById('comment-pos-y');
+    const commentXVal = document.getElementById('comment-x-val');
+    const commentYVal = document.getElementById('comment-y-val');
+    const commentViewerWrap = document.getElementById('comment-viewer');
+
+    if (commentViewerToggle && commentViewerWrap) {
+        // ... (This logic actually should wrap the existing comment viewer, let's keep it clean)
+        const savedCommentToggle = localStorage.getItem('savedCommentToggle');
+        if (savedCommentToggle !== null) {
+            commentViewerToggle.checked = (savedCommentToggle === 'true');
+        }
+        commentViewerWrap.style.display = commentViewerToggle.checked ? 'block' : 'none';
+        if (commentSettingsContainer) {
+            commentSettingsContainer.style.display = commentViewerToggle.checked ? 'flex' : 'none';
+        }
+
+        commentViewerToggle.addEventListener('change', () => {
+            commentViewerWrap.style.display = commentViewerToggle.checked ? 'block' : 'none';
+            if (commentSettingsContainer) {
+                commentSettingsContainer.style.display = commentViewerToggle.checked ? 'flex' : 'none';
+            }
+            localStorage.setItem('savedCommentToggle', commentViewerToggle.checked);
+        });
+
+        // 座標保存
+        const savedCommentX = localStorage.getItem('savedCommentX');
+        const savedCommentY = localStorage.getItem('savedCommentY');
+        
+        // CSSを絶対配置に変更して元のボトム設定をリセット
+        commentViewerWrap.style.position = 'absolute';
+        commentViewerWrap.style.bottom = 'auto';
+        
+        if (savedCommentX && commentPosX) {
+            commentPosX.value = savedCommentX;
+            if (commentXVal) commentXVal.textContent = savedCommentX;
+            commentViewerWrap.style.left = `${savedCommentX}%`;
+            commentViewerWrap.style.transform = 'translate(-50%, -50%)';
+        } else {
+            // 初期値
+            commentViewerWrap.style.left = `95%`;
+            commentViewerWrap.style.transform = 'translate(-50%, -50%)';
+        }
+        if (savedCommentY && commentPosY) {
+            commentPosY.value = savedCommentY;
+            if (commentYVal) commentYVal.textContent = savedCommentY;
+            commentViewerWrap.style.top = `${savedCommentY}%`;
+        } else {
+            // 初期値
+            commentViewerWrap.style.top = `30%`;
+        }
+
+        if (commentPosX && commentPosY) {
+            commentPosX.addEventListener('input', () => {
+                commentViewerWrap.style.left = `${commentPosX.value}%`;
+                commentViewerWrap.style.transform = 'translate(-50%, -50%)';
+                if (commentXVal) commentXVal.textContent = commentPosX.value;
+                localStorage.setItem('savedCommentX', commentPosX.value);
+            });
+            commentPosY.addEventListener('input', () => {
+                commentViewerWrap.style.top = `${commentPosY.value}%`;
+                if (commentYVal) commentYVal.textContent = commentPosY.value;
+                localStorage.setItem('savedCommentY', commentPosY.value);
+            });
+        }
+    }
+
+    // 時計の表示機能
+    const clockToggle = document.getElementById('clock-toggle');
+    const clockSettingsContainer = document.getElementById('clock-settings-container');
+    const clockPosX = document.getElementById('clock-pos-x');
+    const clockPosY = document.getElementById('clock-pos-y');
+    const clockXVal = document.getElementById('clock-x-val');
+    const clockYVal = document.getElementById('clock-y-val');
+    const clockStyleSelect = document.getElementById('clock-style');
+    const streamClock = document.getElementById('stream-clock');
+    let clockInterval = null;
+
+    if (clockToggle && streamClock) {
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        let hasAnnouncedEnd = false;
+        const streamEndTimeInput = document.getElementById('stream-end-time');
+        const streamEndToggle = document.getElementById('stream-end-toggle');
+
+        // Restore saved stream end time
+        const savedEndTime = localStorage.getItem('savedStreamEndTime');
+        if (savedEndTime && streamEndTimeInput) {
+            streamEndTimeInput.value = savedEndTime;
+        }
+        
+        // Restore saved toggle state
+        const streamEndSettingsContainer = document.getElementById('stream-end-settings-container');
+        if (streamEndToggle) {
+            const savedEndToggle = localStorage.getItem('savedStreamEndToggle');
+            if (savedEndToggle !== null) {
+                streamEndToggle.checked = savedEndToggle === 'true';
+            }
+            if (streamEndSettingsContainer) {
+                streamEndSettingsContainer.style.display = streamEndToggle.checked ? 'flex' : 'none';
+            }
+            streamEndToggle.addEventListener('change', () => {
+                localStorage.setItem('savedStreamEndToggle', streamEndToggle.checked);
+                if (streamEndSettingsContainer) {
+                    streamEndSettingsContainer.style.display = streamEndToggle.checked ? 'flex' : 'none';
+                }
+            });
+        }
+        
+        // Restore saved text and wait time
+        const streamEndTextInput = document.getElementById('stream-end-text');
+        const streamEndWaitInput = document.getElementById('stream-end-wait');
+        const streamEndWaitVal = document.getElementById('stream-end-wait-val');
+        
+        if (streamEndTextInput) {
+            const savedText = localStorage.getItem('savedStreamEndText');
+            if (savedText) streamEndTextInput.value = savedText;
+            streamEndTextInput.addEventListener('change', () => {
+                localStorage.setItem('savedStreamEndText', streamEndTextInput.value);
+            });
+        }
+        
+        if (streamEndWaitInput) {
+            const savedWait = localStorage.getItem('savedStreamEndWait');
+            if (savedWait) {
+                streamEndWaitInput.value = savedWait;
+                if (streamEndWaitVal) streamEndWaitVal.textContent = savedWait;
+            }
+            streamEndWaitInput.addEventListener('input', () => {
+                if (streamEndWaitVal) streamEndWaitVal.textContent = streamEndWaitInput.value;
+                localStorage.setItem('savedStreamEndWait', streamEndWaitInput.value);
+            });
+        }
+
+        if (streamEndTimeInput) {
+            streamEndTimeInput.addEventListener('change', () => {
+                localStorage.setItem('savedStreamEndTime', streamEndTimeInput.value);
+                hasAnnouncedEnd = false; // Reset if time changed
+            });
+        }
+
+        const updateClock = () => {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const date = String(now.getDate()).padStart(2, '0');
+            const day = days[now.getDay()];
+            
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+            
+            streamClock.innerHTML = `
+                <div class="clock-date">${year}/${month}/${date} (${day})</div>
+                <div class="clock-time">${h}:${m}:${s}</div>
+            `;
+            
+            // 配信終了時刻のチェック
+            if (streamEndToggle && streamEndToggle.checked && streamEndTimeInput && streamEndTimeInput.value) {
+                if (!hasAnnouncedEnd && `${h}:${m}` === streamEndTimeInput.value) {
+                    hasAnnouncedEnd = true;
+                    
+                    const voiceText = (streamEndTextInput && streamEndTextInput.value) ? 
+                                      streamEndTextInput.value : 
+                                      "予定の時刻になりました。本日の配信はここまでとなります。見に来てくれてありがとうございました！";
+                                      
+                    queueVoicevoxAudio(voiceText, false).catch(e => console.warn(e));
+                    
+                    // 配信終了画面に切り替え (ボイス開始の少し後)
+                    setTimeout(() => {
+                        const endBtn = document.getElementById('overlay-end-btn');
+                        if (endBtn) endBtn.click();
+                    }, 5000);
+                    
+                    // APIで配信終了
+                    const waitSeconds = (streamEndWaitInput && streamEndWaitInput.value) ? parseInt(streamEndWaitInput.value) : 10;
+                    setTimeout(() => {
+                        if (youtubeWs && youtubeWs.readyState === WebSocket.OPEN) {
+                            console.log("Sending end_youtube_stream command...");
+                            const videoId = document.getElementById('youtube-video-input').value.trim();
+                            youtubeWs.send(JSON.stringify({ type: 'end_youtube_stream', videoId: videoId }));
+                        }
+                    }, waitSeconds * 1000);
+                }
+                // 翌日など再び時刻がずれたらフラグを戻す
+                if (hasAnnouncedEnd && `${h}:${m}` !== streamEndTimeInput.value) {
+                    hasAnnouncedEnd = false;
+                }
+            }
+        };
+
+        const savedClock = localStorage.getItem('savedClockToggle');
+        if (savedClock !== null) clockToggle.checked = savedClock === 'true';
+        
+
+        
+        const savedPosX = localStorage.getItem('savedClockPosX');
+        if (savedPosX !== null && clockPosX) {
+            clockPosX.value = savedPosX;
+            if (clockXVal) clockXVal.textContent = savedPosX;
+        }
+        
+        const savedPosY = localStorage.getItem('savedClockPosY');
+        if (savedPosY !== null && clockPosY) {
+            clockPosY.value = savedPosY;
+            if (clockYVal) clockYVal.textContent = savedPosY;
+        }
+        
+        const savedStyle = localStorage.getItem('savedClockStyle');
+        if (savedStyle && clockStyleSelect) clockStyleSelect.value = savedStyle;
+
+        const applyClockState = () => {
+            if (clockToggle.checked) {
+                streamClock.style.display = 'flex';
+                if (clockSettingsContainer) clockSettingsContainer.style.display = 'flex';
+                
+                // 位置とスタイルを更新
+                streamClock.className = 'stream-clock';
+                if (clockStyleSelect) streamClock.classList.add(`style-${clockStyleSelect.value}`);
+                
+                if (clockPosX && clockPosY) {
+                    const x = clockPosX.value;
+                    const y = clockPosY.value;
+                    streamClock.style.left = `${x}%`;
+                    streamClock.style.top = `${y}%`;
+                    streamClock.style.transform = `translate(-${x}%, -${y}%)`;
+                    
+                    // X座標に応じてテキストのアライメントを変更 (左寄りなら左揃え、右寄りなら右揃え)
+                    if (x < 33) streamClock.style.alignItems = 'flex-start';
+                    else if (x > 66) streamClock.style.alignItems = 'flex-end';
+                    else streamClock.style.alignItems = 'center';
+                }
+                
+                updateClock();
+                if (!clockInterval) clockInterval = setInterval(updateClock, 1000);
+            } else {
+                streamClock.style.display = 'none';
+                if (clockSettingsContainer) clockSettingsContainer.style.display = 'none';
+                if (clockInterval) {
+                    clearInterval(clockInterval);
+                    clockInterval = null;
+                }
+            }
+        };
+
+        applyClockState();
+
+        clockToggle.addEventListener('change', () => {
+            localStorage.setItem('savedClockToggle', clockToggle.checked);
+            applyClockState();
+        });
+        
+        if (clockPosX) {
+            clockPosX.addEventListener('input', () => {
+                if (clockXVal) clockXVal.textContent = clockPosX.value;
+                applyClockState();
+            });
+            clockPosX.addEventListener('change', () => {
+                localStorage.setItem('savedClockPosX', clockPosX.value);
+            });
+        }
+        
+        if (clockPosY) {
+            clockPosY.addEventListener('input', () => {
+                if (clockYVal) clockYVal.textContent = clockPosY.value;
+                applyClockState();
+            });
+            clockPosY.addEventListener('change', () => {
+                localStorage.setItem('savedClockPosY', clockPosY.value);
+            });
+        }
+        
+        if (clockStyleSelect) {
+            clockStyleSelect.addEventListener('change', () => {
+                localStorage.setItem('savedClockStyle', clockStyleSelect.value);
+                applyClockState();
+            });
+        }
     }
 
     // =====================================================================
@@ -2776,7 +3476,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const store = tx.objectStore(STORE_NAME);
                 const req = store.get('currentBGM');
                 req.onsuccess = () => resolve(req.result);
-                req.onerror = (e) => reject(e.target.error);
+                req.onerror = (e) => reject(req.error);
             });
         } catch (e) {
             console.error('BGM Load Error:', e);
@@ -2953,12 +3653,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (bgmPlayBtn) bgmPlayBtn.disabled = false;
                 if (bgmStopBtn) bgmStopBtn.disabled = false;
                 drawBgmWaveform(bgmBuffer);
+
+                // 準備ができたら自動再生を試みる
+                if (bgmPlayBtn) {
+                    setTimeout(() => {
+                        bgmPlayBtn.click();
+                    }, 100);
+                }
             } catch (error) {
                 console.error("BGM decode error on restore:", error);
                 if (bgmFileName) bgmFileName.textContent = "復元エラー";
             }
         }
     })();
+
+    // グローバルのunlockAudioで処理するため、個別のイベントリスナーは削除します。
 
     function stopBgm() {
         if (bgmSource) {
@@ -2978,7 +3687,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             if (bgmAudioContext.state === 'suspended') {
-                await bgmAudioContext.resume();
+                bgmAudioContext.resume().catch(e => console.warn("Autoplay blocked:", e));
             }
 
             stopBgm(); // 既に再生中なら停止
@@ -3240,7 +3949,8 @@ document.addEventListener('DOMContentLoaded', () => {
         thumbAiBgGenerateBtn.addEventListener('click', async () => {
             const apiKey = localStorage.getItem('savedAiApiKey');
             const provider = localStorage.getItem('savedAiProvider') || 'gemini';
-            const aiModel = localStorage.getItem('savedAiModel') || (provider === 'openai' ? 'dall-e-3' : 'gemini-2.0-flash-preview-image-generation');
+            // 強制的にImagenモデルを使用する
+            const aiModel = (provider === 'openai' ? 'dall-e-3' : 'imagen-3.0-generate-002');
 
             if (!apiKey) {
                 alert('AI設定タブでAPIキーを設定してください。');
@@ -3274,8 +3984,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const data = await res.json();
                     imageUrl = data.data[0].url;
                 } else {
-                    // Gemini Imagen
-                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${apiKey}`, {
+                    // Gemini 画像生成
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${aiModel}:generateContent?key=${apiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -3288,10 +3998,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         throw new Error(errData.error?.message || 'Gemini API Error');
                     }
                     const data = await res.json();
+                    console.log('Gemini Response:', data);
+
                     const parts = data.candidates?.[0]?.content?.parts || [];
-                    const imgPart = parts.find(p => p.inlineData);
-                    if (!imgPart) throw new Error('画像が返ってきませんでした');
-                    imageBase64 = `data:${imgPart.inlineData.mimeType};base64,${imgPart.inlineData.data}`;
+                    // 画像データ（inlineDataまたはfileData）を探す
+                    const imgPart = parts.find(p => p.inlineData || p.fileData);
+
+                    if (!imgPart) {
+                        // テキスト（プロンプト等）しか返ってこなかった場合のエラー案内
+                        const textPart = parts.find(p => p.text);
+                        const textMsg = textPart ? textPart.text : '不明なレスポンス';
+                        throw new Error('選択中のモデル（' + aiModel + '）は画像生成に対応していません。「imagen-3.0-generate-002」等の画像モデルを指定するか、OpenAI（DALL-E 3）をご利用ください。');
+                    }
+
+                    const mime = imgPart.inlineData?.mimeType || imgPart.fileData?.mimeType || 'image/png';
+                    const base64Data = imgPart.inlineData?.data || imgPart.fileData?.data;
+                    imageBase64 = `data:${mime};base64,${base64Data}`;
                 }
 
                 // 画像をキャッシュ
@@ -3805,8 +4527,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Browser Autoplay Policy: unlock audio context on first user click/touch/keypress
     const audioUnlockBanner = document.getElementById('audio-unlock-banner');
-    if (audioUnlockBanner && !isObsMode) {
-        audioUnlockBanner.style.display = 'block';
+    
+    if (!voicevoxAudioContext) {
+        voicevoxAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    const checkAndHideBanner = () => {
+        if (voicevoxAudioContext && voicevoxAudioContext.state === 'running') {
+            if (audioUnlockBanner) audioUnlockBanner.style.display = 'none';
+            return true;
+        }
+        return false;
+    };
+
+    // 初期状態で許可されているかチェック
+    if (!isObsMode && !checkAndHideBanner()) {
+        if (audioUnlockBanner) audioUnlockBanner.style.display = 'block';
+        
+        // 許可されていない場合は、少しだけresumeを試みてみる（ブラウザによって挙動が違うため）
+        voicevoxAudioContext.resume().then(() => {
+            checkAndHideBanner();
+        }).catch(e => console.warn("Auto resume blocked:", e));
     }
 
     const unlockAudio = () => {
@@ -3814,17 +4555,20 @@ document.addEventListener('DOMContentLoaded', () => {
             voicevoxAudioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
         if (voicevoxAudioContext.state === 'suspended') {
-            voicevoxAudioContext.resume().then(() => {
-                console.log('[VOICEVOX] AudioContext successfully resumed/unlocked via user interaction! State:', voicevoxAudioContext.state);
-                if (audioUnlockBanner) audioUnlockBanner.style.display = 'none';
-            }).catch(e => {
-                console.error('[VOICEVOX] Failed to resume AudioContext on gesture:', e);
-            });
-        } else {
-            if (audioUnlockBanner) audioUnlockBanner.style.display = 'none';
+            voicevoxAudioContext.resume().catch(e => console.warn("voicevox auto resume:", e));
         }
+        
+        if (typeof bgmAudioContext !== 'undefined' && bgmAudioContext && bgmAudioContext.state === 'suspended') {
+            bgmAudioContext.resume().catch(e => console.warn("bgm auto resume:", e));
+        }
+
+        setTimeout(() => {
+            checkAndHideBanner();
+        }, 100);
     };
-    window.addEventListener('click', unlockAudio, { once: true });
-    window.addEventListener('touchend', unlockAudio, { once: true });
-    window.addEventListener('keydown', unlockAudio, { once: true });
+    
+    // イベントリスナーは常に追加しておき、何度でもリトライできるようにする
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('touchend', unlockAudio);
+    window.addEventListener('keydown', unlockAudio);
 });

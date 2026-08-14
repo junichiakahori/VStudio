@@ -12,16 +12,16 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- 音声ロック解除用警告バナー -->
-        <div id="audio-unlock-banner" style="display:none; position:fixed; top:20px; left:50%; transform:translateX(-50%); background:rgba(255, 68, 68, 0.95); color:#fff; padding:12px 24px; border-radius:30px; font-weight:bold; font-size:0.85rem; z-index:9999; box-shadow:0 8px 25px rgba(0,0,0,0.4); cursor:pointer; pointer-events:auto; border:2px solid #fff; font-family:'Noto Sans JP', sans-serif; letter-spacing: 0.5px;">
-            🔊 画面をどこでもクリックして、音声（VOICEVOX）を有効にしてください！
-        </div>
+        <!-- 音声ロック解除用警告バナー（移動済み） -->
         <div class="avatar-viewport" id="avatar-viewport">
             <div class="background-layer" id="background-layer"></div>
+            <div class="stream-clock" id="stream-clock" style="display:none;">00:00</div>
+            <div class="stream-stats" id="stream-stats" style="display:none;">
+                <div class="stat-item"><span class="stat-icon">👤</span><span id="stat-subscribers">-</span></div>
+                <div class="stat-item"><span class="stat-icon">👁️</span><span id="stat-viewers">-</span></div>
+                <div class="stat-item"><span class="stat-icon">💬</span><span id="stat-comments">0</span></div>
+            </div>
             <canvas id="live2d-canvas"></canvas>
-            <button class="floating-toggle-btn" id="toggle-panel-btn">
-                <span class="btn-icon">👁️</span><span id="toggle-panel-text">全画面</span>
-            </button>
             <div class="comment-viewer" id="comment-viewer"></div>
             <div class="camera-preview-container" id="camera-preview-container">
                 <video id="webcam" autoplay playsinline></video>
@@ -35,6 +35,10 @@
             <div class="overlay-screen" id="stream-overlay"></div>
         </div>
         <div class="control-panel" id="control-panel">
+            <!-- 音声ロック解除用警告バナー（コントロールパネル内） -->
+            <div id="audio-unlock-banner" style="display:none; background:rgba(255, 68, 68, 0.2); color:#ff6b6b; padding:10px 15px; border-radius:6px; font-weight:bold; font-size:0.8rem; cursor:pointer; border:1px solid #ff6b6b; margin: 15px 15px 0 15px; text-align:center; animation: pulse 2s infinite;">
+                🔊 ここをクリックして、音声（VOICEVOXやBGM）を有効化
+            </div>
             <div class="panel-header">
                 <h2>Live2D Studio</h2>
                 <p>リアルタイム Live2D アバター</p>
@@ -60,7 +64,72 @@
                 <div class="control-group" style="display: flex; flex-direction: row; gap: 10px;">
                     <button class="btn" id="overlay-prep-btn" style="flex:1; background:var(--panel-bg); border:1px solid var(--border-neon); color:var(--text-primary);">配信準備中</button>
                     <button class="btn" id="overlay-afk-btn" style="flex:1; background:var(--panel-bg); border:1px solid var(--border-neon); color:var(--text-primary);">離席中</button>
+                    <button class="btn" id="overlay-end-btn" style="flex:1; background:var(--panel-bg); border:1px solid var(--border-neon); color:var(--text-primary);">配信終了</button>
                     <button class="btn" id="overlay-clear-btn" style="flex:1; background:var(--danger, #ff4444); color:#fff; border:none;">解除</button>
+                </div>
+                <div class="control-group" style="margin-top:10px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap:10px;">
+                    <label class="switch-label" style="flex:1;">
+                        <span style="font-size: 0.8rem;">指定時刻に自動終了</span>
+                        <input type="checkbox" id="stream-end-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <input type="time" id="stream-end-time" style="background:#1a1a2e; border:1px solid var(--border-neon); border-radius:4px; padding:0.3rem; color:#fff; font-size:0.9rem; width:110px;">
+                </div>
+                <div id="stream-end-settings-container" style="display:none; flex-direction:column; gap:5px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px; margin-bottom:10px;">
+                    <label style="font-size: 0.8rem; color: var(--text-muted);">終了宣言ボイス</label>
+                    <input type="text" id="stream-end-text" value="本日の配信はこれにて終了します。ありがとうございました！" style="width:100%; padding:0.4rem; border-radius:4px; border:1px solid var(--border-neon); background:#1a1a2e; color:#fff; font-size:0.8rem;">
+                    
+                    <label style="font-size: 0.8rem; color: var(--text-muted); margin-top:5px;">API終了までの待機時間: <span id="stream-end-wait-val">10</span>秒</label>
+                    <input type="range" id="stream-end-wait" min="0" max="60" value="10" style="width:100%;">
+                </div>
+                <div class="control-group" style="margin-top:10px; display: flex; flex-direction: column; gap: 8px;">
+                    <label class="switch-label">
+                        <span>時計を画面に表示する</span>
+                        <input type="checkbox" id="clock-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <div id="clock-settings-container" style="display:none; flex-direction:column; gap:5px; margin-top:5px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px; margin-bottom: 5px;">
+                        <label style="font-size: 0.8rem; color: var(--text-primary); font-weight: bold;">[ 時計の表示設定 ]</label>
+                        <label style="font-size: 0.8rem; color: var(--text-muted);">X座標 (左右): <span id="clock-x-val">95</span>%</label>
+                        <input type="range" id="clock-pos-x" min="0" max="100" value="95" style="width:100%;">
+                        
+                        <label style="font-size: 0.8rem; color: var(--text-muted); margin-top:5px;">Y座標 (上下): <span id="clock-y-val">5</span>%</label>
+                        <input type="range" id="clock-pos-y" min="0" max="100" value="5" style="width:100%;">
+                        
+                        <label style="font-size: 0.8rem; color: var(--text-muted); margin-top:5px;">デザインスタイル:</label>
+                        <select id="clock-style" style="width:100%; background:#1a1a2e; border:1px solid var(--border-neon); border-radius:4px; padding:0.3rem; color:#fff; font-size:0.8rem;">
+                            <option value="neon">サイバーネオン</option>
+                            <option value="minimal">シンプル/ミニマル</option>
+                            <option value="retro">レトロデジタル</option>
+                            <option value="pop">ポップキュート</option>
+                        </select>
+                    </div>
+
+                    <label class="switch-label">
+                        <span>配信の統計情報を表示する</span>
+                        <input type="checkbox" id="stats-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <div id="stats-settings-container" style="display:none; flex-direction:column; gap:5px; margin-top:5px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px; margin-bottom: 5px;">
+                        <label style="font-size: 0.8rem; color: var(--text-primary); font-weight: bold;">[ 統計パネルの位置設定 ]</label>
+                        <label style="font-size: 0.8rem; color: var(--text-muted);">X座標 (左右): <span id="stats-x-val">95</span>%</label>
+                        <input type="range" id="stats-pos-x" min="0" max="100" value="95" style="width:100%;">
+                        <label style="font-size: 0.8rem; color: var(--text-muted); margin-top:5px;">Y座標 (上下): <span id="stats-y-val">15</span>%</label>
+                        <input type="range" id="stats-pos-y" min="0" max="100" value="15" style="width:100%;">
+                    </div>
+                    
+                    <label class="switch-label">
+                        <span>コメントを画面に表示する</span>
+                        <input type="checkbox" id="comment-viewer-toggle" checked>
+                        <span class="slider round"></span>
+                    </label>
+                    <div id="comment-settings-container" style="display:none; flex-direction:column; gap:5px; margin-top:5px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px;">
+                        <label style="font-size: 0.8rem; color: var(--text-primary); font-weight: bold;">[ コメントパネルの位置設定 ]</label>
+                        <label style="font-size: 0.8rem; color: var(--text-muted);">X座標 (左右): <span id="comment-x-val">95</span>%</label>
+                        <input type="range" id="comment-pos-x" min="0" max="100" value="95" style="width:100%;">
+                        <label style="font-size: 0.8rem; color: var(--text-muted); margin-top:5px;">Y座標 (上下): <span id="comment-y-val">30</span>%</label>
+                        <input type="range" id="comment-pos-y" min="0" max="100" value="30" style="width:100%;">
+                    </div>
                 </div>
             </div>
             <div class="panel-section">
@@ -244,6 +313,23 @@
                     </div>
                     <div id="youtube-status" style="font-size:0.72rem;margin-top:0.5rem;color:var(--text-muted);">未接続</div>
                 </div>
+                
+                <!-- YouTube OAuth Settings -->
+                <div class="control-group" style="margin-top:10px; border: 1px solid rgba(255, 255, 255, 0.1); padding: 10px; border-radius: 6px;">
+                    <label style="display:block;margin-bottom:0.5rem;font-size:0.8rem;color:var(--text-muted);">[開発者用] YouTube Data API 連携</label>
+                    <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                        <input type="text" id="youtube-oauth-client-id" placeholder="OAuth 2.0 クライアント ID" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.75rem;outline:none;">
+                        <input type="text" id="youtube-api-key" placeholder="API キー" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.75rem;outline:none;">
+                        <div style="display:flex;gap:0.5rem;">
+                            <button id="youtube-oauth-login-btn" class="btn" style="flex:1;background:var(--primary);color:#000;border:none;border-radius:6px;padding:0.4rem;font-weight:bold;cursor:pointer;font-size:0.75rem;">Google でログイン</button>
+                            <button id="youtube-oauth-logout-btn" class="btn" style="flex:1;background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:0.4rem;font-weight:bold;cursor:pointer;font-size:0.75rem;display:none;">ログアウト</button>
+                        </div>
+                        <div id="youtube-oauth-status" style="font-size:0.7rem;color:var(--text-muted);">未認証</div>
+                    </div>
+                </div>
+                <div class="control-group" style="margin-top:5px; text-align:right;">
+                    <button id="clear-comments-btn" class="btn" style="background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:0.3rem 0.8rem;font-size:0.75rem;cursor:pointer;">履歴・統計をリセット</button>
+                </div>
                 <div class="control-group">
                     <label class="switch-label">
                         <span>VOICEVOX 読み上げ</span>
@@ -267,6 +353,34 @@
                         <input type="checkbox" id="idle-speech-toggle" checked>
                         <span class="slider round"></span>
                     </label>
+                </div>
+                <div class="control-group" style="margin-top:8px; display:flex; gap:8px;">
+                    <div style="flex:1;">
+                        <label style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:3px;">一人称</label>
+                        <select id="idle-first-person" style="width:100%; background:rgba(0,0,0,0.3); border:1px solid var(--border-neon); border-radius:6px; padding:0.35rem; color:var(--text-muted); font-size:0.78rem; outline:none; cursor:pointer;">
+                            <option value="わたし">わたし</option>
+                            <option value="私">私</option>
+                            <option value="あたし">あたし</option>
+                            <option value="ぼく">ぼく</option>
+                            <option value="僕">僕</option>
+                            <option value="おれ">おれ</option>
+                            <option value="俺">俺</option>
+                            <option value="うち">うち</option>
+                        </select>
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:3px;">二人称（視聴者呼称）</label>
+                        <select id="idle-second-person" style="width:100%; background:rgba(0,0,0,0.3); border:1px solid var(--border-neon); border-radius:6px; padding:0.35rem; color:var(--text-muted); font-size:0.78rem; outline:none; cursor:pointer;">
+                            <option value="みんな">みんな</option>
+                            <option value="あなた">あなた</option>
+                            <option value="君">君</option>
+                            <option value="きみ">きみ</option>
+                            <option value="お前">お前</option>
+                            <option value="リスナー">リスナー</option>
+                            <option value="リスナーさん">リスナーさん</option>
+                            <option value="視聴者さん">視聴者さん</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="control-group" style="margin-top:10px;">
                     <label class="switch-label">
@@ -555,7 +669,7 @@
     <script src="live2dcubismcore.min.js"></script>
     <!-- pixi-live2d-display v0.4 -->
     <script src="pixi-live2d-display.min.js"></script>
-    <script src="idle_phrases.js?v=3.46"></script>
-    <script src="live2d-app.js?v=3.46"></script>
+    <script src="idle_phrases.js?v=3.47"></script>
+    <script src="live2d-app.js?v=3.47"></script>
 </body>
 </html>
