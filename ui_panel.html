@@ -153,6 +153,14 @@
                     </div>
                     <button class="btn" id="open-thumb-editor-btn" style="width:100%; background:var(--primary); color:#000; font-weight:bold;">🖼️ サムネイルエディタを開く</button>
                 </div>
+                <div class="control-group" style="margin-top: 10px;">
+                    <p style="font-size: 0.8rem; font-weight: bold; color: var(--text-primary); margin: 0 0 5px;">🤖 AI生成用の詳細設定</p>
+                    <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 3px;">SNSリンク (任意)</label>
+                    <input type="text" id="ai-stream-sns" placeholder="例：X: https://x.com/myname" style="width:100%; padding:0.4rem; border-radius:4px; border:1px solid var(--border-neon); background:#1a1a2e; color:#fff; font-size:0.8rem; margin-bottom:0.5rem; box-sizing:border-box;">
+                    
+                    <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 3px;">クレジット・素材表記 (任意)</label>
+                    <textarea id="ai-stream-credits" placeholder="例：BGM: 魔王魂" rows="2" style="width:100%; padding:0.4rem; border-radius:4px; border:1px solid var(--border-neon); background:#1a1a2e; color:#fff; font-size:0.8rem; resize:vertical; box-sizing:border-box;"></textarea>
+                </div>
             </div>
             <div class="panel-section" data-tab="tab-avatar">
                 <h3><span class="icon">🎙️</span>表情と連動</h3>
@@ -410,6 +418,16 @@
                             <button id="radio-script-play-btn" class="btn" style="flex:1; background:#0f0;color:#000;border:none;border-radius:6px;padding:0.4rem;font-weight:bold;cursor:pointer;font-size:0.75rem;">▶️ ラジオ自動再生を開始</button>
                             <button id="radio-script-stop-btn" class="btn" style="display:none; flex:1; background:#f00;color:#fff;border:none;border-radius:6px;padding:0.4rem;font-weight:bold;cursor:pointer;font-size:0.75rem;">⏹ 停止</button>
                         </div>
+                        <div style="display:flex; flex-direction:column; gap:5px; margin-top:5px; padding-top:5px; border-top:1px solid rgba(255,255,255,0.1);">
+                            <div style="display:flex; align-items:center; gap:5px;">
+                                <input type="text" id="radio-pool-test-input" placeholder="テストコメントの内容" value="手動テストコメントです！" style="flex:1; background:rgba(0,0,0,0.3); border:1px solid var(--border-neon); border-radius:4px; padding:0.3rem; color:#fff; font-size:0.7rem; outline:none;">
+                            </div>
+                            <div style="display:flex; align-items:center; gap:5px;">
+                                <span style="font-size:0.7rem; color:var(--text-muted); white-space:nowrap;">プール: <strong id="radio-pool-count" style="color:#0f0;">0</strong>件</span>
+                                <button id="radio-pool-test-btn" class="btn" style="flex:1; background:var(--secondary);color:#fff;border:1px solid var(--border-neon);border-radius:6px;padding:0.3rem;font-size:0.7rem;cursor:pointer;">💬 追加</button>
+                                <button id="radio-pool-clear-btn" class="btn" style="flex:1; background:rgba(255,50,50,0.3);color:#fff;border:1px solid var(--border-neon);border-radius:6px;padding:0.3rem;font-size:0.7rem;cursor:pointer;">🗑 クリア</button>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- ローカル時刻での自動開始UI -->
@@ -485,6 +503,26 @@
                     <label style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;display:block;">システムプロンプト (キャラ設定)</label>
                     <textarea id="ai-system-prompt" rows="4" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.8rem;outline:none;margin-top:0.3rem;box-sizing:border-box;resize:vertical;">あなたは元気で明るい女の子のVTuberです。視聴者からのコメントに対して、タメ口で親しみやすく返答してください。「文字」や「制限」などのAIの設定に関する言葉は絶対に口に出さないでください。
 【重要】もし質問の答えを知らない場合や最新情報が必要な場合は、推測ではぐらかさずに「[search] 調べたいキーワード」だけを返答してください。例: [search] ドル円 現在</textarea>
+                </div>
+            </div>
+
+            <div class="panel-section" data-tab="tab-audio">
+                <h3><span class="icon">📰</span>ニュース番組モード</h3>
+                <div class="control-group">
+                    <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:0.3rem;">ニュースRSSのURL</label>
+                    <input type="text" id="news-rss-url" value="https://www.nhk.or.jp/rss/news/cat0.xml" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-primary);font-size:0.75rem;outline:none;box-sizing:border-box;">
+                    <p style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;">デフォルトはNHKニュース。他のRSS URLも指定可能です。（※サイトによって取得できない場合があります）</p>
+                </div>
+                <div class="control-group" style="margin-top:10px;">
+                    <button class="btn" id="news-fetch-btn" style="width:100%; background:#6c5ce7; color:#fff; font-weight:bold; padding:0.6rem; border-radius:6px; border:none; cursor:pointer; font-size:0.85rem;">✨ 今すぐ最新ニュースを読んで感想を言う</button>
+                </div>
+                <div class="control-group" style="margin-top:15px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.1);">
+                    <label class="switch-label">
+                        <span>連続ニュース速報モード</span>
+                        <input type="checkbox" id="news-continuous-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <p style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;">オンにすると、記事を連続で読み上げます。指定時刻に自動終了が設定されている場合、終了1分前に自動で締めの挨拶を行います。</p>
                 </div>
             </div>
 
@@ -725,6 +763,11 @@
 
                 <div style="flex: 1;"></div>
                 
+                <div class="control-group">
+                    <label style="font-size: 0.85rem; color:var(--text-muted); display:block; margin-bottom:5px;">保存ファイル名 (.png)</label>
+                    <input type="text" id="thumb-filename-input" placeholder="thumbnail" style="width:100%; padding:0.5rem; border-radius:4px; border:1px solid var(--border-neon); background:#1a1a2e; color:#fff; box-sizing:border-box;">
+                </div>
+
                 <div class="modal-actions" style="margin-top:10px; flex-direction:column; gap:10px;">
                     <button id="thumb-download-btn" class="btn" style="width:100%; background:var(--primary); color:#000; font-weight:bold;">🖼️ 画像をダウンロード</button>
                     <button id="thumb-editor-cancel-btn" class="btn" style="width:100%; background:var(--panel-bg); border:1px solid var(--border-neon); color:var(--text-primary);">閉じる</button>
@@ -760,7 +803,8 @@
                 </table>
             </div>
 
-            <div class="modal-actions" style="margin-top: 15px; justify-content: flex-end;">
+            <div class="modal-actions" style="margin-top: 15px; justify-content: flex-end; gap: 10px;">
+                <button id="cache-editor-clear-all-btn" class="btn" style="background: rgba(255,50,50,0.3); border: 1px solid var(--border-neon); color: var(--text-primary);">すべて削除 (一括クリア)</button>
                 <button id="cache-editor-close-btn" class="btn" style="background: var(--panel-bg); border: 1px solid var(--border-neon); color: var(--text-primary);">閉じる</button>
             </div>
         </div>
@@ -788,7 +832,10 @@
                             <input id="radio-config-title" type="text" placeholder="例：とろろのまったりラジオ" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-neon); border-radius: 4px; padding: 4px 8px; color: var(--text-primary); font-size: 0.85rem; outline: none;">
                         </div>
                         <div>
-                            <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 3px;">今回のテーマ（フリートークのお題）</label>
+                            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px;">
+                                <label style="font-size: 0.75rem; color: var(--text-muted); display: block;">今回のテーマ（フリートークのお題）</label>
+                                <button id="ai-generate-theme-btn" style="background: var(--bg-surface); border: 1px solid var(--border-neon); color: var(--text-primary); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; cursor: pointer; transition: 0.2s;">✨ AIにおまかせ生成</button>
+                            </div>
                             <input id="radio-config-theme" type="text" placeholder="例：最近あった小さな幸せ" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-neon); border-radius: 4px; padding: 4px 8px; color: var(--text-primary); font-size: 0.85rem; outline: none;">
                         </div>
                     </div>
@@ -914,13 +961,32 @@
             <button id="radio-script-generate-btn" class="btn" style="width: 100%; background: #6c5ce7; color: #fff; font-weight: bold; margin-bottom: 10px;">✨ AIに台本とSEを自動生成させる</button>
             <div id="radio-script-loading" style="display:none; font-size:0.8rem; color:var(--text-muted); text-align:center; margin-bottom:10px;">生成中...（しばらくお待ちください）</div>
 
+            <div style="background: rgba(0, 255, 255, 0.1); border: 1px solid var(--primary); border-radius: 6px; padding: 10px; margin-bottom: 10px; font-size: 0.8rem; color: var(--text-primary); line-height: 1.4;">
+                <strong>💡 手動編集時に使える特殊タグ</strong><br>
+                以下のタグを1行のみで記述すると、特別な動作をします。<br>
+                <span style="color: #00ffff;">[SE: 〇〇]</span> - 指定した効果音(seフォルダ内のファイル名)を再生します。<br>
+                <span style="color: #ff9900;">[ラジオ一時停止: コメント返し]</span> - 台本の読み上げを一時停止し、3分間AIがリスナーのコメントに返信するフリートークモードになります（終了後、自動で台本を再開します）。
+            </div>
+
             <div style="display: flex; gap: 10px; width: 100%; margin-bottom: 10px;">
                 <div style="flex: 1; display: flex; flex-direction: column;">
-                    <label style="font-size: 0.85rem; color: var(--text-primary); margin-bottom: 5px;">表示・字幕用台本（漢字混じり）</label>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <label style="font-size: 0.85rem; color: var(--text-primary);">表示・字幕用台本（漢字混じり）</label>
+                        <div style="display: flex; gap: 5px; align-items: center;">
+                            <select id="radio-script-se-select" style="background: rgba(0,0,0,0.5); border: 1px solid var(--border-neon); color: #fff; font-size: 0.75rem; border-radius: 4px; padding: 2px;">
+                                <option value="">(SE読込中...)</option>
+                            </select>
+                            <button id="radio-script-se-play-btn" class="btn" style="background: var(--info, #0097e6); color: #fff; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;" title="選択したSEを再生">▶️</button>
+                            <button id="radio-script-se-insert-btn" class="btn" style="background: var(--primary); color: #000; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;" title="カーソル位置にSEタグを挿入">📥 挿入</button>
+                        </div>
+                    </div>
                     <textarea id="radio-script-textarea" rows="15" placeholder="ここに台本が生成されます。1行が1セリフとして順番に処理されます。&#10;例:&#10;こんにちは！ [SE: 大勢で拍手]&#10;今日の話題は〇〇です。" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-neon); border-radius: 6px; padding: 0.5rem; color: var(--text-primary); outline: none; font-size: 0.9rem; resize: vertical;"></textarea>
                 </div>
                 <div style="flex: 1; display: flex; flex-direction: column;">
-                    <label style="font-size: 0.85rem; color: var(--text-primary); margin-bottom: 5px;">読み上げ用台本（ひらがなのみ）</label>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <label style="font-size: 0.85rem; color: var(--text-primary);">読み上げ用台本（ひらがなのみ）</label>
+                        <button id="radio-script-fix-yomi-btn" class="btn" style="background: var(--primary); color: #000; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">✨ 漢字を自動修正</button>
+                    </div>
                     <textarea id="radio-script-yomi-textarea" rows="15" placeholder="ここにVOICEVOXに読み上げさせるための「ひらがな台本」が表示されます。&#10;例:&#10;こんにちは！ [SE: 大勢で拍手]&#10;きょうのわだいは、まるまるです。" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-neon); border-radius: 6px; padding: 0.5rem; color: var(--text-primary); outline: none; font-size: 0.9rem; resize: vertical;"></textarea>
                 </div>
             </div>

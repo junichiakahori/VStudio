@@ -301,75 +301,93 @@ async def start_youtube_client(video_id: str, websocket):
         logging.error(f"Error scraping initial history: {e}")
     # ----------------------------------
 
-    try:
-        loop = asyncio.get_event_loop()
-        chat = await loop.run_in_executor(None, lambda: pytchat.create(video_id=video_id, interruptable=False))
-        if not chat.is_alive():
-            raise Exception("Chat is not alive. Invalid Video ID or not a live stream.")
-    except Exception as e:
-        logging.error(f"Failed to start YouTube client: {e}")
-        await broadcast_to_clients({
-            "type": "status",
-            "status": "error",
-            "message": "接続エラー: 無効な動画IDか、ライブ配信ではありません"
-        })
-        return
-
     await broadcast_to_clients({
         "type": "status",
-        "status": "connected",
-        "message": f"Connected to YouTube Live (ID: {video_id})"
+        "status": "waiting",
+        "message": f"Connecting to YouTube (ID: {video_id})..."
     })
 
-    async def fetch_chat(local_chat):
-        global recent_comments, comment_history
+    async def fetch_chat():
+        global recent_comments, comment_history, chat_task, current_video_id
+        local_chat = None
         try:
             loop = asyncio.get_event_loop()
-            while local_chat.is_alive() and chat_task is not None:
-                chat_data = await loop.run_in_executor(None, local_chat.get)
-                for c in chat_data.sync_items():
-                    comment_sig = f"{c.author.name}:{c.message}"
-                    if comment_sig in recent_comments:
+            while chat_task is not None and current_video_id == video_id:
+                if local_chat is None or not local_chat.is_alive():
+                    try:
+                        import httpx
+                        local_chat = await loop.run_in_executor(None, lambda: pytchat.create(video_id=video_id, interruptable=False, client=httpx.Client(http2=False)))
+                        if local_chat.is_alive():
+                            await broadcast_to_clients({
+                                "type": "status",
+                                "status": "connected",
+                                "message": f"Connected to YouTube Live (ID: {video_id})"
+                            })
+                        else:
+                            await broadcast_to_clients({
+                                "type": "status",
+                                "status": "waiting",
+                                "message": f"待機中... 配信開始またはチャットの有効化を待っています (ID: {video_id})"
+                            })
+                    except Exception as e:
+                        logging.warning(f"pytchat creation failed (might not be live yet): {e}")
+                        local_chat = None
+                        await broadcast_to_clients({
+                            "type": "status",
+                            "status": "waiting",
+                            "message": f"待機中... 配信開始またはチャットの有効化を待っています (ID: {video_id})"
+                        })
+                    
+                    if local_chat is None or not local_chat.is_alive():
+                        await asyncio.sleep(15) # 15秒ごとに再試行
                         continue
-                    
-                    recent_comments.append(comment_sig)
-                    if len(recent_comments) > 100:
-                        recent_comments.pop(0)
 
-                    logging.info(f"[YouTube] {c.author.name}: {c.message}")
-                    
-                    # You can also handle SuperChats here by checking c.amountValue
-                    if c.amountValue > 0:
-                        logging.info(f"[SuperChat] {c.author.name} sent {c.amountString}")
+                try:
+                    chat_data = await loop.run_in_executor(None, local_chat.get)
+                    for c in chat_data.sync_items():
+                        comment_sig = f"{c.author.name}:{c.message}"
+                        if comment_sig in recent_comments:
+                            continue
+                        
+                        recent_comments.append(comment_sig)
+                        if len(recent_comments) > 100:
+                            recent_comments.pop(0)
+
+                        logging.info(f"[YouTube] {c.author.name}: {c.message}")
+                        
+                        if c.amountValue > 0:
+                            logging.info(f"[SuperChat] {c.author.name} sent {c.amountString}")
+                            msg = {
+                                "type": "gift",
+                                "nickname": c.author.name,
+                                "amount": c.amountString,
+                                "iconUrl": c.author.imageUrl
+                            }
+                            comment_history.append(msg)
+                            if len(comment_history) > 100: comment_history.pop(0)
+                            await broadcast_to_clients(msg)
+                        
                         msg = {
-                            "type": "gift",
+                            "type": "comment",
                             "nickname": c.author.name,
-                            "amount": c.amountString,
+                            "comment": c.message,
                             "iconUrl": c.author.imageUrl
                         }
                         comment_history.append(msg)
                         if len(comment_history) > 100: comment_history.pop(0)
                         await broadcast_to_clients(msg)
                     
-                    msg = {
-                        "type": "comment",
-                        "nickname": c.author.name,
-                        "comment": c.message,
-                        "iconUrl": c.author.imageUrl
-                    }
-                    comment_history.append(msg)
-                    if len(comment_history) > 100: comment_history.pop(0)
-                    await broadcast_to_clients(msg)
-                
-                await asyncio.sleep(1) # wait 1 second before polling again
+                    await asyncio.sleep(1) # wait 1 second before polling again
+                except Exception as e:
+                    logging.error(f"Chat fetch error: {e}")
+                    local_chat = None # エラー時は次回ループで再接続
+                    await asyncio.sleep(5)
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            logging.error(f"Chat fetch error: {e}")
-        finally:
-            pass
+            logging.error(f"Chat loop fatal error: {e}")
 
-    chat_task = asyncio.create_task(fetch_chat(chat))
+    chat_task = asyncio.create_task(fetch_chat())
     global stats_task
     stats_task = asyncio.create_task(fetch_stats(video_id))
 

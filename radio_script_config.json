@@ -1,12 +1,12 @@
 {
     "program_title": "とろろのまったりラジオ",
-    "program_theme": "最近あった小さな幸せ",
+    "program_theme": "早起きは三文の徳？朝7時のテンションと葛藤",
     "personality": {
-        "name": "とろろ",
+        "name": "AI Vtuber とろろ",
         "greeting_opening": "",
         "greeting_closing": "",
-        "start_time": "22:00",
-        "end_time": "23:00",
+        "start_time": "07:00",
+        "end_time": "08:00",
         "broadcast_date": ""
     },
     "se_allowed": [

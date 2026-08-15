@@ -201,6 +201,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let isVoicevoxEnabled = false;
     let voicevoxAudioQueue = [];
     let isVoicevoxPlaying = false;
+    let radioCommentQueue = [];
+
+    function queueCommentAudio(text) {
+        const radioModeToggle = document.getElementById('ai-radio-mode-toggle');
+        const isRadioMode = radioModeToggle && radioModeToggle.checked;
+        if (isRadioMode && radioModeState.currentPhase !== 'waiting_for_comments') {
+            radioCommentQueue.push(text);
+            console.log(`[ラジオモード] コメントをプールに保存しました: ${text}`);
+        } else {
+            queueVoicevoxAudio(text).catch(e => console.warn(e));
+        }
+    }
 
     // ラジオモードの進行状態管理
     let radioModeState = {
@@ -1689,6 +1701,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     console.log(`[ラジオモード] 手動/スケジュールトリガーにより台本読み上げ開始。全${radioModeState.scriptLines.length}行 (開始行: ${startIdx + 1})`);
 
+                    // BGMを最初から再生し直す
+                    const bgmPlayBtnRef = document.getElementById('bgm-play-btn');
+                    if (bgmPlayBtnRef && (typeof bgmBuffer !== 'undefined') && bgmBuffer) {
+                        console.log('[ラジオモード] BGMを最初から再生し直します');
+                        bgmPlayBtnRef.click();
+                    }
+
                     if (typeof triggerIdleSpeech === 'function') {
                         triggerIdleSpeech();
                     }
@@ -1716,6 +1735,58 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearIdleTimer();
             }
             console.log('[ラジオモード] 再生を停止しました。');
+            console.log('[ラジオモード] 再生を停止しました。');
+        });
+    }
+
+    const radioPoolTestBtn = document.getElementById('radio-pool-test-btn');
+    const radioPoolClearBtn = document.getElementById('radio-pool-clear-btn');
+    const radioPoolCount = document.getElementById('radio-pool-count');
+
+    // プール件数を定期的に更新
+    setInterval(() => {
+        if (radioPoolCount && typeof radioCommentQueue !== 'undefined') {
+            radioPoolCount.textContent = radioCommentQueue.length;
+        }
+    }, 1000);
+
+    if (radioPoolTestBtn) {
+        radioPoolTestBtn.addEventListener('click', () => {
+            if (typeof queueCommentAudio === 'function') {
+                const nickname = "テスト";
+                const inputEl = document.getElementById('radio-pool-test-input');
+                const comment = inputEl && inputEl.value.trim().length > 0 ? inputEl.value.trim() : "手動テストコメントです！";
+                
+                // コメントを画面のビューアーにも表示する
+                if (typeof addCommentToViewer === 'function') {
+                    addCommentToViewer(nickname, comment, 'youtube', false, '');
+                }
+
+                // コメント自体を読み上げキューへ（通常フローと同じ）
+                queueCommentAudio(`${nickname}さん、${comment}`);
+                
+                // AI返答の生成をトリガー（通常フローと同じ）
+                if (typeof generateAIResponse === 'function') {
+                    const aiApiKeyInput = document.getElementById('ai-api-key');
+                    const isAiReplyEnabled = document.getElementById('ai-reply-toggle')?.checked;
+                    if (isAiReplyEnabled && aiApiKeyInput && aiApiKeyInput.value.trim().length > 0) {
+                        generateAIResponse(nickname, comment);
+                        console.log('[ラジオモード] テストコメントとAI返信生成をリクエストしました');
+                    } else {
+                        console.log('[ラジオモード] テストコメントを追加しました (AI返信はOFFです)');
+                    }
+                }
+            }
+        });
+    }
+
+    if (radioPoolClearBtn) {
+        radioPoolClearBtn.addEventListener('click', () => {
+            if (typeof radioCommentQueue !== 'undefined') {
+                radioCommentQueue = [];
+                if (radioPoolCount) radioPoolCount.textContent = 0;
+                console.log('[ラジオモード] コメントプールをクリアしました。');
+            }
         });
     }
 
@@ -1846,9 +1917,90 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if (radioScriptBtn && radioScriptModal) {
+        let seListLoaded = false;
         radioScriptBtn.addEventListener('click', () => {
             radioScriptModal.style.display = 'flex';
+            if (!seListLoaded) {
+                const seSelect = document.getElementById('radio-script-se-select');
+                if (seSelect) {
+                    fetch('http://localhost:8001/se_list')
+                        .then(r => r.ok ? r.json() : null)
+                        .then(data => {
+                            if (data && data.files) {
+                                seSelect.innerHTML = '';
+                                data.files.sort((a, b) => a.localeCompare(b, 'ja')).forEach(f => {
+                                    const opt = document.createElement('option');
+                                    opt.value = f;
+                                    opt.textContent = f;
+                                    seSelect.appendChild(opt);
+                                });
+                                seListLoaded = true;
+                            } else {
+                                seSelect.innerHTML = '<option value="">(取得失敗)</option>';
+                            }
+                        })
+                        .catch(() => seSelect.innerHTML = '<option value="">(サーバー未接続)</option>');
+                }
+            }
         });
+
+        const sePlayBtn = document.getElementById('radio-script-se-play-btn');
+        const seInsertBtn = document.getElementById('radio-script-se-insert-btn');
+        const seSelect = document.getElementById('radio-script-se-select');
+        let currentSeAudio = null;
+        if (sePlayBtn && seSelect) {
+            sePlayBtn.addEventListener('click', () => {
+                if (!seSelect.value) return;
+                if (currentSeAudio) {
+                    currentSeAudio.pause();
+                    currentSeAudio.currentTime = 0;
+                }
+                currentSeAudio = new Audio(`se/${seSelect.value}.mp3`);
+                currentSeAudio.play().catch(e => console.warn('SE再生エラー:', e));
+            });
+        }
+        if (seInsertBtn && seSelect && radioScriptTextarea) {
+            seInsertBtn.addEventListener('click', () => {
+                if (!seSelect.value) return;
+                const insertText = `\n[SE: ${seSelect.value}]\n`;
+                const startPos = radioScriptTextarea.selectionStart;
+                const endPos = radioScriptTextarea.selectionEnd;
+                radioScriptTextarea.value = radioScriptTextarea.value.substring(0, startPos)
+                    + insertText
+                    + radioScriptTextarea.value.substring(endPos, radioScriptTextarea.value.length);
+                radioScriptTextarea.focus();
+                radioScriptTextarea.selectionStart = startPos + insertText.length;
+                radioScriptTextarea.selectionEnd = startPos + insertText.length;
+            });
+        }
+
+        // 台本テキストエリア内で[SE: 〇〇]をクリックした際に再生する機能
+        const setupScriptSeClickPlay = (textarea) => {
+            if (!textarea) return;
+            textarea.addEventListener('click', (e) => {
+                const pos = e.target.selectionStart;
+                const text = e.target.value;
+                const lastNewline = text.lastIndexOf('\n', pos - 1);
+                const nextNewline = text.indexOf('\n', pos);
+                const start = lastNewline === -1 ? 0 : lastNewline + 1;
+                const end = nextNewline === -1 ? text.length : nextNewline;
+                const line = text.substring(start, end).trim();
+
+                const seMatch = line.match(/^\[SE:\s*(.+?)\]$/);
+                if (seMatch) {
+                    const seName = seMatch[1];
+                    if (currentSeAudio) {
+                        currentSeAudio.pause();
+                        currentSeAudio.currentTime = 0;
+                    }
+                    currentSeAudio = new Audio(`se/${seName}.mp3`);
+                    currentSeAudio.play().catch(err => console.warn('クリックSE再生エラー:', err));
+                }
+            });
+        };
+        setupScriptSeClickPlay(radioScriptTextarea);
+        const radioScriptYomiTextarea = document.getElementById('radio-script-yomi-textarea');
+        setupScriptSeClickPlay(radioScriptYomiTextarea);
 
         radioScriptGenBtn.addEventListener('click', async () => {
             const aiApiKeyInput = document.getElementById('ai-api-key');
@@ -1965,10 +2117,10 @@ ${closingInstruction ? '\n【エンディング（最終行）の指定】\n' + 
 
 【フォーマットのルール】
 1. 1セリフにつき1行で出力してください。セリフの中に改行を含めないでください。
-2. 構成は「オープニング（2〜3行）」→「メイントーク（複数行）」→「コメント返し待機枠（1行）」→「エンディング（2〜3行）」のように自然な流れにしてください。
+2. 構成は「オープニング（2〜3行）」→「メイントーク（パーソナリティの独り語り）」→「[ラジオ一時停止: コメント返し]」→「エンディング（2〜3行）」のように自然な流れにしてください。
 3. SE（効果音）を鳴らしたいタイミングで、独立した1行として \`[SE: 効果音の名前]\` と記述してください。セリフと同じ行には書かないでください。SEは場面転換や盛り上がりのタイミングで数回使用してください。
-4. 【重要】事前の「リスナーからのお便りやメールの紹介」は台本に含めないでください（お便りは存在しないという設定です）。
-5. 【重要】番組の終盤（エンディングの直前）に、リアルタイムのコメントを読むための「無音の待機枠」を設けてください。必ず独立した1行として \`[ラジオ一時停止: コメント返し]\` というタグだけを出力し、絶対に架空のリスナー名や架空のコメントを生成しないでください。
+4. 【重要・禁止事項】「リスナーからのお便り、メール、コメントの紹介」は【完全に禁止】です。架空のリスナー名や架空のコメント（例：「〜さんからのお便りです」「〜というコメントが来ていますね」等）は【絶対に捏造・出力しないでください】。番組は終始「パーソナリティの独り語り」のみで進行してください。
+5. 【重要】エンディングの直前に、独立した1行として \`[ラジオ一時停止: コメント返し]\` というタグだけを1回出力してください。このタグの前後で、コメントを読み上げるようなセリフは一切不要です。
 ${seListStr}
 
 【出力形式の例】
@@ -1976,7 +2128,10 @@ ${configOpening || '皆さんこんにちは！今夜もまったりやってい
 [SE: 大勢で拍手]
 今回のテーマはですね、${programTheme}についていろいろ話していきたいと思います。
 実はわたし最近ちょっとした発見がありまして、みなさんにもシェアしたいんですよ。
-（…このように${targetLines}行程度まで続ける…）
+（…このように${targetLines}行程度まで「パーソナリティ自身の体験談や考え（独り語り）」を続ける…）
+（…絶対に架空のリスナーのお便りやコメントを捏造しないでください…）
+[ラジオ一時停止: コメント返し]
+さて、そろそろお別れの時間ですね。
 ${configClosing || '今夜もたくさん聴いてくれてありがとう。また次回もよろしくね！'}
 [SE: 放送終了チャイム]
 
@@ -1996,18 +2151,47 @@ ${configClosing || '今夜もたくさん聴いてくれてありがとう。ま
 
                     // 読み上げ用台本（ひらがな）の生成
                     radioScriptLoading.textContent = 'ひらがな変換中...';
-                    const yomiPrompt = `次のラジオ台本テキストの各行を、すべて【ひらがなのみ】に変換して読み仮名を作成してください。
-漢字やカタカナは一切使わず、必ずひらがなで出力してください（記号は除く）。
-「[SE: ...]」と書かれた行はそのまま残してください。
-各行の対応関係を維持し（1行入力＝1行出力）、行数を増減しないでください。
-読点（、）や句点（。）、感嘆符（！）、疑問符（？）などの記号はそのまま残してください。
-変換後のテキストのみ出力してください（説明不要）。
+                    const dictValue = document.getElementById('ai-hiragana-dict') ? document.getElementById('ai-hiragana-dict').value.trim() : "";
+                    let dictInstruction = "";
+                    if (dictValue) {
+                        dictInstruction = `\n【ユーザー指定辞書（大文字小文字を問わず適用）】\n以下の単語は、大文字・小文字の違いを無視して一致した場合も含め、必ず右側の指定された読みに変換してください。\n${dictValue}\n`;
+                    }
+
+                    const getPromptForChunk = (chunk) => `以下の台本テキストをVOICEVOXで読み上げるための「完全なひらがな・カタカナのみのテキスト」に変換してください。
+
+【絶対ルール（必ず守ること）】
+1. すべての「漢字」と「アルファベット」を、例外なく「ひらがな」または「カタカナ」の読み仮名に変換すること。「今」「私」「何」のような簡単な漢字も含め、完全に変換してください。
+2. 「カタカナ」は絶対にひらがなに変換せず、元の「カタカナ」のまま維持すること（例：「マイク」→「マイク」）。
+3. 「[SE: 大勢で拍手]」や「[ラジオ一時停止: コメント返し]」のような [ ] で囲まれたタグ部分は、システム制御用なので絶対に変換せず、1文字も変えずにそのまま残すこと。
+4. 各行の対応関係を維持し（1行入力＝1行出力）、行数を増減しないこと。
+5. 句読点（、。）や記号、改行のフォーマットは一切変更しないこと。
+6. 【重要】音声合成に発音通り読ませるため、助詞の「は」「へ」「を」は必ず発音通り「わ」「え」「お」に書き換えること（例：「わたしは東京へ空を飛ぶ」→「わたしわとうきょうえそらおとぶ」）。
+7. 【重要】数字や英単語は、必ず日本語の発音通りに変換すること（例：「7時」→「しちじ」、「100%」→「ひゃくぱーせんと」、「BGM」→「びーじーえむ」）。
+8. 元の文章にない言葉を追加したり、単語の読み（癒やし→いやし、Vtuber→ぶいちゅーばー等）を間違えたりしないよう、正確に変換してください。${dictInstruction}
+9. 結果のテキストのみを出力し、説明は不要です。
 
 台本:
-${cleaned}`;
+${chunk}`;
 
                     try {
-                        let yomiScript = await aiFeatures.callAI(yomiPrompt, apiKey, provider, true);
+                        const lines = cleaned.split('\n');
+                        const chunkSize = 15;
+                        const chunks = [];
+                        for (let i = 0; i < lines.length; i += chunkSize) {
+                            chunks.push(lines.slice(i, i + chunkSize).join('\n'));
+                        }
+
+                        let yomiScript = "";
+                        for (let i = 0; i < chunks.length; i++) {
+                            const chunkText = chunks[i];
+                            if (!chunkText.trim()) continue;
+                            radioScriptLoading.textContent = `ひらがな変換中... (${i + 1}/${chunks.length})`;
+                            const resText = await aiFeatures.callAI(getPromptForChunk(chunkText), apiKey, provider, true);
+                            if (resText) {
+                                yomiScript += resText + '\n';
+                            }
+                        }
+                        
                         if (yomiScript && radioScriptYomiTextarea) {
                             let cleanedYomi = yomiScript
                                 .replace(/\r\n/g, '\n').replace(/\r/g, '\n')
@@ -2016,10 +2200,12 @@ ${cleaned}`;
                             // ダブルチェック機構
                             radioScriptLoading.textContent = 'ひらがなの誤字脱字をダブルチェック中...';
                             const checkPrompt = `以下の「漢字の台本」を元に作成された「現在のひらがな台本」をチェックしてください。
-ひらがな台本に、誤字脱字、読み間違い、助詞の抜け、または【漢字やカタカナのまま残ってしまっている箇所】があれば修正し、**完全にひらがなのみ（記号・SE指定は除く）**になった「修正済みのひらがな台本」を出力してください。
+ひらがな台本に、誤字脱字、読み間違い、助詞の抜け、または【漢字が残ってしまっている箇所】があれば修正し、「カタカナはそのまま維持」した「修正済みの台本」を出力してください。
 漢字は絶対に使用しないでください。
-「[SE: ...]」の行もそのまま残してください。
-説明や前置きは一切不要です。出力は修正後のひらがなテキストのみにしてください。
+「カタカナ」は元の通りカタカナのまま残してください。
+「[SE: ...]」や「[ラジオ一時停止: ...]」の行も1文字も変えずにそのまま残してください。
+【重要】助詞の「は」「へ」「を」が残っていれば、必ず発音通り「わ」「え」「お」に書き換えてください。
+説明や前置きは一切不要です。出力は修正後のテキストのみにしてください。
 
 【漢字の台本】
 ${cleaned}
@@ -2038,8 +2224,28 @@ ${cleanedYomi}`;
                                 console.warn('[ダブルチェックエラー]', checkErr);
                             }
 
+                            // さらにpykakasiのローカルAPIでダメ押しの完全置換を行う
+                            try {
+                                const resKakasi = await fetch('http://127.0.0.1:8001/convert_remaining_kanji', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+                                    body: cleanedYomi
+                                });
+                                if (resKakasi.ok) {
+                                    cleanedYomi = await resKakasi.text();
+                                    console.log('[ローカル変換] 完了');
+                                }
+                            } catch (e) {
+                                console.warn("pykakasi変換フォールバックエラー:", e);
+                            }
+
                             radioScriptYomiTextarea.value = cleanedYomi;
                             console.log(`[ひらがな変換] ${cleanedYomi.split('\n').length}行生成完了`);
+                            
+                            // 自動で保存ボタンをクリックしてシステムに反映させる
+                            if (radioScriptSaveBtn) {
+                                radioScriptSaveBtn.click();
+                            }
                         }
                     } catch (yomiErr) {
                         console.warn('[ひらがな変換エラー]', yomiErr);
@@ -2069,6 +2275,117 @@ ${cleanedYomi}`;
                 radioScriptTextarea.value = '';
             }
         });
+
+        const radioScriptFixYomiBtn = document.getElementById('radio-script-fix-yomi-btn');
+        if (radioScriptFixYomiBtn) {
+            radioScriptFixYomiBtn.addEventListener('click', async () => {
+                const aiApiKeyInput = document.getElementById('ai-api-key');
+                const apiKey = aiApiKeyInput ? aiApiKeyInput.value.trim() : null;
+                if (!apiKey) {
+                    alert("AIのAPIキーが設定されていません。AI設定項目からAPIキーを入力してください。");
+                    return;
+                }
+
+                const yomiText = radioScriptYomiTextarea.value.trim();
+                if (!yomiText) return;
+
+                const aiProviderSelect = document.getElementById('ai-provider-select');
+                const provider = aiProviderSelect ? aiProviderSelect.value : 'gemini';
+
+                const originalBtnText = radioScriptFixYomiBtn.textContent;
+                radioScriptFixYomiBtn.textContent = '⏳ AIで自動修正中...';
+                radioScriptFixYomiBtn.disabled = true;
+
+                try {
+                    let fixedText = yomiText;
+
+                    // 台本が長すぎるとAIが処理をサボる（途中から元の漢字のまま出力する等）ため、15行ずつチャンク分割して処理する
+                    const lines = fixedText.split('\n');
+                    const chunkSize = 15;
+                    const chunks = [];
+                    for (let i = 0; i < lines.length; i += chunkSize) {
+                        chunks.push(lines.slice(i, i + chunkSize).join('\n'));
+                    }
+
+                    const dictValue = document.getElementById('ai-hiragana-dict') ? document.getElementById('ai-hiragana-dict').value.trim() : "";
+                    let dictInstruction = "";
+                    if (dictValue) {
+                        dictInstruction = `\n【ユーザー指定辞書（大文字小文字を問わず適用）】\n以下の単語は、大文字・小文字の違いを無視して一致した場合も含め、必ず右側の指定された読みに変換してください。\n${dictValue}\n`;
+                    }
+
+                    let finalConvertedText = "";
+                    for (let i = 0; i < chunks.length; i++) {
+                        const chunkText = chunks[i];
+                        if (!chunkText.trim()) continue;
+                        
+                        radioScriptFixYomiBtn.textContent = `⏳ AIで自動修正中... (${i + 1}/${chunks.length})`;
+                        
+                        const prompt = `以下の台本テキストをVOICEVOXで読み上げるための「完全なひらがな・カタカナのみのテキスト」に変換してください。
+（※入力テキストが既にひらがな中心であっても、残っている漢字や数字、アルファベットをすべて変換してください）
+
+【絶対ルール（必ず守ること）】
+1. すべての「漢字」と「アルファベット」を、例外なく「ひらがな」または「カタカナ」の読み仮名に変換すること。「今」「私」「何」のような簡単な漢字も含め、完全に変換してください。
+2. 「カタカナ」は絶対にひらがなに変換せず、元の「カタカナ」のまま維持すること（例：「マイク」→「マイク」）。
+3. 「[SE: 大勢で拍手]」や「[ラジオ一時停止: コメント返し]」のような [ ] で囲まれたタグ部分は、システム制御用なので絶対に変換せず、1文字も変えずにそのまま残すこと。
+4. 各行の対応関係を維持し（1行入力＝1行出力）、行数を増減しないこと。
+5. 句読点（、。）や記号、改行のフォーマットは一切変更しないこと。
+6. 【重要】音声合成に発音通り読ませるため、助詞の「は」「へ」「を」は必ず発音通り「わ」「え」「お」に書き換えること（例：「わたしは東京へ空を飛ぶ」→「わたしわとうきょうえそらおとぶ」）。
+7. 【重要】数字や英単語は、必ず日本語の発音通りに変換すること（例：「7時」→「しちじ」、「100%」→「ひゃくぱーせんと」、「BGM」→「びーじーえむ」）。
+8. 元の文章にない言葉を追加したり、単語の読み（癒やし→いやし、Vtuber→ぶいちゅーばー等）を間違えたりしないよう、正確に変換してください。${dictInstruction}
+9. 結果のテキストのみを出力し、説明は不要です。
+
+台本:
+${chunkText}`;
+
+                        const resText = await aiFeatures.callAI(prompt, apiKey, provider, true);
+                        if (resText) {
+                            finalConvertedText += resText + '\n';
+                        } else {
+                            throw new Error("チャンクの処理中にAIからの返答が空になりました。");
+                        }
+                    }
+
+                    if (finalConvertedText) {
+                        const finalYomi = finalConvertedText.trim();
+                        radioScriptYomiTextarea.value = finalYomi;
+                        // 以前のように radioScriptSaveBtn.click() を呼ぶとアラートが出てモーダルが閉じてしまうため、
+                        // ここで静かに状態反映とサーバーへの上書き保存のみを行う
+                        if (typeof radioModeState !== 'undefined') {
+                            const yomiLines = finalYomi.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                            radioModeState.scriptYomiLines = yomiLines;
+                        }
+                        
+                        try {
+                            await fetch('http://127.0.0.1:8001/radio_script_yomi', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+                                body: finalYomi
+                            });
+                            
+                            // 保存が完了したことをユーザーに控えめに通知する
+                            radioScriptFixYomiBtn.textContent = '✅ 修正＆保存完了！';
+                            setTimeout(() => {
+                                if (radioScriptFixYomiBtn.textContent === '✅ 修正＆保存完了！') {
+                                    radioScriptFixYomiBtn.textContent = originalBtnText;
+                                }
+                            }, 2000);
+                        } catch (saveErr) {
+                            console.warn("静的保存に失敗しました:", saveErr);
+                            localStorage.setItem('savedRadioScriptYomi', finalYomi);
+                        }
+                    } else {
+                        alert("AIによる自動修正に失敗しました。");
+                    }
+
+                } catch (e) {
+                    console.error("ひらがな自動修正エラー:", e);
+                    alert("ひらがな自動修正中にエラーが発生しました。");
+                } finally {
+                    radioScriptFixYomiBtn.textContent = originalBtnText;
+                    radioScriptFixYomiBtn.disabled = false;
+                }
+            });
+        }
 
         radioScriptSaveBtn.addEventListener('click', async () => {
             const rawScript = radioScriptTextarea.value;
@@ -2278,6 +2595,8 @@ ${cleanedYomi}`;
         }
     }
 
+    const cacheEditorClearAllBtn = document.getElementById('cache-editor-clear-all-btn');
+
     if (openCacheEditorBtn && cacheEditorModal) {
         openCacheEditorBtn.addEventListener('click', () => {
             cacheEditorModal.style.display = 'flex';
@@ -2287,6 +2606,17 @@ ${cleanedYomi}`;
         cacheEditorCloseBtn.addEventListener('click', () => {
             cacheEditorModal.style.display = 'none';
         });
+        if (cacheEditorClearAllBtn) {
+            cacheEditorClearAllBtn.addEventListener('click', () => {
+                if (confirm('本当にすべてのAI変換キャッシュを削除しますか？\n（この操作は元に戻せません）')) {
+                    for (const key in aiHiraganaCache) {
+                        delete aiHiraganaCache[key];
+                    }
+                    saveHiraganaData();
+                    renderCacheEditorList(cacheEditorSearch.value);
+                }
+            });
+        }
         cacheEditorSearch.addEventListener('input', () => {
             renderCacheEditorList(cacheEditorSearch.value);
         });
@@ -2694,7 +3024,9 @@ ${cleanedYomi}`;
                 resetIdleTimer();
             };
 
-            tiktokWs.onmessage = (event) => {
+
+    tiktokWs.onmessage = (event) => {
+
                 try {
                     const data = JSON.parse(event.data);
                     if (data.type === 'status') {
@@ -2720,7 +3052,7 @@ ${cleanedYomi}`;
                                     // 2回目以降の入室（戻ってきた）
                                     let greet = zunda ? `${cleanName}さん、おかえりなさいなのだ！` : `${cleanName}さん、おかえりなさい！`;
                                     greet = aiFeatures.adjustIdlePhraseForModel(greet, currentModelId);
-                                    queueVoicevoxAudio(greet);
+                                    queueCommentAudio(greet);
                                 } else {
                                     // 初回の入室
                                     joinedUsers.add(cleanName);
@@ -2742,7 +3074,7 @@ ${cleanedYomi}`;
                                         : `${cleanName}さん、${timeGreeting}！${randomPhrase}`;
 
                                     fullGreeting = aiFeatures.adjustIdlePhraseForModel(fullGreeting, currentModelId);
-                                    queueVoicevoxAudio(fullGreeting);
+                                    queueCommentAudio(fullGreeting);
                                 }
                             }
                         }
@@ -2756,7 +3088,7 @@ ${cleanedYomi}`;
                                 const zunda = isZundamonSelected() && currentModelId === 'hiyori';
                                 let greet = zunda ? `${cleanName}さん、ギフトありがとうなのだ！` : `${cleanName}さん、ギフトありがとう！`;
                                 greet = aiFeatures.adjustIdlePhraseForModel(greet, currentModelId);
-                                queueVoicevoxAudio(greet);
+                                queueCommentAudio(greet);
                             }
                         }
                     } else if (data.type === 'like') {
@@ -2792,7 +3124,7 @@ ${cleanedYomi}`;
                                     console.log(`[TikTok Skip] 待機列過多のためスキップ: ${cleanComment}`);
                                 } else {
                                     // 1. コメントを読み上げる
-                                    queueVoicevoxAudio(`${cleanNickname}さん、${cleanComment}`);
+                                    queueCommentAudio(`${cleanNickname}さん、${cleanComment}`);
 
                                     if (isAiReplyEnabled && aiApiKeyInput && aiApiKeyInput.value.trim().length > 0) {
                                         // 2A. AIによる自動返信
@@ -2801,12 +3133,12 @@ ${cleanedYomi}`;
                                         // 2B. キーワードによる自動返信
                                         if (matchedRule) {
                                             const adjustedReply = aiFeatures.adjustIdlePhraseForModel(matchedRule.response, currentModelId);
-                                            queueVoicevoxAudio(adjustedReply);
+                                            queueCommentAudio(adjustedReply);
                                         } else if (Math.random() < 0.20) {
                                             // 3. キーワードに一致しなかった場合、たまに相槌を打つ（20%の確率）
                                             const genericReplies = ["なるほどなるほどー", "たしかにー！", "へぇー！", "そうんだね！", "わかるわかるー"];
                                             const adjustedReply = aiFeatures.adjustIdlePhraseForModel(genericReplies[Math.floor(Math.random() * genericReplies.length)], currentModelId);
-                                            queueVoicevoxAudio(adjustedReply);
+                                            queueCommentAudio(adjustedReply);
                                         }
                                     }
                                 }
@@ -2898,6 +3230,14 @@ ${cleanedYomi}`;
 
             isYoutubeIntendedConnect = true;
             youtubeStatus.textContent = '接続中...';
+            
+            // YouTube接続時、ラジオの開始行を1にリセットする
+            const startLineInput = document.getElementById('radio-script-start-line');
+            if (startLineInput) {
+                startLineInput.value = 1;
+            }
+            localStorage.setItem('radioScriptLastIndex', 0);
+            
             youtubeWs = new WebSocket('ws://localhost:8768');
 
             youtubeWs.onopen = () => {
@@ -2935,7 +3275,8 @@ ${cleanedYomi}`;
                         const scheduleContainer = document.getElementById('youtube-schedule-container');
                         if (scheduleContainer) scheduleContainer.style.display = 'none';
                     } else if (data.type === 'stream_info') {
-                        if (data.liveBroadcastContent === 'upcoming' && data.scheduledStartTime) {
+                                                if (data.liveBroadcastContent === 'upcoming' && data.scheduledStartTime) {
+
                             const scheduleContainer = document.getElementById('youtube-schedule-container');
                             const timeEl = document.getElementById('youtube-schedule-time');
                             const countdownEl = document.getElementById('youtube-schedule-countdown');
@@ -2948,12 +3289,6 @@ ${cleanedYomi}`;
                                 timeEl.textContent = `予定時刻: ${targetTime.toLocaleString()}`;
                             }
 
-                            // 既に予定時刻を過ぎている場合は、自動開始のトリガーを行わない（リロード時の誤作動防止）
-                            if (targetTime.getTime() - new Date().getTime() <= 0) {
-                                if (countdownEl) countdownEl.textContent = "00:00:00";
-                                return;
-                            }
-
                             if (window.youtubeScheduleTimer) clearInterval(window.youtubeScheduleTimer);
                             window.youtubeScheduleTimer = setInterval(() => {
                                 const now = new Date();
@@ -2963,18 +3298,69 @@ ${cleanedYomi}`;
                                     clearInterval(window.youtubeScheduleTimer);
                                     if (countdownEl) countdownEl.textContent = "00:00:00";
 
-                                    if (autoStartCb && autoStartCb.checked && youtubeWs && youtubeWs.readyState === WebSocket.OPEN) {
-                                        console.log('[YouTube] 予約時間になりました。配信開始とラジオ再生をトリガーします。');
-                                        youtubeWs.send(JSON.stringify({ type: 'start_youtube_stream', videoId: videoId }));
+                                    // DOM要素を最新状態で取得し直す
+                                    const currentAutoStartCb = document.getElementById('youtube-auto-start-cb');
 
-                                        // ラジオ台本ボタンを押す（もし存在し、ラジオが生成されていれば）
+                                    let shouldStart = false;
+                                    if (currentAutoStartCb && currentAutoStartCb.checked) {
+                                        shouldStart = true;
+                                    } else {
+                                        // ブラウザのキャッシュでチェックが外れていた場合のフォールバック
+                                        shouldStart = confirm('予定時刻を過ぎていますが、自動開始のチェックが外れています。\n今すぐOBSのストリーミングとラジオの自動再生を開始しますか？');
+                                    }
+
+                                    if (shouldStart && youtubeWs && youtubeWs.readyState === 1) {
+                                        console.log('[YouTube] 予約時間になりました。配信開始プロセスをトリガーします。');
+                                        
+                                        // 配信準備中などのオーバーレイを自動で解除する
+                                        if (typeof window.executeOverlayClearProcess === 'function') {
+                                            window.executeOverlayClearProcess();
+                                        } else {
+                                            // フォールバック
+                                            const streamOverlayEl = document.getElementById('stream-overlay');
+                                            if (streamOverlayEl) streamOverlayEl.classList.remove('active');
+                                            if (typeof isPreparing !== 'undefined') isPreparing = false;
+                                        }
+                                        
+                                        // 1. OBSの配信を開始する
+                                        if (typeof isObsWsConnected !== 'undefined' && isObsWsConnected && typeof obsWsClient !== 'undefined' && obsWsClient) {
+                                            console.log('[OBS] OBSのストリーミングを開始します...');
+                                            obsWsClient.call('StartStream').catch(err => {
+                                                console.error('[OBS] Failed to start OBS stream:', err);
+                                                alert('[OBSエラー] 配信の開始に失敗しました。OBS側の設定（ストリームキー等）を確認してください。\n' + err);
+                                            });
+                                        } else {
+                                            console.log('[OBS] OBS連携が未接続のため、OBS開始処理をスキップします。');
+                                        }
+
+                                        // 2. 映像がYouTubeに届くまで少し待機してから、YouTubeのステータスをLiveにする
                                         setTimeout(() => {
-                                            const playBtn = document.getElementById('radio-script-play-btn');
-                                            if (playBtn) {
-                                                console.log('[YouTube] ラジオ自動再生を実行');
-                                                playBtn.click();
+                                            console.log('[YouTube] YouTube側の配信(Live)を開始します...');
+                                            try {
+                                                youtubeWs.send(JSON.stringify({ type: 'start_youtube_stream', videoId: videoId }));
+                                            } catch(e) {
+                                                alert('YouTubeへの開始コマンド送信に失敗しました: ' + e);
                                             }
-                                        }, 1000); // 配信開始から少し遅らせて再生
+
+                                            // 3. ラジオ台本ボタンを押す
+                                            setTimeout(() => {
+                                                // ラジオモードがOFFの場合は強制的にONにする
+                                                const radioModeToggle = document.getElementById('ai-radio-mode-toggle');
+                                                if (radioModeToggle && !radioModeToggle.checked) {
+                                                    console.log('[YouTube] ラジオモードを強制的にONにします');
+                                                    radioModeToggle.checked = true;
+                                                    radioModeToggle.dispatchEvent(new Event('change'));
+                                                }
+
+                                                const playBtn = document.getElementById('radio-script-play-btn');
+                                                if (playBtn) {
+                                                    console.log('[YouTube] ラジオ自動再生を実行');
+                                                    playBtn.click();
+                                                }
+                                            }, 2000); // 配信開始から少し遅らせて再生
+                                        }, 8000); // OBS開始から8秒待機
+                                    } else {
+                                        console.log('【自動開始スキップ】ユーザーがキャンセルしたか、接続が失われています。');
                                     }
 
                                     if (scheduleContainer) {
@@ -2992,51 +3378,69 @@ ${cleanedYomi}`;
                                     }
                                 }
                             }, 1000);
+                        } else if (data.liveBroadcastContent === 'live') {
+                            if (confirm('この配信はすでにYouTube上で「Live」状態です。\nOBSのストリーミングとラジオの自動再生だけを開始しますか？')) {
+                                if (typeof isObsWsConnected !== 'undefined' && isObsWsConnected && typeof obsWsClient !== 'undefined' && obsWsClient) {
+                                    console.log('[OBS] OBSのストリーミングを開始します...');
+                                    obsWsClient.call('StartStream').catch(err => {
+                                        console.error('[OBS] Failed to start OBS stream:', err);
+                                        alert('[OBSエラー] 配信の開始に失敗しました。OBS側の設定を確認してください。\n' + err);
+                                    });
+                                } else {
+                                    alert('[OBS] OBS連携が未接続のため、OBS開始処理をスキップしました。手動で開始してください。');
+                                }
+
+                                setTimeout(() => {
+                                    const radioModeToggle = document.getElementById('ai-radio-mode-toggle');
+                                    if (radioModeToggle && !radioModeToggle.checked) {
+                                        radioModeToggle.checked = true;
+                                        radioModeToggle.dispatchEvent(new Event('change'));
+                                    }
+                                    const playBtn = document.getElementById('radio-script-play-btn');
+                                    if (playBtn) {
+                                        playBtn.click();
+                                    }
+                                }, 2000);
+                            }
                         }
                     } else if (data.type === 'stats') {
-                        const statSubEl = document.getElementById('stat-subscribers');
-                        const statViewEl = document.getElementById('stat-viewers');
-                        if (statSubEl && data.subscribers) {
-                            function formatStatNumber(str) {
-                                if (!str) return "0";
-                                let cleanStr = str.replace(/チャンネル登録者数/g, '').replace(/subscribers/ig, '').trim().replace(/,/g, '');
-                                let numMatch = cleanStr.match(/^([0-9\.]+)\s*(.*)$/);
-                                if (!numMatch) return str;
-                                let num = parseFloat(numMatch[1]);
-                                let suffix = numMatch[2].toLowerCase();
-                                if (suffix.startsWith('k') || suffix.startsWith('thousand')) num *= 1000;
-                                else if (suffix.startsWith('m') || suffix.startsWith('million')) num *= 1000000;
-                                else if (suffix.startsWith('万')) num *= 10000;
-                                else if (suffix.startsWith('億')) num *= 100000000;
-                                return num.toLocaleString();
-                            }
-                            statSubEl.textContent = formatStatNumber(data.subscribers);
+                        const statViewers = document.getElementById('stat-viewers');
+                        if (statViewers && data.viewers !== undefined) {
+                            statViewers.textContent = data.viewers || '-';
                         }
-                        if (statViewEl && data.viewers) {
-                            statViewEl.textContent = data.viewers;
+                        const statSubscribers = document.getElementById('stat-subscribers');
+                        if (statSubscribers && data.subscribers) {
+                            // APIが "105\nsubscribers" のような文字列を返す場合があるため、先頭の数値部分のみ取り出す
+                            const numOnly = String(data.subscribers).match(/[\d,]+/);
+                            statSubscribers.textContent = numOnly ? numOnly[0] : data.subscribers;
                         }
                     } else if (data.type === 'gift') {
-                        console.log(`[YouTube SuperChat] ${data.nickname} sent ${data.amount}`);
-                        addCommentToViewer(data.nickname, `💰 スーパーチャット: ${data.amount}`, 'youtube', true, data.iconUrl);
-                        if (isVoicevoxEnabled && !data.isHistory && typeof isStreamEndedState !== 'undefined' && !isStreamEndedState) {
+                        console.log(`[YouTube] ${data.nickname} sent a superchat/gift`);
+                        addCommentToViewer(data.nickname, `🎁 スーパーチャット！`, 'youtube', true, data.iconUrl);
+                        const isRadioModeFlag = document.getElementById('ai-radio-mode-toggle')?.checked;
+                        const acceptHistory = isRadioModeFlag && radioModeState.currentPhase === 'none';
+                        if (isVoicevoxEnabled && (!data.isHistory || acceptHistory) && (typeof isStreamEndedState === 'undefined' || !isStreamEndedState)) {
                             const cleanName = removeEmojis(data.nickname);
                             if (cleanName.length > 0) {
                                 aiEmotion = 'joy';
                                 const zunda = isZundamonSelected() && currentModelId === 'hiyori';
                                 let greet = zunda ? `${cleanName}さん、スーパーチャットありがとうなのだ！` : `${cleanName}さん、スーパーチャットありがとう！`;
                                 greet = aiFeatures.adjustIdlePhraseForModel(greet, currentModelId);
-                                queueVoicevoxAudio(greet);
+                                queueCommentAudio(greet);
                             }
                         }
                     } else if (data.type === 'comment') {
                         console.log(`[YouTube] @${data.nickname}: ${data.comment}`);
                         addCommentToViewer(data.nickname, data.comment, 'youtube', false, data.iconUrl);
-                        if (isVoicevoxEnabled && !data.isHistory && typeof isStreamEndedState !== 'undefined' && !isStreamEndedState) {
+                        const isRadioModeFlag = document.getElementById('ai-radio-mode-toggle')?.checked;
+                        const acceptHistory = isRadioModeFlag && radioModeState.currentPhase === 'none';
+                        console.log(`[DEBUG] Comment Check: isVoicevoxEnabled=${isVoicevoxEnabled}, isHistory=${data.isHistory}, acceptHistory=${acceptHistory}, phase=${radioModeState.currentPhase}`);
+                        if (isVoicevoxEnabled && (!data.isHistory || acceptHistory) && typeof isStreamEndedState !== 'undefined' && !isStreamEndedState) {
                             const cleanNickname = removeEmojis(data.nickname);
                             const cleanComment = removeEmojis(data.comment);
                             if (cleanComment.length > 0) {
                                 aiEmotion = guessEmotionFromText(cleanComment);
-
+                                
                                 const timeGreeting = getTimeGreeting();
                                 const zunda = isZundamonSelected() && currentModelId === 'hiyori';
                                 const replies = [
@@ -3054,18 +3458,18 @@ ${cleanedYomi}`;
                                 if (isQueueFull && !matchedRule) {
                                     console.log(`[YouTube Skip] 待機列過多のためスキップ: ${cleanComment}`);
                                 } else {
-                                    queueVoicevoxAudio(`${cleanNickname}さん、${cleanComment}`);
+                                    queueCommentAudio(`${cleanNickname}さん、${cleanComment}`);
 
                                     if (isAiReplyEnabled && aiApiKeyInput && aiApiKeyInput.value.trim().length > 0) {
                                         generateAIResponse(cleanNickname, cleanComment);
                                     } else {
                                         if (matchedRule) {
                                             const adjustedReply = aiFeatures.adjustIdlePhraseForModel(matchedRule.response, currentModelId);
-                                            queueVoicevoxAudio(adjustedReply);
+                                            queueCommentAudio(adjustedReply);
                                         } else if (Math.random() < 0.20) {
                                             const genericReplies = ["なるほどなるほどー", "たしかにー！", "へぇー！", "そうんだね！", "わかるわかるー"];
                                             const adjustedReply = aiFeatures.adjustIdlePhraseForModel(genericReplies[Math.floor(Math.random() * genericReplies.length)], currentModelId);
-                                            queueVoicevoxAudio(adjustedReply);
+                                            queueCommentAudio(adjustedReply);
                                         }
                                     }
                                 }
@@ -3305,10 +3709,9 @@ ${cleanedYomi}`;
         const roleplayInstruction = "\n\n【配信者としての振る舞い（超重要）】あなたはバーチャル空間から配信しているVTuber（配信者）です。「私はAIなので…」といった機械的な発言やAIだと自称することは絶対にやめてください。\n・天気や最新ニュースなどを聞かれた場合は、必ず最新の情報を検索・調査して答えてください。\n・【重要】最新情報を検索しても分からない場合や、全く知識がない場合にのみ、「ずっと部屋でゲームしてるから分からないよ〜！」のように人間の配信者らしいユーモアで切り返してください。最初から検索せずにはぐらかすのは厳禁です。\n・どんな質問に対しても、リスナーと仲良く会話を楽しむ人間（配信者）として振る舞ってください。";
         let systemPrompt = systemPromptRaw + emotionInstruction + timeContext + roleplayInstruction;
 
-        const aiHiraganaToggle = document.getElementById('ai-hiragana-toggle');
-        if (aiHiraganaToggle && aiHiraganaToggle.checked) {
-            systemPrompt += "\n\n【重要：ひらがな出力】音声読み上げシステムの仕様上、漢字の誤読を防ぐため、あなたの返信はすべて「ひらがなのみ」で出力してください。ただし、自然な間のために読点（、）や句点（。）は必ず残してください。その他の記号やカタカナ、英語などは使わないでください。";
-        }
+        // 注意: ひらがな変換は返信文生成の後に別ステップで行うため、
+        // ここで「ひらがなのみ」指示を追加すると「コメント→こんと」のような誤変換が起きる。
+        // そのため意図的にこのブロックは削除済み。
         
         // DuckDuckGo検索（Agentic Loop）以外のモードが選ばれている場合は、
         // ユーザーがテキストエリアに残している手動の [search] 指示文を無視・除去する（誤爆を防ぐため）
@@ -3449,7 +3852,7 @@ if (aiResponseText) {
     // 読み上げ用のクリーンアップ（絵文字除去など）
     const cleanResponse = finalSpokenText.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
     if (cleanResponse.length > 0) {
-        queueVoicevoxAudio(cleanResponse);
+        queueCommentAudio(cleanResponse);
     }
 }
         } catch (error) {
@@ -3618,12 +4021,13 @@ async function triggerIdleSpeech() {
     let seToPlay = null; // 今回鳴らす効果音
 
     let useRadioScript = false;
-    if (isRadioMode && shouldRemake) {
+    if (isRadioMode) {
         if (!radioModeState.scriptLines || radioModeState.scriptLines.length === 0) {
             console.log("[ラジオモード] 台本が設定されていません。事前準備が必要です。");
             return;
         }
-        if (radioModeState.currentPhase === 'none' || radioModeState.currentPhase === 'finished') {
+        if (radioModeState.currentPhase === 'none' || radioModeState.currentPhase === 'finished' || radioModeState.currentPhase === 'waiting_for_comments') {
+            // ラジオモードがONの時は、再生中でなくても通常の独り言はスキップする
             return;
         }
         if (radioModeState.currentPhase === 'playing') {
@@ -3643,6 +4047,14 @@ async function triggerIdleSpeech() {
             if (playBtn) playBtn.style.display = 'block';
             if (stopBtn) stopBtn.style.display = 'none';
 
+            // ラジオ終了時に、自動配信終了が有効なら配信終了プロセスを開始する
+            const streamEndToggle = document.getElementById('stream-end-toggle');
+            if (streamEndToggle && streamEndToggle.checked) {
+                if (typeof window.executeStreamEndProcess === 'function') {
+                    window.executeStreamEndProcess();
+                }
+            }
+
             return;
         }
 
@@ -3653,10 +4065,19 @@ async function triggerIdleSpeech() {
             yomiPhrase = radioModeState.scriptYomiLines[radioModeState.currentScriptIndex];
         }
 
-        // 一時停止タグのパース
+            // 一時停止タグのパース
         if (phrase.includes('[ラジオ一時停止')) {
             console.log("[ラジオモード] 一時停止タグを検出。3分間のコメント返し待機モードに入ります。");
             radioModeState.currentPhase = 'waiting_for_comments';
+
+            if (typeof radioCommentQueue !== 'undefined' && radioCommentQueue.length > 0) {
+                console.log(`[ラジオモード] 溜まっていたコメント ${radioCommentQueue.length} 件を読み上げキューに移動`);
+                radioCommentQueue.forEach(text => {
+                    queueVoicevoxAudio(text).catch(e => console.warn(e));
+                });
+                radioCommentQueue = [];
+            }
+
 
             const playBtn = document.getElementById('radio-script-play-btn');
             const stopBtn = document.getElementById('radio-script-stop-btn');
@@ -3671,21 +4092,32 @@ async function triggerIdleSpeech() {
                 startLineInput.value = radioModeState.currentScriptIndex + 1;
             }
 
-            // 3分後に自動で再生を再開するタイマーをセット
-            setTimeout(() => {
-                console.log("[ラジオモード] 待機時間が終了しました。自動再生を再開します。");
-                if (radioModeState.currentPhase === 'waiting_for_comments') {
-                    radioModeState.currentPhase = 'playing';
-                    const currentPlayBtn = document.getElementById('radio-script-play-btn');
-                    if (currentPlayBtn && currentPlayBtn.style.display !== 'none') {
-                        currentPlayBtn.click();
-                    } else {
-                        triggerIdleSpeech();
-                    }
+            // コメント読み上げ（キュー）が空になるのを監視し、完了したら自動で再開する
+            const checkQueueInterval = setInterval(() => {
+                if (radioModeState.currentPhase !== 'waiting_for_comments') {
+                    clearInterval(checkQueueInterval);
+                    return;
                 }
-            }, 3 * 60 * 1000);
+                if (voicevoxAudioQueue.length === 0 && !isVoicevoxPlaying) {
+                    clearInterval(checkQueueInterval);
+                    console.log("[ラジオモード] コメント読み上げキューが空になったため、間もなく自動再生を再開します。");
+                    
+                    // コメントの余韻を残すため、少しだけ待機（3秒）してから再開
+                    setTimeout(() => {
+                        if (radioModeState.currentPhase === 'waiting_for_comments') {
+                            console.log("[ラジオモード] 自動再生を再開します。");
+                            radioModeState.currentPhase = 'playing';
+                            const currentPlayBtn = document.getElementById('radio-script-play-btn');
+                            if (currentPlayBtn && currentPlayBtn.style.display !== 'none') {
+                                currentPlayBtn.click();
+                            } else {
+                                triggerIdleSpeech();
+                            }
+                        }
+                    }, 3000);
+                }
+            }, 1000);
 
-            // この回は喋らずに終了し、次回（5秒後）から通常モード（AIフリートーク）で喋る
             resetIdleTimer();
             return;
         }
@@ -3762,7 +4194,7 @@ async function triggerIdleSpeech() {
     }
 
     // 事前台本（ラジオモード）の場合は、リスナーの呼称（二人称）の強制置換のみ行わない
-    if (!(isRadioMode && shouldRemake)) {
+    if (!isRadioMode) {
         const idleSecondPerson = document.getElementById('idle-second-person');
         if (idleSecondPerson && idleSecondPerson.value) {
             const sp = idleSecondPerson.value;
@@ -3771,7 +4203,8 @@ async function triggerIdleSpeech() {
         }
     }
 
-    console.log(`[独り言] ${phrase}`);
+    const logPrefix = useRadioScript ? "[ラジオ台本]" : "[独り言]";
+    console.log(`${logPrefix} ${phrase}`);
 
     // 独り言も会話履歴に追加し、視聴者が独り言に反応した時に文脈が繋がるようにする
     if (typeof aiChatHistory !== 'undefined') {
@@ -3924,7 +4357,9 @@ async function queueVoicevoxAudio(text, isIdle = false, preConvertedYomi = null)
     }
 
     if (!isIdle && currentVoicevoxSource && isVoicevoxPlaying && currentPlayingIsIdle) {
-        console.log('[VOICEVOX] 独り言を中断してコメントを優先します！');
+        const radioModeToggle = document.getElementById('ai-radio-mode-toggle');
+        const isRadioMode = radioModeToggle && radioModeToggle.checked;
+        console.log(isRadioMode ? '[VOICEVOX] ラジオ台本を中断してコメントを優先します！' : '[VOICEVOX] 独り言を中断してコメントを優先します！');
         try {
             currentVoicevoxSource.stop(); // This triggers onended -> playNextVoicevox()
         } catch (e) {
@@ -4036,7 +4471,7 @@ async function playNextVoicevox() {
             const aiRemakeToggle = document.getElementById('ai-idle-remake-toggle');
             const aiApiKeyInput = document.getElementById('ai-api-key');
             const hasApiKey = aiApiKeyInput && aiApiKeyInput.value.trim();
-            const isRadioActive = isRadioMode && aiRemakeToggle && aiRemakeToggle.checked && hasApiKey;
+            const isRadioActive = isRadioMode; // ラジオモードはAI機能に依存しない
 
             if (isRadioActive &&
                 radioModeState.currentPhase === 'playing' &&
@@ -4111,41 +4546,64 @@ if (overlayEndBtn && streamOverlay) {
         if (typeof clearIdleTimer === 'function') {
             clearIdleTimer();
         }
+        if (typeof chatQueue !== 'undefined') {
+            chatQueue.length = 0;
+        }
 
         // BGMの停止処理
         wasBgmPlayingBeforeOverlay = bgmIsPlaying;
         if (bgmIsPlaying && typeof stopBgm === 'function') {
             stopBgm();
         }
+
+        // API自動終了中ではない手動操作の場合、コメント取得も即座に切断する
+        if (!window.isStreamEndProcessRunning) {
+            if (typeof isYoutubeIntendedConnect !== 'undefined' && isYoutubeIntendedConnect) {
+                const ytBtn = document.getElementById('youtube-connect-btn');
+                if (ytBtn) ytBtn.click();
+            }
+            if (typeof isTiktokIntendedConnect !== 'undefined' && isTiktokIntendedConnect) {
+                const ttBtn = document.getElementById('tiktok-connect-btn');
+                if (ttBtn) ttBtn.click();
+            }
+        }
     });
 }
-if (overlayClearBtn && streamOverlay) {
-    overlayClearBtn.addEventListener('click', () => {
-        streamOverlay.classList.remove('active');
+window.executeOverlayClearProcess = function() {
+    if (!streamOverlay) return;
+    streamOverlay.classList.remove('active');
 
-        // BGMの再開処理 (準備中 or 終了画面から戻ったときのみ)
-        if ((isPreparing || isStreamEndedState) && wasBgmPlayingBeforeOverlay) {
-            const playBtn = document.getElementById('bgm-play-btn');
-            if (playBtn && !bgmIsPlaying) {
-                playBtn.click();
-            }
-            wasBgmPlayingBeforeOverlay = false;
+    // BGMの再開処理 (準備中 or 終了画面から戻ったときのみ)
+    if ((isPreparing || isStreamEndedState) && wasBgmPlayingBeforeOverlay) {
+        const playBtn = document.getElementById('bgm-play-btn');
+        if (playBtn && !bgmIsPlaying) {
+            playBtn.click();
         }
+        wasBgmPlayingBeforeOverlay = false;
+    }
 
-        isStreamEndedState = false;
+    isStreamEndedState = false;
+    window.isStreamEndProcessRunning = false;
 
-        // 配信準備中を解除したときに挨拶
-        if (isPreparing) {
-            isPreparing = false;
-            if (isVoicevoxEnabled) {
-                const startTextEl = document.getElementById('stream-start-text');
-                const startText = startTextEl ? startTextEl.value : "配信を開始しました！皆さんよろしくお願いします！";
+    // 配信準備中を解除したときに挨拶
+    if (isPreparing) {
+        isPreparing = false;
+        if (typeof isVoicevoxEnabled !== 'undefined' && isVoicevoxEnabled) {
+            const startTextEl = document.getElementById('stream-start-text');
+            const startText = startTextEl ? startTextEl.value : "配信を開始しました！皆さんよろしくお願いします！";
+            if (typeof queueVoicevoxAudio === 'function') {
                 queueVoicevoxAudio(startText, false).catch(e => console.warn(e));
             }
-        } else {
-            // 配信終了状態からの解除などの場合は、独り言タイマーを即座に再開する
-            if (typeof resetIdleTimer === 'function') resetIdleTimer();
         }
+    } else {
+        // 配信終了状態からの解除などの場合は、独り言タイマーを即座に再開する
+        if (typeof resetIdleTimer === 'function') resetIdleTimer();
+    }
+};
+
+if (overlayClearBtn && streamOverlay) {
+    overlayClearBtn.addEventListener('click', () => {
+        window.executeOverlayClearProcess();
     });
 }
 
@@ -4355,6 +4813,75 @@ if (clockToggle && streamClock) {
         });
     }
 
+    window.executeStreamEndProcess = function() {
+        if (window.isStreamEndProcessRunning) return;
+        window.isStreamEndProcessRunning = true;
+        
+        console.log("[システム] APIとOBS連携による配信終了プロセスを実行します");
+        
+        // 配信終了処理に入ったら、未読コメントを破棄してこれ以上読まないようにする
+        if (typeof chatQueue !== 'undefined') {
+            chatQueue.length = 0; // 配列を空にする
+            console.log("[システム] コメントキューをクリアしました");
+        }
+        
+        // 配信終了画面（オーバーレイ）に自動で切り替え
+        const endBtn = document.getElementById('overlay-end-btn');
+        if (endBtn) {
+            console.log("[システム] 配信終了画面に切り替えます");
+            endBtn.click();
+        }
+
+        // BGMやVoicevoxが完全に停止するのを待つポーリング
+        const checkInterval = setInterval(() => {
+            // voicevoxAudioQueue が空で、かつ isVoicevoxPlaying が false なら完了とみなす
+            const voicevoxDone = (typeof voicevoxAudioQueue !== 'undefined' ? voicevoxAudioQueue.length === 0 : true) && 
+                                 (typeof isVoicevoxPlaying !== 'undefined' ? !isVoicevoxPlaying : true);
+            
+            // BGMの停止確認
+            const bgmDone = (typeof bgmIsPlaying !== 'undefined' ? !bgmIsPlaying : true);
+
+            if (voicevoxDone && bgmDone) {
+                clearInterval(checkInterval);
+                console.log("[システム] ボイスとBGMの停止を確認しました。配信インフラを切断します...");
+
+                if (typeof youtubeWs !== 'undefined' && youtubeWs && youtubeWs.readyState === 1) { // WebSocket.OPEN
+                    console.log("Sending end_youtube_stream command...");
+                    const videoInput = document.getElementById('youtube-video-input');
+                    const videoId = videoInput ? videoInput.value.trim() : '';
+                    youtubeWs.send(JSON.stringify({ type: 'end_youtube_stream', videoId: videoId }));
+
+                    // コメント取得も自動で切断する
+                    setTimeout(() => {
+                        console.log("Disconnecting YouTube comment polling...");
+                        if (typeof isYoutubeIntendedConnect !== 'undefined' && isYoutubeIntendedConnect) {
+                            const ytBtn = document.getElementById('youtube-connect-btn');
+                            if (ytBtn) ytBtn.click();
+                        }
+                    }, 1000);
+                }
+
+                // TikTokコメント取得も自動で切断する
+                if (typeof tiktokWs !== 'undefined' && tiktokWs && tiktokWs.readyState === 1) {
+                    setTimeout(() => {
+                        console.log("Disconnecting TikTok comment polling...");
+                        if (typeof isTiktokIntendedConnect !== 'undefined' && isTiktokIntendedConnect) {
+                            const ttBtn = document.getElementById('tiktok-connect-btn');
+                            if (ttBtn) ttBtn.click();
+                        }
+                    }, 1000);
+                }
+
+                if (typeof isObsWsConnected !== 'undefined' && isObsWsConnected && typeof obsWsClient !== 'undefined' && obsWsClient) {
+                    console.log("Sending StopStream to OBS...");
+                    obsWsClient.call('StopStream').catch(err => {
+                        console.error('Failed to stop OBS stream:', err);
+                    });
+                }
+            }
+        }, 500); // 0.5秒ごとにチェック
+    };
+
     const updateClock = () => {
         const now = new Date();
         const year = now.getFullYear();
@@ -4382,29 +4909,10 @@ if (clockToggle && streamClock) {
 
                 queueVoicevoxAudio(voiceText, false).catch(e => console.warn(e));
 
-                // 配信終了画面に切り替え (ボイス開始の少し後)
-                setTimeout(() => {
-                    const endBtn = document.getElementById('overlay-end-btn');
-                    if (endBtn) endBtn.click();
-                }, 5000);
-
                 // APIで配信終了
-                const waitSeconds = (streamEndWaitInput && streamEndWaitInput.value) ? parseInt(streamEndWaitInput.value) : 10;
-                setTimeout(() => {
-                    if (youtubeWs && youtubeWs.readyState === WebSocket.OPEN) {
-                        console.log("Sending end_youtube_stream command...");
-                        const videoId = document.getElementById('youtube-video-input').value.trim();
-                        youtubeWs.send(JSON.stringify({ type: 'end_youtube_stream', videoId: videoId }));
-                    }
-
-                    // OBS側のストリームも自動停止する
-                    if (isObsWsConnected && obsWsClient) {
-                        console.log("Sending StopStream to OBS...");
-                        obsWsClient.call('StopStream').catch(err => {
-                            console.error('Failed to stop OBS stream:', err);
-                        });
-                    }
-                }, waitSeconds * 1000);
+                if (typeof window.executeStreamEndProcess === 'function') {
+                    window.executeStreamEndProcess();
+                }
             }
             // 翌日など再び時刻がずれたらフラグを戻す
             if (hasAnnouncedEnd && `${h}:${m}` !== streamEndTimeInput.value) {
@@ -4858,10 +5366,19 @@ function bindUIEvents() {
 
                     console.log('[Local Schedule] 指定時刻になりました。BGMとラジオを自動開始します。');
 
-                    // BGMが止まっていたら再生
+                    // オーバーレイの解除
+                    if (typeof window.executeOverlayClearProcess === 'function') {
+                        window.executeOverlayClearProcess();
+                    } else {
+                        const streamOverlayEl = document.getElementById('stream-overlay');
+                        if (streamOverlayEl) streamOverlayEl.classList.remove('active');
+                        if (typeof isPreparing !== 'undefined') isPreparing = false;
+                    }
+
+                    // BGMを最初から再生（既に再生中でも再スタート）
                     const bgmPlayBtn = document.getElementById('bgm-play-btn');
-                    if (bgmPlayBtn && !bgmPlayBtn.disabled && (!bgmSource || bgmAudioContext.state === 'suspended' || document.getElementById('bgm-stop-btn').disabled)) {
-                        console.log('[Local Schedule] BGMを自動再生');
+                    if (bgmPlayBtn && (typeof bgmBuffer !== 'undefined') && bgmBuffer) {
+                        console.log('[Local Schedule] BGMを最初から再生');
                         bgmPlayBtn.click();
                     }
 
@@ -5106,6 +5623,30 @@ function bindUIEvents() {
         if (savedDesc) streamDescInput.value = savedDesc;
         streamDescInput.addEventListener('input', () => {
             localStorage.setItem('savedStreamDesc', streamDescInput.value);
+            const ytDescTextarea = document.getElementById('yt-desc-textarea');
+            if (ytDescTextarea) {
+                ytDescTextarea.value = streamDescInput.value;
+                const charcount = document.getElementById('yt-desc-charcount');
+                if (charcount) charcount.textContent = `${ytDescTextarea.value.length}文字`;
+            }
+        }, { signal: __uiSignal });
+    }
+
+    const aiStreamSnsInput = document.getElementById('ai-stream-sns');
+    if (aiStreamSnsInput) {
+        const savedSns = localStorage.getItem('savedAiStreamSns');
+        if (savedSns) aiStreamSnsInput.value = savedSns;
+        aiStreamSnsInput.addEventListener('input', () => {
+            localStorage.setItem('savedAiStreamSns', aiStreamSnsInput.value);
+        }, { signal: __uiSignal });
+    }
+
+    const aiStreamCreditsInput = document.getElementById('ai-stream-credits');
+    if (aiStreamCreditsInput) {
+        const savedCredits = localStorage.getItem('savedAiStreamCredits');
+        if (savedCredits) aiStreamCreditsInput.value = savedCredits;
+        aiStreamCreditsInput.addEventListener('input', () => {
+            localStorage.setItem('savedAiStreamCredits', aiStreamCreditsInput.value);
         }, { signal: __uiSignal });
     }
 
@@ -5408,29 +5949,42 @@ function bindUIEvents() {
     if (openThumbEditorBtn) {
         openThumbEditorBtn.addEventListener('click', () => {
             if (thumbEditorModal) thumbEditorModal.style.display = 'flex';
-            if (thumbEditTitle && streamTitleInput) thumbEditTitle.value = streamTitleInput.value;
-            if (thumbEditDesc && streamDescInput) thumbEditDesc.value = streamDescInput.value;
+            
+            const thumbFilenameInput = document.getElementById('thumb-filename-input');
+            if (thumbFilenameInput && (!thumbFilenameInput.value || thumbFilenameInput.value === 'thumbnail')) {
+                const now = new Date();
+                const yyyymmdd = String(now.getFullYear()) + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+                const title = (streamTitleInput && streamTitleInput.value.trim()) ? streamTitleInput.value.trim() : 'サムネ';
+                thumbFilenameInput.value = `${yyyymmdd}_${title}`;
+            }
+
             captureAvatarFrame(); // 初回表示時に今のポーズを取得
             drawThumbPreview();
         }, { signal: __uiSignal });
     }
 
     if (thumbEditTitle) {
+        const savedThumbTitle = localStorage.getItem('savedThumbTitle');
+        if (savedThumbTitle !== null) {
+            thumbEditTitle.value = savedThumbTitle;
+        } else if (streamTitleInput) {
+            thumbEditTitle.value = streamTitleInput.value;
+        }
         thumbEditTitle.addEventListener('input', () => {
-            if (streamTitleInput) {
-                streamTitleInput.value = thumbEditTitle.value;
-                localStorage.setItem('savedStreamTitle', streamTitleInput.value);
-            }
+            localStorage.setItem('savedThumbTitle', thumbEditTitle.value);
             drawThumbPreview();
         }, { signal: __uiSignal });
     }
 
     if (thumbEditDesc) {
+        const savedThumbDesc = localStorage.getItem('savedThumbDesc');
+        if (savedThumbDesc !== null) {
+            thumbEditDesc.value = savedThumbDesc;
+        } else if (streamDescInput) {
+            thumbEditDesc.value = streamDescInput.value;
+        }
         thumbEditDesc.addEventListener('input', () => {
-            if (streamDescInput) {
-                streamDescInput.value = thumbEditDesc.value;
-                localStorage.setItem('savedStreamDesc', streamDescInput.value);
-            }
+            localStorage.setItem('savedThumbDesc', thumbEditDesc.value);
             drawThumbPreview();
         }, { signal: __uiSignal });
     }
@@ -5441,13 +5995,82 @@ function bindUIEvents() {
         }, { signal: __uiSignal });
     }
 
+    const thumbFilenameInput = document.getElementById('thumb-filename-input');
+    if (thumbFilenameInput) {
+        const savedFilename = localStorage.getItem('savedThumbFilename');
+        if (savedFilename !== null) {
+            thumbFilenameInput.value = savedFilename;
+        }
+        thumbFilenameInput.addEventListener('input', () => {
+            localStorage.setItem('savedThumbFilename', thumbFilenameInput.value);
+        }, { signal: __uiSignal });
+    }
+
     if (thumbDownloadBtn) {
-        thumbDownloadBtn.addEventListener('click', () => {
+        thumbDownloadBtn.addEventListener('click', async () => {
             if (!thumbPreviewCanvas) return;
+            
+            let baseName = 'thumbnail';
+            if (thumbFilenameInput && thumbFilenameInput.value.trim()) {
+                baseName = thumbFilenameInput.value.trim();
+            } else if (thumbEditTitle && thumbEditTitle.value.trim()) {
+                baseName = thumbEditTitle.value.trim();
+            } else if (streamTitleInput && streamTitleInput.value.trim()) {
+                baseName = streamTitleInput.value.trim();
+            }
+            
+            baseName = baseName.replace(/[\\/:*?"<>|#]/g, '_').trim().substring(0, 50);
+
+            const dataUrl = thumbPreviewCanvas.toDataURL('image/png');
+            const arr = dataUrl.split(',');
+            const mime = arr[0].match(/:(.*?);/)[1];
+            const bstr = atob(arr[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) {
+                u8arr[n] = bstr.charCodeAt(n);
+            }
+            const blob = new Blob([u8arr], { type: mime });
+            const suggestedFilename = `${baseName}_thumb.png`;
+
+            // 保存ダイアログを表示する新しいAPI（対応ブラウザのみ）
+            if ('showSaveFilePicker' in window) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: suggestedFilename,
+                        types: [{
+                            description: 'PNG画像',
+                            accept: {'image/png': ['.png']},
+                        }],
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    return; // 保存成功時はここで処理終了
+                } catch (err) {
+                    if (err.name === 'AbortError') return; // キャンセルされた場合
+                    console.error('SaveFilePicker error:', err);
+                    // エラー時は従来のaタグダウンロードへフォールバック
+                }
+            }
+
+            // フォールバック（従来のダウンロード方式）
+            const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
-            link.download = 'thumbnail.png';
-            link.href = thumbPreviewCanvas.toDataURL('image/png');
-            link.click();
+            link.download = suggestedFilename;
+            link.href = url;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            
+            const event = new MouseEvent('click', {
+                view: window,
+                bubbles: true,
+                cancelable: true
+            });
+            link.dispatchEvent(event);
+            
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
         }, { signal: __uiSignal });
     }
 
@@ -5484,12 +6107,14 @@ function bindUIEvents() {
         }
     };
 
-    // ローカルストレージで保存
+    // ローカルストレージで保存・streamDescInputとの同期
     if (ytDescTextarea) {
-        const saved = localStorage.getItem('savedYtDescription');
+        const saved = localStorage.getItem('savedStreamDesc'); // savedYtDescription から統一
         if (saved) ytDescTextarea.value = saved;
+        
         ytDescTextarea.addEventListener('input', () => {
-            localStorage.setItem('savedYtDescription', ytDescTextarea.value);
+            localStorage.setItem('savedStreamDesc', ytDescTextarea.value);
+            if (streamDescInput) streamDescInput.value = ytDescTextarea.value;
             updateYtDescCount();
         }, { signal: __uiSignal });
         updateYtDescCount();
@@ -5498,6 +6123,10 @@ function bindUIEvents() {
     // 編集ボタン → モーダルを開く
     if (editYtDescBtn && ytDescModal) {
         editYtDescBtn.addEventListener('click', () => {
+            if (streamDescInput && ytDescTextarea) {
+                // 開くときに最新の streamDescInput の値を反映
+                ytDescTextarea.value = streamDescInput.value;
+            }
             ytDescModal.style.display = 'flex';
             updateYtDescCount();
         }, { signal: __uiSignal });
@@ -5619,26 +6248,45 @@ function bindUIEvents() {
             }
 
             const theme = aiStreamThemeInput.value.trim() || 'おまかせ（今日の配信）';
+            const jpNames = { hiyori: 'ひより', akari: 'あかり', hijiki: 'ひじき', tororo: 'とろろ', wanko: 'わんこ' };
+            const charName = jpNames[currentModelId] || 'VTuber';
+
+            const radioScriptTextarea = document.getElementById('radio-script-textarea');
+            const scriptContent = radioScriptTextarea ? radioScriptTextarea.value.trim() : '';
+            
+            let themeContext = `以下のキーワードやテーマを元に、YouTube配信用の「配信タイトル」と「概要文」のセットを10通り作成してください。\n\nキーワード・テーマ: ${theme}`;
+            
+            if (scriptContent) {
+                themeContext = `以下の「キーワード・テーマ」と、今回の配信で実際に話す「ラジオ台本」を元にして、この配信の内容が魅力的に伝わるYouTube配信用の「配信タイトル」と「概要文」のセットを10通り作成してください。\n台本の内容を踏まえた具体的なあらすじや見どころを概要文に盛り込んでください。\n\nキーワード・テーマ: ${theme}\n\n【今回のラジオ台本（参考）】\n${scriptContent}`;
+            }
+
+            const userSns = document.getElementById('ai-stream-sns')?.value.trim();
+            const userCredits = document.getElementById('ai-stream-credits')?.value.trim();
+            
+            const snsInstruction = userSns 
+                ? `3. X(Twitter)などのSNSへのリンク（以下のユーザー指定のリンクをそのまま使用してください）\n   ${userSns}`
+                : `3. X(Twitter)などのSNSへのリンク（URLは https://twitter.com/${currentModelId}_vtuber のようなダミーを生成してください）`;
+                
+            const creditsInstruction = userCredits
+                ? `5. 素材・モデルのクレジット表記（以下のユーザー指定の内容をそのまま使用してください）\n   ${userCredits}`
+                : `5. 素材・モデルのクレジット表記（以下の内容を必ず含めてください）\n   - Live2Dモデル: 「${charName}」© Live2D Inc. (Live2D Creative Studio サンプルモデル)\n   - BGMやその他素材（ダミーで構いません）`;
+
             const prompt = `あなたはプロのVTuber配信マネージャーです。
-以下のキーワードやテーマを元に、YouTube配信用の「配信タイトル」と「概要文」のセットを10通り作成してください。
+${themeContext}
 
 【概要文の要件】
 他の人気VTuberがよくやっているように、以下の要素を盛り込んでリッチな概要文にしてください：
 1. 配信のあらすじ・見どころ（元気な挨拶を含む）
-2. 関連するハッシュタグ（例: #水森りんご 等）
-3. X(Twitter)などのSNSへのリンク（URLは https://twitter.com/... のようなダミーでOK）
+2. 関連するハッシュタグ（あなたの名前「${charName}」を含めた配信用のオリジナルハッシュタグを2〜3個作成してください）
+${snsInstruction}
 4. 視聴者へのお願い・配信のルール（「話題に出ていない他の配信者の名前を出さない」「伝書鳩NG」「荒らしはブロック＆スルー」など）
-5. 素材・モデルのクレジット表記（以下の内容を必ず含めてください）
-   - Live2Dモデル: 「とろろ」© Live2D Inc. (Live2D Creative Studio サンプルモデル)
-   - BGMやその他素材（ダミーで構いません）
+${creditsInstruction}
 
 必ず以下のJSONフォーマットのみを返してください（マークダウンやバッククォート、説明などは一切不要です）。
 [
   { "title": "タイトル1", "description": "概要1" },
   { "title": "タイトル2", "description": "概要2" }
-]
-
-キーワード・テーマ: ${theme}`;
+]`;
 
             aiGenerateStreamBtn.textContent = '✨ 生成中...';
             aiGenerateStreamBtn.disabled = true;
@@ -5685,6 +6333,9 @@ function bindUIEvents() {
                 const candidates = JSON.parse(jsonText);
 
                 // モーダルにレンダリング
+                const modalTitle = aiCandidatesModal.querySelector('h3');
+                if (modalTitle) modalTitle.textContent = '✨ AI生成の候補';
+
                 aiCandidatesList.innerHTML = '';
                 candidates.forEach((cand, i) => {
                     const div = document.createElement('div');
@@ -5701,7 +6352,15 @@ function bindUIEvents() {
                     applyBtn.textContent = '適用する';
                     applyBtn.onclick = () => {
                         if (streamTitleInput) streamTitleInput.value = cand.title;
-                        if (streamDescInput) streamDescInput.value = cand.description;
+                        if (streamDescInput) {
+                            streamDescInput.value = cand.description;
+                            const ytDescTextarea = document.getElementById('yt-desc-textarea');
+                            if (ytDescTextarea) {
+                                ytDescTextarea.value = cand.description;
+                                const charcount = document.getElementById('yt-desc-charcount');
+                                if (charcount) charcount.textContent = `${cand.description.length}文字`;
+                            }
+                        }
                         localStorage.setItem('savedStreamTitle', cand.title);
                         localStorage.setItem('savedStreamDesc', cand.description);
                         aiCandidatesModal.style.display = 'none';
@@ -5721,6 +6380,128 @@ function bindUIEvents() {
             } finally {
                 aiGenerateStreamBtn.textContent = '✨ AI生成';
                 aiGenerateStreamBtn.disabled = false;
+            }
+        }, { signal: __uiSignal });
+    }
+
+    const aiGenerateThemeBtn = document.getElementById('ai-generate-theme-btn');
+    if (aiGenerateThemeBtn) {
+        aiGenerateThemeBtn.addEventListener('click', async () => {
+            const apiKey = localStorage.getItem('savedAiApiKey');
+            const provider = localStorage.getItem('savedAiProvider') || 'gemini';
+            const aiModel = localStorage.getItem('savedAiModel') || (provider === 'openai' ? 'gpt-4o-mini' : 'gemini-1.5-flash');
+
+            if (!apiKey) {
+                alert('AI設定タブでAPIキーを設定してください。');
+                return;
+            }
+
+            const configDate = document.getElementById('radio-config-date')?.value || '';
+            const configTime = document.getElementById('radio-config-start-time')?.value || '';
+            let contextStr = '';
+            if (configDate || configTime) {
+                contextStr = `\n【配信日時】\n${configDate} ${configTime}\n※この配信日時（季節、時期、時間帯など）にマッチしたタイムリーなお題もいくつか含めてください。\n`;
+            }
+
+            const prompt = `あなたはプロのラジオ番組の放送作家です。
+VTuberが配信で語る「10分〜20分程度のフリートーク（雑談）」に向いている、面白くて話題が広がりやすいお題（テーマ）を10個提案してください。
+日常のちょっとしたあるある、季節の話題、クスッと笑える失敗談、最近の個人的な発見など、リスナーも共感しやすいお題が最適です。${contextStr}
+必ず以下のJSONフォーマットのみを返してください（マークダウンやバッククォート、説明などは一切不要です）。
+[
+  { "title": "お題の短いタイトル", "description": "そのお題でどんな話を展開できそうかの簡単な説明（1〜2文）" },
+  { "title": "別のタイトル", "description": "別の説明" }
+]`;
+
+            aiGenerateThemeBtn.textContent = '✨ 生成中...';
+            aiGenerateThemeBtn.disabled = true;
+
+            try {
+                let jsonText = '';
+                if (provider === 'openai') {
+                    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: aiModel,
+                            messages: [{ role: 'user', content: prompt }],
+                            temperature: 0.8
+                        })
+                    });
+                    if (!res.ok) throw new Error('OpenAI API Error');
+                    const data = await res.json();
+                    jsonText = data.choices[0].message.content;
+                } else {
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${aiModel}:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            generationConfig: { temperature: 0.8 }
+                        })
+                    });
+                    if (!res.ok) throw new Error('Gemini API Error');
+                    const data = await res.json();
+                    jsonText = data.candidates[0].content.parts[0].text;
+                }
+
+                if (jsonText.includes('```json')) {
+                    jsonText = jsonText.split('```json')[1].split('```')[0].trim();
+                } else if (jsonText.includes('```')) {
+                    jsonText = jsonText.split('```')[1].split('```')[0].trim();
+                }
+
+                const candidates = JSON.parse(jsonText);
+
+                const aiCandidatesModal = document.getElementById('ai-candidates-modal');
+                const aiCandidatesList = document.getElementById('ai-candidates-list');
+                
+                if (!aiCandidatesModal || !aiCandidatesList) return;
+
+                aiCandidatesList.innerHTML = '';
+                candidates.forEach((cand, i) => {
+                    const div = document.createElement('div');
+                    div.className = 'ai-candidate-item';
+
+                    const title = document.createElement('h4');
+                    title.textContent = `${i + 1}. ${cand.title}`;
+
+                    const desc = document.createElement('p');
+                    desc.textContent = cand.description;
+
+                    const applyBtn = document.createElement('button');
+                    applyBtn.className = 'apply-btn';
+                    applyBtn.textContent = '適用する';
+                    applyBtn.onclick = () => {
+                        const radioConfigTheme = document.getElementById('radio-config-theme');
+                        if (radioConfigTheme) {
+                            radioConfigTheme.value = cand.title;
+                            // 自動的にテーマ入力欄の変更イベントを発火（もし必要なら）
+                            radioConfigTheme.dispatchEvent(new Event('input'));
+                        }
+                        aiCandidatesModal.style.display = 'none';
+                    };
+
+                    div.appendChild(title);
+                    div.appendChild(desc);
+                    div.appendChild(applyBtn);
+                    aiCandidatesList.appendChild(div);
+                });
+
+                // モーダルのタイトルをお題用に一時変更
+                const modalTitle = aiCandidatesModal.querySelector('h3');
+                if (modalTitle) modalTitle.textContent = '✨ フリートークのお題候補';
+
+                aiCandidatesModal.style.display = 'flex';
+
+            } catch (err) {
+                console.error(err);
+                alert('AI生成に失敗しました。\\n' + err.message);
+            } finally {
+                aiGenerateThemeBtn.textContent = '✨ AIにおまかせ生成';
+                aiGenerateThemeBtn.disabled = false;
             }
         }, { signal: __uiSignal });
     }
@@ -5980,6 +6761,214 @@ const unlockAudio = () => {
         checkAndHideBanner();
     }, 100);
 };
+
+// ==========================================
+// ニュース番組モード (News Program Mode)
+// ==========================================
+const newsFetchBtn = document.getElementById('news-fetch-btn');
+const newsContinuousToggle = document.getElementById('news-continuous-toggle');
+const newsRssUrlInput = document.getElementById('news-rss-url');
+const newsBoard = document.getElementById('news-board');
+const newsArticleTitle = document.getElementById('news-article-title');
+const newsArticleDesc = document.getElementById('news-article-desc');
+const newsArticleDate = document.getElementById('news-article-date');
+
+let isContinuousNewsMode = false;
+let continuousNewsItems = [];
+let isReadingNews = false;
+
+async function playNextContinuousNews(isOneOff = false) {
+    if (isReadingNews) return;
+    if (!isOneOff && !isContinuousNewsMode) return;
+
+    // --- 終了1分前チェック ---
+    const autoEndToggle = document.getElementById('stream-end-toggle');
+    const endTimeInput = document.getElementById('stream-end-time');
+    if (!isOneOff && autoEndToggle && autoEndToggle.checked && endTimeInput && endTimeInput.value) {
+        const now = new Date();
+        const [targetH, targetM] = endTimeInput.value.split(':').map(Number);
+        const targetDate = new Date();
+        targetDate.setHours(targetH, targetM, 0, 0);
+        
+        // もし目標時刻が過去になっていたら明日にする
+        if (targetDate < now) targetDate.setDate(targetDate.getDate() + 1);
+        
+        const diffSec = (targetDate - now) / 1000;
+        console.log(`[ニュースモード] 自動終了時刻までの残り時間: ${Math.floor(diffSec)}秒`);
+        
+        if (diffSec > 0 && diffSec <= 60) {
+            // 終了1分前を切った！
+            console.log("[ニュースモード] 終了1分前を切ったため、連続モードを終了して締めの挨拶に入ります。");
+            isContinuousNewsMode = false;
+            if (newsContinuousToggle) newsContinuousToggle.checked = false;
+            
+            // 締めの挨拶
+            const isZunda = currentModelId === 'zundamon' || currentModelId === 'zundamon_human';
+            const zundaPrompt = isZunda ? "語尾に「のだ」「なのだ」をつけてずんだもんになりきってください。" : "";
+            const prompt = `あなたはVTuberの配信者です。配信の終了時間が1分後に迫っています。これまで読んでいたニュースコーナーを締めくくり、リスナーに向けて「本日のニュースは以上になります。それでは、配信終了のお時間までごゆっくりお過ごしください！」といった内容の挨拶を1〜2文で述べてください。余計な説明や括弧書きは不要です。${zundaPrompt}`;
+            
+            const apiKeyInput = document.getElementById('ai-api-key');
+            const providerSelect = document.getElementById('ai-provider-select');
+            
+            if (apiKeyInput && apiKeyInput.value.trim()) {
+                const text = await aiFeatures.callAI(prompt, apiKeyInput.value.trim(), providerSelect ? providerSelect.value : 'gemini', true);
+                if (text) {
+                    let phraseToSpeak = aiFeatures.adjustIdlePhraseForModel(text, currentModelId);
+                    queueVoicevoxAudio(phraseToSpeak, true).catch(e => console.warn(e));
+                }
+            }
+            return;
+        }
+    }
+
+    isReadingNews = true;
+    
+    try {
+        const rssUrl = newsRssUrlInput ? newsRssUrlInput.value.trim() : 'https://www.nhk.or.jp/rss/news/cat0.xml';
+        if (!rssUrl) throw new Error('RSS URLが設定されていません');
+
+        const apiKeyInput = document.getElementById('ai-api-key');
+        const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+        if (!apiKey) throw new Error('AIのAPIキー（Gemini等）が設定されていません');
+
+        // キューが空ならRSSから取得
+        if (continuousNewsItems.length === 0) {
+            console.log("[ニュースモード] RSSからニュースを取得中...");
+            const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`);
+            const json = await res.json();
+            if (json.status !== 'ok' || !json.items || json.items.length === 0) {
+                throw new Error("ニュースを取得できませんでした。");
+            }
+            // ランダムに並び替えてプールに入れる
+            continuousNewsItems = json.items.sort(() => Math.random() - 0.5);
+        }
+
+        const item = continuousNewsItems.shift();
+
+        // 画面表示
+        newsArticleTitle.textContent = item.title;
+        const tmpDiv = document.createElement('div');
+        tmpDiv.innerHTML = item.description || "";
+        let plainDesc = tmpDiv.textContent || tmpDiv.innerText || "";
+        if (plainDesc.length > 100) plainDesc = plainDesc.substring(0, 100) + '...';
+        newsArticleDesc.textContent = plainDesc;
+        newsArticleDate.textContent = item.pubDate ? new Date(item.pubDate.replace(/-/g, '/')).toLocaleString() : new Date().toLocaleString();
+
+        newsBoard.classList.add('active');
+
+        // 独り言一時停止
+        if (typeof clearIdleTimer === 'function') clearIdleTimer();
+
+        // プロンプト作成
+        const providerSelect = document.getElementById('ai-provider-select');
+        const provider = providerSelect ? providerSelect.value : 'gemini';
+        const isZunda = currentModelId === 'zundamon' || currentModelId === 'zundamon_human';
+        const zundaPrompt = isZunda ? "語尾に「のだ」「なのだ」をつけてずんだもんになりきってください。" : "";
+        
+        let introInstruction = isOneOff ? "まずリスナーに向けて1文で要約して紹介し" : "「次のニュースです」などと一言添えてからリスナーに向けて1文で要約し";
+
+        const prompt = `あなたはVTuberの配信者です。以下のニュース記事について、${introInstruction}、続けてあなた自身の率直な感想やリアクションを1〜2文で述べてください。余計な説明や括弧書きは不要です。${zundaPrompt}
+        
+【ニュースタイトル】
+${item.title}
+
+【概要】
+${plainDesc}`;
+
+        console.log("[ニュースモード] AIにリクエスト中...");
+        const generatedText = await aiFeatures.callAI(prompt, apiKey, provider, true);
+
+        // API待機中に配信終了画面になった場合は中断する
+        if (typeof isStreamEndedState !== 'undefined' && isStreamEndedState) {
+            console.log("[ニュースモード] 配信終了状態になったため、ニュースの読み上げを中断します。");
+            newsBoard.classList.remove('active');
+            isReadingNews = false;
+            return;
+        }
+
+        if (generatedText) {
+            // VOICEVOXにキュー追加
+            setTimeout(() => {
+                let phraseToSpeak = aiFeatures.adjustIdlePhraseForModel(generatedText, currentModelId);
+                const idleFirstPerson = document.getElementById('idle-first-person');
+                if (idleFirstPerson && idleFirstPerson.value) {
+                    const fp = idleFirstPerson.value;
+                    phraseToSpeak = phraseToSpeak.replace(/わたくし|わたし|あたし|私|ぼく|僕|おれ|俺|うち/g, fp);
+                }
+
+                if (typeof aiChatHistory !== 'undefined') {
+                    aiChatHistory.push({ role: 'assistant', content: phraseToSpeak });
+                    if (aiChatHistory.length > 10) aiChatHistory.shift();
+                }
+
+                queueVoicevoxAudio(phraseToSpeak, true).catch(e => console.warn(e));
+
+                // 読み上げ完了を監視
+                const checkInterval = setInterval(() => {
+                    const isDone = (typeof voicevoxAudioQueue !== 'undefined' ? voicevoxAudioQueue.length === 0 : true) && 
+                                   (typeof isVoicevoxPlaying !== 'undefined' ? !isVoicevoxPlaying : true);
+                    if (isDone) {
+                        clearInterval(checkInterval);
+                        setTimeout(() => {
+                            newsBoard.classList.remove('active');
+                            isReadingNews = false;
+                            
+                            if (isOneOff) {
+                                if (typeof resetIdleTimer === 'function') resetIdleTimer();
+                            } else if (isContinuousNewsMode) {
+                                // 連続モードの場合は数秒後に次へ
+                                setTimeout(() => {
+                                    playNextContinuousNews();
+                                }, 4000);
+                            } else {
+                                if (typeof resetIdleTimer === 'function') resetIdleTimer();
+                            }
+                        }, 3000);
+                    }
+                }, 1000);
+            }, 1000);
+        } else {
+            throw new Error("AIがテキストを生成しませんでした");
+        }
+
+    } catch (error) {
+        console.error("[ニュースモード] エラー:", error);
+        newsArticleDesc.textContent = "エラーが発生しました: " + error.message;
+        setTimeout(() => {
+            newsBoard.classList.remove('active');
+            isReadingNews = false;
+            
+            if (isContinuousNewsMode) {
+                // エラーでも数秒後にリトライ
+                setTimeout(() => {
+                    playNextContinuousNews();
+                }, 10000);
+            } else {
+                if (typeof resetIdleTimer === 'function') resetIdleTimer();
+            }
+        }, 3000);
+    }
+}
+
+if (newsFetchBtn) {
+    newsFetchBtn.addEventListener('click', () => {
+        if (!newsBoard) return;
+        isContinuousNewsMode = false;
+        if (newsContinuousToggle) newsContinuousToggle.checked = false;
+        continuousNewsItems = []; // リセット
+        playNextContinuousNews(true);
+    });
+}
+
+if (newsContinuousToggle) {
+    newsContinuousToggle.addEventListener('change', (e) => {
+        isContinuousNewsMode = e.target.checked;
+        if (isContinuousNewsMode) {
+            continuousNewsItems = []; // 新しく始める
+            if (!isReadingNews) playNextContinuousNews(false);
+        }
+    });
+}
 
 // イベントリスナーは常に追加しておき、何度でもリトライできるようにする
 window.addEventListener('click', unlockAudio);

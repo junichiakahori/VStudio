@@ -218,6 +218,48 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
+        elif self.path == '/convert_remaining_kanji':
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            try:
+                import pykakasi
+                import re
+                kks = pykakasi.kakasi()
+                text = post_data.decode('utf-8')
+                
+                def process_segment(seg):
+                    res = kks.convert(seg)
+                    out = ""
+                    for item in res:
+                        if re.search(r'[\u4e00-\u9faf]', item['orig']):
+                            out += item['hira']
+                        else:
+                            out += item['orig']
+                    return out
+
+                output = ""
+                lines = text.split('\n')
+                for i, line in enumerate(lines):
+                    parts = re.split(r'(\[.*?\])', line)
+                    for p in parts:
+                        if p.startswith('[') and p.endswith(']'):
+                            output += p
+                        else:
+                            output += process_segment(p)
+                    if i < len(lines) - 1:
+                        output += '\n'
+
+                self.send_response(200)
+                self.send_header('Content-type', 'text/plain; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(output.encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
         else:
             self.send_response(404)
             self.end_headers()

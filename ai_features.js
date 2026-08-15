@@ -81,7 +81,7 @@ export function adjustIdlePhraseForModel(phrase, modelId) {
     return phrase;
 }
 
-export async function callAI(prompt, apiKey, provider, pureText=false) {
+export async function callAI(prompt, apiKey, provider, pureText=false, maxTokens=null) {
     try {
         if (provider === 'gemini') {
             const aiModelInput = document.getElementById('ai-model-input');
@@ -116,18 +116,22 @@ export async function callAI(prompt, apiKey, provider, pureText=false) {
             if (sysInst) msgs.push({ role: 'system', content: sysInst });
             msgs.push({ role: 'user', content: prompt });
 
+            const requestBody = {
+                model: targetModel,
+                messages: msgs,
+                temperature: 0.7
+            };
+            if (maxTokens) {
+                requestBody.max_tokens = maxTokens;
+            }
+
             const res = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${apiKey}`
                 },
-                body: JSON.stringify({
-                    model: targetModel,
-                    messages: msgs,
-                    max_tokens: 100,
-                    temperature: 0.7
-                })
+                body: JSON.stringify(requestBody)
             });
             const json = await res.json();
             if (res.ok && json.choices && json.choices.length > 0) {
@@ -174,17 +178,28 @@ export function applyCustomHiraganaDict(text) {
         }
     }
 
+    // ユーザー名に含まれるピリオドやアンダースコア（例: drone.akahori → drone akahori）を
+    // スペースに変換することでAIの誤読を防ぐ
+    processedText = processedText.replace(/([a-zA-Z0-9])([._])([a-zA-Z0-9])/g, '$1 $3');
+
     // 2. ユーザーが画面上で登録したカスタム辞書
     const aiHiraganaDict = document.getElementById('ai-hiragana-dict');
     if (!aiHiraganaDict || !aiHiraganaDict.value.trim()) return processedText;
     const lines = aiHiraganaDict.value.split('\n');
-    for (const line of lines) {
+        for (const line of lines) {
         const parts = line.split(',');
         if (parts.length >= 2) {
             const target = parts[0].trim();
             const replacement = parts[1].trim();
             if (target && replacement) {
-                processedText = processedText.split(target).join(replacement);
+                // 大文字・小文字を問わず一致するように正規表現で置換
+                try {
+                    const regex = new RegExp(target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+                    processedText = processedText.replace(regex, replacement);
+                } catch (e) {
+                    // 正規表現が無効な場合は従来の方法でフォールバック
+                    processedText = processedText.split(target).join(replacement);
+                }
             }
         }
     }
@@ -210,7 +225,7 @@ export async function convertToHiraganaWithAI(text, aiHiraganaCache, saveHiragan
     const provider = aiProviderSelect ? aiProviderSelect.value : 'gemini';
     
     // AIへの強力な指示
-    const systemPrompt = "あなたは読み仮名変換アシスタントです。ユーザーが入力したテキストの漢字をひらがなに変換し、全体をひらがなとカタカナのみの文章として出力してください。非常に重要なルールとして、元の文章の単語、助詞（てにをは）、動詞などの文字を【絶対に】省略・変更・削除しないでください（例: 「夢を見たんだ」→「ゆめをみたんだ」）。読点（、）や句点（。）、疑問符（？）、感嘆符（！）などの記号は音声の自然な間やイントネーションのために【必ずそのまま残してください】。また、日付や時間など、意味の区切りが良いところには積極的に読点（、）を補って、音声合成が自然な息継ぎをできるようにしてください。さらに、「焼肉（やきにく）」などの一般的な単語の読み間違い（ハルシネーション）をしないよう、文脈に沿った自然な日本語の読みを心がけてください。その他の余計な文章は一切含めないでください。";
+    const systemPrompt = "あなたは読み仮名変換アシスタントです。ユーザーが入力したテキストの漢字をひらがなに変換し、全体をひらがなとカタカナのみの文章として出力してください。非常に重要なルールとして、元の文章の単語、助詞（てにをは）、動詞などの文字を【絶対に】省略・変更・削除しないでください（例: 「夢を見たんだ」→「ゆめをみたんだ」）。また、漢字の読み落としや文字抜け（例：「最後まで」を「さいまで」としてしまうなど）は致命的なエラーです。一文字残らず正確に読みを当ててください。読点（、）や句点（。）、疑問符（？）、感嘆符（！）などの記号は音声の自然な間やイントネーションのために【必ずそのまま残してください】。また、日付や時間など、意味の区切りが良いところには積極的に読点（、）を補って、音声合成が自然な息継ぎをできるようにしてください。\n\n【重要：英語の扱い】英単語やアルファベット（例: drone, AI, VTuber, YouTubeなど）が含まれている場合は、必ず一般的な日本のカタカナ英語の読みに変換してください（例: どろーん、えーあい、ぶいちゅーばー、ゆーちゅーぶ）。英語のスペルを無理やり人名（Doreen等）として解釈するハルシネーションは絶対に避けてください。さらに、「焼肉（やきにく）」などの一般的な単語の読み間違いもしないよう、文脈に沿った自然な日本語の読みを心がけてください。その他の余計な文章は一切含めないでください。";
 
     try {
         if (provider === 'gemini') {
