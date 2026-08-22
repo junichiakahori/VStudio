@@ -1,4 +1,4 @@
-window.addEventListener("uiLoaded", () => {
+(window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("radio-mode", () => {
   // =====================================================================
   // ラジオ台本作成モーダル関連のロジック
   // =====================================================================
@@ -156,6 +156,9 @@ window.addEventListener("uiLoaded", () => {
         if (radioPoolCount) radioPoolCount.textContent = 0;
         console.log("[ラジオモード] コメントプールをクリアしました。");
       }
+      if (typeof window.clearAllComments === "function") {
+        window.clearAllComments();
+      }
     });
   }
 
@@ -174,7 +177,7 @@ window.addEventListener("uiLoaded", () => {
   // 設定の読み込み
   const loadRadioConfig = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8001/radio_script_config");
+      const res = await fetch("/radio_script_config");
       if (!res.ok) return;
       const cfg = await res.json();
       if (cfg) {
@@ -285,7 +288,7 @@ window.addEventListener("uiLoaded", () => {
         se_allowed: seAllowed,
       };
       try {
-        const res = await fetch("http://127.0.0.1:8001/radio_script_config", {
+        const res = await fetch("/radio_script_config", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(config),
@@ -304,10 +307,10 @@ window.addEventListener("uiLoaded", () => {
 
   // 読み込み時に保存された台本を復元（サーバーのテキストファイルから読み込み）
   Promise.all([
-    fetch("http://127.0.0.1:8001/radio_script")
+    fetch("/radio_script")
       .then((r) => (r.ok ? r.text() : ""))
       .catch(() => ""),
-    fetch("http://127.0.0.1:8001/radio_script_yomi")
+    fetch("/radio_script_yomi")
       .then((r) => (r.ok ? r.text() : ""))
       .catch(() => ""),
   ]).then(([savedScript, savedYomi]) => {
@@ -318,9 +321,11 @@ window.addEventListener("uiLoaded", () => {
         .map((l) => l.trim())
         .filter((l) => l.length > 0);
       radioModeState.scriptLines = lines;
-      console.log(
-        `[ラジオ台本] radio_script.txtから${lines.length}行読み込みました`,
-      );
+      if (!window.__radioScriptLoaded) {
+        console.log(
+          `[ラジオ台本] radio_script.txtから${lines.length}行読み込みました`,
+        );
+      }
     } else {
       // APIサーバー未起動などの場合はlocalStorageにフォールバック
       const fallbackScript = localStorage.getItem("savedRadioScript");
@@ -331,9 +336,11 @@ window.addEventListener("uiLoaded", () => {
           .map((l) => l.trim())
           .filter((l) => l.length > 0);
         radioModeState.scriptLines = lines;
-        console.log(
-          `[ラジオ台本] localStorageから${lines.length}行読み込み（フォールバック）`,
-        );
+        if (!window.__radioScriptLoaded) {
+          console.log(
+            `[ラジオ台本] localStorageから${lines.length}行読み込み（フォールバック）`,
+          );
+        }
       }
     }
 
@@ -344,9 +351,11 @@ window.addEventListener("uiLoaded", () => {
         .map((l) => l.trim())
         .filter((l) => l.length > 0);
       radioModeState.scriptYomiLines = yomiLines;
-      console.log(
-        `[ラジオ台本] radio_script_yomi.txtから${yomiLines.length}行読み込みました`,
-      );
+      if (!window.__radioScriptLoaded) {
+        console.log(
+          `[ラジオ台本] radio_script_yomi.txtから${yomiLines.length}行読み込みました`,
+        );
+      }
     } else {
       const fallbackYomi = localStorage.getItem("savedRadioScriptYomi");
       if (fallbackYomi) {
@@ -357,11 +366,14 @@ window.addEventListener("uiLoaded", () => {
           .map((l) => l.trim())
           .filter((l) => l.length > 0);
         radioModeState.scriptYomiLines = yomiLines;
-        console.log(
-          `[ラジオ台本] localStorageから${yomiLines.length}行読み込み（フォールバック）`,
-        );
+        if (!window.__radioScriptLoaded) {
+          console.log(
+            `[ラジオ台本] localStorageから${yomiLines.length}行読み込み（フォールバック）`,
+          );
+        }
       }
     }
+    window.__radioScriptLoaded = true;
 
     // 進行状況の復元
     const lastIndex = parseInt(
@@ -382,7 +394,7 @@ window.addEventListener("uiLoaded", () => {
       if (!seListLoaded) {
         window.seSelect = document.getElementById("radio-script-se-select");
         if (seSelect) {
-          fetch("http://localhost:8001/se_list")
+          fetch("/se_list")
             .then((r) => (r.ok ? r.json() : null))
             .then((data) => {
               if (data && data.files) {
@@ -402,8 +414,8 @@ window.addEventListener("uiLoaded", () => {
             })
             .catch(
               () =>
-                (seSelect.innerHTML =
-                  '<option value="">(サーバー未接続)</option>'),
+              (seSelect.innerHTML =
+                '<option value="">(サーバー未接続)</option>'),
             );
         }
       }
@@ -420,7 +432,11 @@ window.addEventListener("uiLoaded", () => {
           currentSeAudio.pause();
           currentSeAudio.currentTime = 0;
         }
+        const seVolSlider = document.getElementById("se-volume-slider");
+        const savedSeVol = localStorage.getItem("savedSeVolume");
+        const targetSeVol = seVolSlider ? (parseFloat(seVolSlider.value) / 100.0) : (savedSeVol ? (parseFloat(savedSeVol) / 100.0) : 1.0);
         currentSeAudio = new Audio(`se/${seSelect.value}.mp3`);
+        currentSeAudio.volume = targetSeVol;
         currentSeAudio.play().catch((e) => console.warn("SE再生エラー:", e));
       });
     }
@@ -462,7 +478,11 @@ window.addEventListener("uiLoaded", () => {
             currentSeAudio.pause();
             currentSeAudio.currentTime = 0;
           }
+          const seVolSlider = document.getElementById("se-volume-slider");
+          const savedSeVol = localStorage.getItem("savedSeVolume");
+          const targetSeVol = seVolSlider ? (parseFloat(seVolSlider.value) / 100.0) : (savedSeVol ? (parseFloat(savedSeVol) / 100.0) : 1.0);
           currentSeAudio = new Audio(`se/${seName}.mp3`);
+          currentSeAudio.volume = targetSeVol;
           currentSeAudio
             .play()
             .catch((err) => console.warn("クリックSE再生エラー:", err));
@@ -574,7 +594,7 @@ window.addEventListener("uiLoaded", () => {
             selectedSEs.join(", ");
         } else {
           try {
-            const res = await fetch("http://localhost:8001/se_list");
+            const res = await fetch("/se_list");
             if (res.ok) {
               const data = await res.json();
               if (data.files && data.files.length > 0) {
@@ -766,7 +786,7 @@ ${cleanedYomi}`;
               // さらにpykakasiのローカルAPIでダメ押しの完全置換を行う
               try {
                 const resKakasi = await fetch(
-                  "http://127.0.0.1:8001/convert_remaining_kanji",
+                  "/convert_remaining_kanji",
                   {
                     method: "POST",
                     headers: { "Content-Type": "text/plain; charset=utf-8" },
@@ -916,7 +936,7 @@ ${chunkText}`;
             }
 
             try {
-              await fetch("http://127.0.0.1:8001/radio_script_yomi", {
+              await fetch("/radio_script_yomi", {
                 method: "POST",
                 headers: { "Content-Type": "text/plain; charset=utf-8" },
                 body: finalYomi,
@@ -976,14 +996,14 @@ ${chunkText}`;
 
       // テキストファイルに保存（APIサーバー経由）
       try {
-        const res = await fetch("http://127.0.0.1:8001/radio_script", {
+        const res = await fetch("/radio_script", {
           method: "POST",
           headers: { "Content-Type": "text/plain; charset=utf-8" },
           body: rawScript,
         });
         if (!res.ok) throw new Error("Save script failed");
 
-        const resYomi = await fetch("http://127.0.0.1:8001/radio_script_yomi", {
+        const resYomi = await fetch("/radio_script_yomi", {
           method: "POST",
           headers: { "Content-Type": "text/plain; charset=utf-8" },
           body: rawYomi,

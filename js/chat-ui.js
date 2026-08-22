@@ -79,9 +79,49 @@ if (clearCommentsBtn) {
   });
 }
 
-// 初回レンダリング
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", renderAllComments);
-} else {
-  window.renderAllComments();
-}
+// =====================================================================
+// アコーディオン開閉（折りたたみ/展開 & 状態記憶）
+// =====================================================================
+window.initAccordionSections = function initAccordionSections() {
+  const sections = document.querySelectorAll(".panel-section");
+  sections.forEach((sec, idx) => {
+    const h3 = sec.querySelector("h3");
+    if (!h3) return;
+
+    // セクションIDを決定 (IDまたはタイトルから安全に生成)
+    const titleText = h3.textContent.replace(/[^\w\s\u3000-\u30FF\u4E00-\u9FA0]+/g, '').trim();
+    const secId = sec.id || `sec_${sec.dataset.tab || 'tab'}_${idx}_${titleText}`;
+
+    // 既に矢印がなければ追加
+    if (!h3.querySelector(".accordion-arrow")) {
+      const originalHtml = h3.innerHTML;
+      h3.innerHTML = `<div class="accordion-title">${originalHtml}</div><span class="accordion-arrow">▼</span>`;
+    }
+
+    // 保存された状態を復元 (デフォルトは展開)
+    const isSavedCollapsed = localStorage.getItem(`accordion_${secId}`);
+    if (isSavedCollapsed === "true") {
+      sec.classList.add("collapsed");
+    } else {
+      sec.classList.remove("collapsed");
+    }
+
+    // クリックイベント（重複バインド防止）
+    if (!h3._accordionBound) {
+      h3._accordionBound = true;
+      h3.addEventListener("click", (e) => {
+        // ボタンや入力欄、セレクトボックスのクリックは無視
+        if (e.target.closest("button") || e.target.closest("input") || e.target.closest("select")) return;
+        sec.classList.toggle("collapsed");
+        const collapsed = sec.classList.contains("collapsed");
+        localStorage.setItem(`accordion_${secId}`, collapsed ? "true" : "false");
+      });
+    }
+  });
+};
+
+(window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("chat-ui", () => {
+  if (typeof initAccordionSections === "function") {
+    initAccordionSections();
+  }
+});

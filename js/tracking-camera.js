@@ -90,7 +90,7 @@ window.initMic = async function initMic() {
     micToggle.checked = false;
   }
 };
-window.addEventListener("uiLoaded", () => {
+(window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("tracking-camera", () => {
   // =====================================================================
   // MediaPipe 顔トラッキング
   // =====================================================================

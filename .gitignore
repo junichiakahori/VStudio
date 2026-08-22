@@ -10,3 +10,6 @@ patch_youtube.py
 test_*.py
 test_*.js
 generate_procedural.py
+.DS_Store
+browser_console.log
+yt_dump.html

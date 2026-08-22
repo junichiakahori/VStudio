@@ -1,4 +1,4 @@
-window.addEventListener("uiLoaded", () => {
+function initChatClient() {
   window.youtubeWs = null;
   window.tiktokWs = null;
   window.oauthAccessToken = null;
@@ -69,10 +69,9 @@ window.addEventListener("uiLoaded", () => {
   let tiktokReconnectTimer = null;
 
   if (tiktokConnectBtn) {
-    tiktokConnectBtn.addEventListener("click", (event) => {
+    tiktokConnectBtn.onclick = (event) => {
       const username = tiktokUserInput.value.trim();
       if (!username) {
-        // 手動操作の場合はアラート、自動接続（スクリプトからの.click()）は静かにスキップ
         if (event && event.isTrusted) {
           alert("TikTokのユーザー名を入力してください");
         }
@@ -88,10 +87,12 @@ window.addEventListener("uiLoaded", () => {
         isTiktokIntendedConnect = false;
         clearTimeout(tiktokReconnectTimer);
         if (tiktokWs) {
-          if (tiktokWs.readyState === WebSocket.OPEN) {
-            tiktokWs.send(JSON.stringify({ type: "disconnect_tiktok" }));
-          }
-          tiktokWs.close();
+          try {
+            if (tiktokWs.readyState === WebSocket.OPEN) {
+              tiktokWs.send(JSON.stringify({ type: "disconnect_tiktok" }));
+            }
+            tiktokWs.close();
+          } catch (e) {}
           tiktokWs = null;
         }
         tiktokConnectBtn.textContent = "接続";
@@ -217,9 +218,20 @@ window.addEventListener("uiLoaded", () => {
             }
           } else if (data.type === "like") {
             console.log(`[TikTok] ${data.nickname} sent likes`);
-            // いいね連打対策のため読み上げは行わない
+            if (typeof window.spawnReactionEffect === "function") {
+              window.spawnReactionEffect("❤️", data.count || 2);
+            }
+          } else if (data.type === "reaction") {
+            if (typeof window.spawnReactionEffect === "function") {
+              window.spawnReactionEffect(data.emoji || "❤️", data.count || 1);
+            }
           } else if (data.type === "comment") {
             console.log(`[TikTok] @${data.nickname}: ${data.comment}`);
+            // 絵文字・リアクション検知
+            const reactionMatches = (data.comment || "").match(/[❤️💖💕💓💗💘✨🌟🎉🥳👍😻🐾🔥🥰😍🙌⭐]/g);
+            if (reactionMatches && typeof window.spawnReactionEffect === "function") {
+              window.spawnReactionEffect(reactionMatches[0], Math.min(reactionMatches.length, 3));
+            }
             addCommentToViewer(
               data.nickname,
               data.comment,
@@ -373,24 +385,18 @@ window.addEventListener("uiLoaded", () => {
       };
 
       tiktokWs.onerror = (err) => {
-        console.error("TikTok WS error", err);
-        tiktokStatus.textContent = "接続エラー";
+        tiktokStatus.textContent = "未接続";
         if (typeof clearIdleTimer === "function") clearIdleTimer();
       };
-    });
+    };
 
-    // 保存されたTikTokIDがあれば入力欄に復元、空でない場合のみ自動接続
+    // 保存されたTikTokIDがあれば入力欄に復元
     const savedTiktokId = localStorage.getItem("savedTiktokId");
     if (savedTiktokId !== null) {
       const trimmedTiktokId = savedTiktokId.trim();
       if (trimmedTiktokId) {
         if (tiktokUserInput) tiktokUserInput.value = trimmedTiktokId;
-        // IDが入力されている場合のみ自動接続する
-        setTimeout(() => {
-          tiktokConnectBtn.click();
-        }, 500);
       } else {
-        // 空のまま保存されている場合は削除してクリーンな状態に
         localStorage.removeItem("savedTiktokId");
       }
     }
@@ -399,78 +405,100 @@ window.addEventListener("uiLoaded", () => {
   window.isYoutubeIntendedConnect = false;
   let youtubeReconnectTimer = null;
 
+  window.connectYoutubeLive = function(newVideoId = null) {
+    if (newVideoId && youtubeUserInput) {
+      youtubeUserInput.value = newVideoId.trim();
+    }
+    if (window.isYoutubeIntendedConnect) {
+      // 既に接続中の場合は一度切断してから再接続
+      if (youtubeConnectBtn) youtubeConnectBtn.click();
+      setTimeout(() => {
+        if (youtubeConnectBtn) youtubeConnectBtn.click();
+      }, 300);
+    } else {
+      if (youtubeConnectBtn) youtubeConnectBtn.click();
+    }
+  };
+
+  if (youtubeUserInput) {
+    youtubeUserInput.addEventListener("change", () => {
+      const newId = youtubeUserInput.value.trim();
+      const currentSaved = localStorage.getItem("savedYoutubeId");
+      if (newId && window.isYoutubeIntendedConnect && newId !== currentSaved) {
+        console.log(`[YouTube] Video IDが変更されたため (${currentSaved} -> ${newId})、再接続します`);
+        window.connectYoutubeLive(newId);
+      }
+    });
+  }
+
   if (youtubeConnectBtn) {
-    youtubeConnectBtn.addEventListener("click", (event) => {
-      const videoId = youtubeUserInput.value.trim();
-      if (!videoId) {
-        if (event && event.isTrusted) {
-          alert("YouTubeの動画IDを入力してください");
+  function stopYoutubeConnection() {
+    window.isYoutubeIntendedConnect = false;
+    clearTimeout(youtubeReconnectTimer);
+    if (youtubeWs) {
+      try {
+        if (youtubeWs.readyState === WebSocket.OPEN) {
+          youtubeWs.send(JSON.stringify({ type: "disconnect_youtube" }));
         }
-        return;
-      }
+        youtubeWs.close();
+      } catch (e) {}
+      youtubeWs = null;
+    }
+    if (youtubeConnectBtn) {
+      youtubeConnectBtn.textContent = "接続";
+      youtubeConnectBtn.style.background = "#ff0000";
+    }
+    if (youtubeStatus) youtubeStatus.textContent = "未接続";
+    const scheduleContainer = document.getElementById("youtube-schedule-container");
+    if (scheduleContainer) scheduleContainer.style.display = "none";
+    if (window.youtubeScheduleTimer) clearInterval(window.youtubeScheduleTimer);
+  }
 
-      const savedYoutubeId = localStorage.getItem("savedYoutubeId");
-      if (savedYoutubeId && savedYoutubeId !== videoId) {
-        if (typeof clearAllComments === "function") clearAllComments();
-      }
-      localStorage.setItem("savedYoutubeId", videoId);
+  function startYoutubeConnection(videoId) {
+    if (!videoId) return;
+    window.isYoutubeIntendedConnect = true;
+    if (youtubeStatus) youtubeStatus.textContent = "接続中...";
 
-      if (isYoutubeIntendedConnect) {
-        isYoutubeIntendedConnect = false;
-        clearTimeout(youtubeReconnectTimer);
-        if (youtubeWs) {
-          if (youtubeWs.readyState === WebSocket.OPEN) {
-            youtubeWs.send(JSON.stringify({ type: "disconnect_youtube" }));
-          }
-          youtubeWs.close();
-          youtubeWs = null;
-        }
-        youtubeConnectBtn.textContent = "接続";
-        youtubeConnectBtn.style.background = "#ff0000";
-        youtubeStatus.textContent = "未接続";
-        const scheduleContainer = document.getElementById(
-          "youtube-schedule-container",
-        );
-        if (scheduleContainer) scheduleContainer.style.display = "none";
-        if (window.youtubeScheduleTimer)
-          clearInterval(window.youtubeScheduleTimer);
-        return;
-      }
+    if (youtubeWs) {
+      try { youtubeWs.close(); } catch (e) {}
+      youtubeWs = null;
+    }
 
-      isYoutubeIntendedConnect = true;
-      youtubeStatus.textContent = "接続中...";
+    // YouTube接続時、ラジオの開始行を1にリセットする
+    const startLineInput = document.getElementById("radio-script-start-line");
+    if (startLineInput) {
+      startLineInput.value = 1;
+    }
+    localStorage.setItem("radioScriptLastIndex", 0);
 
-      // YouTube接続時、ラジオの開始行を1にリセットする
-      const startLineInput = document.getElementById("radio-script-start-line");
-      if (startLineInput) {
-        startLineInput.value = 1;
-      }
-      localStorage.setItem("radioScriptLastIndex", 0);
+    youtubeWs = new WebSocket("ws://localhost:8768");
 
-      youtubeWs = new WebSocket("ws://localhost:8768");
-
-      youtubeWs.onopen = () => {
-        youtubeWs.send(
-          JSON.stringify({ type: "connect_youtube", video_id: videoId }),
-        );
-        // 配信状態もチェック
-        youtubeWs.send(
-          JSON.stringify({ type: "check_stream_status", videoId: videoId }),
-        );
+    youtubeWs.onopen = () => {
+      youtubeWs.send(
+        JSON.stringify({ type: "connect_youtube", video_id: videoId }),
+      );
+      youtubeWs.send(
+        JSON.stringify({ type: "check_stream_status", videoId: videoId }),
+      );
+      if (youtubeConnectBtn) {
         youtubeConnectBtn.textContent = "切断";
         youtubeConnectBtn.style.background = "var(--danger, #ff4444)";
-        if (typeof resetIdleTimer === "function") resetIdleTimer();
-      };
+      }
+      if (typeof resetIdleTimer === "function") resetIdleTimer();
+    };
 
+    let isYoutubeConnectedLogged = false;
       youtubeWs.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
           if (data.type === "status") {
             youtubeStatus.textContent = data.message;
-            if (data.status === "connected") {
+            if (data.status === "connected" && !isYoutubeConnectedLogged) {
+              isYoutubeConnectedLogged = true;
               console.log("[YouTube] コメント読み上げの準備が完了しました！");
             }
             if (data.status === "error" || data.status === "disconnected") {
+              isYoutubeConnectedLogged = false;
               if (youtubeWs) {
                 youtubeWs.close();
                 youtubeWs = null;
@@ -697,18 +725,30 @@ window.addEventListener("uiLoaded", () => {
           } else if (data.type === "stats") {
             const statViewers = document.getElementById("stat-viewers");
             if (statViewers && data.viewers !== undefined) {
-              statViewers.textContent = data.viewers || "-";
+              statViewers.textContent = (data.viewers === "" || data.viewers === null) ? "-" : data.viewers;
             }
             const statSubscribers = document.getElementById("stat-subscribers");
+            let subDisplay = "-";
             if (statSubscribers && data.subscribers) {
-              // APIが "105\nsubscribers" のような文字列を返す場合があるため、先頭の数値部分のみ取り出す
               const numOnly = String(data.subscribers).match(/[\d,]+/);
-              statSubscribers.textContent = numOnly
-                ? numOnly[0]
-                : data.subscribers;
+              subDisplay = numOnly ? numOnly[0] : data.subscribers;
+              statSubscribers.textContent = subDisplay;
+            }
+            const currentCommentsCount = window.totalCommentsCount || 0;
+            const inputVal = document.getElementById("youtube-video-input")?.value || "";
+            const currentVid = data.videoId || "-";
+            const statsSig = `${inputVal}|${currentVid}|${subDisplay}|${data.viewers}|${currentCommentsCount}`;
+            if (window._lastLoggedStatsSig !== statsSig) {
+              window._lastLoggedStatsSig = statsSig;
+              console.log(
+                `[YouTube Live 統計] 📺 接続先: ${inputVal || currentVid} (動画ID: ${currentVid}) | 👤 登録者数: ${subDisplay}人 | 👁️ 視聴者数/再生数: ${data.viewers || '-'} | 💬 コメント総数: ${currentCommentsCount}件`
+              );
             }
           } else if (data.type === "gift") {
             console.log(`[YouTube] ${data.nickname} sent a superchat/gift`);
+            if (typeof window.spawnReactionEffect === "function") {
+              window.spawnReactionEffect("🎁", 3);
+            }
             addCommentToViewer(
               data.nickname,
               `🎁 スーパーチャット！`,
@@ -741,8 +781,17 @@ window.addEventListener("uiLoaded", () => {
                 queueCommentAudio(greet);
               }
             }
+          } else if (data.type === "reaction") {
+            if (typeof window.spawnReactionEffect === "function") {
+              window.spawnReactionEffect(data.emoji || "❤️", data.count || 1);
+            }
           } else if (data.type === "comment") {
             console.log(`[YouTube] @${data.nickname}: ${data.comment}`);
+            // 絵文字・リアクション検知
+            const reactionMatches = (data.comment || "").match(/[❤️💖💕💓💗💘✨🌟🎉🥳👍😻🐾🔥🥰😍🙌⭐]/g);
+            if (reactionMatches && typeof window.spawnReactionEffect === "function") {
+              window.spawnReactionEffect(reactionMatches[0], Math.min(reactionMatches.length, 3));
+            }
             addCommentToViewer(
               data.nickname,
               data.comment,
@@ -883,37 +932,78 @@ window.addEventListener("uiLoaded", () => {
       };
 
       youtubeWs.onclose = () => {
-        if (isYoutubeIntendedConnect) {
-          youtubeStatus.textContent = "再接続中...";
-          youtubeConnectBtn.textContent = "再接続";
-          youtubeConnectBtn.style.background = "#ff8800";
+        if (window.isYoutubeIntendedConnect) {
+          if (youtubeStatus) youtubeStatus.textContent = "再接続中...";
+          if (youtubeConnectBtn) {
+            youtubeConnectBtn.textContent = "再接続中";
+            youtubeConnectBtn.style.background = "#ff8800";
+          }
           clearTimeout(youtubeReconnectTimer);
           youtubeReconnectTimer = setTimeout(() => {
-            if (isYoutubeIntendedConnect) youtubeConnectBtn.click();
-          }, 5000);
+            if (window.isYoutubeIntendedConnect) {
+              startYoutubeConnection(videoId);
+            }
+          }, 3500);
         } else {
-          youtubeStatus.textContent = "未接続";
-          youtubeConnectBtn.textContent = "接続";
-          youtubeConnectBtn.style.background = "#ff0000";
+          if (youtubeStatus) youtubeStatus.textContent = "未接続";
+          if (youtubeConnectBtn) {
+            youtubeConnectBtn.textContent = "接続";
+            youtubeConnectBtn.style.background = "#ff0000";
+          }
         }
       };
 
       youtubeWs.onerror = (err) => {
         console.error("YouTube WS error", err);
-        youtubeStatus.textContent = "接続エラー";
+        if (youtubeStatus) youtubeStatus.textContent = "接続エラー (自動再試行中)";
         if (typeof clearIdleTimer === "function") clearIdleTimer();
       };
-    });
+    }
+
+    // 古いイベントリスナーの重複実行を完全に防止するため、ボタンをクローンして置き換える
+    const oldBtn = document.getElementById("youtube-connect-btn");
+    if (oldBtn) {
+      const newBtn = oldBtn.cloneNode(true);
+      oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+      youtubeConnectBtn = newBtn;
+
+      youtubeConnectBtn.addEventListener("click", (event) => {
+        const videoId = youtubeUserInput ? youtubeUserInput.value.trim() : "";
+        if (!videoId) {
+          if (event && event.isTrusted) {
+            alert("YouTubeの動画IDまたはチャンネル名を入力してください");
+          }
+          return;
+        }
+
+        const savedYoutubeId = localStorage.getItem("savedYoutubeId");
+        if (savedYoutubeId && savedYoutubeId !== videoId) {
+          if (typeof clearAllComments === "function") clearAllComments();
+        }
+        localStorage.setItem("savedYoutubeId", videoId);
+
+        if (window.isYoutubeIntendedConnect) {
+          stopYoutubeConnection();
+        } else {
+          startYoutubeConnection(videoId);
+        }
+      });
+    }
+
+    window.startYoutubeConnection = startYoutubeConnection;
+    window.stopYoutubeConnection = stopYoutubeConnection;
+    window.connectYouTubeNow = function(channelOrId) {
+      const target = channelOrId || (youtubeUserInput ? youtubeUserInput.value.trim() : "@drone.akahori");
+      if (target) {
+        if (youtubeUserInput) youtubeUserInput.value = target;
+        localStorage.setItem("savedYoutubeId", target);
+        startYoutubeConnection(target);
+      }
+    };
 
     const savedYoutubeId = localStorage.getItem("savedYoutubeId");
     if (savedYoutubeId && youtubeUserInput) {
       youtubeUserInput.value = savedYoutubeId;
-      if (savedYoutubeId.trim() && youtubeConnectBtn) {
-        // IDが入力されている場合のみ自動接続する
-        setTimeout(() => {
-          youtubeConnectBtn.click();
-        }, 1500); // 起動時の負荷分散のため遅延させる
-      }
     }
   }
 
@@ -1113,7 +1203,7 @@ window.addEventListener("uiLoaded", () => {
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
     const currentDate = now.getDate();
-    window.days = [
+    const yomiDays = [
       "にちようび",
       "げつようび",
       "かようび",
@@ -1122,7 +1212,7 @@ window.addEventListener("uiLoaded", () => {
       "きんようび",
       "どようび",
     ];
-    const currentDay = days[now.getDay()];
+    const currentDay = yomiDays[now.getDay()];
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
 
@@ -1344,4 +1434,10 @@ window.addEventListener("uiLoaded", () => {
   }
 
   window.queueCommentAudio = queueCommentAudio;
-});
+}
+
+window.initChatClient = initChatClient;
+(window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("chat-client", initChatClient);
+if (document.getElementById("youtube-connect-btn") || window.isUiLoaded) {
+  initChatClient();
+}

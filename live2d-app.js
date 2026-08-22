@@ -6,6 +6,8 @@ import {
 } from "./idle_phrases.js";
 import * as aiFeaturesModule from "./ai_features.js";
 import "./ui_features.js"; // HMR tracking: UI event rebinding without full reload
+import "./js/server-manager.js"; // Backend Server Manager
+import "./js/settings-backup.js"; // Settings export/import
 import uiHtml from "./ui_panel.html?raw"; // Separated UI HTML
 
 window.aiFeatures = aiFeaturesModule;
@@ -423,10 +425,6 @@ document.addEventListener("DOMContentLoaded", () => {
       live2dModel.x = w / 2 + offsetX;
       live2dModel.y = h / 2 + offsetY;
     }
-
-    console.log(
-      `Model positioned: scale=${finalScale.toFixed(3)}, x=${live2dModel.x}, y=${live2dModel.y}, mw=${mw}, mh=${mh}`,
-    );
   };
 
   // =====================================================================
@@ -784,17 +782,22 @@ document.addEventListener("DOMContentLoaded", () => {
     return false;
   };
 
-  // 初期状態で許可されているかチェック
-  if (!window.isObsMode && !checkAndHideBanner()) {
-    if (audioUnlockBanner) audioUnlockBanner.style.display = "block";
-
-    // 許可されていない場合は、少しだけresumeを試みてみる（ブラウザによって挙動が違うため）
-    voicevoxAudioContext
-      .resume()
-      .then(() => {
-        checkAndHideBanner();
-      })
-      .catch((e) => console.warn("Auto resume blocked:", e));
+  if (!window.isObsMode) {
+    if (voicevoxAudioContext.state === "running") {
+      checkAndHideBanner();
+    } else {
+      // 許可されていない場合は、resumeを試みる
+      voicevoxAudioContext
+        .resume()
+        .then(() => {
+          checkAndHideBanner();
+        })
+        .catch((e) => {
+          // ブロックされた場合のみバナーを表示する
+          if (audioUnlockBanner) audioUnlockBanner.style.display = "block";
+          console.warn("Auto resume blocked:", e);
+        });
+    }
   }
 
   const unlockAudio = () => {

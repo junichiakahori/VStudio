@@ -186,45 +186,6 @@ function updateHighlightUI() {
   }
 }
 
-if (bgmUpload) {
-  bgmUpload.addEventListener("change", async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    bgmFileName.textContent = file.name;
-
-    if (!window.bgmAudioContext) {
-      window.bgmAudioContext = new (
-        window.AudioContext || window.webkitAudioContext
-      )();
-    }
-    if (window.bgmAudioContext.state === "suspended") {
-      await window.bgmAudioContext.resume();
-    }
-
-    const arrayBuffer = await file.arrayBuffer();
-    try {
-      window.bgmBuffer = await safeDecodeAudioData(
-        window.bgmAudioContext,
-        arrayBuffer,
-      );
-      console.log(
-        `[BGM] 読み込み完了: ${file.name} (長さ: ${window.bgmBuffer.duration.toFixed(2)}秒)`,
-      );
-      bgmPlayBtn.disabled = false;
-      bgmStopBtn.disabled = false;
-
-      drawBgmWaveform(window.bgmBuffer);
-
-      // 再度 arrayBuffer を取得して保存 (decodeAudioDataで消費されることがあるため)
-      const arrayBufferToSave = await file.arrayBuffer();
-      await saveBgmToDB(arrayBufferToSave, file.name);
-      console.log(`[BGM] IndexedDBに保存しました`);
-    } catch (error) {
-      console.error("BGM decode error:", error);
-      bgmFileName.textContent = "読み込みエラー";
-    }
-  });
-}
 
 // グローバルのunlockAudioで処理するため、個別のイベントリスナーは削除します。
 
@@ -240,7 +201,77 @@ window.stopBgm = function stopBgm() {
   window.bgmIsPlaying = false;
 };
 
-window.addEventListener("uiLoaded", () => {
+// スムーズなフェードアウト停止 (デフォルト 1.8秒)
+window.fadeOutBgm = function (durationMs = 1800) {
+  return new Promise((resolve) => {
+    if (!window.bgmSource || !window.bgmGainNode || !window.bgmAudioContext || !window.bgmIsPlaying) {
+      window.stopBgm();
+      return resolve();
+    }
+    try {
+      const currTime = window.bgmAudioContext.currentTime;
+      const currentGain = window.bgmGainNode.gain.value;
+      window.bgmGainNode.gain.cancelScheduledValues(currTime);
+      window.bgmGainNode.gain.setValueAtTime(currentGain, currTime);
+      window.bgmGainNode.gain.linearRampToValueAtTime(0.0001, currTime + (durationMs / 1000.0));
+
+      setTimeout(() => {
+        window.stopBgm();
+        resolve();
+      }, durationMs + 50);
+    } catch (e) {
+      window.stopBgm();
+      resolve();
+    }
+  });
+};
+
+// スムーズなフェードイン再生 (デフォルト 2.0秒)
+window.fadeInBgm = async function (durationMs = 2000) {
+  if (!window.bgmBuffer || !window.bgmAudioContext) return;
+  if (window.bgmAudioContext.state === "suspended") {
+    try {
+      await window.bgmAudioContext.resume();
+    } catch (e) {
+      console.warn("AudioContext resume failed:", e);
+    }
+  }
+
+  const volSlider = document.getElementById("bgm-volume-slider");
+  const parsedVol = volSlider ? parseFloat(volSlider.value) : 50;
+  const targetVol = (isNaN(parsedVol) ? 50 : parsedVol) / 100.0;
+
+  window.stopBgm();
+
+  if (!window.bgmGainNode) {
+    window.bgmGainNode = window.bgmAudioContext.createGain();
+    window.bgmGainNode.gain.setValueAtTime(0.0001, window.bgmAudioContext.currentTime);
+    window.bgmGainNode.connect(window.bgmAudioContext.destination);
+  }
+
+  const currTime = window.bgmAudioContext.currentTime;
+  window.bgmGainNode.gain.cancelScheduledValues(currTime);
+  window.bgmGainNode.gain.setValueAtTime(0.0001, currTime);
+  window.bgmGainNode.gain.linearRampToValueAtTime(targetVol, currTime + (durationMs / 1000.0));
+
+  window.bgmSource = window.bgmAudioContext.createBufferSource();
+  window.bgmSource.buffer = window.bgmBuffer;
+  window.bgmSource.loop = true;
+
+  const bgmLoopStart = document.getElementById("bgm-loop-start");
+  const bgmLoopEnd = document.getElementById("bgm-loop-end");
+  const startVal = bgmLoopStart ? parseFloat(bgmLoopStart.value) : 0;
+  const endVal = bgmLoopEnd ? parseFloat(bgmLoopEnd.value) : 0;
+  if (!isNaN(startVal) && startVal >= 0) window.bgmSource.loopStart = startVal;
+  if (!isNaN(endVal) && endVal > 0 && endVal <= window.bgmBuffer.duration) window.bgmSource.loopEnd = endVal;
+
+  window.bgmSource.connect(window.bgmGainNode);
+  window.bgmSource.start(0);
+  window.bgmIsPlaying = true;
+  console.log(`[BGM] フェードイン再生開始 (目標音量: ${targetVol}, 時間: ${durationMs}ms)`);
+};
+
+(window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("bgm-player", () => {
   window.bgmUpload = document.getElementById("bgm-upload");
   window.bgmFileName = document.getElementById("bgm-file-name");
   window.bgmPlayBtn = document.getElementById("bgm-play-btn");
@@ -256,6 +287,49 @@ window.addEventListener("uiLoaded", () => {
   window.bgmLoopHighlight = document.getElementById("bgm-loop-highlight");
   window.bgmHandleStart = document.getElementById("bgm-handle-start");
   window.bgmHandleEnd = document.getElementById("bgm-handle-end");
+
+  if (window.bgmUpload) {
+    window.bgmUpload.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (window.bgmFileName) window.bgmFileName.textContent = file.name;
+
+      if (!window.bgmAudioContext) {
+        window.bgmAudioContext = new (
+          window.AudioContext || window.webkitAudioContext
+        )();
+      }
+      if (window.bgmAudioContext.state === "suspended") {
+        await window.bgmAudioContext.resume();
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      try {
+        window.bgmBuffer = await safeDecodeAudioData(
+          window.bgmAudioContext,
+          arrayBuffer,
+        );
+        console.log(
+          `[BGM] 読み込み完了: ${file.name} (長さ: ${window.bgmBuffer.duration.toFixed(2)}秒)`,
+        );
+        if (window.bgmPlayBtn) window.bgmPlayBtn.disabled = false;
+        if (window.bgmStopBtn) window.bgmStopBtn.disabled = false;
+
+        drawBgmWaveform(window.bgmBuffer);
+
+        // 再度 arrayBuffer を取得して保存
+        const arrayBufferToSave = await file.arrayBuffer();
+        await saveBgmToDB(arrayBufferToSave, file.name);
+        console.log(`[BGM] IndexedDBに保存しました`);
+        
+        // 値をクリアして次回同じファイルを選べるようにする
+        e.target.value = "";
+      } catch (error) {
+        console.error("BGM decode error:", error);
+        if (window.bgmFileName) window.bgmFileName.textContent = "読み込みエラー";
+      }
+    });
+  }
 
   // Load saved settings
   if (bgmVolumeSlider) {
@@ -277,6 +351,14 @@ window.addEventListener("uiLoaded", () => {
 
   // 初期ロード時にDBからBGMを復元
   (async () => {
+    if (window.__bgmRestoredFromDB || window.bgmBuffer) {
+      if (window.bgmBuffer && bgmPlayBtn && bgmStopBtn) {
+        bgmPlayBtn.disabled = false;
+        bgmStopBtn.disabled = false;
+      }
+      return;
+    }
+    window.__bgmRestoredFromDB = true;
     const savedBGM = await loadBgmFromDB();
     if (savedBGM && savedBGM.buffer) {
       if (!window.bgmAudioContext) {
@@ -298,9 +380,9 @@ window.addEventListener("uiLoaded", () => {
         drawBgmWaveform(window.bgmBuffer);
 
         // 準備ができたら自動再生を試みる
-        if (bgmPlayBtn) {
+        if (bgmPlayBtn && !window.bgmIsPlaying) {
           setTimeout(() => {
-            bgmPlayBtn.click();
+            if (!window.bgmIsPlaying) bgmPlayBtn.click();
           }, 100);
         }
       } catch (error) {
@@ -311,66 +393,32 @@ window.addEventListener("uiLoaded", () => {
   })();
 
   if (bgmPlayBtn) {
-    bgmPlayBtn.addEventListener("click", async () => {
-      console.log("[BGM] Play button clicked!");
+    bgmPlayBtn.onclick = async () => {
+      console.log("[BGM] Play button clicked (Fade In)!");
       if (!window.bgmBuffer || !window.bgmAudioContext) {
-        console.warn(
-          "[BGM] バッファがないかAudioContextが初期化されていません",
-        );
+        console.warn("[BGM] バッファがないかAudioContextが初期化されていません");
         return;
       }
-
-      if (window.bgmAudioContext.state === "suspended") {
-        window.bgmAudioContext
-          .resume()
-          .catch((e) => console.warn("Autoplay blocked:", e));
-      }
-
-      window.stopBgm(); // 既に再生中なら停止
-
-      if (!window.bgmGainNode) {
-        window.bgmGainNode = window.bgmAudioContext.createGain();
-        window.bgmGainNode.connect(window.bgmAudioContext.destination);
-      }
-      const parsedVol = parseFloat(bgmVolumeSlider.value);
-      const vol = (isNaN(parsedVol) ? 50 : parsedVol) / 100.0;
-      window.bgmGainNode.gain.value = vol;
-
-      window.bgmSource = window.bgmAudioContext.createBufferSource();
-      window.bgmSource.buffer = window.bgmBuffer;
-      window.bgmSource.loop = true;
-
-      const startVal = parseFloat(bgmLoopStart.value);
-      const endVal = parseFloat(bgmLoopEnd.value);
-      if (!isNaN(startVal) && startVal >= 0) {
-        window.bgmSource.loopStart = startVal;
-      }
-      if (!isNaN(endVal) && endVal > 0 && endVal <= window.bgmBuffer.duration) {
-        window.bgmSource.loopEnd = endVal;
-      }
-
-      window.bgmSource.connect(window.bgmGainNode);
-      window.bgmSource.start();
-      bgmIsPlaying = true;
-      console.log(
-        `[BGM] 再生開始 (ループ: ${window.bgmSource.loopStart}s 〜 ${window.bgmSource.loopEnd}s, 音量: ${window.bgmGainNode.gain.value})`,
-      );
-    });
+      fadeInBgm(1500);
+    };
   }
 
   if (bgmStopBtn) {
-    bgmStopBtn.addEventListener("click", stopBgm);
+    bgmStopBtn.onclick = () => {
+      console.log("[BGM] Stop button clicked (Fade Out)!");
+      fadeOutBgm(1500);
+    };
   }
 
   if (bgmVolumeSlider) {
-    bgmVolumeSlider.addEventListener("input", () => {
+    bgmVolumeSlider.oninput = () => {
       const vol = parseFloat(bgmVolumeSlider.value);
-      bgmVolumeVal.textContent = Math.round(vol);
+      if (bgmVolumeVal) bgmVolumeVal.textContent = Math.round(vol);
       localStorage.setItem("savedBgmVolume", vol);
       if (window.bgmGainNode) {
         window.bgmGainNode.gain.value = vol / 100.0;
       }
-    });
+    };
   }
 
   const updateLoopPoints = () => {

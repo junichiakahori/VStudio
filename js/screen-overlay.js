@@ -1,4 +1,4 @@
-window.addEventListener("uiLoaded", () => {
+(window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("screen-overlay", () => {
   // =====================================================================
   // 画面オーバーレイ (配信準備中 / 離席中 / 配信終了)
   // =====================================================================
@@ -25,9 +25,11 @@ window.addEventListener("uiLoaded", () => {
         clearIdleTimer();
       }
 
-      // BGMの停止処理
-      wasBgmPlayingBeforeOverlay = bgmIsPlaying;
-      if (bgmIsPlaying && typeof stopBgm === "function") {
+      // BGMの滑らかなフェードアウト停止処理
+      wasBgmPlayingBeforeOverlay = (typeof bgmIsPlaying !== "undefined" ? bgmIsPlaying : false);
+      if (wasBgmPlayingBeforeOverlay && typeof fadeOutBgm === "function") {
+        fadeOutBgm(1800);
+      } else if (wasBgmPlayingBeforeOverlay && typeof stopBgm === "function") {
         stopBgm();
       }
     });
@@ -55,9 +57,11 @@ window.addEventListener("uiLoaded", () => {
         chatQueue.length = 0;
       }
 
-      // BGMの停止処理
-      wasBgmPlayingBeforeOverlay = bgmIsPlaying;
-      if (bgmIsPlaying && typeof stopBgm === "function") {
+      // BGMの滑らかなフェードアウト停止処理
+      wasBgmPlayingBeforeOverlay = (typeof bgmIsPlaying !== "undefined" ? bgmIsPlaying : false);
+      if (wasBgmPlayingBeforeOverlay && typeof fadeOutBgm === "function") {
+        fadeOutBgm(2000);
+      } else if (wasBgmPlayingBeforeOverlay && typeof stopBgm === "function") {
         stopBgm();
       }
 
@@ -84,11 +88,13 @@ window.addEventListener("uiLoaded", () => {
     if (!streamOverlay) return;
     streamOverlay.classList.remove("active");
 
-    // BGMの再開処理 (準備中 or 終了画面から戻ったときのみ)
+    // BGMの滑らかなフェードイン再開処理 (準備中 or 終了画面から戻ったときのみ)
     if ((isPreparing || isStreamEndedState) && wasBgmPlayingBeforeOverlay) {
-      window.playBtn = document.getElementById("bgm-play-btn");
-      if (playBtn && !bgmIsPlaying) {
-        playBtn.click();
+      if (typeof fadeInBgm === "function") {
+        fadeInBgm(2000);
+      } else {
+        window.playBtn = document.getElementById("bgm-play-btn");
+        if (playBtn && !bgmIsPlaying) playBtn.click();
       }
       wasBgmPlayingBeforeOverlay = false;
     }
@@ -153,45 +159,7 @@ window.addEventListener("uiLoaded", () => {
       localStorage.setItem("savedStatsToggle", statsToggle.checked);
     });
 
-    // 座標保存
-    const savedStatsX = localStorage.getItem("savedStatsX");
-    const savedStatsY = localStorage.getItem("savedStatsY");
 
-    // 元のCSS設定をリセット
-    streamStats.style.right = "auto";
-
-    if (savedStatsX && statsPosX) {
-      statsPosX.value = savedStatsX;
-      if (statsXVal) statsXVal.textContent = savedStatsX;
-      streamStats.style.left = `${savedStatsX}%`;
-      streamStats.style.transform = "translate(-50%, -50%)";
-    } else {
-      // 初期値
-      streamStats.style.left = `95%`;
-      streamStats.style.transform = "translate(-50%, -50%)";
-    }
-    if (savedStatsY && statsPosY) {
-      statsPosY.value = savedStatsY;
-      if (statsYVal) statsYVal.textContent = savedStatsY;
-      streamStats.style.top = `${savedStatsY}%`;
-    } else {
-      // 初期値
-      streamStats.style.top = `15%`;
-    }
-
-    if (statsPosX && statsPosY) {
-      statsPosX.addEventListener("input", () => {
-        streamStats.style.left = `${statsPosX.value}%`;
-        streamStats.style.transform = "translate(-50%, -50%)";
-        if (statsXVal) statsXVal.textContent = statsPosX.value;
-        localStorage.setItem("savedStatsX", statsPosX.value);
-      });
-      statsPosY.addEventListener("input", () => {
-        streamStats.style.top = `${statsPosY.value}%`;
-        if (statsYVal) statsYVal.textContent = statsPosY.value;
-        localStorage.setItem("savedStatsY", statsPosY.value);
-      });
-    }
   }
 
   // コメントビューアーの表示機能
@@ -232,46 +200,27 @@ window.addEventListener("uiLoaded", () => {
       localStorage.setItem("savedCommentToggle", commentViewerToggle.checked);
     });
 
-    // 座標保存
-    const savedCommentX = localStorage.getItem("savedCommentX");
-    const savedCommentY = localStorage.getItem("savedCommentY");
+    // コメントビューアーの高さ調整
+    const heightSlider = document.getElementById("comment-viewer-height-slider");
+    const heightValSpan = document.getElementById("comment-viewer-height-val");
+    const savedHeight = localStorage.getItem("commentViewerMaxHeight") || "260";
 
-    // CSSを絶対配置に変更して元のボトム設定をリセット
-    commentViewerWrap.style.position = "absolute";
-    commentViewerWrap.style.bottom = "auto";
+    const applyCommentHeight = (h) => {
+      commentViewerWrap.style.maxHeight = `${h}px`;
+      if (heightSlider) heightSlider.value = h;
+      if (heightValSpan) heightValSpan.textContent = h;
+      localStorage.setItem("commentViewerMaxHeight", h);
+    };
 
-    if (savedCommentX && commentPosX) {
-      commentPosX.value = savedCommentX;
-      if (commentXVal) commentXVal.textContent = savedCommentX;
-      commentViewerWrap.style.left = `${savedCommentX}%`;
-      commentViewerWrap.style.transform = "translate(-50%, -50%)";
-    } else {
-      // 初期値
-      commentViewerWrap.style.left = `95%`;
-      commentViewerWrap.style.transform = "translate(-50%, -50%)";
-    }
-    if (savedCommentY && commentPosY) {
-      commentPosY.value = savedCommentY;
-      if (commentYVal) commentYVal.textContent = savedCommentY;
-      commentViewerWrap.style.top = `${savedCommentY}%`;
-    } else {
-      // 初期値
-      commentViewerWrap.style.top = `30%`;
-    }
+    applyCommentHeight(savedHeight);
 
-    if (commentPosX && commentPosY) {
-      commentPosX.addEventListener("input", () => {
-        commentViewerWrap.style.left = `${commentPosX.value}%`;
-        commentViewerWrap.style.transform = "translate(-50%, -50%)";
-        if (commentXVal) commentXVal.textContent = commentPosX.value;
-        localStorage.setItem("savedCommentX", commentPosX.value);
-      });
-      commentPosY.addEventListener("input", () => {
-        commentViewerWrap.style.top = `${commentPosY.value}%`;
-        if (commentYVal) commentYVal.textContent = commentPosY.value;
-        localStorage.setItem("savedCommentY", commentPosY.value);
+    if (heightSlider) {
+      heightSlider.addEventListener("input", (e) => {
+        applyCommentHeight(e.target.value);
       });
     }
+
+
   }
 
   // 時計の表示機能
@@ -350,17 +299,7 @@ window.addEventListener("uiLoaded", () => {
     const savedClock = localStorage.getItem("savedClockToggle");
     if (savedClock !== null) clockToggle.checked = savedClock === "true";
 
-    const savedPosX = localStorage.getItem("savedClockPosX");
-    if (savedPosX !== null && clockPosX) {
-      clockPosX.value = savedPosX;
-      if (clockXVal) clockXVal.textContent = savedPosX;
-    }
 
-    const savedPosY = localStorage.getItem("savedClockPosY");
-    if (savedPosY !== null && clockPosY) {
-      clockPosY.value = savedPosY;
-      if (clockYVal) clockYVal.textContent = savedPosY;
-    }
 
     const savedStyle = localStorage.getItem("savedClockStyle");
     if (savedStyle && clockStyleSelect) clockStyleSelect.value = savedStyle;
@@ -377,18 +316,10 @@ window.addEventListener("uiLoaded", () => {
           streamClock.classList.add(`style-${clockStyleSelect.value}`);
 
         if (clockPosX && clockPosY) {
-          const x = clockPosX.value;
-          const y = clockPosY.value;
-          streamClock.style.left = `${x}%`;
-          streamClock.style.top = `${y}%`;
-          streamClock.style.transform = `translate(-${x}%, -${y}%)`;
-
           // X座標に応じてテキストのアライメントを変更 (左寄りなら左揃え、右寄りなら右揃え)
-          if (x < 33) streamClock.style.alignItems = "flex-start";
-          else if (x > 66) streamClock.style.alignItems = "flex-end";
-          else streamClock.style.alignItems = "center";
+          // Since sliders are gone, we just default to center or use draggable position heuristics later.
+          streamClock.style.alignItems = "center";
         }
-
         updateClock();
         if (!clockInterval) clockInterval = setInterval(updateClock, 1000);
       } else {
@@ -409,25 +340,7 @@ window.addEventListener("uiLoaded", () => {
       applyClockState();
     });
 
-    if (clockPosX) {
-      clockPosX.addEventListener("input", () => {
-        if (clockXVal) clockXVal.textContent = clockPosX.value;
-        applyClockState();
-      });
-      clockPosX.addEventListener("change", () => {
-        localStorage.setItem("savedClockPosX", clockPosX.value);
-      });
-    }
 
-    if (clockPosY) {
-      clockPosY.addEventListener("input", () => {
-        if (clockYVal) clockYVal.textContent = clockPosY.value;
-        applyClockState();
-      });
-      clockPosY.addEventListener("change", () => {
-        localStorage.setItem("savedClockPosY", clockPosY.value);
-      });
-    }
 
     if (clockStyleSelect) {
       clockStyleSelect.addEventListener("change", () => {

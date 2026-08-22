@@ -78,7 +78,7 @@ window.customIdlePhrases = {
 
 window.loadCustomIdlePhrases = async function () {
   try {
-    const res = await fetch("http://localhost:8001/custom_idle_phrases.json");
+    const res = await fetch("/custom_idle_phrases.json");
     if (res.ok) {
       const data = await res.json();
       Object.assign(window.customIdlePhrases, data);
@@ -92,7 +92,7 @@ loadCustomIdlePhrases();
 
 window.saveCustomIdlePhrase = async function (model, category, phrase) {
   try {
-    await fetch("http://localhost:8001/add_idle_phrase", {
+    await fetch("/add_idle_phrase", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model, category, phrase }),
@@ -110,13 +110,21 @@ window.saveCustomIdlePhrase = async function (model, category, phrase) {
 };
 
 window.triggerIdleSpeech = async function () {
+  // ニュース放送中・ラジオモード中・配信終了後・準備中は独り言を一切発声しない
+  const isNewsRunning = window.newsBroadcastState && window.newsBroadcastState.isRunning;
+  const isNewsMode = window.currentBroadcastMode === "news";
+  const isRadioModeActive = window.currentBroadcastMode === "radio" || (document.getElementById("ai-radio-mode-toggle")?.checked);
+  const isEnded = (typeof isStreamEndedState !== "undefined" && isStreamEndedState) || (typeof isStreamEndProcessRunning !== "undefined" && isStreamEndProcessRunning);
+
   if (
     !window.isIdleSpeechEnabled ||
     !window.isVoicevoxEnabled ||
-    (typeof isStreamEndedState !== "undefined" && isStreamEndedState) ||
+    isNewsRunning ||
+    isNewsMode ||
+    isRadioModeActive ||
+    isEnded ||
     (typeof isPreparing !== "undefined" && isPreparing)
   ) {
-    resetIdleTimer();
     return;
   }
 
@@ -533,6 +541,15 @@ window.triggerIdleSpeech = async function () {
 
 window.resetIdleTimer = function () {
   clearIdleTimer();
+  const isNewsRunning = window.newsBroadcastState && window.newsBroadcastState.isRunning;
+  const isNewsMode = window.currentBroadcastMode === "news";
+  const isRadioModeActive = window.currentBroadcastMode === "radio" || (document.getElementById("ai-radio-mode-toggle")?.checked);
+  const isEnded = (typeof isStreamEndedState !== "undefined" && isStreamEndedState) || (typeof isStreamEndProcessRunning !== "undefined" && isStreamEndProcessRunning);
+
+  if (isNewsRunning || isNewsMode || isRadioModeActive || isEnded) {
+    return;
+  }
+
   if (isVoicevoxEnabled && isIdleSpeechEnabled) {
     // UI上の設定(5秒)に合わせる (5秒〜10秒のランダム)
     const delay = 5000 + Math.random() * 5000;

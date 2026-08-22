@@ -1,24 +1,24 @@
-window.addEventListener("uiLoaded", () => {
+(window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("ui-tabs", () => {
   // =====================================================================
   // タブ切り替えロジック
   // =====================================================================
   const tabBtns = document.querySelectorAll(".tab-btn");
   const panelSections = document.querySelectorAll(".panel-section");
 
+  const savedTab = localStorage.getItem("activeTab") || "tab-avatar";
+
   tabBtns.forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.onclick = () => {
       const targetTab = btn.getAttribute("data-target");
       if (!targetTab) return;
 
+      localStorage.setItem("activeTab", targetTab);
+
       tabBtns.forEach((b) => {
         b.classList.remove("active");
-        b.style.color = "var(--text-muted)";
-        b.style.borderBottom = "2px solid transparent";
       });
 
       btn.classList.add("active");
-      btn.style.color = "#fff";
-      btn.style.borderBottom = "2px solid var(--primary)";
 
       panelSections.forEach((sec) => {
         if (sec.getAttribute("data-tab") === targetTab) {
@@ -27,17 +27,35 @@ window.addEventListener("uiLoaded", () => {
           sec.style.display = "none";
         }
       });
-    });
+    };
   });
 
   // 初期状態の設定
-  panelSections.forEach((sec) => {
-    if (sec.getAttribute("data-tab") === "tab-avatar") {
-      sec.style.display = "flex";
-    } else {
-      sec.style.display = "none";
+  let initialBtnFound = false;
+  tabBtns.forEach((btn) => {
+    if (btn.getAttribute("data-target") === savedTab) {
+      btn.click();
+      initialBtnFound = true;
     }
   });
+  if (!initialBtnFound && tabBtns.length > 0) {
+    tabBtns[0].click();
+  }
+
+  // スクロール位置の保存と復元（タブの下のスクロールコンテナを対象）
+  const scrollContainer = document.getElementById("panel-scroll-container") || document.getElementById("control-panel");
+  if (scrollContainer) {
+    const savedScroll = localStorage.getItem("controlPanelScrollY");
+    if (savedScroll !== null) {
+      setTimeout(() => {
+        scrollContainer.scrollTop = parseInt(savedScroll, 10);
+      }, 150); 
+    }
+
+    scrollContainer.addEventListener("scroll", () => {
+      localStorage.setItem("controlPanelScrollY", scrollContainer.scrollTop);
+    });
+  }
 
   // ラジオモードの設定表示切り替え
   window.radioModeToggle = document.getElementById("ai-radio-mode-toggle");

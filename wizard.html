@@ -1,0 +1,1423 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 YouTube 配信準備ウィザード - Live2D Studio</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+JP:wght@300;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="live2d-styles.css?v=1.3">
+    <style>
+        body {
+            background: #0d0e17;
+            color: #f1f2f6;
+            font-family: 'Outfit', 'Noto Sans JP', sans-serif;
+            margin: 0;
+            padding: 16px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .wizard-container {
+            width: 100%;
+            max-width: 720px;
+            max-height: 92vh;
+            background: rgba(18, 18, 30, 0.95);
+            border: 1px solid var(--border-neon, #00d2d3);
+            border-radius: 14px;
+            box-shadow: 0 0 30px rgba(0, 210, 211, 0.25);
+            padding: 20px 24px;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+
+        .wizard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 12px;
+            margin-bottom: 14px;
+            flex-shrink: 0;
+        }
+
+        .wizard-header h2 {
+            font-size: 1.3rem;
+            margin: 0;
+            color: #00d2d3;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .step-indicators {
+            display: flex;
+            justify-content: space-between;
+            position: relative;
+            margin-bottom: 16px;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .wizard-step-node {
+            flex: 1;
+            text-align: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: var(--text-muted, #888);
+            border-bottom: 3px solid rgba(255,255,255,0.1);
+            padding-bottom: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .wizard-step-node.active {
+            color: #00d2d3;
+            border-bottom: 3px solid #00d2d3;
+        }
+
+        .wizard-step-node.completed {
+            color: #00e676;
+            border-bottom: 3px solid #00e676;
+        }
+
+        .wizard-step-content {
+            flex: 1;
+            overflow-y: auto;
+            max-height: calc(92vh - 180px);
+            padding-right: 6px;
+            box-sizing: border-box;
+        }
+
+        /* スタイリッシュなスクロールバー */
+        .wizard-step-content::-webkit-scrollbar {
+            width: 6px;
+        }
+        .wizard-step-content::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        .wizard-step-content::-webkit-scrollbar-thumb {
+            background: rgba(0, 210, 211, 0.4);
+            border-radius: 4px;
+        }
+        .wizard-step-content::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 210, 211, 0.8);
+        }
+
+        .wizard-mode-card {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 18px 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .wizard-mode-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255,255,255,0.3);
+        }
+
+        .wizard-mode-card.selected {
+            background: rgba(255,255,255,0.12);
+        }
+
+        .status-box {
+            background: rgba(0,0,0,0.35);
+            border: 1px solid var(--border-neon, #00d2d3);
+            border-radius: 8px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+        }
+
+        .btn-nav {
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-prev {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .btn-next {
+            background: #00d2d3;
+            color: #000;
+        }
+
+        .btn-finish {
+            background: linear-gradient(135deg, #00e676, #00b894);
+            color: #000;
+            box-shadow: 0 0 15px rgba(0,230,118,0.4);
+            padding: 10px 28px;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="wizard-container">
+        <!-- ヘッダー -->
+        <div class="wizard-header">
+            <h2><span>🚀 YouTube 配信準備ウィザード</span></h2>
+            <span id="opener-status" style="font-size: 0.75rem; color: #00e676;">🟢 スタジオ連携中</span>
+        </div>
+
+        <!-- ステップインジケーター -->
+        <div class="step-indicators">
+            <div id="step-node-1" class="wizard-step-node active">1. 配信タイプ</div>
+            <div id="step-node-2" class="wizard-step-node">2. システム・音声</div>
+            <div id="step-node-3" class="wizard-step-node">3. 台本・コンテンツ</div>
+            <div id="step-node-4" class="wizard-step-node">4. 最終確認・配信開始</div>
+        </div>
+
+        <!-- Step 1: 配信タイプ選択 -->
+        <div id="step-1" class="wizard-step-content" style="display: flex; flex-direction: column; gap: 16px;">
+            <p style="font-size: 0.9rem; color: var(--text-primary); margin: 0;">本日の配信タイプを選択してください：</p>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;">
+                <!-- 雑談配信カード -->
+                <div class="wizard-mode-card" data-mode="chat">
+                    <div style="font-size: 2.2rem; margin-bottom: 8px;">💬</div>
+                    <div style="font-weight: bold; font-size: 1.05rem; color: #fff; margin-bottom: 6px;">雑談配信</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.4;">リスナーのコメント応答や独り言（Idle Speech）を中心としたトーク配信</div>
+                </div>
+                <!-- ラジオ配信カード -->
+                <div class="wizard-mode-card" data-mode="radio">
+                    <div style="font-size: 2.2rem; margin-bottom: 8px;">📻</div>
+                    <div style="font-weight: bold; font-size: 1.05rem; color: #ff9900; margin-bottom: 6px;">ラジオ配信</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.4;">AIで作成した番組台本に沿ってお便りやSEを交えながら進行するラジオ番組</div>
+                </div>
+                <!-- ニュース配信カード -->
+                <div class="wizard-mode-card" data-mode="news">
+                    <div style="font-size: 2.2rem; margin-bottom: 8px;">📰</div>
+                    <div style="font-weight: bold; font-size: 1.05rem; color: #00d2d3; margin-bottom: 6px;">ニュース配信</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.4;">最新RSSニュースから取得した記事をカテゴリ順に全自動で読み上げるニュース番組</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: システム＆音声チェック -->
+        <div id="step-2" class="wizard-step-content" style="display: none; flex-direction: column; gap: 14px;">
+            <p style="font-size: 0.85rem; color: var(--text-primary); margin: 0;">サーバー接続状態とアバター音声を確認してください：</p>
+            <div class="status-box">
+                <div class="status-row">
+                    <span>Local API サーバー (port 8001)</span>
+                    <span id="status-local-api" style="font-weight: bold; color: #ff7675;">🔴 確認中...</span>
+                </div>
+                <div class="status-row">
+                    <span>YouTube コメントサーバー (port 8002)</span>
+                    <span id="status-yt-server" style="font-weight: bold; color: #ff7675;">🔴 確認中...</span>
+                </div>
+                <div class="status-row">
+                    <span>VOICEVOX エンジン (port 50021)</span>
+                    <span id="status-voicevox" style="font-weight: bold; color: #ff7675;">🔴 確認中...</span>
+                </div>
+                <div class="status-row">
+                    <span>OBS WebSocket 接続</span>
+                    <span id="status-obs" style="font-weight: bold; color: #ff7675;">🔴 未接続</span>
+                </div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+                <div style="font-size: 0.85rem; font-weight: bold; color: #00d2d3;">🎙️ 音声＆モデルテスト</div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button id="voice-test-btn" class="btn" style="flex: 1; background: #6c5ce7; color: #fff; font-size: 0.85rem; padding: 8px 12px; border-radius: 6px; border:none; cursor:pointer; font-weight:bold;">🔊 VOICEVOXテスト発声</button>
+                    <button id="bgm-test-btn" class="btn" style="flex: 1; background: var(--primary, #00d2d3); color: #000; font-size: 0.85rem; padding: 8px 12px; border-radius: 6px; border:none; cursor:pointer; font-weight:bold;">🎵 BGM再生テスト</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: コンテンツ・台本準備 -->
+        <div id="step-3" class="wizard-step-content" style="display: none; flex-direction: column; gap: 14px;">
+            <!-- 雑談配信 -->
+            <div id="content-chat" style="display:none; flex-direction:column; gap:10px;">
+                <div style="background: rgba(0,255,255,0.08); border: 1px solid #00d2d3; border-radius: 8px; padding: 14px;">
+                    <div style="font-weight: bold; font-size: 0.95rem; color: #00d2d3; margin-bottom: 6px;">💬 雑談配信の設定確認</div>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 12px; line-height:1.5;">リスナーがいない時の独り言（Idle Speech）やコメント返信設定を確認してください。</p>
+                    <button id="open-idle-settings-btn" class="btn" style="background: rgba(255,255,255,0.1); border: 1px solid var(--border-neon); color: #fff; font-size: 0.85rem; padding: 8px 14px; border-radius: 6px; cursor:pointer;">⚙️ スタジオ側の「音声/AI」タブを開く</button>
+                </div>
+            </div>
+            <!-- ラジオ配信 -->
+            <div id="content-radio" style="display:none; flex-direction:column; gap:10px;">
+                <div style="background: rgba(255,153,0,0.08); border: 1px solid #ff9900; border-radius: 8px; padding: 14px;">
+                    <div style="font-weight: bold; font-size: 0.95rem; color: #ff9900; margin-bottom: 6px;">📻 ラジオ台本の準備・確認</div>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 12px; line-height:1.5;">本日のラジオ番組台本が設定されているか確認してください。</p>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:0.85rem;">台本読み込み状態: <strong id="radio-script-status" style="color:#ff9900;">0行 (未準備)</strong></span>
+                        <button id="open-radio-script-btn" class="btn" style="background:#ff9900; color:#000; font-weight:bold; font-size:0.85rem; padding:8px 14px; border-radius:6px; border:none; cursor:pointer;">📝 ラジオ台本設定を開く</button>
+                    </div>
+                </div>
+            </div>
+            <!-- ニュース配信 -->
+            <div id="content-news" style="display:none; flex-direction:column; gap:10px;">
+                <div style="background: rgba(0,210,211,0.08); border: 1px solid #00d2d3; border-radius: 8px; padding: 14px;">
+                    <div style="font-weight: bold; font-size: 0.95rem; color: #00d2d3; margin-bottom: 8px;">📰 ニュース配信の条件設定・取得</div>
+                    
+                    <!-- 取得条件コントロール -->
+                    <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 8px; margin-bottom: 8px;">
+                        <div>
+                            <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 3px;">取得カテゴリ</label>
+                            <select id="wizard-news-category-select" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid var(--border-neon, #00d2d3); border-radius: 4px; padding: 6px 8px; color: #fff; font-size: 0.8rem; outline: none;">
+                                <option value="cat_all">🌐 全カテゴリ（総合・社会・国際・経済・政治・エンタメ・スポーツ・IT・科学・地域）</option>
+                                <option value="cat_top">🔥 主要・トップニュース</option>
+                                <option value="cat_society">🏙️ 社会</option>
+                                <option value="cat_world">🌍 国際</option>
+                                <option value="cat_business">💼 ビジネス・経済</option>
+                                <option value="cat_politics">🏛️ 政治</option>
+                                <option value="cat_entertainment">🎬 エンタメ</option>
+                                <option value="cat_sports">⚽ スポーツ</option>
+                                <option value="cat_tech">💻 IT・テクノロジー</option>
+                                <option value="cat_science">🔬 科学・学術</option>
+                                <option value="cat_local">🗾 地域・ローカル</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 3px;">各カテゴリ最大件数</label>
+                            <select id="wizard-news-count-select" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid var(--border-neon, #00d2d3); border-radius: 4px; padding: 6px 8px; color: #fff; font-size: 0.8rem; outline: none;">
+                                <option value="1">各1件</option>
+                                <option value="2">各2件</option>
+                                <option value="3" selected>各3件</option>
+                                <option value="5">各5件</option>
+                                <option value="999">全件（上限なし）</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 日時範囲コントロール -->
+                    <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px; margin-bottom: 10px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+                            <label style="font-size: 0.75rem; color: var(--text-muted);">🕒 ニュース取得の日時範囲（時間指定可能）</label>
+                            <div style="display:flex; gap: 4px;">
+                                <button type="button" id="btn-quick-12h" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 3px; color: #fff; font-size: 0.65rem; padding: 2px 5px; cursor: pointer;">直近12h</button>
+                                <button type="button" id="btn-quick-24h" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 3px; color: #fff; font-size: 0.65rem; padding: 2px 5px; cursor: pointer;">直近24h</button>
+                                <button type="button" id="btn-quick-today" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 3px; color: #fff; font-size: 0.65rem; padding: 2px 5px; cursor: pointer;">今日</button>
+                                <button type="button" id="btn-quick-all" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 3px; color: #fff; font-size: 0.65rem; padding: 2px 5px; cursor: pointer;">クリア</button>
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; align-items: center;">
+                            <div>
+                                <input type="datetime-local" id="wizard-news-date-start" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid var(--border-neon, #00d2d3); border-radius: 4px; padding: 5px 6px; color: #fff; font-size: 0.75rem; outline: none;">
+                            </div>
+                            <div>
+                                <input type="datetime-local" id="wizard-news-date-end" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid var(--border-neon, #00d2d3); border-radius: 4px; padding: 5px 6px; color: #fff; font-size: 0.75rem; outline: none;">
+                            </div>
+                            <button id="wizard-fetch-news-btn" class="btn" style="background: #00e676; color: #000; font-weight: bold; font-size: 0.8rem; padding: 5px 12px; border-radius: 4px; border: none; cursor: pointer; height: 28px; white-space: nowrap;">⬇️ 取得</button>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                        <span style="font-size:0.85rem;">取得記事数: <strong id="news-item-count" style="color:#00d2d3;">確認中...</strong></span>
+                        <div style="display:flex; gap:6px;">
+                            <button id="wizard-clear-read-btn" class="btn" style="background: rgba(255,118,117,0.15); color: #ff7675; border: 1px solid rgba(255,118,117,0.4); font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer;" title="テスト等で既読になったフラグを全て未読に戻します">🗑️ 既読クリア</button>
+                            <button id="open-news-list-popup-btn" class="btn" style="background: rgba(255,255,255,0.1); color: #fff; font-size: 0.75rem; padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer;">📋 別窓で詳細</button>
+                            <button id="open-news-settings-btn" class="btn" style="background: #00d2d3; color: #000; font-weight: bold; font-size: 0.75rem; padding: 4px 10px; border-radius: 4px; border: none; cursor: pointer;">⚙️ 番組設定</button>
+                        </div>
+                    </div>
+
+                    <!-- ニュース一覧プレビュー -->
+                    <div id="wizard-news-preview-list" style="max-height: 150px; overflow-y: auto; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
+                        <div style="color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 10px;">ニュースを読み込み中...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4: 最終確認・配信開始 -->
+        <div id="step-4" class="wizard-step-content" style="display: none; flex-direction: column; gap: 14px;">
+            <p style="font-size: 0.85rem; color: var(--text-primary); margin: 0;">配信枠情報と配信の終了方法を設定して、配信準備を完了します：</p>
+            <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 12px;">
+                <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+                        <label style="font-size: 0.8rem; color: var(--text-muted);">YouTube 配信枠 URL または 動画ID</label>
+                        <span id="wizard-yt-info-status" style="font-size: 0.75rem; color: var(--text-muted);"></span>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <input id="wizard-yt-input" type="text" placeholder="https://www.youtube.com/watch?v=... または 動画ID" style="flex:1; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-neon, #00d2d3); border-radius: 6px; padding: 8px 10px; color: #fff; font-size: 0.9rem; outline: none;">
+                        <button id="wizard-yt-check-btn" class="btn" style="background: rgba(0,210,211,0.2); border: 1px solid #00d2d3; color: #00d2d3; font-size: 0.75rem; padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap; font-weight: bold;">🔍 枠情報確認</button>
+                    </div>
+                    <!-- 枠情報の詳細カード -->
+                    <div id="wizard-yt-info-card" style="display:none; margin-top:6px; background: rgba(0,0,0,0.4); border: 1px solid rgba(0,210,211,0.3); border-radius:6px; padding: 8px 10px; font-size: 0.8rem;">
+                        <div id="wizard-yt-title" style="font-weight:bold; color:#fff; margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
+                        <div style="display:flex; justify-content:space-between; font-size: 0.75rem;">
+                            <span id="wizard-yt-schedule" style="color: #00d2d3;">⏰ 予定日時: 取得中...</span>
+                            <span id="wizard-yt-live-badge" style="font-weight:bold;"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 📋 OBS / YouTube 配信予約用データ（ワンクリックコピー） -->
+                <div style="background: rgba(0, 210, 211, 0.08); border: 1px solid rgba(0, 210, 211, 0.35); border-radius: 8px; padding: 12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                        <span style="font-size: 0.82rem; font-weight: bold; color: #00d2d3;">📋 OBS「配信の管理」/ YouTube予約用データ</span>
+                        <button id="btn-copy-all-obs-info" class="btn" style="background: rgba(0,210,211,0.25); border: 1px solid #00d2d3; color: #fff; font-size: 0.7rem; padding: 3px 8px; border-radius: 4px; cursor: pointer;">📋 まとめてコピー</button>
+                    </div>
+                    
+                    <!-- 配信タイトル -->
+                    <div style="margin-bottom: 8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 2px;">
+                            <label style="font-size: 0.75rem; color: var(--text-muted);">📌 配信タイトル（OBS・YouTube用）</label>
+                            <button id="btn-copy-title" style="background: none; border: none; color: #00e676; font-size: 0.7rem; cursor: pointer; text-decoration: underline; padding: 0;">タイトルをコピー</button>
+                        </div>
+                        <div style="display:flex; gap: 4px;">
+                            <input id="wizard-suggested-title" type="text" style="flex:1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; padding: 5px 8px; color: #fff; font-size: 0.8rem; outline: none;">
+                            <button id="btn-regen-title" title="別のタイトル案を生成" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: #fff; font-size: 0.75rem; padding: 0 8px; cursor: pointer;">🎲</button>
+                        </div>
+                    </div>
+
+                    <!-- 配信説明欄（概要欄） -->
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 2px;">
+                            <label style="font-size: 0.75rem; color: var(--text-muted);">📝 説明欄（概要欄 / ニュース一覧自動挿入）</label>
+                            <button id="btn-copy-desc" style="background: none; border: none; color: #00e676; font-size: 0.7rem; cursor: pointer; text-decoration: underline; padding: 0;">説明欄をコピー</button>
+                        </div>
+                        <textarea id="wizard-suggested-desc" rows="4" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; padding: 6px 8px; color: #ccc; font-size: 0.75rem; font-family: monospace; outline: none; resize: vertical;"></textarea>
+                    </div>
+
+                    <div style="margin-top: 6px; font-size: 0.7rem; color: var(--text-muted); line-height: 1.4;">
+                        💡 OBSの <strong>[配信の管理] ➔ [新しい配信を作成]</strong> または YouTube Studio の配信予約画面に貼り付けてご利用いただけます。
+                    </div>
+                </div>
+
+                <!-- 配信開始予定時刻の設定 -->
+                <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <label style="font-size: 0.8rem; font-weight: bold; color: var(--primary, #00d2d3);">⏰ 配信開始予定時刻</label>
+                        <label style="font-size: 0.75rem; color: #fff; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                            <input type="checkbox" id="wizard-start-schedule-toggle" style="cursor: pointer;">
+                            <span>指定時刻に自動開始する</span>
+                        </label>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input id="wizard-start-time" type="time" style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid var(--border-neon, #00d2d3); border-radius: 6px; padding: 6px 10px; color: #fff; font-size: 0.9rem; outline: none;">
+                        <span id="wizard-start-time-hint" style="font-size: 0.75rem; color: var(--text-muted);">（チェックなしで即時開始）</span>
+                    </div>
+                </div>
+
+                <!-- 配信終了方法の選択 -->
+                <div>
+                    <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">配信の終了方法</label>
+                    <select id="wizard-end-mode-select" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid var(--border-neon, #00d2d3); border-radius: 6px; padding: 8px 10px; color: #fff; font-size: 0.85rem; outline: none; margin-bottom: 8px;">
+                        <option value="news_end" id="opt-news-end">📰 ニュース読み終わり次第終了（全記事読了時に自動終了）</option>
+                        <option value="none">🚫 自動終了しない（無制限・24時間耐久配信）</option>
+                        <option value="timer">⏱️ タイマー指定（配信開始から○時間後に自動終了）</option>
+                        <option value="time">📅 時刻指定（指定した時刻に自動終了）</option>
+                    </select>
+
+                    <!-- タイマー指定用の入力欄 -->
+                    <div id="wizard-end-timer-container" style="display: flex; flex-direction: column; gap: 4px;">
+                        <select id="wizard-duration-select" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-neon, #00d2d3); border-radius: 6px; padding: 7px 10px; color: #fff; font-size: 0.85rem; outline: none;">
+                            <option value="30">30分後</option>
+                            <option value="60">1時間後</option>
+                            <option value="120">2時間後</option>
+                            <option value="180">3時間後</option>
+                            <option value="360">6時間後</option>
+                            <option value="720">12時間後</option>
+                            <option value="1440" selected>24時間後（24時間耐久）</option>
+                            <option value="2880">48時間後（48時間耐久）</option>
+                        </select>
+                    </div>
+
+                    <!-- 時刻指定用の入力欄 -->
+                    <div id="wizard-end-time-container" style="display: none; flex-direction: column; gap: 4px;">
+                        <input id="wizard-end-time" type="time" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-neon, #00d2d3); border-radius: 6px; padding: 7px 10px; color: #fff; font-size: 0.9rem; outline: none;">
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: rgba(0, 230, 118, 0.08); border: 1px solid #00e676; border-radius: 8px; padding: 14px; text-align: center;">
+                <div style="font-weight: bold; color: #00e676; font-size: 1rem; margin-bottom: 4px;">🎉 全ての準備が整いました！</div>
+                <div id="wizard-finish-summary-text" style="font-size: 0.8rem; color: var(--text-muted);">「配信準備完了・スタート！」を押すと、設定が適用され配信を開始します。</div>
+            </div>
+        </div>
+
+        <!-- フッターナビゲーション -->
+        <div style="margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+            <button id="nav-prev-btn" class="btn-nav btn-prev" style="display: none;">◀ 戻る</button>
+            <div style="flex: 1;"></div>
+            <button id="nav-next-btn" class="btn-nav btn-next">次へ ▶</button>
+            <button id="nav-finish-btn" class="btn-nav btn-finish" style="display: none;">🚀 配信準備完了・スタート！</button>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        let selectedMode = "news"; // 'chat' | 'radio' | 'news'
+
+        const openerWin = window.opener;
+        const openerStatus = document.getElementById("opener-status");
+        if (!openerWin) {
+            if (openerStatus) {
+                openerStatus.textContent = "⚠️ スタジオ未接続 (親画面なし)";
+                openerStatus.style.color = "#ff7675";
+            }
+        }
+
+        // モードカード
+        const modeCards = document.querySelectorAll(".wizard-mode-card");
+        function updateModeUI() {
+            modeCards.forEach(card => {
+                const mode = card.getAttribute("data-mode");
+                if (mode === selectedMode) {
+                    card.classList.add("selected");
+                    card.style.borderColor = mode === "radio" ? "#ff9900" : (mode === "news" ? "#00d2d3" : "#6c5ce7");
+                    card.style.boxShadow = `0 0 15px ${mode === "radio" ? "rgba(255,153,0,0.35)" : (mode === "news" ? "rgba(0,210,211,0.35)" : "rgba(108,92,231,0.35)")}`;
+                } else {
+                    card.classList.remove("selected");
+                    card.style.borderColor = "rgba(255, 255, 255, 0.1)";
+                    card.style.boxShadow = "none";
+                }
+            });
+        }
+
+        modeCards.forEach(card => {
+            card.addEventListener("click", () => {
+                selectedMode = card.getAttribute("data-mode");
+                updateModeUI();
+            });
+        });
+        updateModeUI();
+
+        // ステップ遷移
+        function goToStep(step) {
+            currentStep = step;
+            for (let i = 1; i <= 4; i++) {
+                const elContent = document.getElementById(`step-${i}`);
+                const elNode = document.getElementById(`step-node-${i}`);
+                if (elContent) elContent.style.display = i === step ? "flex" : "none";
+                if (elNode) {
+                    elNode.className = "wizard-step-node";
+                    if (i === step) elNode.classList.add("active");
+                    else if (i < step) elNode.classList.add("completed");
+                }
+            }
+
+            document.getElementById("nav-prev-btn").style.display = step > 1 ? "block" : "none";
+            document.getElementById("nav-next-btn").style.display = step < 4 ? "block" : "none";
+            document.getElementById("nav-finish-btn").style.display = step === 4 ? "block" : "none";
+
+            if (step === 2) checkSystemHealth();
+            if (step === 3) updateStep3Content();
+            if (step === 4) updateStep4Inputs();
+        }
+
+        // Step 2: サーバー状態確認
+        async function checkSystemHealth() {
+            // Local API
+            const elLocal = document.getElementById("status-local-api");
+            try {
+                const r = await fetch("/custom_idle_phrases.json", { cache: "no-store" });
+                if (r.ok && elLocal) {
+                    elLocal.textContent = "🟢 正常動作中";
+                    elLocal.style.color = "#00e676";
+                }
+            } catch (e) {
+                if (elLocal) {
+                    elLocal.textContent = "🔴 停止中";
+                    elLocal.style.color = "#ff7675";
+                }
+            }
+
+            // YouTube Comment Server
+            const elYt = document.getElementById("status-yt-server");
+            try {
+                const r = await fetch("http://localhost:8002/comments", { cache: "no-store" });
+                if (elYt) {
+                    elYt.textContent = "🟢 正常動作中";
+                    elYt.style.color = "#00e676";
+                }
+            } catch (e) {
+                if (elYt) {
+                    elYt.textContent = "🟡 未起動 (コメント受信時に起動)";
+                    elYt.style.color = "#ffeaa7";
+                }
+            }
+
+            // VOICEVOX
+            const elVv = document.getElementById("status-voicevox");
+            try {
+                const r = await fetch("http://localhost:50021/version", { cache: "no-store" });
+                if (r.ok && elVv) {
+                    elVv.textContent = "🟢 正常動作中";
+                    elVv.style.color = "#00e676";
+                }
+            } catch (e) {
+                if (elVv) {
+                    elVv.textContent = "🔴 停止中 (アプリを起動してください)";
+                    elVv.style.color = "#ff7675";
+                }
+            }
+
+            // OBS
+            const elObs = document.getElementById("status-obs");
+            if (elObs) {
+                if (openerWin && openerWin.isObsWsConnected) {
+                    elObs.textContent = "🟢 接続済み";
+                    elObs.style.color = "#00e676";
+                } else {
+                    elObs.textContent = "🟡 未接続 (手動配信時はスキップ可)";
+                    elObs.style.color = "var(--text-muted, #888)";
+                }
+            }
+        }
+
+        // 音声・BGMテスト
+        document.getElementById("voice-test-btn").addEventListener("click", () => {
+            if (openerWin && typeof openerWin.queueVoicevoxAudio === "function") {
+                const charId = openerWin.currentModelId || "";
+                const msg = charId.includes("zunda")
+                    ? "マイクとボイスのテストなのだ！準備万端なのだ！"
+                    : "音声のテスト発声です。正常に出力されています。";
+                openerWin.queueVoicevoxAudio(msg, true).catch(e => console.warn(e));
+            } else {
+                alert("親画面（スタジオ）と連携して音声を出力します。");
+            }
+        });
+
+        document.getElementById("bgm-test-btn").addEventListener("click", () => {
+            if (openerWin) {
+                const playBtn = openerWin.document.getElementById("bgm-play-btn");
+                if (playBtn) playBtn.click();
+            }
+        });
+
+        // Step 3
+        function updateStep3Content() {
+            document.getElementById("content-chat").style.display = selectedMode === "chat" ? "flex" : "none";
+            document.getElementById("content-radio").style.display = selectedMode === "radio" ? "flex" : "none";
+            document.getElementById("content-news").style.display = selectedMode === "news" ? "flex" : "none";
+
+            if (openerWin) {
+                if (selectedMode === "radio" && openerWin.radioModeState) {
+                    const count = openerWin.radioModeState.scriptLines ? openerWin.radioModeState.scriptLines.length : 0;
+                    const el = document.getElementById("radio-script-status");
+                    if (el) {
+                        el.textContent = count > 0 ? `✅ ${count}行 準備完了` : "⚠️ 0行 (未準備)";
+                        el.style.color = count > 0 ? "#00e676" : "#ff9900";
+                    }
+                }
+                if (selectedMode === "news") {
+                    // 日時の初期化
+                    const startInput = document.getElementById("wizard-news-date-start");
+                    const endInput = document.getElementById("wizard-news-date-end");
+                    const mainStart = openerWin.document.getElementById("news-date-start");
+                    const mainEnd = openerWin.document.getElementById("news-date-end");
+
+                    const formatLocalDT = (d) => {
+                        const y = d.getFullYear();
+                        const m = String(d.getMonth() + 1).padStart(2, "0");
+                        const day = String(d.getDate()).padStart(2, "0");
+                        const hh = String(d.getHours()).padStart(2, "0");
+                        const mm = String(d.getMinutes()).padStart(2, "0");
+                        return `${y}-${m}-${day}T${hh}:${mm}`;
+                    };
+
+                    if (startInput && !startInput.value) {
+                        if (mainStart && mainStart.value) {
+                            startInput.value = mainStart.value;
+                        } else {
+                            const d = new Date();
+                            d.setHours(0, 0, 0, 0);
+                            startInput.value = formatLocalDT(d);
+                        }
+                    }
+                    if (endInput && !endInput.value) {
+                        if (mainEnd && mainEnd.value) {
+                            endInput.value = mainEnd.value;
+                        } else {
+                            const d = new Date();
+                            d.setHours(23, 59, 0, 0);
+                            endInput.value = formatLocalDT(d);
+                        }
+                    }
+
+                    renderWizardNewsList();
+                }
+            }
+        }
+
+        // クイック日時プリセットボタン
+        const formatDT = (d) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            const hh = String(d.getHours()).padStart(2, "0");
+            const mm = String(d.getMinutes()).padStart(2, "0");
+            return `${y}-${m}-${day}T${hh}:${mm}`;
+        };
+
+        const applyWizardQuickRange = (rangeKey = "12h") => {
+            const now = new Date();
+            const btn12 = document.getElementById("btn-quick-12h");
+            const btn24 = document.getElementById("btn-quick-24h");
+            const btnToday = document.getElementById("btn-quick-today");
+            const btnAll = document.getElementById("btn-quick-all");
+            const allBtns = [btn12, btn24, btnToday, btnAll].filter(Boolean);
+
+            allBtns.forEach(btn => {
+                btn.style.background = "rgba(255,255,255,0.08)";
+                btn.style.borderColor = "rgba(255,255,255,0.15)";
+                btn.style.color = "#fff";
+                btn.style.fontWeight = "normal";
+            });
+
+            const startInput = document.getElementById("wizard-news-date-start");
+            const endInput = document.getElementById("wizard-news-date-end");
+
+            if (rangeKey === "12h") {
+                const past = new Date(now.getTime() - 12 * 60 * 60 * 1000);
+                if (startInput) startInput.value = formatDT(past);
+                if (endInput) endInput.value = formatDT(now);
+                if (btn12) {
+                    btn12.style.background = "rgba(0, 210, 211, 0.25)";
+                    btn12.style.borderColor = "#00d2d3";
+                    btn12.style.color = "#00ffff";
+                    btn12.style.fontWeight = "bold";
+                }
+            } else if (rangeKey === "24h") {
+                const past = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                if (startInput) startInput.value = formatDT(past);
+                if (endInput) endInput.value = formatDT(now);
+                if (btn24) {
+                    btn24.style.background = "rgba(0, 210, 211, 0.25)";
+                    btn24.style.borderColor = "#00d2d3";
+                    btn24.style.color = "#00ffff";
+                    btn24.style.fontWeight = "bold";
+                }
+            } else if (rangeKey === "today") {
+                const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+                const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+                if (startInput) startInput.value = formatDT(start);
+                if (endInput) endInput.value = formatDT(end);
+                if (btnToday) {
+                    btnToday.style.background = "rgba(0, 210, 211, 0.25)";
+                    btnToday.style.borderColor = "#00d2d3";
+                    btnToday.style.color = "#00ffff";
+                    btnToday.style.fontWeight = "bold";
+                }
+            } else if (rangeKey === "all") {
+                if (startInput) startInput.value = "";
+                if (endInput) endInput.value = "";
+                if (btnAll) {
+                    btnAll.style.background = "rgba(0, 210, 211, 0.25)";
+                    btnAll.style.borderColor = "#00d2d3";
+                    btnAll.style.color = "#00ffff";
+                    btnAll.style.fontWeight = "bold";
+                }
+            }
+
+            localStorage.setItem("savedNewsQuickRange", rangeKey);
+        };
+
+        document.getElementById("btn-quick-12h")?.addEventListener("click", () => applyWizardQuickRange("12h"));
+        document.getElementById("btn-quick-24h")?.addEventListener("click", () => applyWizardQuickRange("24h"));
+        document.getElementById("btn-quick-today")?.addEventListener("click", () => applyWizardQuickRange("today"));
+        document.getElementById("btn-quick-all")?.addEventListener("click", () => applyWizardQuickRange("all"));
+
+        const savedRange = localStorage.getItem("savedNewsQuickRange") || "12h";
+        applyWizardQuickRange(savedRange);
+
+        // ニュースカテゴリと最大件数の復元・自動保存
+        const catSelect = document.getElementById("wizard-news-category-select");
+        const countSelect = document.getElementById("wizard-news-count-select");
+
+        const savedCategory = localStorage.getItem("savedNewsCategory") || "cat_all";
+        const savedCount = localStorage.getItem("savedNewsCountSelect") || "3";
+
+        if (catSelect) {
+            catSelect.value = savedCategory;
+            catSelect.addEventListener("change", (e) => {
+                localStorage.setItem("savedNewsCategory", e.target.value);
+            });
+        }
+        if (countSelect) {
+            countSelect.value = savedCount;
+            countSelect.addEventListener("change", (e) => {
+                localStorage.setItem("savedNewsCountSelect", e.target.value);
+            });
+        }
+
+        // ニュース取得ボタン
+        document.getElementById("wizard-fetch-news-btn").addEventListener("click", async () => {
+            if (!openerWin) return;
+            const btn = document.getElementById("wizard-fetch-news-btn");
+            if (catSelect) localStorage.setItem("savedNewsCategory", catSelect.value);
+            if (countSelect) localStorage.setItem("savedNewsCountSelect", countSelect.value);
+            const startDate = document.getElementById("wizard-news-date-start")?.value || null;
+            const endDate = document.getElementById("wizard-news-date-end")?.value || null;
+
+            const selectedCat = catSelect ? catSelect.value : "cat_all";
+            const maxCount = countSelect ? parseInt(countSelect.value, 10) : 3;
+
+            btn.disabled = true;
+            btn.textContent = "⏳ 取得中...";
+            
+            try {
+                if (typeof openerWin.fetchNewsWithOptions === "function") {
+                    await openerWin.fetchNewsWithOptions(selectedCat, maxCount, startDate, endDate);
+                } else {
+                    const fetchBtn = openerWin.document.getElementById("news-fetch-only-btn");
+                    if (fetchBtn) fetchBtn.click();
+                    await new Promise(r => setTimeout(r, 2500));
+                }
+                renderWizardNewsList();
+                generateStreamReservationMetadata(true);
+            } catch (e) {
+                console.error("ニュース取得エラー:", e);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "⬇️ ニュース取得";
+            }
+        });
+
+        function renderWizardNewsList() {
+            const listEl = document.getElementById("wizard-news-preview-list");
+            const countEl = document.getElementById("news-item-count");
+            if (!listEl || !openerWin) return;
+
+            const newsItems = openerWin.latestFetchedNews || [];
+            if (countEl) {
+                countEl.textContent = newsItems.length > 0 ? `✅ ${newsItems.length}件 取得済み` : "⚠️ 0件 (ニュースを取得してください)";
+                countEl.style.color = newsItems.length > 0 ? "#00e676" : "#ff7675";
+            }
+
+            if (newsItems.length === 0) {
+                listEl.innerHTML = `
+                    <div style="text-align: center; padding: 15px; color: #ff7675; font-size: 0.8rem;">
+                        ニュース記事がまだ取得されていません。<br>
+                        「⬇️ ニュースを再取得」ボタンを押してください。
+                    </div>`;
+                return;
+            }
+
+            const readTitles = openerWin.readNewsTitles || new Set();
+
+            listEl.innerHTML = "";
+            newsItems.forEach((item, idx) => {
+                const isRead = readTitles.has(item.title);
+                const itemDiv = document.createElement("div");
+                itemDiv.style.display = "flex";
+                itemDiv.style.alignItems = "center";
+                itemDiv.style.justifyContent = "space-between";
+                itemDiv.style.gap = "8px";
+                itemDiv.style.padding = "6px 8px";
+                itemDiv.style.background = isRead ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.07)";
+                itemDiv.style.borderRadius = "4px";
+                itemDiv.style.borderLeft = isRead ? "3px solid #666" : "3px solid #00d2d3";
+                itemDiv.style.fontSize = "0.78rem";
+
+                const leftSpan = document.createElement("div");
+                leftSpan.style.display = "flex";
+                leftSpan.style.alignItems = "center";
+                leftSpan.style.gap = "6px";
+                leftSpan.style.overflow = "hidden";
+
+                const catBadge = document.createElement("span");
+                catBadge.style.background = "#00d2d3";
+                catBadge.style.color = "#000";
+                catBadge.style.fontWeight = "bold";
+                catBadge.style.fontSize = "0.65rem";
+                catBadge.style.padding = "1px 5px";
+                catBadge.style.borderRadius = "3px";
+                catBadge.style.whiteSpace = "nowrap";
+                catBadge.textContent = item.categoryName || "総合";
+
+                const titleSpan = document.createElement("span");
+                titleSpan.style.color = isRead ? "var(--text-muted)" : "#fff";
+                titleSpan.style.overflow = "hidden";
+                titleSpan.style.textOverflow = "ellipsis";
+                titleSpan.style.whiteSpace = "nowrap";
+                titleSpan.textContent = `${idx + 1}. ${item.title}`;
+
+                leftSpan.appendChild(catBadge);
+                leftSpan.appendChild(titleSpan);
+
+                const statusSpan = document.createElement("span");
+                statusSpan.style.fontSize = "0.7rem";
+                statusSpan.style.color = isRead ? "#888" : "#00e676";
+                statusSpan.style.whiteSpace = "nowrap";
+                statusSpan.textContent = isRead ? "既読" : "未読";
+
+                itemDiv.appendChild(leftSpan);
+                itemDiv.appendChild(statusSpan);
+                listEl.appendChild(itemDiv);
+            });
+        }
+
+
+        // 既読フラグクリアボタン
+        document.getElementById("wizard-clear-read-btn").addEventListener("click", () => {
+            if (openerWin && typeof openerWin.clearNewsReadFlags === "function") {
+                openerWin.clearNewsReadFlags(false);
+                renderWizardNewsList();
+            } else {
+                localStorage.removeItem("newsReadTitles");
+                renderWizardNewsList();
+                alert("既読フラグをすべてクリアしました！");
+            }
+        });
+
+        // ニュース一覧別窓ボタン
+        document.getElementById("open-news-list-popup-btn").addEventListener("click", () => {
+            if (openerWin) {
+                const btn = openerWin.document.getElementById("news-list-btn");
+                if (btn) btn.click();
+            }
+        });
+
+        document.getElementById("open-idle-settings-btn").addEventListener("click", () => {
+            if (openerWin) {
+                const tab = openerWin.document.querySelector('.tab-btn[data-target="tab-audio"]');
+                if (tab) tab.click();
+                openerWin.focus();
+            }
+        });
+
+        document.getElementById("open-radio-script-btn").addEventListener("click", () => {
+            if (openerWin) {
+                const btn = openerWin.document.getElementById("ai-radio-script-btn");
+                if (btn) btn.click();
+                openerWin.focus();
+            }
+        });
+
+        document.getElementById("open-news-settings-btn").addEventListener("click", () => {
+            if (openerWin) {
+                const btn = openerWin.document.getElementById("news-script-btn");
+                if (btn) btn.click();
+                openerWin.focus();
+            }
+        });
+
+        // YouTube 枠情報確認
+        async function fetchYoutubeVideoInfo(rawVal) {
+            if (!rawVal || rawVal.trim().length < 5) return null;
+            const statusEl = document.getElementById("wizard-yt-info-status");
+            const cardEl = document.getElementById("wizard-yt-info-card");
+            const titleEl = document.getElementById("wizard-yt-title");
+            const schedEl = document.getElementById("wizard-yt-schedule");
+            const liveEl = document.getElementById("wizard-yt-live-badge");
+
+            // URLまたは生文字列から11桁IDを抽出
+            const match = rawVal.trim().match(/(?:v=|\/live\/|\/watch\?v=|youtu\.be\/|^)([a-zA-Z0-9_-]{11})/);
+            const extractedId = match ? match[1] : rawVal.trim();
+
+            if (statusEl) {
+                statusEl.textContent = "⏳ 枠情報取得中...";
+                statusEl.style.color = "#00d2d3";
+            }
+
+            let info = null;
+
+            try {
+                const res = await fetch("/get_youtube_video_info", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ videoId: extractedId })
+                });
+                if (res.ok) {
+                    info = await res.json();
+                }
+            } catch (e) {
+                console.warn("API取得スキップ:", e);
+            }
+
+            // チャンネル指定（@handle または チャンネルURL）の場合のサポート
+            const isChannel = rawVal.trim().startsWith("@") || rawVal.includes("youtube.com/@") || rawVal.includes("/channel/");
+            if (isChannel && (!info || info.error)) {
+                info = {
+                    videoId: rawVal.trim(),
+                    title: `チャンネル自動追従 (${rawVal.trim()})`,
+                    status: "channel_autodetect",
+                    isLive: false,
+                    scheduledStartTime: null
+                };
+            }
+
+            // サーバーから情報が取れなかった場合でも、11桁の正規IDであれば予約・非公開枠として受領
+            if (!info || info.error) {
+                if (extractedId.length === 11) {
+                    info = {
+                        videoId: extractedId,
+                        title: `YouTube配信枠 (${extractedId})`,
+                        status: "scheduled_private",
+                        isLive: false,
+                        scheduledStartTime: null
+                    };
+                }
+            }
+
+            if (info && !info.error) {
+                if (cardEl && titleEl && schedEl && liveEl) {
+                    cardEl.style.display = "block";
+                    titleEl.textContent = info.title || `YouTube配信枠: ${info.videoId}`;
+
+                    if (info.isLive) {
+                        liveEl.textContent = "🟢 配信中 (Live Now)";
+                        liveEl.style.color = "#00e676";
+                    } else if (info.status === "scheduled") {
+                        liveEl.textContent = "🟡 待機中 (開始前)";
+                        liveEl.style.color = "#ffbe76";
+                    } else if (info.status === "channel_autodetect") {
+                        liveEl.textContent = "📡 チャンネル自動追従";
+                        liveEl.style.color = "#00ffff";
+                    } else if (info.status === "scheduled_private") {
+                        liveEl.textContent = "🔒 予約・非公開枠 (ID設定済)";
+                        liveEl.style.color = "#00d2d3";
+                    } else {
+                        liveEl.textContent = "⚪️ 待機中 / 確認済";
+                        liveEl.style.color = "#aaa";
+                    }
+
+                    // 配信予定日時の安全なパース
+                    let parsedDate = null;
+                    if (info.scheduledStartTime) {
+                        const raw = info.scheduledStartTime;
+                        const num = Number(raw);
+                        if (!isNaN(num) && num > 0) {
+                            parsedDate = num < 10000000000 ? new Date(num * 1000) : new Date(num);
+                        } else {
+                            parsedDate = new Date(raw);
+                        }
+                        if (parsedDate && isNaN(parsedDate.getTime())) parsedDate = null;
+                    }
+
+                    const startTimeInput = document.getElementById("wizard-start-time");
+                    const startToggle = document.getElementById("wizard-start-schedule-toggle");
+
+                    if (parsedDate) {
+                        const schedStr = parsedDate.toLocaleString("ja-JP", {
+                            month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit"
+                        });
+                        schedEl.textContent = `⏰ 配信予定: ${schedStr}`;
+                        schedEl.style.color = "#00d2d3";
+
+                        // 入力欄にも自動反映して自動開始をON
+                        const hh = String(parsedDate.getHours()).padStart(2, "0");
+                        const mm = String(parsedDate.getMinutes()).padStart(2, "0");
+                        if (startTimeInput) startTimeInput.value = `${hh}:${mm}`;
+                        if (startToggle) startToggle.checked = true;
+                    } else if (info.status === "channel_autodetect") {
+                        const currentInputVal = startTimeInput ? startTimeInput.value : "";
+                        schedEl.textContent = currentInputVal ? `⏰ 配信予定: 本日 ${currentInputVal}` : "⏰ 配信開始時に最新枠を自動取得";
+                        schedEl.style.color = "#00d2d3";
+                    } else if (info.status === "scheduled_private") {
+                        const currentInputVal = startTimeInput ? startTimeInput.value : "";
+                        schedEl.textContent = currentInputVal ? `⏰ 配信予定: 本日 ${currentInputVal}` : "⏰ 配信予定: YouTube Studioにて設定済";
+                        schedEl.style.color = "#00d2d3";
+                    } else {
+                        schedEl.textContent = "⏰ 予定日時: 指定なし (即時開始)";
+                        schedEl.style.color = "var(--text-muted)";
+                    }
+                }
+
+                if (statusEl) {
+                    statusEl.textContent = info.status === "channel_autodetect" ? "✅ チャンネル確認完了" : "✅ 枠確認完了";
+                    statusEl.style.color = "#00e676";
+                }
+                return info;
+            } else {
+                if (cardEl) cardEl.style.display = "none";
+                if (statusEl) {
+                    statusEl.textContent = "⚠️ YouTube動画IDまたはチャンネル名を入力してください";
+                    statusEl.style.color = "#ff7675";
+                }
+                return null;
+            }
+        }
+
+        document.getElementById("wizard-yt-check-btn").addEventListener("click", () => {
+            const val = document.getElementById("wizard-yt-input").value;
+            fetchYoutubeVideoInfo(val);
+        });
+
+        document.getElementById("wizard-yt-input").addEventListener("blur", () => {
+            const val = document.getElementById("wizard-yt-input").value;
+            if (val && val.trim().length >= 5) {
+                fetchYoutubeVideoInfo(val);
+            }
+        });
+
+        document.getElementById("wizard-start-time").addEventListener("input", (e) => {
+            const schedEl = document.getElementById("wizard-yt-schedule");
+            if (schedEl && e.target.value) {
+                schedEl.textContent = `⏰ 配信予定: 本日 ${e.target.value}`;
+                schedEl.style.color = "#00d2d3";
+            }
+        });
+
+        // Step 4
+        function updateStep4Inputs() {
+            if (openerWin) {
+                const mainYt = openerWin.document.getElementById("youtube-video-input");
+                const wizardYt = document.getElementById("wizard-yt-input");
+                if (mainYt && wizardYt && !wizardYt.value) {
+                    wizardYt.value = mainYt.value;
+                    if (wizardYt.value) fetchYoutubeVideoInfo(wizardYt.value);
+                }
+
+                const mainEnd = openerWin.document.getElementById("stream-end-time");
+                const wizardEnd = document.getElementById("wizard-end-time");
+                if (mainEnd && wizardEnd && !wizardEnd.value) wizardEnd.value = mainEnd.value;
+
+                // 開始予定時刻の初期化
+                const mainScheduleTime = openerWin.document.getElementById("local-schedule-time");
+                const mainScheduleToggle = openerWin.document.getElementById("local-schedule-toggle");
+                const wizardStartTime = document.getElementById("wizard-start-time");
+                const wizardStartToggle = document.getElementById("wizard-start-schedule-toggle");
+
+                if (wizardStartTime && !wizardStartTime.value) {
+                    if (mainScheduleTime && mainScheduleTime.value) {
+                        wizardStartTime.value = mainScheduleTime.value;
+                    } else {
+                        const now = new Date();
+                        now.setMinutes(now.getMinutes() + 5);
+                        const h = String(now.getHours()).padStart(2, "0");
+                        const m = String(now.getMinutes()).padStart(2, "0");
+                        wizardStartTime.value = `${h}:${m}`;
+                    }
+                }
+                if (wizardStartToggle && mainScheduleToggle) {
+                    wizardStartToggle.checked = mainScheduleToggle.checked;
+                }
+            }
+
+            const optNews = document.getElementById("opt-news-end");
+            const selectEl = document.getElementById("wizard-end-mode-select");
+            if (optNews && selectEl) {
+                if (selectedMode === "news") {
+                    optNews.style.display = "block";
+                    selectEl.value = "news_end";
+                } else {
+                    optNews.style.display = "none";
+                    if (selectEl.value === "news_end") selectEl.value = "none";
+                }
+                selectEl.dispatchEvent(new Event("change"));
+            }
+
+            generateStreamReservationMetadata(true);
+        }
+
+        // 配信予約用メタデータ（タイトル・説明欄）自動生成
+        let titlePatternIdx = 0;
+        let lastMetaNewsCount = -1;
+        function generateStreamReservationMetadata(forceRegen = false) {
+            const today = new Date();
+            const y = today.getFullYear();
+            const m = today.getMonth() + 1;
+            const d = today.getDate();
+            const dateStr = `${m}/${d}`;
+            const fullDateStr = `${y}/${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}`;
+            
+            let suggestedTitle = "";
+            let suggestedDesc = "";
+            
+            // 話者に応じた公式クレジット表記を取得
+            let voicevoxCredit = "VOICEVOX";
+            try {
+                const spSelect = openerWin?.document?.getElementById("voicevox-speaker-id");
+                if (spSelect && spSelect.selectedOptions && spSelect.selectedOptions[0]) {
+                    const optText = spSelect.selectedOptions[0].textContent;
+                    const charName = optText.split("(")[0].trim();
+                    if (charName) voicevoxCredit = `VOICEVOX:${charName}`;
+                }
+            } catch (e) {}
+
+            // 画面上で設定されているSNSリンク・チャンネル情報を取得
+            const snsLink = (openerWin?.document?.getElementById("ai-stream-sns")?.value || localStorage.getItem("savedAiStreamSns") || "").trim();
+            const ytInput = (openerWin?.document?.getElementById("youtube-video-input")?.value || localStorage.getItem("savedYoutubeVideoId") || "").trim();
+            
+            let footerLinks = "";
+            if (snsLink) {
+                footerLinks += `\n【SNS・リンク】\n${snsLink}\n`;
+            }
+            if (ytInput) {
+                const ytDisplay = ytInput.startsWith("@") ? `https://www.youtube.com/${ytInput}` : (ytInput.startsWith("http") ? ytInput : `https://www.youtube.com/watch?v=${ytInput}`);
+                if (!snsLink.includes(ytInput)) {
+                    footerLinks += (footerLinks ? "" : "\n【配信チャンネル】\n") + `YouTube: ${ytDisplay}\n`;
+                }
+            }
+
+            // BGM・背景・モデル情報の取得
+            const bgmFileName = (openerWin?.document?.getElementById("bgm-file-name")?.textContent || "").trim();
+            const bgmCredit = (bgmFileName && !bgmFileName.includes("未選択") && !bgmFileName.includes("エラー")) ? bgmFileName : "フリー音源 / DOVA-SYNDROME";
+            const currentModel = openerWin?.currentModelId || "hiyori";
+            const modelCredit = (currentModel === "hiyori") ? "Live2D公式 (Hiyori)" : `${currentModel} (Live2D)`;
+
+            // 公式デフォルトフッター（とろろ専用クレジット・ルール・SNS）
+            const defaultTororoFooter = `\n忙しいあなたも、これを見れば今日のニュースがバッチリわかる！今日も楽しくおしゃべりしながら見ていってね！\n\n◆オリジナルハッシュタグ\n#とろろニュース #とろろ生放送 #今日の気になる\n\n◆X（旧Twitter）はこちら！\nhttps://x.com/drone_akahori\n\n◆クレジット表記\n・Live2Dモデル: 「とろろ」© Live2D Inc. (Live2D Creative Studio サンプルモデル)\n・VOICE：VOICEVOX ずんだもん\n・BGM：ドローン赤堀 - Nukadaki\n・配信背景：喫茶あかほり ミクスタカフェ\n\n◆配信のルール・お願い\n・話題に出ていない他の配信者さんの名前を出すのは控えてね！\n・他の配信者さんの枠でとろろの名前を出す「伝書鳩行為」もNGだよ！\n・荒らしやスパムを見かけても、反応せずにブロック＆スルーのご協力をお願いします。\nみんなで楽しく居心地の良い配信にしようね！チャンネル登録と高評価もよろしくお願いします！`;
+            const savedFooter = localStorage.getItem("savedCustomStreamDescFooter") || defaultTororoFooter;
+
+            if (selectedMode === "news") {
+                const newsItems = (openerWin && openerWin.latestFetchedNews) ? openerWin.latestFetchedNews : [];
+                const count = newsItems.length;
+                
+                const titleTemplates = [
+                    `【${dateStr} 最新ニュース速報】注目の話題 ${count > 0 ? `${count}件` : ''}を一挙お届け！【AITuber生放送】`,
+                    `【最新ニュース生配信】国内・海外・ITの注目話題まとめ (${fullDateStr})`,
+                    `【生放送ニュース】最新の出来事を分かりやすく解説＆お届け！ (${dateStr})`,
+                    `【${fullDateStr} ニュース速報】今日知っておきたい最新ニュース (${count}件)`
+                ];
+                suggestedTitle = titleTemplates[titlePatternIdx % titleTemplates.length];
+
+                // 説明欄（概要欄）の生成
+                suggestedDesc = `こんとろ〜！バーチャルキャスターのとろろがお送りする本日の総まとめニュース配信！\nパパッと今日の重要トピックをおさらいしちゃいます✨\n\n今回の振り返り項目：\n`;
+                if (newsItems.length > 0) {
+                    newsItems.slice(0, 15).forEach((item) => {
+                        suggestedDesc += `・${item.title}\n`;
+                    });
+                    if (newsItems.length > 15) {
+                        suggestedDesc += `...他 全${newsItems.length}件\n`;
+                    }
+                } else {
+                    suggestedDesc += `・最新ニュースを随時更新・お届けします\n`;
+                }
+                suggestedDesc += savedFooter;
+            } else if (selectedMode === "radio") {
+                suggestedTitle = `【まったりラジオ生放送】作業用BGM・フリートーク・お便り紹介 (${dateStr})`;
+                suggestedDesc = `ようこそ！まったりラジオ配信へ！\n\n作業のお供や就寝前のリラックスタイムにどうぞ☕️\nコメント・お便りお待ちしています！\n` + savedFooter;
+            } else {
+                suggestedTitle = `【雑談・作業配信】初見さん大歓迎！コメント拾ってのんびりお話し (${dateStr})`;
+                suggestedDesc = `雑談配信へようこそ！\nコメントたくさん拾ってお話しします✨\n初見さんもお気軽にコメントしていってくださいね！\n` + savedFooter;
+            }
+
+            const titleInput = document.getElementById("wizard-suggested-title");
+            const descInput = document.getElementById("wizard-suggested-desc");
+            const currentCount = (openerWin && openerWin.latestFetchedNews) ? openerWin.latestFetchedNews.length : 0;
+            const countChanged = (currentCount !== lastMetaNewsCount);
+            lastMetaNewsCount = currentCount;
+
+            if (titleInput && (forceRegen || countChanged || !titleInput.value)) titleInput.value = suggestedTitle;
+            if (descInput && (forceRegen || countChanged || !descInput.value)) descInput.value = suggestedDesc;
+
+            // ユーザーが説明欄を編集した場合はフッター（クレジット）部分を自動学習・永続保存
+            if (descInput && !descInput._hasBoundInput) {
+                descInput._hasBoundInput = true;
+                descInput.addEventListener("input", () => {
+                    const val = descInput.value;
+                    const ruleIdx = val.indexOf("【配信ルール");
+                    const creditIdx = val.indexOf("音声：");
+                    const splitIdx = ruleIdx !== -1 ? ruleIdx : creditIdx;
+                    if (splitIdx !== -1) {
+                        const customFooter = val.substring(splitIdx - 1);
+                        localStorage.setItem("savedCustomStreamDescFooter", customFooter);
+                    }
+                });
+            }
+        }
+
+        // コピー共通関数
+        async function copyToClipboard(text, btnEl, successLabel = "✅ コピー完了！") {
+            try {
+                await navigator.clipboard.writeText(text);
+                const originalText = btnEl.textContent;
+                btnEl.textContent = successLabel;
+                btnEl.style.color = "#00e676";
+                setTimeout(() => {
+                    btnEl.textContent = originalText;
+                    btnEl.style.color = "";
+                }, 2000);
+            } catch (err) {
+                console.error("クリップボードへのコピーに失敗しました:", err);
+            }
+        }
+
+        document.getElementById("btn-copy-title")?.addEventListener("click", (e) => {
+            const val = document.getElementById("wizard-suggested-title")?.value || "";
+            copyToClipboard(val, e.target, "✅ タイトルコピー完了！");
+        });
+
+        document.getElementById("btn-copy-desc")?.addEventListener("click", (e) => {
+            const val = document.getElementById("wizard-suggested-desc")?.value || "";
+            copyToClipboard(val, e.target, "✅ 説明欄コピー完了！");
+        });
+
+        document.getElementById("btn-copy-all-obs-info")?.addEventListener("click", (e) => {
+            const titleVal = document.getElementById("wizard-suggested-title")?.value || "";
+            const descVal = document.getElementById("wizard-suggested-desc")?.value || "";
+            const timeVal = document.getElementById("wizard-start-time")?.value || "";
+            const text = `【配信タイトル】\n${titleVal}\n\n【配信開始予定】\n本日 ${timeVal}\n\n【説明欄】\n${descVal}`;
+            copyToClipboard(text, e.target, "✅ まとめてコピー完了！");
+        });
+
+        document.getElementById("btn-regen-title")?.addEventListener("click", () => {
+            titlePatternIdx++;
+            generateStreamReservationMetadata(true);
+        });
+
+        // 終了方法モードの切り替え
+        const endModeSelect = document.getElementById("wizard-end-mode-select");
+        const endTimerContainer = document.getElementById("wizard-end-timer-container");
+        const endTimeContainer = document.getElementById("wizard-end-time-container");
+
+        if (endModeSelect) {
+            endModeSelect.addEventListener("change", () => {
+                const val = endModeSelect.value;
+                if (val === "timer") {
+                    endTimerContainer.style.display = "flex";
+                    endTimeContainer.style.display = "none";
+                } else if (val === "time") {
+                    endTimerContainer.style.display = "none";
+                    endTimeContainer.style.display = "flex";
+                } else {
+                    endTimerContainer.style.display = "none";
+                    endTimeContainer.style.display = "none";
+                }
+            });
+        }
+
+        // ナビゲーション
+        document.getElementById("nav-prev-btn").addEventListener("click", () => {
+            if (currentStep > 1) goToStep(currentStep - 1);
+        });
+        document.getElementById("nav-next-btn").addEventListener("click", () => {
+            if (currentStep < 4) goToStep(currentStep + 1);
+        });
+
+        // 配信開始
+        document.getElementById("nav-finish-btn").addEventListener("click", async () => {
+            if (openerWin) {
+                // 1. YouTube枠ID
+                const ytVal = document.getElementById("wizard-yt-input").value.trim();
+                const mainYt = openerWin.document.getElementById("youtube-video-input");
+                if (ytVal) {
+                    const match = ytVal.match(/(?:v=|\/live\/|\/watch\?v=|youtu\.be\/|^)([a-zA-Z0-9_-]{11})/);
+                    const cleanId = match ? match[1] : ytVal;
+                    if (typeof openerWin.connectYoutubeLive === "function") {
+                        openerWin.connectYoutubeLive(cleanId);
+                    } else {
+                        if (mainYt) mainYt.value = cleanId;
+                        const parentYtBtn = openerWin.document.getElementById("youtube-connect-btn");
+                        if (parentYtBtn) parentYtBtn.click();
+                    }
+                }
+
+                // 2. 配信開始スケジュールの適用
+                openerWin.currentBroadcastMode = selectedMode;
+                const startToggleVal = document.getElementById("wizard-start-schedule-toggle")?.checked || false;
+                const startTimeVal = document.getElementById("wizard-start-time")?.value || "";
+                const mainSchedToggle = openerWin.document.getElementById("local-schedule-toggle");
+                const mainSchedTime = openerWin.document.getElementById("local-schedule-time");
+
+                if (mainSchedTime && startTimeVal) mainSchedTime.value = startTimeVal;
+                if (mainSchedToggle) {
+                    mainSchedToggle.checked = startToggleVal;
+                    mainSchedToggle.dispatchEvent(new Event("change"));
+                }
+
+                // 3. 配信終了設定の適用
+                const endMode = endModeSelect ? endModeSelect.value : "none";
+                const mainEndToggle = openerWin.document.getElementById("stream-end-toggle");
+
+                if (endMode === "news_end") {
+                    openerWin.isAutoEndAfterNews = true;
+                    if (mainEndToggle) mainEndToggle.checked = false;
+                    if (typeof openerWin.clearStreamEndTimer === "function") {
+                        openerWin.clearStreamEndTimer();
+                    }
+                } else if (endMode === "timer") {
+                    openerWin.isAutoEndAfterNews = false;
+                    const durSelect = document.getElementById("wizard-duration-select");
+                    const durationMinutes = durSelect ? parseInt(durSelect.value, 10) : 1440;
+                    if (typeof openerWin.setStreamEndTimer === "function") {
+                        openerWin.setStreamEndTimer(durationMinutes);
+                    }
+                    if (mainEndToggle) mainEndToggle.checked = false; // 時計比較はOFF
+                } else if (endMode === "time") {
+                    openerWin.isAutoEndAfterNews = false;
+                    const endVal = document.getElementById("wizard-end-time").value;
+                    const mainEnd = openerWin.document.getElementById("stream-end-time");
+                    if (endVal && mainEnd) mainEnd.value = endVal;
+                    if (mainEndToggle) mainEndToggle.checked = true;
+                    if (typeof openerWin.clearStreamEndTimer === "function") {
+                        openerWin.clearStreamEndTimer();
+                    }
+                } else {
+                    // 自動終了なし（無制限・24時間耐久）
+                    openerWin.isAutoEndAfterNews = false;
+                    if (mainEndToggle) mainEndToggle.checked = false;
+                    if (typeof openerWin.clearStreamEndTimer === "function") {
+                        openerWin.clearStreamEndTimer();
+                    }
+                }
+
+                // 4. 配信種別に応じた番組スタート（即時開始の場合のみ直ちに実行）
+                if (!startToggleVal) {
+                    // OBS配信開始（OBS WebSocket接続時）
+                    if (typeof openerWin.ensureObsStreamingStarted === "function") {
+                        openerWin.ensureObsStreamingStarted().catch(e => console.warn(e));
+                    }
+
+                    // 配信準備中オーバーレイの解除
+                    const prepToggle = openerWin.document.getElementById("preparing-mode-toggle");
+                    if (prepToggle && prepToggle.checked) {
+                        prepToggle.checked = false;
+                        prepToggle.dispatchEvent(new Event("change"));
+                    }
+
+                    if (selectedMode === "news") {
+                        openerWin.currentBroadcastMode = "news";
+                        if (typeof openerWin.clearIdleTimer === "function") openerWin.clearIdleTimer();
+
+                        // ニュース番組 全自動スタートを実行
+                        if (typeof openerWin.startNewsBroadcast === "function") {
+                            openerWin.startNewsBroadcast();
+                        } else {
+                            const newsStartBtn = openerWin.document.getElementById("news-broadcast-start-btn");
+                            if (newsStartBtn) newsStartBtn.click();
+                        }
+                    } else if (selectedMode === "radio") {
+                        openerWin.currentBroadcastMode = "radio";
+                        const radioToggle = openerWin.document.getElementById("ai-radio-mode-toggle");
+                        if (radioToggle) radioToggle.checked = true;
+                        const radioPlayBtn = openerWin.document.getElementById("radio-script-play-btn");
+                        if (radioPlayBtn) radioPlayBtn.click();
+                    } else {
+                        // 雑談配信（通常の独り言＆コメント応答）
+                        openerWin.currentBroadcastMode = "chat";
+                        const charId = openerWin.currentModelId || "";
+                        const startVoice = charId.includes("zunda")
+                            ? "配信の準備が完了したのだ！今日も楽しく配信スタートなのだ！"
+                            : "配信の準備が完了しました。本日の配信をスタートします！";
+                        if (typeof openerWin.queueVoicevoxAudio === "function") {
+                            openerWin.queueVoicevoxAudio(startVoice, true).catch(e => console.warn(e));
+                        }
+                        if (typeof openerWin.resetIdleTimer === "function") {
+                            openerWin.resetIdleTimer();
+                        }
+                    }
+                }
+
+                openerWin.focus();
+            }
+
+            const startToggleVal = document.getElementById("wizard-start-schedule-toggle")?.checked || false;
+            const startTimeVal = document.getElementById("wizard-start-time")?.value || "";
+
+            if (startToggleVal && startTimeVal) {
+                alert(`⏰ 配信準備が完了しました！\n指定時刻（${startTimeVal}）になると自動的に配信がスタートします。`);
+            } else {
+                alert("🚀 配信準備が完了しました！\n設定が適用され、配信がスタートします。");
+            }
+            window.close();
+        });
+    </script>
+</body>
+</html>

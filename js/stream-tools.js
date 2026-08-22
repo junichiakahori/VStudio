@@ -1,4 +1,4 @@
-window.addEventListener("uiLoaded", () => {
+(window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("stream-tools", () => {
   // =====================================================================
   // 配信情報・サムネ作成
   // =====================================================================

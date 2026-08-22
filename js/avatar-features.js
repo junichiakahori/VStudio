@@ -109,7 +109,7 @@ window.loadSettings = function loadSettings() {
     }
   } catch (e) {}
 };
-window.addEventListener("uiLoaded", () => {
+(window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("avatar-features", () => {
   // =====================================================================
   // スライダー
   // =====================================================================

@@ -1,4 +1,7 @@
 window.addEventListener("uiLoaded", () => {
+  if (window.__autoSaveUIInitialized) return;
+  window.__autoSaveUIInitialized = true;
+
   // =========================================================================
   // 汎用UI状態の自動保存・復元機能 (すべてのUI要素を網羅)
   // =========================================================================
@@ -53,34 +56,18 @@ window.addEventListener("uiLoaded", () => {
     });
 
     // =====================================================================
-    // リロード時の自動接続・自動実行
+    // リロード時の自動接続 (サイレント実行)
     // =====================================================================
     setTimeout(() => {
-      window.obsConnectBtn = document.getElementById("obs-ws-connect-btn");
-      window.obsStatus = document.getElementById("obs-ws-status");
       const shouldAutoConnect =
         localStorage.getItem("obsWsAutoConnect") === "true";
 
-      if (shouldAutoConnect && obsConnectBtn) {
-        let retryCount = 0;
-        const tryConnect = () => {
-          if (obsStatus && obsStatus.textContent === "接続済み") return;
-
-          if (typeof window.OBSWebSocket !== "undefined") {
-            console.log("[AutoSave] Auto connecting to OBS WebSocket...");
-            obsConnectBtn.click();
-          } else if (retryCount < 10) {
-            retryCount++;
-            setTimeout(tryConnect, 500); // 500ms待ってリトライ
-          } else {
-            console.error(
-              "[AutoSave] OBSWebSocket library not loaded in time.",
-            );
-          }
-        };
-        tryConnect();
+      if (shouldAutoConnect && typeof window.toggleObsWsConnection === "function") {
+        const obsStatus = document.getElementById("obs-ws-status");
+        if (obsStatus && obsStatus.textContent === "接続済み") return;
+        window.toggleObsWsConnection(true); // silent
       }
-    }, 300); // UIイベントが伝搬し終わった後に実行
+    }, 500);
   }
 
   initAutoSaveUI();

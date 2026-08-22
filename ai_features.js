@@ -206,77 +206,11 @@ export function applyCustomHiraganaDict(text) {
     return processedText;
 }
 
-export async function convertToHiraganaWithAI(text, aiHiraganaCache, saveHiraganaDataFn) {
+export async function convertToHiraganaWithAI(text) {
     if (!text) return text;
-
-    // 1. 辞書（組み込み＋ユーザー）の適用
-    const dictAppliedText = applyCustomHiraganaDict(text);
-
-    // 2. キャッシュの確認
-    if (aiHiraganaCache && aiHiraganaCache[dictAppliedText]) {
-        return aiHiraganaCache[dictAppliedText];
-    }
-
-    const aiApiKeyInput = document.getElementById('ai-api-key');
-    const apiKey = aiApiKeyInput ? aiApiKeyInput.value.trim() : null;
-    if (!apiKey) return dictAppliedText;
-
-    const aiProviderSelect = document.getElementById('ai-provider-select');
-    const provider = aiProviderSelect ? aiProviderSelect.value : 'gemini';
-    
-    // AIへの強力な指示
-    const systemPrompt = "あなたは読み仮名変換アシスタントです。ユーザーが入力したテキストの漢字をひらがなに変換し、全体をひらがなとカタカナのみの文章として出力してください。非常に重要なルールとして、元の文章の単語、助詞（てにをは）、動詞などの文字を【絶対に】省略・変更・削除しないでください（例: 「夢を見たんだ」→「ゆめをみたんだ」）。また、漢字の読み落としや文字抜け（例：「最後まで」を「さいまで」としてしまうなど）は致命的なエラーです。一文字残らず正確に読みを当ててください。読点（、）や句点（。）、疑問符（？）、感嘆符（！）などの記号は音声の自然な間やイントネーションのために【必ずそのまま残してください】。また、日付や時間など、意味の区切りが良いところには積極的に読点（、）を補って、音声合成が自然な息継ぎをできるようにしてください。\n\n【重要：英語の扱い】英単語やアルファベット（例: drone, AI, VTuber, YouTubeなど）が含まれている場合は、必ず一般的な日本のカタカナ英語の読みに変換してください（例: どろーん、えーあい、ぶいちゅーばー、ゆーちゅーぶ）。英語のスペルを無理やり人名（Doreen等）として解釈するハルシネーションは絶対に避けてください。さらに、「焼肉（やきにく）」などの一般的な単語の読み間違いもしないよう、文脈に沿った自然な日本語の読みを心がけてください。その他の余計な文章は一切含めないでください。";
-
-    try {
-        if (provider === 'gemini') {
-            const aiModelInput = document.getElementById('ai-model-input');
-            const targetModel = (aiModelInput && aiModelInput.value.trim()) || 'gemini-1.5-flash';
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-                body: JSON.stringify({
-                    systemInstruction: { parts: [{ text: systemPrompt }] },
-                    contents: [{ role: 'user', parts: [{ text: dictAppliedText }] }]
-                })
-            });
-            const json = await res.json();
-            if (res.ok && json.candidates && json.candidates.length > 0) {
-                const resultText = json.candidates[0].content.parts[0].text.trim().replace(/\s+/g, '');
-                if (aiHiraganaCache) aiHiraganaCache[dictAppliedText] = resultText;
-                if (saveHiraganaDataFn) saveHiraganaDataFn();
-                return resultText;
-            }
-        } else if (provider === 'openai') {
-            const aiModelInput = document.getElementById('ai-model-input');
-            const targetModel = (aiModelInput && aiModelInput.value.trim()) || 'gpt-4o-mini';
-            const res = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                },
-                body: JSON.stringify({
-                    model: targetModel,
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: dictAppliedText }
-                    ],
-                    max_tokens: 60,
-                    temperature: 0.0
-                })
-            });
-            const json = await res.json();
-            if (res.ok && json.choices && json.choices.length > 0) {
-                const resultText = json.choices[0].message.content.trim().replace(/\s+/g, '');
-                if (aiHiraganaCache) aiHiraganaCache[dictAppliedText] = resultText;
-                if (saveHiraganaDataFn) saveHiraganaDataFn();
-                return resultText;
-            }
-        }
-    } catch (e) {
-        console.error("AI Hiragana Conversion Error:", e);
-    }
-    return dictAppliedText;
+    // LLMによる平仮名化ハルシネーション（「要請した」→「ようした」等の脱落）を完全遮断し、
+    // 辞書適用済みのテキストを返却して VOICEVOX（OpenJTalk）に正確に読ませる
+    return applyCustomHiraganaDict(text);
 }
 
 export function restorePunctuation(original, hiragana) {

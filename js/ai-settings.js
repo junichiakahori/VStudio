@@ -1,7 +1,7 @@
 window.aiHiraganaCache = {};
 window.loadHiraganaData = async function () {
   try {
-    const res = await fetch("http://localhost:8001/hiragana_data.json");
+    const res = await fetch("/hiragana_data.json");
     if (res.ok) {
       const data = await res.json();
       if (data.dictionary !== undefined || data.cache !== undefined) {
@@ -9,28 +9,19 @@ window.loadHiraganaData = async function () {
         if (aiHiraganaDict && data.dictionary !== undefined) {
           aiHiraganaDict.value = data.dictionary;
         }
+        localStorage.removeItem("aiHiraganaCache");
         return;
       }
     }
   } catch (e) {
     console.warn("Failed to load hiragana_data.json", e);
   }
-  // Fallback (migrate from localStorage)
-  try {
-    const storedCache = localStorage.getItem("aiHiraganaCache");
-    if (storedCache) aiHiraganaCache = JSON.parse(storedCache);
-    const savedDict = localStorage.getItem("savedAiHiraganaDict");
-    if (savedDict !== null && aiHiraganaDict) aiHiraganaDict.value = savedDict;
-    saveHiraganaData(); // save to server
-  } catch (e) {
-    console.warn("Failed to migrate hiragana data", e);
-  }
 };
 window.saveHiraganaData = async function () {
   const dictionary = aiHiraganaDict ? aiHiraganaDict.value : "";
   const payload = { dictionary: dictionary, cache: aiHiraganaCache };
   try {
-    await fetch("http://localhost:8001/update_hiragana_data", {
+    await fetch("/update_hiragana_data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -126,7 +117,7 @@ window.updateAiLink = function updateAiLink() {
   }
 };
 
-window.addEventListener("uiLoaded", () => {
+(window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("ai-settings", () => {
   // =====================================================================
   // TikTok & VOICEVOX 連携
   // =====================================================================
@@ -134,7 +125,7 @@ window.addEventListener("uiLoaded", () => {
   if (voicevoxSpeakerId) {
     const savedSpeaker = localStorage.getItem("savedVoicevoxSpeaker");
 
-    fetch("http://127.0.0.1:50021/speakers")
+    fetch("http://localhost:50021/speakers")
       .then((res) => res.json())
       .then((speakers) => {
         voicevoxSpeakerId.innerHTML = ""; // clear default
@@ -391,20 +382,201 @@ window.addEventListener("uiLoaded", () => {
     });
   }
 
+  function restoreSavedModelList(provider) {
+    const p = provider || (aiProviderSelect ? aiProviderSelect.value : "gemini");
+    const rawList = localStorage.getItem("savedAiModelList_" + p);
+    if (rawList && aiModelInput) {
+      try {
+        let list = JSON.parse(rawList);
+        if (Array.isArray(list) && list.length > 0) {
+          // 不正モデルやロボティクス等の特殊モデルをキャッシュから除外
+          list = list.filter(
+            (m) =>
+              !m.includes("robotics") &&
+              !m.includes("vision") &&
+              !m.includes("embedding") &&
+              !m.includes("aqa") &&
+              !m.includes("image") &&
+              !m.includes("tts") &&
+              !m.includes("computer-use") &&
+              !m.includes("customtools") &&
+              m !== "gemini-pro" &&
+              m !== "gemini-pro-latest",
+          );
+
+          if (list.length === 0) {
+            list = ["gemini-3.7-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
+          }
+
+          localStorage.setItem("savedAiModelList_" + p, JSON.stringify(list));
+
+          aiModelInput.innerHTML = "";
+          list.forEach((m) => {
+            const opt = document.createElement("option");
+            opt.value = m;
+            opt.textContent = m;
+            aiModelInput.appendChild(opt);
+          });
+          const savedModel = localStorage.getItem("savedAiModel");
+          if (savedModel && list.includes(savedModel) && !savedModel.includes("robotics")) {
+            aiModelInput.value = savedModel;
+          } else {
+            aiModelInput.value = list.includes("gemini-3.7-flash")
+              ? "gemini-3.7-flash"
+              : (list.includes("gemini-2.0-flash") ? "gemini-2.0-flash" : list[0]);
+          }
+          localStorage.setItem("savedAiModel", aiModelInput.value);
+        }
+      } catch (e) {}
+    }
+  }
+
+  async function fetchAiModels(silent = false) {
+    if (window.__isFetchingAiModels) return;
+    const apiKey = aiApiKeyInput ? aiApiKeyInput.value.trim() : "";
+    const provider = aiProviderSelect ? aiProviderSelect.value : "gemini";
+    if (!apiKey) {
+      if (!silent) alert("APIキーを入力してください");
+      return;
+    }
+
+    window.__isFetchingAiModels = true;
+    console.log(`[AI設定] 🌐 ${provider.toUpperCase()} APIから利用可能モデル一覧を取得中...`);
+
+    if (!silent && aiFetchModelsBtn) {
+      aiFetchModelsBtn.textContent = "取得中...";
+      aiFetchModelsBtn.disabled = true;
+    }
+
+    try {
+      if (provider === "openai") {
+        const res = await fetch("https://api.openai.com/v1/models", {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        const json = await res.json();
+        if (res.ok && json.data) {
+          const chatModels = json.data
+            .filter((m) => m.id.includes("gpt"))
+            .map((m) => m.id)
+            .sort((a, b) =>
+              b.localeCompare(a, undefined, {
+                numeric: true,
+                sensitivity: "base",
+              }),
+            );
+          if (chatModels.length > 0) {
+            aiModelInput.innerHTML = "";
+            chatModels.forEach((m) => {
+              const option = document.createElement("option");
+              option.value = m;
+              option.textContent = m;
+              aiModelInput.appendChild(option);
+            });
+            localStorage.setItem(
+              "savedAiModelList_openai",
+              JSON.stringify(chatModels),
+            );
+            const saved = localStorage.getItem("savedAiModel");
+            if (saved && chatModels.includes(saved)) {
+              aiModelInput.value = saved;
+            } else {
+              aiModelInput.value = chatModels.includes("gpt-4o-mini")
+                ? "gpt-4o-mini"
+                : chatModels[0];
+            }
+            localStorage.setItem("savedAiModel", aiModelInput.value);
+            console.log(`[AI設定] ✅ OpenAIモデル取得完了: ${chatModels.length}件 (選択中: [${aiModelInput.value}])`, chatModels);
+          }
+        }
+      } else if (provider === "gemini") {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
+        );
+        const json = await res.json();
+        if (res.ok && json.models) {
+          const availableModels = json.models
+            .filter((m) => {
+              if (!m.name) return false;
+              const methods = m.supportedGenerationMethods || [];
+              if (!methods.includes("generateContent")) return false;
+              const id = m.name.replace("models/", "");
+              if (
+                id.includes("vision") ||
+                id.includes("embedding") ||
+                id.includes("aqa") ||
+                id.includes("robotics") ||
+                id.includes("deep-research") ||
+                id.includes("medlm") ||
+                id.includes("image") ||
+                id.includes("tts") ||
+                id.includes("computer-use") ||
+                id.includes("customtools") ||
+                id === "gemini-pro" ||
+                id === "gemini-pro-latest"
+              ) {
+                return false;
+              }
+              return id.startsWith("gemini");
+            })
+            .map((m) => m.name.replace("models/", ""))
+            .sort((a, b) =>
+              b.localeCompare(a, undefined, {
+                numeric: true,
+                sensitivity: "base",
+              }),
+            );
+
+          if (availableModels.length > 0) {
+            aiModelInput.innerHTML = "";
+            availableModels.forEach((m) => {
+              const option = document.createElement("option");
+              option.value = m;
+              option.textContent = m;
+              aiModelInput.appendChild(option);
+            });
+            localStorage.setItem(
+              "savedAiModelList_gemini",
+              JSON.stringify(availableModels),
+            );
+
+            const saved = localStorage.getItem("savedAiModel");
+            if (saved && availableModels.includes(saved) && !saved.includes("robotics")) {
+              aiModelInput.value = saved;
+            } else {
+              aiModelInput.value = availableModels.includes("gemini-3.7-flash")
+                ? "gemini-3.7-flash"
+                : (availableModels.includes("gemini-2.0-flash")
+                  ? "gemini-2.0-flash"
+                  : (availableModels.includes("gemini-1.5-flash") ? "gemini-1.5-flash" : availableModels[0]));
+            }
+            localStorage.setItem("savedAiModel", aiModelInput.value);
+            console.log(`[AI設定] ✅ Gemini生成モデル取得完了: ${availableModels.length}件 (選択中: [${aiModelInput.value}])`, availableModels);
+          }
+        } else {
+          console.warn("[AI設定] ⚠️ Geminiモデル取得レスポンス異常:", json);
+        }
+      }
+    } catch (e) {
+      console.error("[AI設定] ❌ モデル一覧取得エラー:", e);
+    } finally {
+      window.__isFetchingAiModels = false;
+      if (aiFetchModelsBtn) {
+        aiFetchModelsBtn.textContent = "一覧を取得";
+        aiFetchModelsBtn.disabled = false;
+      }
+    }
+  }
+
   aiProviderSelect.addEventListener("change", () => {
     localStorage.setItem("savedAiProvider", aiProviderSelect.value);
-    if (aiModelInput) {
-      aiModelInput.value =
-        aiProviderSelect.value === "openai"
-          ? "gpt-4o-mini"
-          : "gemini-1.5-flash";
-      localStorage.setItem("savedAiModel", aiModelInput.value);
-    }
+    restoreSavedModelList(aiProviderSelect.value);
+    fetchAiModels(true);
     updateAiLink();
   });
-  aiApiKeyInput.addEventListener("input", () =>
-    localStorage.setItem("savedAiApiKey", aiApiKeyInput.value.trim()),
-  );
+  aiApiKeyInput.addEventListener("input", () => {
+    localStorage.setItem("savedAiApiKey", aiApiKeyInput.value.trim());
+    fetchAiModels(true);
+  });
   aiSystemPromptInput.addEventListener("input", () =>
     localStorage.setItem("savedAiPrompt", aiSystemPromptInput.value.trim()),
   );
@@ -414,117 +586,22 @@ window.addEventListener("uiLoaded", () => {
     );
   }
   if (aiModelInput) {
+    aiModelInput.addEventListener("change", () =>
+      localStorage.setItem("savedAiModel", aiModelInput.value.trim()),
+    );
     aiModelInput.addEventListener("input", () =>
       localStorage.setItem("savedAiModel", aiModelInput.value.trim()),
     );
   }
 
-  // 初期化
+  // 初期化：保存済みのモデル一覧を復元＆バックグラウンドで最新同期
+  restoreSavedModelList();
   updateAiLink();
+  setTimeout(() => fetchAiModels(true), 500);
 
   window.aiFetchModelsBtn = document.getElementById("ai-fetch-models-btn");
   if (aiFetchModelsBtn) {
-    aiFetchModelsBtn.addEventListener("click", async () => {
-      const apiKey = aiApiKeyInput.value.trim();
-      const provider = aiProviderSelect.value;
-      if (!apiKey) {
-        alert("APIキーを入力してください");
-        return;
-      }
-
-      aiFetchModelsBtn.textContent = "取得中...";
-      aiFetchModelsBtn.disabled = true;
-
-      try {
-        if (provider === "openai") {
-          const res = await fetch("https://api.openai.com/v1/models", {
-            headers: { Authorization: `Bearer ${apiKey}` },
-          });
-          const json = await res.json();
-          if (res.ok && json.data) {
-            const chatModels = json.data
-              .filter((m) => m.id.includes("gpt"))
-              .map((m) => m.id)
-              .sort((a, b) =>
-                b.localeCompare(a, undefined, {
-                  numeric: true,
-                  sensitivity: "base",
-                }),
-              );
-            if (chatModels.length > 0) {
-              aiModelInput.innerHTML = "";
-              chatModels.forEach((m) => {
-                const option = document.createElement("option");
-                option.value = m;
-                option.textContent = m;
-                aiModelInput.appendChild(option);
-              });
-              aiModelInput.value = chatModels.includes("gpt-4o-mini")
-                ? "gpt-4o-mini"
-                : chatModels[0];
-              localStorage.setItem("savedAiModel", aiModelInput.value);
-              alert(`利用可能なモデルの一覧を取得しました！`);
-            } else {
-              alert("利用可能なチャットモデルが見つかりません");
-            }
-          } else {
-            throw new Error(json.error?.message || "Invalid response");
-          }
-        } else if (provider === "gemini") {
-          const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
-          );
-          const json = await res.json();
-          if (res.ok && json.models) {
-            const availableModels = json.models
-              .filter((m) => m.name && m.name.includes("gemini"))
-              .map((m) => m.name.replace("models/", ""))
-              .sort((a, b) =>
-                b.localeCompare(a, undefined, {
-                  numeric: true,
-                  sensitivity: "base",
-                }),
-              );
-
-            if (availableModels.length > 0) {
-              aiModelInput.innerHTML = "";
-              availableModels.forEach((m) => {
-                const option = document.createElement("option");
-                option.value = m;
-                option.textContent = m;
-                aiModelInput.appendChild(option);
-              });
-
-              let bestModel = availableModels[0];
-              if (availableModels.includes("gemini-1.5-flash"))
-                bestModel = "gemini-1.5-flash";
-              else if (availableModels.includes("gemini-1.5-pro"))
-                bestModel = "gemini-1.5-pro";
-              else if (availableModels.includes("gemini-1.0-pro"))
-                bestModel = "gemini-1.0-pro";
-              else if (availableModels.includes("gemini-pro"))
-                bestModel = "gemini-pro";
-
-              aiModelInput.value = bestModel;
-              localStorage.setItem("savedAiModel", aiModelInput.value);
-              alert(
-                `利用可能なモデルの一覧を取得しました！\n左のリストからお好きなモデルを選べます。`,
-              );
-            } else {
-              alert("利用可能なモデルが見つかりませんでした");
-            }
-          } else {
-            throw new Error(json.error?.message || "Invalid response");
-          }
-        }
-      } catch (e) {
-        console.error("Fetch Models Error:", e);
-        alert(`モデル一覧の取得に失敗しました:\n${e.message}`);
-      } finally {
-        aiFetchModelsBtn.textContent = "一覧を取得";
-        aiFetchModelsBtn.disabled = false;
-      }
-    });
+    aiFetchModelsBtn.addEventListener("click", () => fetchAiModels(false));
   }
 
   window.aiTestBtn = document.getElementById("ai-test-btn");
