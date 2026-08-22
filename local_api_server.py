@@ -616,7 +616,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 2. **語尾のバリエーション**: 毎文同じ語尾（「〜したにゃ」等）を機械的に連発せず、「〜みたいだにゃ」「〜なんだって！」「〜本当に心配だにゃ…」「みんなも気をつけてほしいにゃ」など、自然でリズミカルな会話調にしてください。
 3. **テンポの良い短文構成**: 1文は20〜35文字程度で句点「。」で区切り、長文を1文でダラダラ話さないようにしてください。
 4. **自然な日本語表記**: 字幕用として読みやすい自然な日本語（漢字・ひらがな・カタカナ）で表記してください。
-5. **余計な注釈の禁止**: セリフ以外の前置きや解説（「」「（）」等）は出力せず、発話するセリフのみを出力してください。
+5. **前置き挨拶の重複禁止**: {transition}は冒頭に1度だけ発話し、2文目以降に「次のニュースです」「続いてのニュース」などの前置きを絶対に重複させないこと。
+6. **余計な注釈の禁止**: セリフ以外の前置きや解説（「」「（）」等）は出力せず、発話するセリフのみを出力してください。
 
 【ニュースタイトル】: {title}
 【概要】: {description}"""
@@ -650,7 +651,29 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 clean_text = raw_text.replace("「", "").replace("」", "").replace("（", "").replace("）", "").strip()
                 
                 # 1文ずつ（句点・感嘆符・疑問符・改行）に正確に分割
-                raw_sentences = [s.strip() for s in re.split(r'(?<=[。！？\n])', clean_text) if s.strip()]
+                split_sentences = [s.strip() for s in re.split(r'(?<=[。！？\n])', clean_text) if s.strip()]
+                
+                # 前置き挨拶の重複・連続文の完全排除
+                transition_phrases = [
+                    "次のニュースですにゃ！", "次のニュースですにゃ", "次のニュースなのだ！", "次のニュースなのだ",
+                    "最初のニュースですにゃ！", "最初のニュースなのだ！", "次のニュースです！", "最初のニュースです！",
+                    "続いてのニュースですにゃ！", "続いてのニュースなのだ！", "続いてのニュースです！"
+                ]
+                deduped_sentences = []
+                seen_transition = False
+                for s in split_sentences:
+                    is_trans = any(s == tp or s.startswith(tp) for tp in transition_phrases) or (category_name and f"{category_name}のニュース" in s)
+                    if is_trans:
+                        if seen_transition:
+                            print(f"[ニュース原稿] 重複した前置き挨拶をスキップしました: '{s}'")
+                            continue
+                        seen_transition = True
+                    # 直前の文と完全に同一の場合もスキップ
+                    if deduped_sentences and s == deduped_sentences[-1]:
+                        print(f"[ニュース原稿] 重複した連続文をスキップしました: '{s}'")
+                        continue
+                    deduped_sentences.append(s)
+                raw_sentences = deduped_sentences if deduped_sentences else split_sentences
                 
                 # ▼▼▼ VOICEVOX カタカナ取得 ✕ Gemini 自動照合・自己補正パイプライン ▼▼▼
                 speaker_id = 1
