@@ -261,6 +261,9 @@ async function queueVoicevoxAudio(
     playNextVoicevox();
   }
 
+  if (typeof clearIdleTimer === "function") clearIdleTimer();
+}
+
 // VOICEVOXの再生を即座に完全停止する関数
 function stopVoicevoxPlayback() {
   if (typeof voicevoxAudioQueue !== "undefined") {
