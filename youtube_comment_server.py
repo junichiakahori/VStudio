@@ -53,12 +53,16 @@ class VStudioChatProcessor(DefaultProcessor):
                     else:
                         try:
                             action_str = json.dumps(action, ensure_ascii=False)
-                            if any(k in action_str for k in ["reaction", "Reaction", "emoji", "Emoji", "heart", "like", "Heart"]):
+                            action_lower = action_str.lower()
+                            if any(k in action_lower for k in ["reaction", "heart", "emoji", "like", "viewerreaction", "actionpanel", "ticker"]):
                                 found_emojis = re.findall(r'[❤️💖💕💓💗💘✨🌟🎉🥳👍😻🐾🔥🥰😍🙌⭐💯👏]', action_str)
-                                if found_emojis:
-                                    chatlist.append(ReactionItem(emoji=found_emojis[0], count=min(len(found_emojis), 3)))
-                        except Exception:
-                            pass
+                                emoji = found_emojis[0] if found_emojis else "❤️"
+                                logging.info(f"[YouTube Live Reaction Raw Match] {emoji} (Payload: {action_str[:160]})")
+                                chatlist.append(ReactionItem(emoji=emoji, count=1))
+                            else:
+                                logging.debug(f"[YouTube Other Action] {action_str[:120]}")
+                        except Exception as parse_err:
+                            logging.debug(f"[YouTube Action Parse Err] {parse_err}")
         if self.first and chatlist:
             self.abs_diff = time.time() - (getattr(chatlist[0], 'timestamp', time.time() * 1000) / 1000)
             self.first = False
