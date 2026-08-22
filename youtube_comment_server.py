@@ -81,28 +81,28 @@ def _resolve_single_emoji(s):
     return "❤️"
 
 def _extract_emojis_from_payload(m_payload, fountain, buckets):
-    results = []
+    emoji_counts = {}
     for b in buckets:
         rx_list = b.get("reactionsData", []) or b.get("reactions", [])
         for r in rx_list:
-            count = r.get("reactionCount", 1)
+            cnt = r.get("reactionCount", 1)
             em = r.get("unicodeEmojiId") or r.get("emojiId") or _resolve_single_emoji(json.dumps(r, ensure_ascii=False))
             if em:
-                results.append((em, count))
+                emoji_counts[em] = max(emoji_counts.get(em, 0), cnt)
                 
     for r in fountain.get("reactionsData", []) or fountain.get("reactions", []):
-        count = r.get("reactionCount", 1)
+        cnt = r.get("reactionCount", 1)
         em = r.get("unicodeEmojiId") or r.get("emojiId") or _resolve_single_emoji(json.dumps(r, ensure_ascii=False))
         if em:
-            results.append((em, count))
+            emoji_counts[em] = max(emoji_counts.get(em, 0), cnt)
             
-    if not results:
+    if not emoji_counts:
         full_str = json.dumps(m_payload, ensure_ascii=False)
         logging.info(f"[Reaction Payload Inspection] {full_str[:250]}")
         em = _resolve_single_emoji(full_str)
-        results.append((em or "❤️", 1))
+        emoji_counts[em or "❤️"] = 1
         
-    return results
+    return list(emoji_counts.items())
 
 # YouTube InnerTube Live Reactions (emojiFountainDataEntity) Hook
 _original_get_contents = Parser.get_contents
@@ -135,7 +135,7 @@ def _custom_get_contents(self, jsn):
                             # ペイロードから絵文字の種類と個数を動的に抽出
                             extracted_items = _extract_emojis_from_payload(payload, fountain, buckets)
                             for em, cnt in extracted_items:
-                                count = max(cnt, total_rx, 1)
+                                count = max(cnt, 1)
                                 logging.info(f"[YouTube Live Reaction Intercepted!] emoji={em} count={count} updateTime={update_time}")
                                 lc['actions'].append({
                                     "vstudioLiveReaction": {
