@@ -90,7 +90,7 @@
       reactionCanvas.style.width = "100%";
       reactionCanvas.style.height = "100%";
       reactionCanvas.style.pointerEvents = "none";
-      reactionCanvas.style.zIndex = "100";
+      reactionCanvas.style.zIndex = "999";
     }
 
     if (!container.contains(reactionCanvas)) {
@@ -107,8 +107,8 @@
     if (!reactionCanvas) return;
     const parent = reactionCanvas.parentElement || document.getElementById("avatar-viewport") || document.body;
     const rect = parent.getBoundingClientRect();
-    reactionCanvas.width = rect.width || parent.clientWidth || window.innerWidth;
-    reactionCanvas.height = rect.height || parent.clientHeight || window.innerHeight;
+    reactionCanvas.width = Math.max(rect.width || 0, parent.clientWidth || 0, window.innerWidth || 800);
+    reactionCanvas.height = Math.max(rect.height || 0, parent.clientHeight || 0, window.innerHeight || 600);
   }
 
   class ReactionParticle {
@@ -116,14 +116,18 @@
       this.emoji = emoji || DEFAULT_EMOJIS[Math.floor(Math.random() * DEFAULT_EMOJIS.length)];
       this.theme = getReactionTheme(this.emoji);
       const parent = reactionCanvas ? reactionCanvas.parentElement : null;
-      const w = reactionCanvas && reactionCanvas.width ? reactionCanvas.width : (parent ? parent.clientWidth : window.innerWidth);
-      const h = reactionCanvas && reactionCanvas.height ? reactionCanvas.height : (parent ? parent.clientHeight : window.innerHeight);
+      const w = (reactionCanvas && reactionCanvas.width > 0)
+        ? reactionCanvas.width
+        : (parent && parent.clientWidth > 0 ? parent.clientWidth : window.innerWidth);
+      const h = (reactionCanvas && reactionCanvas.height > 0)
+        ? reactionCanvas.height
+        : (parent && parent.clientHeight > 0 ? parent.clientHeight : window.innerHeight);
 
       this.x = x !== undefined ? x : (w * 0.65 + (Math.random() - 0.5) * (w * 0.45));
-      this.y = y !== undefined ? y : (h - 80 - Math.random() * 80);
+      this.y = y !== undefined ? y : (h - 100 - Math.random() * 80);
 
       this.startX = this.x;
-      this.vx = (Math.random() - 0.5) * 1.2;
+      this.vx = (Math.random() - 0.5) * 1.5;
       this.vy = -(3.8 + Math.random() * 3.2);
       this.swaySpeed = 0.04 + Math.random() * 0.03;
       this.swayAmp = 25 + Math.random() * 20;
@@ -150,7 +154,7 @@
       if (lifeRatio > 0.6) {
         this.opacity = Math.max(0, 1 - (lifeRatio - 0.6) / 0.4);
       }
-      return this.age < this.maxAge && this.y > -50;
+      return this.age < this.maxAge && this.y > -60;
     }
 
     draw(ctx) {
@@ -160,7 +164,7 @@
       ctx.rotate(this.rot);
       ctx.scale(this.scale, this.scale);
 
-      ctx.font = "38px 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif";
+      ctx.font = "42px 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
@@ -205,7 +209,8 @@
     initReactionCanvas();
     const spawnCount = Math.min(Math.max(count, 1), 12);
     const chosenEmoji = emoji || DEFAULT_EMOJIS[Math.floor(Math.random() * DEFAULT_EMOJIS.length)];
-    const theme = getReactionTheme(chosenEmoji);
+
+    console.log(`[Reaction] ✨ エフェクト発生: ${chosenEmoji} x ${spawnCount}`);
 
     for (let i = 0; i < spawnCount; i++) {
       setTimeout(() => {
@@ -227,6 +232,7 @@
    * テスト用リアクションバースト（各種類を順番にデモ）
    */
   window.testReactionBurst = function () {
+    console.log("[Reaction] 🎆 テストリアクションバースト開始");
     const demoEmojis = ["💖", "✨", "🎉", "🔥", "🐾", "👍"];
     demoEmojis.forEach((e, idx) => {
       setTimeout(() => {
