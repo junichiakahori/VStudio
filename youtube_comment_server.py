@@ -18,25 +18,59 @@ import time
 
 logging.basicConfig(level=logging.INFO)
 
+import urllib.parse
+import base64
+
 def _resolve_single_emoji(s):
     if not s:
         return "❤️"
-    # Match specific rich emoji characters
-    found = re.findall(r'[❤️💖💕💓💗💘🎉🥳🙌🎊👏💯🔥⚡👍😻🐾⭐✨🤩😂🤣😆😍🥰😎]', s)
-    if found:
-        return found[0]
         
+    # If s is escaped (e.g. \\uD83C\\uDF89), decode it
+    try:
+        if "\\u" in s or "\\U" in s:
+            s_decoded = s.encode('utf-8').decode('unicode-escape')
+            s = s + " " + s_decoded
+    except Exception:
+        pass
+
+    # URL decode if needed (%3D, %2F)
+    try:
+        s_unquoted = urllib.parse.unquote(s)
+        s = s + " " + s_unquoted
+    except Exception:
+        pass
+
+    # Base64 decode any base64 segments in s
+    b64_matches = re.findall(r'[A-Za-z0-9+/=]{12,}', s)
+    for b in b64_matches:
+        try:
+            b_pad = b + '=' * (-len(b) % 4)
+            raw = base64.b64decode(b_pad)
+            decoded_text = raw.decode('latin-1', errors='ignore')
+            s += " " + decoded_text
+        except Exception:
+            pass
+
+    # Match specific rich emoji characters
+    found = re.findall(r'[🎉🥳🙌🎊👏💯🔥⚡👍😻🐾⭐✨🤩😂🤣😆😍🥰😎❤️💖💕💓💗💘]', s)
+    if found:
+        # Return non-heart emoji if found, or first emoji
+        non_hearts = [e for e in found if e not in ['❤️', '❤']]
+        if non_hearts:
+            return non_hearts[0]
+        return found[0]
+
     s_lower = s.lower()
     mapping = [
-        (["party_popper", "tada", "celebration", "party", "popper"], "🎉"),
-        (["100", "hundred"], "💯"),
-        (["clapping", "clap", "applaud"], "👏"),
-        (["joy", "laugh", "tears_of_joy", "rofl", "lol", "funny"], "😂"),
-        (["fire", "flame", "lit", "hot"], "🔥"),
-        (["+1", "thumbs_up", "like", "thumbsup"], "👍"),
-        (["star_struck", "star", "sparkle", "glitter"], "⭐"),
-        (["heart_eyes", "love", "heart", "heart_suit", "sweet"], "❤️"),
-        (["cat", "meow", "neko"], "😻"),
+        (["party_popper", "tada", "celebration", "party", "popper", "1f389", "f389"], "🎉"),
+        (["100", "hundred", "1f4af", "f4af", "one_hundred"], "💯"),
+        (["clapping", "clap", "applaud", "1f44f", "f44f"], "👏"),
+        (["joy", "laugh", "tears_of_joy", "rofl", "lol", "funny", "1f602", "f602"], "😂"),
+        (["fire", "flame", "lit", "hot", "1f525", "f525"], "🔥"),
+        (["+1", "thumbs_up", "like", "thumbsup", "1f44d", "f44d"], "👍"),
+        (["star_struck", "star", "sparkle", "glitter", "2b50", "1f31f"], "⭐"),
+        (["heart_eyes", "love", "heart", "heart_suit", "sweet", "2764", "1f496"], "❤️"),
+        (["cat", "meow", "neko", "1f63b", "f63b"], "😻"),
     ]
     for keywords, em in mapping:
         if any(k in s_lower for k in keywords):
@@ -61,6 +95,7 @@ def _extract_emojis_from_payload(m_payload, fountain, buckets):
             
     if not results:
         full_str = json.dumps(m_payload, ensure_ascii=False)
+        logging.info(f"[Reaction Payload Inspection] {full_str[:250]}")
         em = _resolve_single_emoji(full_str)
         results.append((em or "❤️", 1))
         
