@@ -1550,8 +1550,11 @@ ${creditsInstruction}
     }
   }
 
-  async function startNewsBroadcast() {
-    if (newsBroadcastState.isRunning) return;
+  async function startNewsBroadcast(startIndex = 0) {
+    if (newsBroadcastState.isRunning) {
+      console.warn("[ニュース番組] 番組は既に実行中です。二重起動を防止しました。");
+      return;
+    }
 
     const startBtn = document.getElementById("news-broadcast-start-btn");
     const stopBtn = document.getElementById("news-broadcast-stop-btn");
@@ -1583,7 +1586,7 @@ ${creditsInstruction}
       return dateA - dateB; // カテゴリ内は古い順（時系列昇順: 朝➔夜）
     });
 
-    newsBroadcastState = { isRunning: true, currentIndex: 0, totalCount: sortedNews.length, lastCategory: "" };
+    newsBroadcastState = { isRunning: true, currentIndex: startIndex, totalCount: sortedNews.length, lastCategory: "" };
     if (startBtn) startBtn.style.display = "none";
     if (stopBtn) stopBtn.style.display = "block";
     if (progressEl) progressEl.style.display = "block";
@@ -1593,13 +1596,13 @@ ${creditsInstruction}
     // 番組開始時にセットリストボードを初期化・表示
     initNewsSetlist(sortedNews);
 
-    // 番組開始時にすべての記事を未読状態に初期化（リハーサルやテスト読了の影響をクリア）
-    if (typeof window.clearNewsReadFlags === "function") {
+    // 番組開始時にすべての記事を未読状態に初期化（途中再開でない場合のみクリア）
+    if (startIndex === 0 && typeof window.clearNewsReadFlags === "function") {
       window.clearNewsReadFlags(true);
     }
 
-    // 番組開始時にコメント履歴とコメント数を初期化
-    if (typeof window.clearAllComments === "function") {
+    // 番組開始時にコメント履歴とコメント数を初期化（途中再開でない場合のみクリア）
+    if (startIndex === 0 && typeof window.clearAllComments === "function") {
       window.clearAllComments();
     }
 
@@ -1620,18 +1623,20 @@ ${creditsInstruction}
 
     const config = getNewsConfig();
 
-    // OP挨拶
-    if (progressEl) progressEl.textContent = "🎬 オープニング再生中...";
-    if (config.useOpChime) { await playSE("放送開始チャイム"); await new Promise(r => setTimeout(r, 600)); }
-    await queueVoicevoxAudio(config.op, true, config.op);
-    await waitForVoicevoxFinish();
-    if (!newsBroadcastState.isRunning) return;
+    // OP挨拶（途中再開でない場合のみ再生）
+    if (startIndex === 0) {
+      if (progressEl) progressEl.textContent = "🎬 オープニング再生中...";
+      if (config.useOpChime) { await playSE("放送開始チャイム"); await new Promise(r => setTimeout(r, 600)); }
+      await queueVoicevoxAudio(config.op, true, config.op);
+      await waitForVoicevoxFinish();
+      if (!newsBroadcastState.isRunning) return;
+    }
 
     // ニュースループ
-    for (let i = 0; i < sortedNews.length; i++) {
+    for (let i = startIndex; i < sortedNews.length; i++) {
       if (!newsBroadcastState.isRunning) break;
       const item = sortedNews[i];
-      const isFirst = i === 0;
+      const isFirst = i === startIndex;
       const isCategoryChanged = !isFirst && (item.categoryKey || "") !== newsBroadcastState.lastCategory;
 
       newsBroadcastState.currentIndex = i + 1;
@@ -1684,6 +1689,13 @@ ${creditsInstruction}
 
   function stopNewsBroadcast() {
     newsBroadcastState.isRunning = false;
+    if (typeof window.stopVoicevoxPlayback === "function") {
+      window.stopVoicevoxPlayback();
+    }
+    const stopAudioEl = document.getElementById("voicevox-audio");
+    if (stopAudioEl) {
+      try { stopAudioEl.pause(); stopAudioEl.currentTime = 0; } catch (e) {}
+    }
     console.log("[ニュース番組] 番組を停止しました。");
   }
 
@@ -1695,10 +1707,10 @@ ${creditsInstruction}
   const newsBroadcastStartBtn = document.getElementById("news-broadcast-start-btn");
   const newsBroadcastStopBtn = document.getElementById("news-broadcast-stop-btn");
   if (newsBroadcastStartBtn) {
-    newsBroadcastStartBtn.addEventListener("click", () => startNewsBroadcast());
+    newsBroadcastStartBtn.onclick = () => startNewsBroadcast();
   }
   if (newsBroadcastStopBtn) {
-    newsBroadcastStopBtn.addEventListener("click", () => stopNewsBroadcast());
+    newsBroadcastStopBtn.onclick = () => stopNewsBroadcast();
   }
 
   // カテゴリ・件数・日付範囲指定によるニュース取得
