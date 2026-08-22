@@ -41,6 +41,30 @@
         baseFreq: 523.25, // C5
         soundType: "fanfare"
       };
+    } else if (/[💯]/.test(emoji)) {
+      return {
+        type: "perfect",
+        glow: "rgba(255, 45, 85, 0.95)",
+        shadowBlur: 20,
+        baseFreq: 880.0, // A5
+        soundType: "fanfare"
+      };
+    } else if (/[👏🙌]/.test(emoji)) {
+      return {
+        type: "clap",
+        glow: "rgba(52, 199, 89, 0.9)",
+        shadowBlur: 16,
+        baseFreq: 698.46, // F5
+        soundType: "pop"
+      };
+    } else if (/[😂🤣😆😁]/.test(emoji)) {
+      return {
+        type: "laugh",
+        glow: "rgba(255, 204, 0, 0.9)",
+        shadowBlur: 18,
+        baseFreq: 659.25, // E5
+        soundType: "pop"
+      };
     } else if (/[👍🔥⚡💪]/.test(emoji)) {
       return {
         type: "energy",

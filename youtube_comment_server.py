@@ -18,6 +18,54 @@ import time
 
 logging.basicConfig(level=logging.INFO)
 
+def _resolve_single_emoji(s):
+    if not s:
+        return "❤️"
+    # Match specific rich emoji characters
+    found = re.findall(r'[❤️💖💕💓💗💘🎉🥳🙌🎊👏💯🔥⚡👍😻🐾⭐✨🤩😂🤣😆😍🥰😎]', s)
+    if found:
+        return found[0]
+        
+    s_lower = s.lower()
+    mapping = [
+        (["party_popper", "tada", "celebration", "party", "popper"], "🎉"),
+        (["100", "hundred"], "💯"),
+        (["clapping", "clap", "applaud"], "👏"),
+        (["joy", "laugh", "tears_of_joy", "rofl", "lol", "funny"], "😂"),
+        (["fire", "flame", "lit", "hot"], "🔥"),
+        (["+1", "thumbs_up", "like", "thumbsup"], "👍"),
+        (["star_struck", "star", "sparkle", "glitter"], "⭐"),
+        (["heart_eyes", "love", "heart", "heart_suit", "sweet"], "❤️"),
+        (["cat", "meow", "neko"], "😻"),
+    ]
+    for keywords, em in mapping:
+        if any(k in s_lower for k in keywords):
+            return em
+            
+    return "❤️"
+
+def _extract_emojis_from_payload(m_payload, fountain, buckets):
+    results = []
+    for b in buckets:
+        for r in b.get("reactions", []):
+            count = r.get("reactionCount", 1)
+            em = _resolve_single_emoji(json.dumps(r, ensure_ascii=False))
+            if em:
+                results.append((em, count))
+                
+    for r in fountain.get("reactions", []):
+        count = r.get("reactionCount", 1)
+        em = _resolve_single_emoji(json.dumps(r, ensure_ascii=False))
+        if em:
+            results.append((em, count))
+            
+    if not results:
+        full_str = json.dumps(m_payload, ensure_ascii=False)
+        em = _resolve_single_emoji(full_str)
+        results.append((em or "❤️", 1))
+        
+    return results
+
 # YouTube InnerTube Live Reactions (emojiFountainDataEntity) Hook
 _original_get_contents = Parser.get_contents
 _last_fountain_update_time = None
@@ -38,7 +86,6 @@ def _custom_get_contents(self, jsn):
                     
                     # リアクションが検知された場合（初回または更新時）
                     if total_rx > 0 or (update_time and _last_fountain_update_time and update_time != _last_fountain_update_time):
-                        logging.info(f"[YouTube Live Reaction Intercepted!] total={total_rx} updateTime={update_time}")
                         _last_fountain_update_time = update_time
                         
                         contents = jsn.get('continuationContents')
@@ -46,13 +93,18 @@ def _custom_get_contents(self, jsn):
                             lc = contents['liveChatContinuation']
                             if 'actions' not in lc or lc['actions'] is None:
                                 lc['actions'] = []
-                            count = max(total_rx, 1)
-                            lc['actions'].append({
-                                "vstudioLiveReaction": {
-                                    "emoji": "❤️",
-                                    "count": count
-                                }
-                            })
+                            
+                            # ペイロードから絵文字の種類と個数を動的に抽出
+                            extracted_items = _extract_emojis_from_payload(payload, fountain, buckets)
+                            for em, cnt in extracted_items:
+                                count = max(cnt, total_rx, 1)
+                                logging.info(f"[YouTube Live Reaction Intercepted!] emoji={em} count={count} updateTime={update_time}")
+                                lc['actions'].append({
+                                    "vstudioLiveReaction": {
+                                        "emoji": em,
+                                        "count": count
+                                    }
+                                })
                     else:
                         if update_time:
                             _last_fountain_update_time = update_time
