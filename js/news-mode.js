@@ -1600,25 +1600,43 @@ ${creditsInstruction}
           }
         }
 
+        let data = null;
         if (!res || !res.ok) {
-          // 通信エラー時の待機告知とフォールバック
-          console.warn("[ニュース番組] 通信待機: サーバー応答待機中...");
-          if (newsArticleTitleEl) newsArticleTitleEl.textContent = "⚠️ 通信状況を確認中...";
-          if (newsArticleDescEl) newsArticleDescEl.textContent = "原稿サーバーへの接続を確認しています。復旧までしばらくお待ちください...";
+          console.warn("[ニュース番組] 通信切断を検知: 復旧待機モード（しばらくお待ちください）に移行します");
+          if (newsArticleTitleEl) newsArticleTitleEl.textContent = "📡 通信状況を確認中...";
+          if (newsArticleDescEl) newsArticleDescEl.textContent = "原稿サーバーまたはネットワークの復旧を待機しています。しばらくお待ちください...";
           
-          await new Promise(r => setTimeout(r, 2000));
-          
-          // 原文（タイトル＋概要）フォールバックで確実に読み上げてスキップを防ぐ
           const isZunda = (currentModelId in ["zundamon", "zundamon_human"]);
           const isCat = (currentModelId in ["tororo", "hijiki"]);
-          const prefix = isFirst ? (isZunda ? "最初のニュースなのだ！" : (isCat ? "最初のニュースですにゃ！" : "最初のニュースです！")) : (isCategoryChanged && item.categoryName ? (isZunda ? `続いては、${item.categoryName}のニュースなのだ！` : (isCat ? `続いては、${item.categoryName}のニュースですにゃ！` : `続いては、${item.categoryName}のニュースです！`)) : (isZunda ? "次のニュースなのだ！" : (isCat ? "次のニュースですにゃ！" : "次のニュースです！")));
-          const suffix = isZunda ? "なのだ。" : (isCat ? "にゃ。" : "です。");
-          const fallbackText = `${prefix} ${item.title}。${plainDesc ? plainDesc.slice(0, 100) : ""}${suffix}`;
-          console.log(`[ニュース番組] フォールバック原稿で確実に読み上げます: ${item.title}`);
-          await queueVoicevoxAudio(fallbackText, true);
+          const waitMsg = isZunda
+            ? "電波の状況を確認中なのだ。復旧までしばらくお待ちくださいなのだ！"
+            : (isCat ? "電波の状況を確認中ですにゃ。復旧までしばらくお待ちくださいにゃ！" : "通信状況を確認中です。復旧までしばらくお待ちください。");
+          
+          await queueVoicevoxAudio(waitMsg, true);
           await waitForVoicevoxFinish();
-        } else {
-          const data = await res.json();
+
+          // ネットワークまたはサーバーが復旧するまで待機（3秒ごとに再接続試行）
+          while (newsBroadcastState.isRunning && (!res || !res.ok)) {
+            await new Promise(r => setTimeout(r, 3000));
+            if (!newsBroadcastState.isRunning) break;
+            try {
+              res = await fetch("/api/news/generate_item_script", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+              });
+              if (res.ok) {
+                console.log("[ニュース番組] 🌐 ネットワーク・サーバーの復旧を確認しました！ニュース読みを再開します。");
+                break;
+              }
+            } catch (retryErr) {
+              console.warn("[ニュース番組] 復旧待機中 (再試行中)...");
+            }
+          }
+        }
+
+        if (res && res.ok && newsBroadcastState.isRunning) {
+          data = await res.json();
           if (data && newsBroadcastState.isRunning) {
             const count = (data.items || data.sentences || []).length;
             console.log(`[ニュース原稿(Backend)] 「${data.fullText}」 (${count}文)`);
