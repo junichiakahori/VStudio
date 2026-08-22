@@ -661,12 +661,21 @@ window.playNextContinuousNews = playNextContinuousNews;
         }
       };
 
-      div.appendChild(numBadge);
-      div.appendChild(badge);
-      div.appendChild(metaSpan);
-      div.appendChild(titleSpan);
-      div.appendChild(playBtn);
-      container.appendChild(div);
+      headerRow.appendChild(leftMeta);
+      headerRow.appendChild(playBtn);
+
+      // 下段: 全幅を使った読みやすいタイトル
+      const titleSpan = doc.createElement("div");
+      titleSpan.style.fontSize = "0.88rem";
+      titleSpan.style.lineHeight = "1.45";
+      titleSpan.style.fontWeight = isPlaying ? "bold" : "normal";
+      titleSpan.style.color = isPlaying ? "#fff" : (isRead ? "#888" : "#f1f2f6");
+      titleSpan.style.wordBreak = "break-word";
+      titleSpan.textContent = item.title;
+
+      card.appendChild(headerRow);
+      card.appendChild(titleSpan);
+      container.appendChild(card);
     });
   };
 
@@ -691,7 +700,7 @@ window.playNextContinuousNews = playNextContinuousNews;
     });
   }
 
-  const newsListBtn = document.getElementById("news-list-btn");
+  const newsListBtn = document.getElementById("news-list-btn") || document.getElementById("news-list-popup-btn");
   if (newsListBtn) {
     newsListBtn.addEventListener("click", () => {
       if (window.newsListPopup && !window.newsListPopup.closed) {
@@ -700,7 +709,7 @@ window.playNextContinuousNews = playNextContinuousNews;
         return;
       }
 
-      window.newsListPopup = window.open("", "NewsList", "width=500,height=600,menubar=no,toolbar=no,location=no,status=no");
+      window.newsListPopup = window.open("", "NewsList", "width=640,height=700,menubar=no,toolbar=no,location=no,status=no");
       if (!window.newsListPopup) {
         alert("ポップアップがブロックされました。ブラウザの設定で許可してください。");
         return;
@@ -713,15 +722,45 @@ window.playNextContinuousNews = playNextContinuousNews;
         <html lang="ja">
         <head>
           <meta charset="UTF-8">
-          <title>取得済みのニュース一覧</title>
+          <title>📰 取得済みのニュース一覧</title>
           <style>
-            body { background: #1a1a2e; color: #fff; font-family: sans-serif; margin: 0; padding: 20px; box-sizing: border-box; }
-            h3 { margin-top: 0; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-            #news-list-container { display: flex; flex-direction: column; gap: 8px; }
+            * { box-sizing: border-box; }
+            body {
+              background: #0f121d;
+              color: #f1f2f6;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", Meiryo, sans-serif;
+              margin: 0;
+              padding: 16px 20px;
+            }
+            header {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              margin-bottom: 14px;
+              padding-bottom: 10px;
+              border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            h3 {
+              margin: 0;
+              font-size: 1.05rem;
+              font-weight: 700;
+              color: #fff;
+            }
+            #news-list-container {
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+            }
+            ::-webkit-scrollbar { width: 6px; }
+            ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+            ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+            ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.35); }
           </style>
         </head>
         <body>
-          <h3>📰 取得済みのニュース一覧</h3>
+          <header>
+            <h3>📰 取得済みのニュース一覧</h3>
+          </header>
           <div id="news-list-container"></div>
           <script>
             setInterval(() => {
