@@ -1724,10 +1724,12 @@ ${creditsInstruction}
     if (typeof window.stopVoicevoxPlayback === "function") {
       window.stopVoicevoxPlayback();
     }
-    const stopAudioEl = document.getElementById("voicevox-audio");
-    if (stopAudioEl) {
-      try { stopAudioEl.pause(); stopAudioEl.currentTime = 0; } catch (e) {}
-    }
+    const startBtn = document.getElementById("news-broadcast-start-btn");
+    const stopBtn = document.getElementById("news-broadcast-stop-btn");
+    const progressEl = document.getElementById("news-broadcast-progress");
+    if (startBtn) startBtn.style.display = "block";
+    if (stopBtn) stopBtn.style.display = "none";
+    if (progressEl) progressEl.textContent = "⏹ 番組を停止しました";
     console.log("[ニュース番組] 番組を停止しました。");
   }
 

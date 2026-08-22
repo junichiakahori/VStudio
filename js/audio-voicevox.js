@@ -261,23 +261,54 @@ async function queueVoicevoxAudio(
     playNextVoicevox();
   }
 
-  if (typeof clearIdleTimer === "function") clearIdleTimer();
+// VOICEVOXの再生を即座に完全停止する関数
+function stopVoicevoxPlayback() {
+  if (typeof voicevoxAudioQueue !== "undefined") {
+    voicevoxAudioQueue.length = 0;
+  }
+  if (currentVoicevoxSource) {
+    try {
+      currentVoicevoxSource.onended = null;
+      currentVoicevoxSource.stop();
+    } catch (e) {}
+    currentVoicevoxSource = null;
+  }
+  const audioEl = document.getElementById("voicevox-audio");
+  if (audioEl) {
+    try {
+      audioEl.pause();
+      audioEl.currentTime = 0;
+    } catch (e) {}
+  }
+  isVoicevoxPlaying = false;
+  if (typeof hideSubtitles === "function") hideSubtitles();
+  console.log("[VOICEVOX] 再生キューをクリアし、音声を即時強制停止しました。");
 }
+
+window.stopVoicevoxPlayback = stopVoicevoxPlayback;
+
 // VOICEVOXのキューが空になり、再生が終わるまで待つ関数
 function waitForVoicevoxFinish() {
   return new Promise((resolve) => {
     const check = setInterval(() => {
+      // ニュース番組が停止された場合は即座に待機を解除
+      if (window.newsBroadcastState && !window.newsBroadcastState.isRunning) {
+        clearInterval(check);
+        resolve();
+        return;
+      }
       const queueEmpty = (typeof voicevoxAudioQueue !== "undefined" ? voicevoxAudioQueue.length === 0 : true);
       const notPlaying = (typeof isVoicevoxPlaying !== "undefined" ? !isVoicevoxPlaying : true);
       if (queueEmpty && notPlaying) {
         clearInterval(check);
         resolve();
       }
-    }, 500);
+    }, 100);
   });
 }
 
 window.queueVoicevoxAudio = queueVoicevoxAudio;
+window.waitForVoicevoxFinish = waitForVoicevoxFinish;
 
 // 字幕テロップのドラッグ＆ドロップと位置復元・トグル制御
 function initSubtitlesControl() {
