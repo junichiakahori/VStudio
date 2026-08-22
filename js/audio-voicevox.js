@@ -180,8 +180,8 @@ async function queueVoicevoxAudio(
 ) {
   if (!text || !text.trim()) return;
 
-  // 1文ずつ（句点・感嘆符・疑問符・改行）に分割する正規表現
-  const splitPattern = /(?<=[。！？!?\n])/g;
+  // 1文ずつ（句点・感嘆符・疑問符・改行）に分割する正規表現（M!LK等の英単語内の感嘆符は文末とみなさない）
+  const splitPattern = /(?<=[。！？\n])|(?<=[!?])(?![A-Za-z0-9])/g;
 
   // クリーンアップ関数
   const cleanYomi = (t) => {

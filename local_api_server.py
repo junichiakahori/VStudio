@@ -650,8 +650,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 # クリーンアップ
                 clean_text = raw_text.replace("「", "").replace("」", "").replace("（", "").replace("）", "").strip()
                 
-                # 1文ずつ（句点・感嘆符・疑問符・改行）に正確に分割
-                split_sentences = [s.strip() for s in re.split(r'(?<=[。！？\n])', clean_text) if s.strip()]
+                # 1文ずつ（句点・感嘆符・疑問符・改行）に正確に分割（M!LK等の単語内感嘆符は除外）
+                split_sentences = [s.strip() for s in re.split(r'(?<=[。！？\n])|(?<=[!?])(?![A-Za-z0-9])', clean_text) if s.strip()]
                 
                 # 前置き挨拶の重複・連続文の完全排除
                 transition_phrases = [
