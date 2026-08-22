@@ -13,9 +13,55 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
 from pytchat.processors.default.processor import DefaultProcessor, Chatdata
+from pytchat.parser.live import Parser
 import time
 
 logging.basicConfig(level=logging.INFO)
+
+# YouTube InnerTube Live Reactions (emojiFountainDataEntity) Hook
+_original_get_contents = Parser.get_contents
+_last_fountain_update_time = None
+_last_fountain_total_reactions = 0
+
+def _custom_get_contents(self, jsn):
+    global _last_fountain_update_time, _last_fountain_total_reactions
+    if jsn and "frameworkUpdates" in jsn:
+        try:
+            mutations = jsn["frameworkUpdates"].get("entityBatchUpdate", {}).get("mutations", [])
+            for m in mutations:
+                payload = m.get("payload", {})
+                if "emojiFountainDataEntity" in payload:
+                    fountain = payload["emojiFountainDataEntity"]
+                    update_time = fountain.get("updateTimeUsec")
+                    buckets = fountain.get("reactionBuckets", [])
+                    total_rx = sum(b.get("totalReactions", 0) for b in buckets)
+                    
+                    # リアクションが検知された場合（初回または更新時）
+                    if total_rx > 0 or (update_time and _last_fountain_update_time and update_time != _last_fountain_update_time):
+                        logging.info(f"[YouTube Live Reaction Intercepted!] total={total_rx} updateTime={update_time}")
+                        _last_fountain_update_time = update_time
+                        
+                        contents = jsn.get('continuationContents')
+                        if contents and 'liveChatContinuation' in contents:
+                            lc = contents['liveChatContinuation']
+                            if 'actions' not in lc or lc['actions'] is None:
+                                lc['actions'] = []
+                            count = max(total_rx, 1)
+                            lc['actions'].append({
+                                "vstudioLiveReaction": {
+                                    "emoji": "❤️",
+                                    "count": count
+                                }
+                            })
+                    else:
+                        if update_time:
+                            _last_fountain_update_time = update_time
+        except Exception as err:
+            logging.debug(f"Error parsing emojiFountainDataEntity: {err}")
+
+    return _original_get_contents(self, jsn)
+
+Parser.get_contents = _custom_get_contents
 
 class ReactionItem:
     def __init__(self, emoji="❤️", count=1, nickname="YouTube視聴者"):
@@ -44,7 +90,10 @@ class VStudioChatProcessor(DefaultProcessor):
                 for action in chatdata:
                     if action is None:
                         continue
-                    if action.get('addChatItemAction') is not None:
+                    if action.get('vstudioLiveReaction') is not None:
+                        rx = action['vstudioLiveReaction']
+                        chatlist.append(ReactionItem(emoji=rx.get('emoji', '❤️'), count=rx.get('count', 1)))
+                    elif action.get('addChatItemAction') is not None:
                         item = action['addChatItemAction'].get('item')
                         if item:
                             chat = self._parse(item)
