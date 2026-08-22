@@ -558,84 +558,102 @@ window.playNextContinuousNews = playNextContinuousNews;
       const isPlaying = isBroadcasting && (isCurrentByTitle || (curIdx > 0 && idx === curIdx - 1));
       const isRead = isBroadcasting ? ((curIdx > 0 && idx < curIdx - 1) || (!isPlaying && isCurrentByTitle)) : (currentRead.has(item.title) || storedReadList.includes(item.title));
 
-      const div = doc.createElement("div");
-      div.style.display = "flex";
-      div.style.alignItems = "center";
-      div.style.gap = "10px";
-      div.style.padding = "10px";
-      div.style.background = isPlaying ? "rgba(0, 230, 118, 0.15)" : (isRead ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.1)");
-      div.style.borderRadius = "6px";
-      div.style.borderLeft = isPlaying ? "3px solid #00e676" : (isRead ? "3px solid #666" : "3px solid #6c5ce7");
+      const card = doc.createElement("div");
+      card.style.display = "flex";
+      card.style.flexDirection = "column";
+      card.style.gap = "6px";
+      card.style.padding = "10px 14px";
+      card.style.background = isPlaying
+        ? "linear-gradient(135deg, rgba(0, 230, 118, 0.16), rgba(0, 230, 118, 0.06))"
+        : (isRead ? "rgba(255, 255, 255, 0.03)" : "linear-gradient(135deg, rgba(108, 92, 231, 0.12), rgba(255, 255, 255, 0.04))");
+      card.style.borderRadius = "8px";
+      card.style.border = isPlaying
+        ? "1px solid rgba(0, 230, 118, 0.45)"
+        : (isRead ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid rgba(108, 92, 231, 0.25)");
+      card.style.borderLeft = isPlaying
+        ? "4px solid #00e676"
+        : (isRead ? "4px solid #555" : "4px solid #6c5ce7");
+      card.style.transition = "all 0.2s ease";
+
+      // 上段: 番号 + バッジ + カテゴリ/配信元/日時 + 右端の再開ボタン
+      const headerRow = doc.createElement("div");
+      headerRow.style.display = "flex";
+      headerRow.style.alignItems = "center";
+      headerRow.style.justifyContent = "space-between";
+      headerRow.style.gap = "8px";
+
+      const leftMeta = doc.createElement("div");
+      leftMeta.style.display = "flex";
+      leftMeta.style.alignItems = "center";
+      leftMeta.style.gap = "6px";
+      leftMeta.style.flexWrap = "wrap";
 
       const numBadge = doc.createElement("span");
-      numBadge.style.fontSize = "0.75rem";
-      numBadge.style.color = "#888";
+      numBadge.style.fontSize = "0.78rem";
+      numBadge.style.color = isPlaying ? "#00e676" : (isRead ? "#777" : "#a29bfe");
       numBadge.style.fontFamily = "monospace";
-      numBadge.style.minWidth = "28px";
+      numBadge.style.fontWeight = "bold";
       numBadge.textContent = `#${idx + 1}`;
 
       const badge = doc.createElement("span");
-      badge.style.fontSize = "0.7rem";
-      badge.style.padding = "2px 6px";
-      badge.style.borderRadius = "4px";
+      badge.style.fontSize = "0.68rem";
+      badge.style.padding = "2px 8px";
+      badge.style.borderRadius = "10px";
       badge.style.fontWeight = "bold";
-      badge.style.minWidth = "36px";
       badge.style.textAlign = "center";
       if (isPlaying) {
-        badge.textContent = "放送中";
+        badge.textContent = "🎙️ 放送中";
         badge.style.background = "#00e676";
         badge.style.color = "#000";
+        badge.style.boxShadow = "0 0 8px rgba(0, 230, 118, 0.5)";
       } else if (isRead) {
         badge.textContent = "既読";
-        badge.style.background = "#444";
-        badge.style.color = "#aaa";
+        badge.style.background = "rgba(255, 255, 255, 0.1)";
+        badge.style.color = "#888";
       } else {
         badge.textContent = "未読";
-        badge.style.background = "#6c5ce7";
-        badge.style.color = "#fff";
+        badge.style.background = "rgba(108, 92, 231, 0.35)";
+        badge.style.color = "#d6d0ff";
+        badge.style.border = "1px solid rgba(108, 92, 231, 0.5)";
       }
 
-      const metaSpan = doc.createElement("div");
-      metaSpan.style.minWidth = "120px";
-      metaSpan.style.display = "flex";
-      metaSpan.style.flexDirection = "column";
+      const catSpan = doc.createElement("span");
+      catSpan.style.fontSize = "0.72rem";
+      catSpan.style.color = isRead ? "#777" : "#81ecec";
+      catSpan.style.fontWeight = "500";
+      catSpan.textContent = `[${item.categoryName || '一般'}] ${item.publisherName || ''}`;
 
-      const catPubDiv = doc.createElement("div");
-      catPubDiv.style.fontSize = "0.7rem";
-      catPubDiv.style.color = isRead ? "#777" : "#a29bfe";
-      catPubDiv.textContent = `[${item.categoryName || '不明'}] ${item.publisherName || ''}`;
+      leftMeta.appendChild(numBadge);
+      leftMeta.appendChild(badge);
+      leftMeta.appendChild(catSpan);
 
-      const dateDiv = doc.createElement("div");
-      dateDiv.style.color = isRead ? "#666" : "#aaa";
-      dateDiv.style.fontSize = "0.65rem";
-      dateDiv.style.marginTop = "2px";
       if (item.pubDate) {
         const d = new Date(item.pubDate);
         if (!isNaN(d.getTime())) {
-          dateDiv.textContent = `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+          const dateSpan = doc.createElement("span");
+          dateSpan.style.color = isRead ? "#666" : "#888";
+          dateSpan.style.fontSize = "0.68rem";
+          dateSpan.textContent = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+          leftMeta.appendChild(dateSpan);
         }
       }
 
-      metaSpan.appendChild(catPubDiv);
-      metaSpan.appendChild(dateDiv);
-
-      const titleSpan = doc.createElement("span");
-      titleSpan.style.fontSize = "0.85rem";
-      titleSpan.style.color = isRead ? "#aaa" : "#fff";
-      titleSpan.style.flex = "1";
-      titleSpan.textContent = item.title;
-
       const playBtn = doc.createElement("button");
       playBtn.textContent = "▶️ ここから再開";
-      playBtn.style.background = isPlaying ? "#00e676" : "rgba(108,92,231,0.3)";
+      playBtn.style.background = isPlaying
+        ? "linear-gradient(135deg, #00e676, #00b894)"
+        : "linear-gradient(135deg, rgba(108, 92, 231, 0.4), rgba(108, 92, 231, 0.2))";
       playBtn.style.color = isPlaying ? "#000" : "#fff";
-      playBtn.style.border = "1px solid rgba(108,92,231,0.6)";
-      playBtn.style.borderRadius = "4px";
-      playBtn.style.padding = "4px 8px";
-      playBtn.style.fontSize = "0.75rem";
-      playBtn.style.fontWeight = "bold";
+      playBtn.style.border = isPlaying ? "none" : "1px solid rgba(108, 92, 231, 0.5)";
+      playBtn.style.borderRadius = "12px";
+      playBtn.style.padding = "3px 10px";
+      playBtn.style.fontSize = "0.72rem";
+      playBtn.style.fontWeight = "600";
       playBtn.style.cursor = "pointer";
       playBtn.style.whiteSpace = "nowrap";
+      playBtn.style.transition = "transform 0.1s ease, filter 0.2s ease";
+      playBtn.onmouseenter = () => { playBtn.style.filter = "brightness(1.2)"; playBtn.style.transform = "scale(1.03)"; };
+      playBtn.onmouseleave = () => { playBtn.style.filter = "brightness(1.0)"; playBtn.style.transform = "scale(1.0)"; };
       playBtn.onclick = () => {
         if (window.opener && typeof window.opener.startNewsBroadcast === "function") {
           window.opener.startNewsBroadcast(idx);
