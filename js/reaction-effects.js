@@ -33,6 +33,22 @@
         baseFreq: 880.0, // A5
         soundType: "twinkle"
       };
+    } else if (/[😄😃😀😁😆😂🤣]/.test(emoji)) {
+      return {
+        type: "smile",
+        glow: "rgba(255, 215, 0, 0.9)",
+        shadowBlur: 18,
+        baseFreq: 700.0, // F5
+        soundType: "pop"
+      };
+    } else if (/[😳😮😲😯😱🥺😭]/.test(emoji)) {
+      return {
+        type: "surprise",
+        glow: "rgba(255, 140, 0, 0.9)",
+        shadowBlur: 18,
+        baseFreq: 830.61, // G#5
+        soundType: "twinkle"
+      };
     } else if (/[🎉🥳🙌🎊]/.test(emoji)) {
       return {
         type: "celebration",

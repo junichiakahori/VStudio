@@ -51,8 +51,8 @@ def _resolve_single_emoji(s):
         except Exception:
             pass
 
-    # Match specific rich emoji characters
-    found = re.findall(r'[🎉🥳🙌🎊👏💯🔥⚡👍😻🐾⭐✨🤩😂🤣😆😍🥰😎❤️💖💕💓💗💘]', s)
+    # Match all Unicode emojis (including 😄, 😳, 🎉, 💯, ❤️ etc.)
+    found = re.findall(r'[\U00010000-\U0010ffff\u2600-\u27bf\u2300-\u23ff\u2b50\u2b55\u3030\u303d\u3297\u3299\ufe0f]', s)
     if found:
         # Return non-heart emoji if found, or first emoji
         non_hearts = [e for e in found if e not in ['❤️', '❤']]
@@ -64,6 +64,8 @@ def _resolve_single_emoji(s):
     mapping = [
         (["party_popper", "tada", "celebration", "party", "popper", "1f389", "f389"], "🎉"),
         (["100", "hundred", "1f4af", "f4af", "one_hundred"], "💯"),
+        (["smile", "grinning", "happy", "1f604", "f604"], "😄"),
+        (["flushed", "blush", "surprised", "1f633", "f633"], "😳"),
         (["clapping", "clap", "applaud", "1f44f", "f44f"], "👏"),
         (["joy", "laugh", "tears_of_joy", "rofl", "lol", "funny", "1f602", "f602"], "😂"),
         (["fire", "flame", "lit", "hot", "1f525", "f525"], "🔥"),
@@ -81,15 +83,16 @@ def _resolve_single_emoji(s):
 def _extract_emojis_from_payload(m_payload, fountain, buckets):
     results = []
     for b in buckets:
-        for r in b.get("reactions", []):
+        rx_list = b.get("reactionsData", []) or b.get("reactions", [])
+        for r in rx_list:
             count = r.get("reactionCount", 1)
-            em = _resolve_single_emoji(json.dumps(r, ensure_ascii=False))
+            em = r.get("unicodeEmojiId") or r.get("emojiId") or _resolve_single_emoji(json.dumps(r, ensure_ascii=False))
             if em:
                 results.append((em, count))
                 
-    for r in fountain.get("reactions", []):
+    for r in fountain.get("reactionsData", []) or fountain.get("reactions", []):
         count = r.get("reactionCount", 1)
-        em = _resolve_single_emoji(json.dumps(r, ensure_ascii=False))
+        em = r.get("unicodeEmojiId") or r.get("emojiId") or _resolve_single_emoji(json.dumps(r, ensure_ascii=False))
         if em:
             results.append((em, count))
             
