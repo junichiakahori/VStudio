@@ -655,9 +655,18 @@ window.playNextContinuousNews = playNextContinuousNews;
       playBtn.onmouseenter = () => { playBtn.style.filter = "brightness(1.2)"; playBtn.style.transform = "scale(1.03)"; };
       playBtn.onmouseleave = () => { playBtn.style.filter = "brightness(1.0)"; playBtn.style.transform = "scale(1.0)"; };
       playBtn.onclick = () => {
-        if (window.opener && typeof window.opener.startNewsBroadcast === "function") {
-          window.opener.startNewsBroadcast(idx);
-          setTimeout(() => { if (typeof window.updateNewsListPopup === "function") window.updateNewsListPopup(); }, 300);
+        console.log(`[ニュース一覧] 指定位置(#${idx + 1})から再開リクエストを受信しました`);
+        const starter = (typeof window.startNewsBroadcast === "function"
+          ? window.startNewsBroadcast
+          : (window.opener && typeof window.opener.startNewsBroadcast === "function" ? window.opener.startNewsBroadcast : null));
+        if (starter) {
+          starter(idx);
+          setTimeout(() => {
+            if (typeof window.updateNewsListPopup === "function") window.updateNewsListPopup();
+            if (window.opener && typeof window.opener.updateNewsListPopup === "function") window.opener.updateNewsListPopup();
+          }, 300);
+        } else {
+          console.error("[ニュース一覧] startNewsBroadcast 関数が見つかりません");
         }
       };
 
@@ -1636,8 +1645,12 @@ ${creditsInstruction}
 
   async function startNewsBroadcast(startIndex = 0) {
     if (newsBroadcastState.isRunning) {
-      console.warn("[ニュース番組] 番組は既に実行中です。二重起動を防止しました。");
-      return;
+      console.log(`[ニュース番組] 指定位置(#${startIndex + 1})から再開するため、現在の番組を安全に切り替えます...`);
+      newsBroadcastState.isRunning = false;
+      if (typeof window.stopVoicevoxPlayback === "function") {
+        window.stopVoicevoxPlayback();
+      }
+      await new Promise(r => setTimeout(r, 400));
     }
 
     const startBtn = document.getElementById("news-broadcast-start-btn");
