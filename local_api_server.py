@@ -799,10 +799,17 @@ def save_learned_pronunciations(new_words):
                 existing = json.load(f)
         updated = False
         for k, v in new_words.items():
-            if k and v and k not in existing:
-                existing[k] = v
+            k_s = (k or "").strip()
+            v_s = (v or "").strip()
+            # 1文字単語や助詞・活用語尾（って、は、を、お等）は文破壊の原因になるため登録禁止
+            if len(k_s) < 2 or not re.search(r'[\u4e00-\u9fafA-Za-z0-9]', k_s):
+                continue
+            if k_s in ["って", "て", "は", "わ", "を", "お", "でお", "のを"]:
+                continue
+            if k_s and v_s and k_s not in existing:
+                existing[k_s] = v_s
                 updated = True
-                print(f"[AI自動学習] 読み補正を辞書に新規登録: '{k}' -> '{v}'")
+                print(f"[AI自動学習] 読み補正を辞書に新規登録: '{k_s}' -> '{v_s}'")
         if updated:
             with open(dict_path, 'w', encoding='utf-8') as f:
                 json.dump(existing, f, ensure_ascii=False, indent=4)
