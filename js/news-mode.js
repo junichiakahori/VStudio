@@ -567,6 +567,13 @@ window.playNextContinuousNews = playNextContinuousNews;
       div.style.borderRadius = "6px";
       div.style.borderLeft = isPlaying ? "3px solid #00e676" : (isRead ? "3px solid #666" : "3px solid #6c5ce7");
 
+      const numBadge = doc.createElement("span");
+      numBadge.style.fontSize = "0.75rem";
+      numBadge.style.color = "#888";
+      numBadge.style.fontFamily = "monospace";
+      numBadge.style.minWidth = "28px";
+      numBadge.textContent = `#${idx + 1}`;
+
       const badge = doc.createElement("span");
       badge.style.fontSize = "0.7rem";
       badge.style.padding = "2px 6px";
@@ -618,9 +625,29 @@ window.playNextContinuousNews = playNextContinuousNews;
       titleSpan.style.flex = "1";
       titleSpan.textContent = item.title;
 
+      const playBtn = doc.createElement("button");
+      playBtn.textContent = "▶️ ここから再開";
+      playBtn.style.background = isPlaying ? "#00e676" : "rgba(108,92,231,0.3)";
+      playBtn.style.color = isPlaying ? "#000" : "#fff";
+      playBtn.style.border = "1px solid rgba(108,92,231,0.6)";
+      playBtn.style.borderRadius = "4px";
+      playBtn.style.padding = "4px 8px";
+      playBtn.style.fontSize = "0.75rem";
+      playBtn.style.fontWeight = "bold";
+      playBtn.style.cursor = "pointer";
+      playBtn.style.whiteSpace = "nowrap";
+      playBtn.onclick = () => {
+        if (window.opener && typeof window.opener.startNewsBroadcast === "function") {
+          window.opener.startNewsBroadcast(idx);
+          setTimeout(() => { if (typeof window.updateNewsListPopup === "function") window.updateNewsListPopup(); }, 300);
+        }
+      };
+
+      div.appendChild(numBadge);
       div.appendChild(badge);
       div.appendChild(metaSpan);
       div.appendChild(titleSpan);
+      div.appendChild(playBtn);
       container.appendChild(div);
     });
   };
@@ -1591,6 +1618,9 @@ ${creditsInstruction}
     if (stopBtn) stopBtn.style.display = "block";
     if (progressEl) progressEl.style.display = "block";
 
+    const startIdxInput = document.getElementById("news-broadcast-start-index");
+    if (startIdxInput) startIdxInput.value = startIndex + 1;
+
     if (typeof clearIdleTimer === "function") clearIdleTimer();
 
     // 番組開始時にセットリストボードを初期化・表示
@@ -1641,6 +1671,8 @@ ${creditsInstruction}
 
       newsBroadcastState.currentIndex = i + 1;
       newsBroadcastState.lastCategory = item.categoryKey || "";
+
+      if (startIdxInput) startIdxInput.value = i + 1;
 
       // カテゴリが切り替わった時（2カテゴリ目以降の最初）にシーン切り替えSEを確実に鳴らす
       if (isCategoryChanged && config.useTransition) {
@@ -1707,7 +1739,11 @@ ${creditsInstruction}
   const newsBroadcastStartBtn = document.getElementById("news-broadcast-start-btn");
   const newsBroadcastStopBtn = document.getElementById("news-broadcast-stop-btn");
   if (newsBroadcastStartBtn) {
-    newsBroadcastStartBtn.onclick = () => startNewsBroadcast();
+    newsBroadcastStartBtn.onclick = () => {
+      const startIdxInput = document.getElementById("news-broadcast-start-index");
+      const idx = startIdxInput ? (parseInt(startIdxInput.value, 10) || 1) - 1 : 0;
+      startNewsBroadcast(Math.max(0, idx));
+    };
   }
   if (newsBroadcastStopBtn) {
     newsBroadcastStopBtn.onclick = () => stopNewsBroadcast();

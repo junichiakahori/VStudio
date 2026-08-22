@@ -733,6 +733,15 @@
                         📰 準備中...
                     </div>
 
+                    <!-- 開始記事番号（途中再開用） -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; background:rgba(0,0,0,0.25); padding:6px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
+                        <span style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap;">🏁 開始記事番号:</span>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <input type="number" id="news-broadcast-start-index" min="1" value="1" style="width:55px; background:rgba(0,0,0,0.5); color:#fff; border:1px solid rgba(0,230,118,0.4); border-radius:4px; padding:3px 6px; text-align:center; font-size:0.85rem; font-weight:bold;">
+                            <span style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap;">本目から</span>
+                        </div>
+                    </div>
+
                     <button id="news-broadcast-start-btn" class="btn" style="width:100%; background:linear-gradient(135deg,#00e676,#00b894); color:#000; font-weight:bold; padding:0.65rem; border-radius:6px; border:none; cursor:pointer; font-size:0.95rem; letter-spacing:0.05em;">
                         🎬 ニュース番組をスタート
                     </button>
