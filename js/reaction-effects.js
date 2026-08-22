@@ -80,6 +80,7 @@
     const container = document.getElementById("avatar-viewport") || document.querySelector(".canvas-container") || document.body;
     if (!container) return;
 
+    reactionCanvas = document.getElementById("reaction-effects-canvas");
     if (!reactionCanvas) {
       reactionCanvas = document.createElement("canvas");
       reactionCanvas.id = "reaction-effects-canvas";
@@ -105,8 +106,9 @@
   function resizeCanvas() {
     if (!reactionCanvas) return;
     const parent = reactionCanvas.parentElement || document.getElementById("avatar-viewport") || document.body;
-    reactionCanvas.width = parent.clientWidth || window.innerWidth;
-    reactionCanvas.height = parent.clientHeight || window.innerHeight;
+    const rect = parent.getBoundingClientRect();
+    reactionCanvas.width = rect.width || parent.clientWidth || window.innerWidth;
+    reactionCanvas.height = rect.height || parent.clientHeight || window.innerHeight;
   }
 
   class ReactionParticle {
@@ -232,6 +234,8 @@
       }, idx * 180);
     });
   };
+
+  (window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("reaction-effects", initReactionCanvas);
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initReactionCanvas);
