@@ -135,6 +135,16 @@
     try {
       window.hotReloadCSS();
       const count = await window.hotReloadScripts();
+      
+      // バックエンド再起動時にも追従してYouTube接続を即時リフレッシュ
+      if (typeof window.isYoutubeIntendedConnect !== "undefined" && window.isYoutubeIntendedConnect) {
+        const savedId = localStorage.getItem("savedYoutubeId") || "@drone.akahori";
+        if (typeof window.startYoutubeConnection === "function") {
+          console.log("[HotReload] YouTube WebSocket接続を最新バックエンドに再同期します...");
+          window.startYoutubeConnection(savedId);
+        }
+      }
+
       if (showToast) {
         showHotReloadToast(`ホットリロード完了 (${count}モジュール更新・配信継続中)`);
       }
