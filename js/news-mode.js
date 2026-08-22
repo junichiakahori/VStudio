@@ -1598,6 +1598,11 @@ ${creditsInstruction}
       window.clearNewsReadFlags(true);
     }
 
+    // 番組開始時にコメント履歴とコメント数を初期化
+    if (typeof window.clearAllComments === "function") {
+      window.clearAllComments();
+    }
+
     // OBS配信状態の確認（「OBS配信も同時にスタートする」トグルがONの場合のみ実行）
     const obsStreamToggle = document.getElementById("news-obs-auto-stream-toggle");
     const isObsStreamEnabled = obsStreamToggle ? obsStreamToggle.checked : false;

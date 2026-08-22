@@ -349,6 +349,11 @@ window.executeStreamEndProcess = executeStreamEndProcess;
             localScheduleToggle.dispatchEvent(new Event("change", { bubbles: true }));
           }
 
+          // 配信・番組開始時にコメント履歴とカウントをゼロクリア
+          if (typeof window.clearAllComments === "function") {
+            window.clearAllComments();
+          }
+
           // 1. OBS配信の自動開始（接続時）
           if (typeof window.ensureObsStreamingStarted === "function") {
             window.ensureObsStreamingStarted().catch((e) => console.warn(e));

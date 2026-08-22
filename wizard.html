@@ -1372,6 +1372,11 @@
                         prepToggle.dispatchEvent(new Event("change"));
                     }
 
+                    // 配信・番組開始時にコメント履歴とコメント数をクリア
+                    if (typeof openerWin.clearAllComments === "function") {
+                        openerWin.clearAllComments();
+                    }
+
                     if (selectedMode === "news") {
                         openerWin.currentBroadcastMode = "news";
                         if (typeof openerWin.clearIdleTimer === "function") openerWin.clearIdleTimer();
