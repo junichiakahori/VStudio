@@ -237,15 +237,21 @@
     }
   }
 
-  /**
-   * リアクション演出を発生させる
-   * @param {string} emoji
-   * @param {number} count
-   */
-  window.spawnReactionEffect = function (emoji, count = 1) {
-    const toggle = document.getElementById("reaction-effects-toggle");
-    if (toggle && !toggle.checked) return;
+  const reactionSpawnQueue = [];
+  let isProcessingSpawnQueue = false;
 
+  function processSpawnQueue() {
+    if (reactionSpawnQueue.length === 0) {
+      isProcessingSpawnQueue = false;
+      return;
+    }
+    isProcessingSpawnQueue = true;
+    const item = reactionSpawnQueue.shift();
+    _executeSpawn(item.emoji, item.count);
+    setTimeout(processSpawnQueue, 140);
+  }
+
+  function _executeSpawn(emoji, count = 1) {
     initReactionCanvas();
     const spawnCount = Math.min(Math.max(count, 1), 12);
     const chosenEmoji = emoji || DEFAULT_EMOJIS[Math.floor(Math.random() * DEFAULT_EMOJIS.length)];
@@ -265,6 +271,21 @@
     // Live2Dの笑顔リアクション
     if (typeof window.aiEmotion !== "undefined") {
       window.aiEmotion = "joy";
+    }
+  }
+
+  /**
+   * リアクション演出を発生させる
+   * @param {string} emoji
+   * @param {number} count
+   */
+  window.spawnReactionEffect = function (emoji, count = 1) {
+    const toggle = document.getElementById("reaction-effects-toggle");
+    if (toggle && !toggle.checked) return;
+
+    reactionSpawnQueue.push({ emoji, count });
+    if (!isProcessingSpawnQueue) {
+      processSpawnQueue();
     }
   };
 
