@@ -1666,8 +1666,8 @@ ${creditsInstruction}
     for (let i = startIndex; i < sortedNews.length; i++) {
       if (!newsBroadcastState.isRunning) break;
       const item = sortedNews[i];
-      const isFirst = i === startIndex;
-      const isCategoryChanged = !isFirst && (item.categoryKey || "") !== newsBroadcastState.lastCategory;
+      const isFirst = (i === 0);
+      const isCategoryChanged = (i > 0) && (item.categoryKey || "") !== newsBroadcastState.lastCategory;
 
       newsBroadcastState.currentIndex = i + 1;
       newsBroadcastState.lastCategory = item.categoryKey || "";
