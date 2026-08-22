@@ -33,45 +33,18 @@
   ];
 
   /**
-   * トースト通知を表示
+   * トースト通知（配信画面をクリーンに保つため画面には表示せずログのみ記録）
    */
   function showHotReloadToast(msg, isSuccess = true) {
-    let toast = document.getElementById("hot-reload-toast");
-    if (!toast) {
-      toast = document.createElement("div");
-      toast.id = "hot-reload-toast";
-      toast.style.cssText = `
-        position: fixed;
-        bottom: 24px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(16, 24, 48, 0.92);
-        border: 1px solid ${isSuccess ? "#00e676" : "#ff7675"};
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 15px ${isSuccess ? "rgba(0, 230, 118, 0.3)" : "rgba(255, 118, 117, 0.3)"};
-        color: #fff;
-        padding: 8px 18px;
-        border-radius: 20px;
-        font-size: 0.82rem;
-        font-weight: 600;
-        z-index: 999999;
-        pointer-events: none;
-        transition: opacity 0.3s ease, transform 0.3s ease;
-        opacity: 0;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      `;
-      document.body.appendChild(toast);
+    const existing = document.getElementById("hot-reload-toast");
+    if (existing) {
+      existing.remove();
     }
-    toast.innerHTML = isSuccess ? `⚡ ${msg}` : `⚠️ ${msg}`;
-    toast.style.borderColor = isSuccess ? "#00e676" : "#ff7675";
-    toast.style.opacity = "1";
-    toast.style.transform = "translateX(-50%) translateY(0)";
-
-    setTimeout(() => {
-      toast.style.opacity = "0";
-      toast.style.transform = "translateX(-50%) translateY(10px)";
-    }, 2500);
+    if (isSuccess) {
+      console.log(`[HotReload] ⚡ ${msg}`);
+    } else {
+      console.warn(`[HotReload] ⚠️ ${msg}`);
+    }
   }
 
   /**
