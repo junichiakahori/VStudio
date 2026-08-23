@@ -1553,6 +1553,8 @@ ${creditsInstruction}
     window.newsBroadcastState = newsBroadcastState;
     updateBroadcastProgress(item);
 
+    console.log(`[ニュース番組] 📰 [${newsBroadcastState.currentIndex}/${newsBroadcastState.totalCount}件] 【${item.categoryName || "ニュース"}】 「${item.title}」`);
+
     // セットリストボードの進行目印を更新
     updateNewsSetlistProgress(item.categoryKey || "cat_top", newsBroadcastState.currentIndex, newsBroadcastState.totalCount);
 
@@ -1618,7 +1620,7 @@ ${creditsInstruction}
             if (newsBoardEl) newsBoardEl.classList.add("active");
 
             const count = (data.items || data.sentences || []).length;
-            console.log(`[ニュース原稿(Backend)] 「${data.fullText}」 (${count}文)`);
+            console.log(`[ニュース原稿(Backend)] [${newsBroadcastState.currentIndex}/${newsBroadcastState.totalCount}件] 「${data.fullText}」 (${count}文)`);
             if (data.items && data.items.length > 0) {
               for (const it of data.items) {
                 if (!newsBroadcastState.isRunning) return false;
