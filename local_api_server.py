@@ -632,15 +632,22 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
                 print(f"[generate_item_script] タイトル: {title[:20]}..., APIキー文字数: {len(api_key)}, provider: {provider}, model: {model_name}")
                 raw_text = ""
-                if api_key:
-                    try:
-                        if provider == 'openai':
+                if provider == 'ollama':
+                    raw_text = call_ollama_backend(prompt, model_name or "qwen2.5:7b")
+                elif provider == 'openai':
+                    if api_key:
+                        try:
                             raw_text = call_openai_backend(prompt, api_key, model_name or "gpt-4o-mini")
-                        else:
+                        except Exception as ai_err:
+                            print(f"[OpenAI生成エラー]: {ai_err}")
+                            raw_text = ""
+                else:
+                    if api_key:
+                        try:
                             raw_text = call_gemini_backend(prompt, api_key, model_name or "gemini-1.5-flash")
-                    except Exception as ai_err:
-                        print(f"[AI生成エラー (429/タイムアウト)]: {ai_err}")
-                        raw_text = ""
+                        except Exception as ai_err:
+                            print(f"[Gemini生成エラー]: {ai_err}")
+                            raw_text = ""
 
                 if not raw_text:
                     print(f"[AI生成失敗] AI原稿の生成に失敗しました（空のレスポンスまたはエラー）。待機画面（しばらくお待ちください）へ移行させるため500エラーを返却します。")
@@ -816,8 +823,28 @@ def call_openai_backend(prompt, api_key, model="gpt-4o-mini"):
     with urllib.request.urlopen(req, context=ctx, timeout=15) as res:
         res_json = json.loads(res.read().decode("utf-8"))
         choices = res_json.get("choices", [])
-        if choices:
+        if choices and "message" in choices[0] and "content" in choices[0]["message"]:
             return choices[0]["message"]["content"].strip()
+    return ""
+
+def call_ollama_backend(prompt, model="qwen2.5:7b", base_url="http://127.0.0.1:11434"):
+    target_model = model or "qwen2.5:7b"
+    url = f"{base_url}/api/generate"
+    headers = {
+        "Content-Type": "application/json"
+    }
+    body = {
+        "model": target_model,
+        "prompt": prompt,
+        "stream": False
+    }
+    try:
+        req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=45) as res:
+            res_json = json.loads(res.read().decode("utf-8"))
+            return res_json.get("response", "").strip()
+    except Exception as e:
+        print(f"[Ollama Backend] モデル '{target_model}' 実行エラー (Ollamaが起動しているか確認してください): {e}", flush=True)
     return ""
 
 def get_voicevox_kana(text, speaker_id=1):

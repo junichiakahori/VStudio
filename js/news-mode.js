@@ -1551,12 +1551,12 @@ ${creditsInstruction}
     let retryFailCount = 0;
 
     while (newsBroadcastState.isRunning) {
-      if (!apiKey) {
+      if (!apiKey && provider !== "ollama") {
         console.warn("[ニュース番組] ⚠️ APIキーが未設定です。復旧待機画面に移行します...");
       }
 
       let res = null;
-      if (apiKey) {
+      if (apiKey || provider === "ollama") {
         try {
           res = await fetch("/api/news/generate_item_script", {
             method: "POST",

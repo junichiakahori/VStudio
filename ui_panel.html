@@ -541,30 +541,33 @@
                 <div class="control-group" id="ai-settings-panel" style="display:none; margin-top:10px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
                     <label style="font-size:0.8rem;color:var(--text-muted);">AI API プロバイダ</label>
                     <select id="ai-provider-select" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.8rem;outline:none;margin-top:0.3rem;cursor:pointer;">
-                        <option value="gemini">Google Gemini (無料枠あり)</option>
+                        <option value="ollama">🦙 Ollama (ローカルLLM - 完全無料・APIキー不要)</option>
+                        <option value="gemini" selected>Google Gemini (クラウド)</option>
                         <option value="openai">OpenAI (ChatGPT)</option>
                     </select>
 
                     <label style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;display:block;">使用モデル名</label>
                     <div style="display:flex;gap:0.5rem;margin-top:0.3rem;align-items:center;">
                         <select id="ai-model-input" style="flex:1;min-width:0;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.4rem;color:var(--text-muted);font-size:0.8rem;outline:none;box-sizing:border-box;text-overflow:ellipsis;white-space:nowrap;">
-                            <option value="gemini-2.0-flash">gemini-2.0-flash (最新・高速)</option>
-                            <option value="gemini-1.5-flash" selected>gemini-1.5-flash (標準・高安定)</option>
-                            <option value="gemini-1.5-pro">gemini-1.5-pro (高精度)</option>
+                            <option value="gemini-3.7-flash">gemini-3.7-flash</option>
+                            <option value="gemini-2.0-flash">gemini-2.0-flash (高速)</option>
+                            <option value="gemini-1.5-flash">gemini-1.5-flash</option>
                         </select>
                         <button id="ai-fetch-models-btn" class="btn" style="background:var(--secondary, #333);color:#fff;border:1px solid var(--border-neon);border-radius:6px;padding:0.4rem 0.5rem;font-size:0.7rem;cursor:pointer;white-space:nowrap;">一覧を取得</button>
                     </div>
 
-                    <label style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;display:block;">API キー</label>
-                    <div style="display:flex;gap:0.5rem;margin-top:0.3rem;">
-                        <input type="password" id="ai-api-key" placeholder="AIのAPIキーを入力" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.8rem;outline:none;box-sizing:border-box;">
-                        <button id="ai-test-btn" class="btn" style="background:var(--primary);color:#000;border:none;border-radius:6px;padding:0 0.8rem;font-weight:bold;cursor:pointer;font-size:0.75rem;">テスト</button>
+                    <div id="ai-api-key-container">
+                        <label style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;display:block;">API キー</label>
+                        <div style="display:flex;gap:0.5rem;margin-top:0.3rem;">
+                            <input type="password" id="ai-api-key" placeholder="AIのAPIキーを入力" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.8rem;outline:none;box-sizing:border-box;">
+                            <button id="ai-test-btn" class="btn" style="background:var(--primary);color:#000;border:none;border-radius:6px;padding:0 0.8rem;font-weight:bold;cursor:pointer;font-size:0.75rem;">テスト</button>
+                        </div>
+                        <div id="ai-test-status" style="font-size:0.75rem; margin-top:0.4rem; float:left;"></div>
+                        <div style="font-size:0.7rem; margin-top:0.4rem; text-align:right; float:right;">
+                            <a id="ai-api-link" href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#00f3ff; text-decoration:none;">▶︎ Gemini APIキーを取得する</a>
+                        </div>
+                        <div style="clear:both;"></div>
                     </div>
-                    <div id="ai-test-status" style="font-size:0.75rem; margin-top:0.4rem; float:left;"></div>
-                    <div style="font-size:0.7rem; margin-top:0.4rem; text-align:right; float:right;">
-                        <a id="ai-api-link" href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#00f3ff; text-decoration:none;">▶︎ Gemini APIキーを取得する</a>
-                    </div>
-                    <div style="clear:both;"></div>
                     
                     <label style="font-size:0.8rem;color:var(--text-muted);margin-top:10px;display:block;">リアルタイム検索機能</label>
                     <select id="ai-search-select" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.8rem;outline:none;margin-top:0.3rem;cursor:pointer;">

@@ -106,14 +106,23 @@ window.renderCacheEditorList = function renderCacheEditorList(filterText = "") {
 };
 window.updateAiLink = function updateAiLink() {
   if (!aiApiLink) return;
-  if (aiProviderSelect.value === "openai") {
+  const apiKeyContainer = document.getElementById("ai-api-key-container");
+  const provider = aiProviderSelect ? aiProviderSelect.value : "gemini";
+  if (provider === "ollama") {
+    aiApiLink.href = "http://localhost:11434";
+    aiApiLink.textContent = "🦙 Ollama (完全無料・APIキー不要・利用枠無制限)";
+    aiApiLink.style.color = "#00ff88";
+    if (apiKeyContainer) apiKeyContainer.style.display = "none";
+  } else if (provider === "openai") {
     aiApiLink.href = "https://platform.openai.com/api-keys";
     aiApiLink.textContent = "▶︎ OpenAI APIキーを取得する";
     aiApiLink.style.color = "#ff6b6b";
+    if (apiKeyContainer) apiKeyContainer.style.display = "block";
   } else {
     aiApiLink.href = "https://aistudio.google.com/app/apikey";
     aiApiLink.textContent = "▶︎ Gemini APIキーを取得する";
     aiApiLink.style.color = "#00f3ff";
+    if (apiKeyContainer) apiKeyContainer.style.display = "block";
   }
 };
 
@@ -384,6 +393,35 @@ window.updateAiLink = function updateAiLink() {
 
   function restoreSavedModelList(provider) {
     const p = provider || (aiProviderSelect ? aiProviderSelect.value : "gemini");
+    if (p === "ollama") {
+      const defaultOllama = ["qwen2.5:7b", "qwen2.5:14b", "llama3.1:8b", "gemma2:9b"];
+      const rawList = localStorage.getItem("savedAiModelList_ollama");
+      let list = defaultOllama;
+      if (rawList) {
+        try {
+          const parsed = JSON.parse(rawList);
+          if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
+        } catch (e) {}
+      }
+      if (aiModelInput) {
+        aiModelInput.innerHTML = "";
+        list.forEach((m) => {
+          const opt = document.createElement("option");
+          opt.value = m;
+          opt.textContent = m;
+          aiModelInput.appendChild(opt);
+        });
+        const savedModel = localStorage.getItem("savedAiModel");
+        if (savedModel && list.includes(savedModel)) {
+          aiModelInput.value = savedModel;
+        } else {
+          aiModelInput.value = list[0];
+        }
+        localStorage.setItem("savedAiModel", aiModelInput.value);
+      }
+      return;
+    }
+
     const rawList = localStorage.getItem("savedAiModelList_" + p);
     if (rawList && aiModelInput) {
       try {
@@ -433,9 +471,9 @@ window.updateAiLink = function updateAiLink() {
 
   async function fetchAiModels(silent = false) {
     if (window.__isFetchingAiModels) return;
-    const apiKey = aiApiKeyInput ? aiApiKeyInput.value.trim() : "";
     const provider = aiProviderSelect ? aiProviderSelect.value : "gemini";
-    if (!apiKey) {
+    const apiKey = aiApiKeyInput ? aiApiKeyInput.value.trim() : "";
+    if (provider !== "ollama" && !apiKey) {
       if (!silent) alert("APIキーを入力してください");
       return;
     }
@@ -449,7 +487,35 @@ window.updateAiLink = function updateAiLink() {
     }
 
     try {
-      if (provider === "openai") {
+      if (provider === "ollama") {
+        const res = await fetch("http://localhost:11434/api/tags");
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.models) {
+            const modelNames = json.models.map((m) => m.name);
+            if (modelNames.length > 0) {
+              aiModelInput.innerHTML = "";
+              modelNames.forEach((m) => {
+                const opt = document.createElement("option");
+                opt.value = m;
+                opt.textContent = m;
+                aiModelInput.appendChild(opt);
+              });
+              localStorage.setItem("savedAiModelList_ollama", JSON.stringify(modelNames));
+              const saved = localStorage.getItem("savedAiModel");
+              if (saved && modelNames.includes(saved)) {
+                aiModelInput.value = saved;
+              } else {
+                aiModelInput.value = modelNames[0];
+              }
+              localStorage.setItem("savedAiModel", aiModelInput.value);
+              console.log(`[AI設定] ✅ Ollamaローカルモデル取得完了: ${modelNames.length}件 (選択中: [${aiModelInput.value}])`, modelNames);
+            }
+          }
+        } else {
+          console.warn("[AI設定] Ollamaサーバー未起動または未応答");
+        }
+      } else if (provider === "openai") {
         const res = await fetch("https://api.openai.com/v1/models", {
           headers: { Authorization: `Bearer ${apiKey}` },
         });
@@ -616,7 +682,36 @@ window.updateAiLink = function updateAiLink() {
         ? aiModelInput.value.trim()
         : provider === "openai"
           ? "gpt-4o-mini"
-          : "gemini-1.5-flash";
+          : (provider === "ollama" ? "qwen2.5:7b" : "gemini-1.5-flash");
+
+      if (provider === "ollama") {
+        aiTestStatus.textContent = "⏳ Ollama (ローカルLLM) テスト中...";
+        aiTestStatus.style.color = "var(--text-muted)";
+        aiTestBtn.disabled = true;
+        try {
+          const res = await fetch("http://localhost:11434/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: modelName || "qwen2.5:7b",
+              prompt: "こんにちは！",
+              stream: false,
+            }),
+          });
+          if (res.ok) {
+            aiTestStatus.textContent = "✅ Ollama (ローカルLLM) 正常稼働中！";
+            aiTestStatus.style.color = "#00ff88";
+          } else {
+            throw new Error(`HTTP ${res.status}`);
+          }
+        } catch (ollamaErr) {
+          aiTestStatus.textContent = "❌ Ollama未起動 (brew services start ollama)";
+          aiTestStatus.style.color = "var(--danger, #ff4444)";
+        } finally {
+          aiTestBtn.disabled = false;
+        }
+        return;
+      }
 
       if (!apiKey) {
         aiTestStatus.textContent = "❌ APIキーを入力してください";
