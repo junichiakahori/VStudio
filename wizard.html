@@ -223,6 +223,10 @@
                     <span id="status-local-api" style="font-weight: bold; color: #ff7675;">🔴 確認中...</span>
                 </div>
                 <div class="status-row">
+                    <span>AI (LLM) エンジン (Ollama / Gemini)</span>
+                    <span id="status-ai-engine" style="font-weight: bold; color: #ff7675;">🔴 確認中...</span>
+                </div>
+                <div class="status-row">
                     <span>YouTube コメントサーバー (port 8768)</span>
                     <span id="status-yt-server" style="font-weight: bold; color: #ff7675;">🔴 確認中...</span>
                 </div>
@@ -538,6 +542,76 @@
                 if (elLocal) {
                     elLocal.textContent = "🔴 停止中";
                     elLocal.style.color = "#ff7675";
+                }
+            }
+
+            // AI (LLM) Engine Check
+            const elAi = document.getElementById("status-ai-engine");
+            try {
+                const provider = (openerWin?.document?.getElementById("ai-provider-select")?.value) || localStorage.getItem("savedAiProvider") || "gemini";
+                const apiKey = (openerWin?.document?.getElementById("ai-api-key")?.value) || localStorage.getItem("savedAiApiKey") || "";
+                
+                // Ollama 稼働チェック
+                let isOllamaRunning = false;
+                let ollamaModel = "";
+                try {
+                    const ollamaRes = await fetch("http://localhost:11434/api/tags", { cache: "no-store" });
+                    if (ollamaRes.ok) {
+                        const ollamaData = await ollamaRes.json();
+                        isOllamaRunning = true;
+                        if (ollamaData.models && ollamaData.models.length > 0) {
+                            ollamaModel = ollamaData.models[0].name;
+                        }
+                    }
+                } catch(e) {}
+
+                if (provider === "ollama") {
+                    if (isOllamaRunning) {
+                        if (elAi) {
+                            elAi.textContent = `🟢 正常動作中 (Ollama: ${ollamaModel || "ローカルLLM"})`;
+                            elAi.style.color = "#00e676";
+                        }
+                    } else {
+                        if (elAi) {
+                            elAi.textContent = "🔴 停止中 (Ollamaを起動してください)";
+                            elAi.style.color = "#ff7675";
+                        }
+                    }
+                } else if (provider === "openai") {
+                    if (apiKey.trim()) {
+                        if (elAi) {
+                            elAi.textContent = "🟢 API設定済み (OpenAI)";
+                            elAi.style.color = "#00e676";
+                        }
+                    } else {
+                        if (elAi) {
+                            elAi.textContent = "🟡 APIキー未設定 (定型文モード)";
+                            elAi.style.color = "#ffeaa7";
+                        }
+                    }
+                } else {
+                    // Gemini or default
+                    if (apiKey.trim()) {
+                        if (elAi) {
+                            elAi.textContent = "🟢 API設定済み (Gemini)";
+                            elAi.style.color = "#00e676";
+                        }
+                    } else if (isOllamaRunning) {
+                        if (elAi) {
+                            elAi.textContent = `🟢 正常動作中 (Ollama検出: ${ollamaModel || "qwen2.5"})`;
+                            elAi.style.color = "#00e676";
+                        }
+                    } else {
+                        if (elAi) {
+                            elAi.textContent = "🟡 APIキー未設定 (定型文モード)";
+                            elAi.style.color = "#ffeaa7";
+                        }
+                    }
+                }
+            } catch(e) {
+                if (elAi) {
+                    elAi.textContent = "🟡 未設定 (定型文モード)";
+                    elAi.style.color = "#ffeaa7";
                 }
             }
 
