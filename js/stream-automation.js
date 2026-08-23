@@ -280,60 +280,49 @@ window.executeStreamEndProcess = executeStreamEndProcess;
       const nowSetup = new Date();
       const pastDiffMs = nowSetup.getTime() - targetTime.getTime();
 
-      // 既に時間を過ぎている場合
+      // 既に指定日時を過ぎている場合は、何分過ぎていても直ちに配信を開始する！
       if (pastDiffMs > 0) {
-        // 直近30分以内の遅れ（準備が少し押した場合など）は、直ちに配信を開始する！
-        if (pastDiffMs <= 30 * 60 * 1000) {
-          console.log("[Local Schedule] 指定日時を既に過ぎていますが直近のため、直ちに配信を開始します！");
-          if (localScheduleCountdown) localScheduleCountdown.textContent = "00:00:00";
-          
-          // 配信開始プロセスを直ちに実行
-          setTimeout(() => {
-            if (typeof window.ensureObsStreamingStarted === "function") {
-              window.ensureObsStreamingStarted().catch((e) => console.warn(e));
-            }
-            if (typeof window.executeOverlayClearProcess === "function") {
-              window.executeOverlayClearProcess();
-            }
-            const prepToggle = document.getElementById("preparing-mode-toggle");
-            if (prepToggle && prepToggle.checked) {
-              prepToggle.checked = false;
-              prepToggle.dispatchEvent(new Event("change"));
-            }
-            window.bgmPlayBtn = document.getElementById("bgm-play-btn");
-            if (bgmPlayBtn && typeof window.bgmBuffer !== "undefined" && window.bgmBuffer) {
-              bgmPlayBtn.click();
-            }
-            setTimeout(() => {
-              const mode = window.currentBroadcastMode || "news";
-              if (mode === "news") {
-                if (typeof window.startNewsBroadcast === "function") window.startNewsBroadcast();
-              } else if (mode === "radio") {
-                const radioBtn = document.getElementById("radio-script-play-btn");
-                if (radioBtn) radioBtn.click();
-              } else {
-                const startVoice = "定刻を過ぎておりますので、本日の配信を直ちにスタートします！";
-                if (typeof window.queueVoicevoxAudio === "function") {
-                  window.queueVoicevoxAudio(startVoice, true).catch((e) => console.warn(e));
-                }
-              }
-            }, 600);
-          }, 300);
-          return;
-        } else if (!localScheduleTime.value.includes("T") && pastDiffMs > 12 * 60 * 60 * 1000) {
-          // 時刻のみ指定で12時間以上過去の設定なら明日の設定とみなす
-          targetTime.setDate(targetTime.getDate() + 1);
-        } else {
-          // 30分以上前〜12時間未満なら停止
-          if (statusBadge) {
-            statusBadge.textContent = "⚠️ 時間経過";
-            statusBadge.style.background = "rgba(255, 153, 0, 0.2)";
-            statusBadge.style.color = "#ff9900";
-            statusBadge.style.border = "1px solid rgba(255, 153, 0, 0.4)";
-          }
-          if (localScheduleCountdown) localScheduleCountdown.textContent = "00:00:00";
-          return;
+        console.log("[Local Schedule] 指定日時を既に過ぎているため、直ちに配信を開始します！");
+        if (localScheduleCountdown) localScheduleCountdown.textContent = "00:00:00";
+        if (statusBadge) {
+          statusBadge.textContent = "🟢 開始中";
+          statusBadge.style.background = "rgba(0, 255, 102, 0.18)";
+          statusBadge.style.color = "#00ff66";
         }
+        
+        // 配信開始プロセスを直ちに実行
+        setTimeout(() => {
+          if (typeof window.ensureObsStreamingStarted === "function") {
+            window.ensureObsStreamingStarted().catch((e) => console.warn(e));
+          }
+          if (typeof window.executeOverlayClearProcess === "function") {
+            window.executeOverlayClearProcess();
+          }
+          const prepToggle = document.getElementById("preparing-mode-toggle");
+          if (prepToggle && prepToggle.checked) {
+            prepToggle.checked = false;
+            prepToggle.dispatchEvent(new Event("change"));
+          }
+          window.bgmPlayBtn = document.getElementById("bgm-play-btn");
+          if (bgmPlayBtn && typeof window.bgmBuffer !== "undefined" && window.bgmBuffer) {
+            bgmPlayBtn.click();
+          }
+          setTimeout(() => {
+            const mode = window.currentBroadcastMode || "news";
+            if (mode === "news") {
+              if (typeof window.startNewsBroadcast === "function") window.startNewsBroadcast();
+            } else if (mode === "radio") {
+              const radioBtn = document.getElementById("radio-script-play-btn");
+              if (radioBtn) radioBtn.click();
+            } else {
+              const startVoice = "定刻を過ぎておりますので、本日の配信を直ちにスタートします！";
+              if (typeof window.queueVoicevoxAudio === "function") {
+                window.queueVoicevoxAudio(startVoice, true).catch((e) => console.warn(e));
+              }
+            }
+          }, 600);
+        }, 300);
+        return;
       }
 
       localScheduleTimerId = setInterval(() => {
