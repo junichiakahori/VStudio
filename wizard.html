@@ -1544,11 +1544,6 @@
                 if (mainTitle && titleVal) mainTitle.value = titleVal;
                 if (mainDesc && descVal) mainDesc.value = descVal;
 
-                // OBSのテキストソース（配信タイトル表示等）へ自動反映
-                if (typeof openerWin.updateObsTextInputs === "function" && titleVal) {
-                    openerWin.updateObsTextInputs(titleVal);
-                }
-
                 openerWin.activeStreamSlot = wizardActiveSlot;
                 openerWin.localStorage.setItem(`savedStreamTitle_${wizardActiveSlot}`, titleVal);
                 openerWin.localStorage.setItem(`savedStreamDesc_${wizardActiveSlot}`, descVal);
