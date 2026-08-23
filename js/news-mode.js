@@ -1571,94 +1571,117 @@ ${creditsInstruction}
     const provider = providerSelect ? providerSelect.value : "gemini";
     const modelName = modelInput ? modelInput.value.trim() : "gemini-1.5-flash";
 
-    if (apiKey) {
+    if (!apiKey) {
+      console.warn("[ニュース番組] APIキーが設定されていません。AI設定を確認してください。");
+      const isZunda = ["zundamon", "zundamon_human"].includes(currentModelId);
+      const warnMsg = isZunda
+        ? "AIのAPIキーが設定されていないのだ。AI設定を確認してほしいのだ！"
+        : "AIのAPIキーが設定されていません。AI設定をご確認くださいにゃ！";
+      await queueVoicevoxAudio(warnMsg, true);
+      await waitForVoicevoxFinish();
+      return false;
+    }
+
+    const payload = {
+      title: item.title,
+      description: plainDesc,
+      categoryName: item.categoryName || "",
+      modelId: currentModelId,
+      isFirst: isFirst,
+      isCategoryChanged: isCategoryChanged,
+      apiKey: apiKey,
+      provider: provider,
+      modelName: modelName
+    };
+
+    let hasAnnouncedOutage = false;
+
+    while (newsBroadcastState.isRunning) {
+      let res = null;
       try {
-        const payload = {
-          title: item.title,
-          description: plainDesc,
-          categoryName: item.categoryName || "",
-          modelId: currentModelId,
-          isFirst: isFirst,
-          isCategoryChanged: isCategoryChanged,
-          apiKey: apiKey,
-          provider: provider,
-          modelName: modelName
-        };
+        res = await fetch("/api/news/generate_item_script", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      } catch (netErr) {
+        console.warn("[ニュース番組] 通信エラー検知 (Local API / Network):", netErr);
+      }
 
-        let res = null;
-        for (let retry = 0; retry < 3; retry++) {
-          try {
-            res = await fetch("/api/news/generate_item_script", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload)
-            });
-            if (res.ok) break;
-          } catch (netErr) {
-            console.warn(`[ニュース番組] 接続試行 ${retry + 1}/3 失敗:`, netErr);
-            await new Promise(r => setTimeout(r, 1000));
-          }
-        }
+      if (res && res.ok) {
+        try {
+          const data = await res.json();
+          if (data && (data.items || data.sentences)) {
+            // テロップを最新ニュースに戻す
+            if (newsTitleEl) newsTitleEl.textContent = item.title;
+            if (newsDescEl) newsDescEl.textContent = plainDesc;
+            if (newsBoardEl) newsBoardEl.classList.add("active");
 
-        let data = null;
-        if (!res || !res.ok) {
-          console.warn("[ニュース番組] 通信切断を検知: 復旧待機モード（しばらくお待ちください）に移行します");
-          if (newsArticleTitleEl) newsArticleTitleEl.textContent = "📡 通信状況を確認中...";
-          if (newsArticleDescEl) newsArticleDescEl.textContent = "原稿サーバーまたはネットワークの復旧を待機しています。しばらくお待ちください...";
-          
-          const isZunda = (currentModelId in ["zundamon", "zundamon_human"]);
-          const isCat = (currentModelId in ["tororo", "hijiki"]);
-          const waitMsg = isZunda
-            ? "電波の状況を確認中なのだ。復旧までしばらくお待ちくださいなのだ！"
-            : (isCat ? "電波の状況を確認中ですにゃ。復旧までしばらくお待ちくださいにゃ！" : "通信状況を確認中です。復旧までしばらくお待ちください。");
-          
-          await queueVoicevoxAudio(waitMsg, true);
-          await waitForVoicevoxFinish();
-
-          // ネットワークまたはサーバーが復旧するまで待機（3秒ごとに再接続試行）
-          while (newsBroadcastState.isRunning && (!res || !res.ok)) {
-            await new Promise(r => setTimeout(r, 3000));
-            if (!newsBroadcastState.isRunning) break;
-            try {
-              res = await fetch("/api/news/generate_item_script", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-              });
-              if (res.ok) {
-                console.log("[ニュース番組] 🌐 ネットワーク・サーバーの復旧を確認しました！ニュース読みを再開します。");
-                break;
-              }
-            } catch (retryErr) {
-              console.warn("[ニュース番組] 復旧待機中 (再試行中)...");
-            }
-          }
-        }
-
-        if (res && res.ok && newsBroadcastState.isRunning) {
-          data = await res.json();
-          if (data && newsBroadcastState.isRunning) {
             const count = (data.items || data.sentences || []).length;
             console.log(`[ニュース原稿(Backend)] 「${data.fullText}」 (${count}文)`);
             if (data.items && data.items.length > 0) {
               for (const it of data.items) {
-                if (!newsBroadcastState.isRunning) break;
+                if (!newsBroadcastState.isRunning) return false;
                 await queueVoicevoxAudio(it.display, true, it.speech);
               }
             } else if (data.sentences) {
               for (const s of data.sentences) {
-                if (!newsBroadcastState.isRunning) break;
+                if (!newsBroadcastState.isRunning) return false;
                 await queueVoicevoxAudio(s, true);
               }
             }
-            // ▼▼▼ VOICEVOXの読み上げが完全に終わるまで待機 ▼▼▼
+            // VOICEVOXの読み上げが完全に終わるまで待機
             await waitForVoicevoxFinish();
+
+            // 既読マーク
+            readNewsTitles.add(item.title);
+            if (window.readNewsTitles) window.readNewsTitles.add(item.title);
+            try { localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles))); } catch (e) { }
+            if (typeof window.updateNewsListPopup === "function") {
+              window.updateNewsListPopup();
+            }
+            return true; // 正常読み上げ完了！
           }
+        } catch (jsonErr) {
+          console.warn("[ニュース番組] JSONパースエラー:", jsonErr);
         }
-      } catch (e) {
-        console.warn("[ニュース番組] 読み上げエラー:", e);
       }
+
+      // ▼▼▼ サーバー未起動、502/504エラー、または通信断線時の待機＆自己修復 ▼▼▼
+      console.warn("[ニュース番組] ⚠️ 原稿サーバー未応答またはエラー検知。復旧待機＆サーバー自動再起動を試行中...");
+
+      // 1. テロップを待機画面へ切り替え
+      const newsArticleTitleEl = document.getElementById("news-article-title");
+      const newsArticleDescEl = document.getElementById("news-article-desc");
+      if (newsArticleTitleEl) newsArticleTitleEl.textContent = "📡 通信状況を確認中...";
+      if (newsArticleDescEl) newsArticleDescEl.textContent = "原稿サーバーまたはネットワークの復旧を待機しています。しばらくお待ちください...";
+
+      // 2. 待機アナウンス（初回のみ発話）
+      if (!hasAnnouncedOutage) {
+        hasAnnouncedOutage = true;
+        const isZunda = ["zundamon", "zundamon_human"].includes(currentModelId);
+        const isCat = ["tororo", "hijiki"].includes(currentModelId);
+        const waitMsg = isZunda
+          ? "電波の状況を確認中なのだ。復旧までしばらくお待ちくださいなのだ！"
+          : (isCat ? "電波の状況を確認中ですにゃ。復旧までしばらくお待ちくださいにゃ！" : "通信状況を確認中です。復旧までしばらくお待ちください。");
+        
+        await queueVoicevoxAudio(waitMsg, true);
+        await waitForVoicevoxFinish();
+      }
+
+      // 3. Local APIサーバーの自動再起動を試みる (Vite Backend Manager経由)
+      try {
+        console.log("[ニュース番組] 🚀 Local APIサーバーの自動復旧(start)コマンドを送信中...");
+        await fetch("/_api/servers/local_api_server/start", { method: "POST" });
+      } catch (smErr) {
+        // 無視
+      }
+
+      // 4. 3秒待機して再試行
+      await new Promise(r => setTimeout(r, 3000));
     }
+
+    return false;
   }
 
   async function startNewsBroadcast(startIndex = 0) {
@@ -1769,7 +1792,13 @@ ${creditsInstruction}
         await new Promise(r => setTimeout(r, 600));
       }
 
-      await readOneNewsItem(item, config, isCategoryChanged, isFirst);
+      const success = await readOneNewsItem(item, config, isCategoryChanged, isFirst);
+      if (!success && newsBroadcastState.isRunning) {
+        console.warn(`[ニュース番組] 記事(#${i + 1})の読み上げが未完了のため、スキップせず同じ記事を再試行します。`);
+        i--;
+        await new Promise(r => setTimeout(r, 2000));
+        continue;
+      }
       if (!newsBroadcastState.isRunning) break;
     }
 
