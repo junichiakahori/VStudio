@@ -83,7 +83,26 @@ export function adjustIdlePhraseForModel(phrase, modelId) {
 
 export async function callAI(prompt, apiKey, provider, pureText=false, maxTokens=null) {
     try {
-        if (provider === 'gemini') {
+        if (provider === 'ollama') {
+            const aiModelInput = document.getElementById('ai-model-input');
+            const targetModel = (aiModelInput && aiModelInput.value.trim()) || 'qwen2.5:7b';
+            const sysInst = pureText ? "あなたは配信者です。出力はあなたの発言内容のみ（余計な説明や括弧書き、絵文字は不要）としてください。\n\n" : "";
+            const res = await fetch('http://localhost:11434/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: targetModel,
+                    prompt: sysInst + prompt,
+                    stream: false
+                })
+            });
+            const json = await res.json();
+            if (res.ok && json.response) {
+                const rawText = json.response.trim();
+                const hasMultipleLines = rawText.includes('\n');
+                return hasMultipleLines ? rawText : rawText.replace(/[\r\n]+/g, ' ');
+            }
+        } else if (provider === 'gemini') {
             const aiModelInput = document.getElementById('ai-model-input');
             const targetModel = (aiModelInput && aiModelInput.value.trim()) || 'gemini-1.5-flash';
             const sysInst = pureText ? "あなたは配信者です。出力はあなたの発言内容のみ（余計な説明や括弧書き、絵文字は不要）としてください。" : "";
