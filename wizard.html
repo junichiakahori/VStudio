@@ -402,8 +402,9 @@
                     <div style="display:flex; gap:6px; margin-bottom: 8px; align-items:center;">
                         <label style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap;">公開設定:</label>
                         <select id="wizard-privacy-status" style="flex:1; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.2); border-radius:4px; padding:4px 8px; color:#fff; font-size:0.75rem; outline:none;">
-                            <option value="unlisted" selected>🔒 限定公開 (推奨・テスト用)</option>
+                            <option value="keep" selected>維持（既存枠の公開設定を変更しない）</option>
                             <option value="public">🌐 公開 (一般リスナー向け)</option>
+                            <option value="unlisted">🔒 限定公開 (推奨・テスト用)</option>
                             <option value="private">👁️ 非公開 (自分のみ)</option>
                         </select>
                     </div>
@@ -2346,6 +2347,14 @@
                             const mainYt = openerWin.document.getElementById("youtube-video-input");
                             if (mainYt) mainYt.value = item.id;
                             openerWin.localStorage.setItem("savedYoutubeVideoId", item.id);
+                        }
+                    }
+                    const privSelect = document.getElementById("wizard-privacy-status");
+                    if (privSelect) {
+                        if (item.privacyStatus && (item.privacyStatus === "public" || item.privacyStatus === "unlisted" || item.privacyStatus === "private")) {
+                            privSelect.value = item.privacyStatus;
+                        } else {
+                            privSelect.value = "keep";
                         }
                     }
                     fetchYoutubeVideoInfo(item.id);
