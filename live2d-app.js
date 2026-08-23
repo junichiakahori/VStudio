@@ -32,24 +32,9 @@ if (import.meta.hot) {
     console.log("[HMR] ui_features.js updated - rebinding UI events...");
     if (window.__rebindUI) window.__rebindUI();
   });
-  // ui_panel.html が変更されたとき、古いUIを破棄して新しいUIを注入し、再バインドする
+  // ui_panel.html が変更されたとき（配信中は絶対リロード禁止）
   import.meta.hot.accept("./ui_panel.html?raw", (newHtmlModule) => {
-    if (newHtmlModule) {
-      console.log("[HMR] ui_panel.html updated!");
-      const container = document.querySelector(".app-container");
-      // Remove old UI elements
-      document.getElementById("control-panel")?.remove();
-      document.getElementById("toast-container")?.remove();
-      document.querySelectorAll(".modal-overlay").forEach((el) => el.remove());
-
-      // Inject new UI
-      container.insertAdjacentHTML("beforeend", newHtmlModule.default);
-
-      // DOMが新しくなったため変数の参照が切れる（let/constで定義されているDOM変数）。
-      // そのためフルリロードにフォールバックさせるのが最も安全です。
-      console.log("[HMR] Forcing full reload due to HTML change...");
-      window.location.reload();
-    }
+    console.log("[HMR] ui_panel.html updated (配信中断防止のため自動リロードは行いません)");
   });
 }
 

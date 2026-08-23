@@ -138,9 +138,23 @@
     }
   });
 
+  // 配信中判定ヘルパー
+  function isStreamingActive() {
+    return (
+      (window.newsBroadcastState && window.newsBroadcastState.isRunning) ||
+      (window.radioBroadcastState && window.radioBroadcastState.isRunning) ||
+      (typeof window.obsIsStreaming !== "undefined" && window.obsIsStreaming)
+    );
+  }
+
   // 定期的な自動ホットリロードシグナル確認（ローカル開発時の自動反映用）
   let lastSignalTime = 0;
   async function pollHotReloadSignal() {
+    // 配信中は絶対に自動リロード・自動反映を行わない
+    if (isStreamingActive()) {
+      return;
+    }
+
     try {
       const res = await fetch("/hot_reload_signal", { method: "GET" });
       if (res.ok) {
