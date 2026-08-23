@@ -395,9 +395,14 @@
                                 📝 既存枠の情報を更新
                             </button>
                         </div>
-                        <button type="button" id="btn-api-upload-thumbnail" class="btn" style="width:100%; background: rgba(0, 210, 211, 0.15); border: 1px solid #00d2d3; color: #00d2d3; font-size: 0.75rem; font-weight: bold; padding: 6px 10px; border-radius: 4px; cursor: pointer; transition: all 0.2s;">
-                            🖼️ 現在のサムネイルをYouTubeに自動アップロード
-                        </button>
+                        <div style="display:flex; gap:6px;">
+                            <button type="button" id="btn-wizard-open-thumb-editor" class="btn" style="flex:1; background: rgba(0, 210, 211, 0.15); border: 1px solid #00d2d3; color: #00d2d3; font-size: 0.75rem; font-weight: bold; padding: 6px 10px; border-radius: 4px; cursor: pointer; transition: all 0.2s; white-space: nowrap;">
+                                🎨 サムネイルを編集
+                            </button>
+                            <button type="button" id="btn-api-upload-thumbnail" class="btn" style="flex:1; background: linear-gradient(135deg, #0984e3, #00cec9); color: #fff; border: none; font-size: 0.75rem; font-weight: bold; padding: 6px 10px; border-radius: 4px; cursor: pointer; transition: all 0.2s; white-space: nowrap;">
+                                🖼️ YouTubeにサムネ反映
+                            </button>
+                        </div>
                     </div>
                     <div id="yt-api-feedback-msg" style="display:none; margin-top:6px; font-size:0.75rem; padding:5px 8px; border-radius:4px;"></div>
                 </div>
@@ -1747,6 +1752,19 @@
             }
         });
 
+        // 🎨 ウィザードからサムネイルエディタを開く
+        document.getElementById("btn-wizard-open-thumb-editor")?.addEventListener("click", () => {
+            if (openerWin) {
+                if (typeof openerWin.openThumbnailEditorModal === "function") {
+                    openerWin.openThumbnailEditorModal();
+                } else {
+                    const btn = openerWin.document.getElementById("open-thumb-editor-btn");
+                    if (btn) btn.click();
+                }
+                openerWin.focus();
+            }
+        });
+
         // 🖼️ 現在のサムネイルをYouTubeに自動アップロード
         document.getElementById("btn-api-upload-thumbnail")?.addEventListener("click", async () => {
             const rawYt = document.getElementById("wizard-yt-input")?.value.trim() || "";
@@ -1758,23 +1776,40 @@
                 return;
             }
 
-            // メイン画面のサムネイルCanvasから画像データを取得
+            const btn = document.getElementById("btn-api-upload-thumbnail");
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = "⏳ 画像生成中...";
+            }
+
+            // メイン画面のサムネイル生成関数またはCanvasから画像データを自動取得
             let imageData = null;
             if (openerWin) {
-                const canvas = openerWin.document.getElementById("thumb-canvas");
-                if (canvas && typeof canvas.toDataURL === "function") {
-                    imageData = canvas.toDataURL("image/png");
+                if (typeof openerWin.generateThumbnailDataUrl === "function") {
+                    try {
+                        imageData = await openerWin.generateThumbnailDataUrl();
+                    } catch (e) {
+                        console.warn("サムネ自動生成失敗:", e);
+                    }
+                }
+                if (!imageData) {
+                    const canvas = openerWin.document.getElementById("thumb-preview-canvas") || openerWin.document.getElementById("thumb-canvas");
+                    if (canvas && typeof canvas.toDataURL === "function") {
+                        imageData = canvas.toDataURL("image/png");
+                    }
                 }
             }
 
             if (!imageData) {
-                showYtApiFeedback("⚠️ サムネイル画像が生成されていません。メイン画面の「サムネイルエディタ」で作成してください。", false);
+                showYtApiFeedback("⚠️ サムネイル画像を自動生成できませんでした。「🎨 サムネイルを編集」ボタンを押してご確認ください。", false);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = "🖼️ YouTubeにサムネ反映";
+                }
                 return;
             }
 
-            const btn = document.getElementById("btn-api-upload-thumbnail");
             if (btn) {
-                btn.disabled = true;
                 btn.textContent = "⏳ アップロード中...";
             }
             showYtApiFeedback("🖼️ サムネイル画像をYouTubeに送信中...", true, true);

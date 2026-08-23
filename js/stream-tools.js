@@ -689,31 +689,49 @@
     }
   };
 
+  window.openThumbnailEditorModal = function () {
+    if (thumbEditorModal) thumbEditorModal.style.display = "flex";
+
+    window.thumbFilenameInput = document.getElementById("thumb-filename-input");
+    if (
+      thumbFilenameInput &&
+      (!thumbFilenameInput.value || thumbFilenameInput.value === "thumbnail")
+    ) {
+      const now = new Date();
+      const yyyymmdd =
+        String(now.getFullYear()) +
+        String(now.getMonth() + 1).padStart(2, "0") +
+        String(now.getDate()).padStart(2, "0");
+      const title =
+        streamTitleInput && streamTitleInput.value.trim()
+          ? streamTitleInput.value.trim()
+          : "サムネ";
+      thumbFilenameInput.value = `${yyyymmdd}_${title}`;
+    }
+
+    if (thumbEditTitle && streamTitleInput && !thumbEditTitle.value) {
+      thumbEditTitle.value = streamTitleInput.value;
+    }
+
+    captureAvatarFrame();
+    drawThumbPreview();
+  };
+
+  window.generateThumbnailDataUrl = async function () {
+    if (thumbEditTitle && streamTitleInput) {
+      thumbEditTitle.value = streamTitleInput.value;
+    }
+    captureAvatarFrame();
+    await drawThumbPreview();
+    if (thumbPreviewCanvas && typeof thumbPreviewCanvas.toDataURL === "function") {
+      return thumbPreviewCanvas.toDataURL("image/png");
+    }
+    return null;
+  };
+
   if (openThumbEditorBtn) {
     openThumbEditorBtn.addEventListener("click", () => {
-      if (thumbEditorModal) thumbEditorModal.style.display = "flex";
-
-      window.thumbFilenameInput = document.getElementById(
-        "thumb-filename-input",
-      );
-      if (
-        thumbFilenameInput &&
-        (!thumbFilenameInput.value || thumbFilenameInput.value === "thumbnail")
-      ) {
-        const now = new Date();
-        const yyyymmdd =
-          String(now.getFullYear()) +
-          String(now.getMonth() + 1).padStart(2, "0") +
-          String(now.getDate()).padStart(2, "0");
-        const title =
-          streamTitleInput && streamTitleInput.value.trim()
-            ? streamTitleInput.value.trim()
-            : "サムネ";
-        thumbFilenameInput.value = `${yyyymmdd}_${title}`;
-      }
-
-      captureAvatarFrame(); // 初回表示時に今のポーズを取得
-      drawThumbPreview();
+      window.openThumbnailEditorModal();
     });
   }
 
