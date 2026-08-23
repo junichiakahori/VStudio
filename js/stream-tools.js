@@ -6,18 +6,133 @@
   window.streamDescInput = document.getElementById("stream-description");
   window.generateThumbBtn = document.getElementById("generate-thumb-btn");
 
+  const slotMorningBtn = document.getElementById("stream-slot-morning-btn");
+  const slotEveningBtn = document.getElementById("stream-slot-evening-btn");
+  const slotTemplateBtn = document.getElementById("stream-title-template-btn");
+
+  const currentHour = new Date().getHours();
+  const autoDefaultSlot = currentHour >= 4 && currentHour < 12 ? "morning" : "evening";
+  let activeStreamSlot = localStorage.getItem("savedStreamSlot") || autoDefaultSlot;
+  window.activeStreamSlot = activeStreamSlot;
+
+  const jpNames = { hiyori: "ひより", akari: "あかり", hijiki: "ひじき", tororo: "とろろ", wanko: "わんこ" };
+  const getCharName = () => (typeof currentModelId !== "undefined" && jpNames[currentModelId] ? jpNames[currentModelId] : "VTuber");
+
+  const defaultTemplates = {
+    morning: {
+      title: () => `【朝の生放送】今日の最新ニュース速報＆注目トピックまとめ！☀️【${getCharName()} / VTuber】`,
+      desc: () => `出勤・通学前にサクッとチェック！今日の最新ニュースと注目トピックを元気にお届けします☀️\n\nお気軽にコメントしていってくださいにゃ！`
+    },
+    evening: {
+      title: () => `【夜の生放送】今日1日の重要ニュースを総ざらい！今夜のまとめ生配信🌙【${getCharName()} / VTuber】`,
+      desc: () => `今日1日お疲れ様でした！今日起きた重要ニュースや話題のトピックを総ざらいでお届けします🌙\n\n一日の終わりにゆっくり聴いていってくださいにゃ！`
+    }
+  };
+
+  function updateSlotUI() {
+    window.activeStreamSlot = activeStreamSlot;
+    localStorage.setItem("savedStreamSlot", activeStreamSlot);
+
+    if (slotMorningBtn && slotEveningBtn) {
+      if (activeStreamSlot === "morning") {
+        slotMorningBtn.style.background = "rgba(255,180,0,0.25)";
+        slotMorningBtn.style.borderColor = "#ffb400";
+        slotMorningBtn.style.color = "#ffb400";
+        slotEveningBtn.style.background = "rgba(255,255,255,0.05)";
+        slotEveningBtn.style.borderColor = "rgba(255,255,255,0.15)";
+        slotEveningBtn.style.color = "var(--text-muted)";
+      } else {
+        slotMorningBtn.style.background = "rgba(255,255,255,0.05)";
+        slotMorningBtn.style.borderColor = "rgba(255,255,255,0.15)";
+        slotMorningBtn.style.color = "var(--text-muted)";
+        slotEveningBtn.style.background = "rgba(108,92,231,0.25)";
+        slotEveningBtn.style.borderColor = "#a29bfe";
+        slotEveningBtn.style.color = "#a29bfe";
+      }
+    }
+  }
+
+  function loadSlotContent(slot) {
+    activeStreamSlot = slot;
+    updateSlotUI();
+
+    const savedTitle = localStorage.getItem(`savedStreamTitle_${slot}`);
+    const savedDesc = localStorage.getItem(`savedStreamDesc_${slot}`);
+
+    if (streamTitleInput) {
+      streamTitleInput.value = savedTitle !== null ? savedTitle : defaultTemplates[slot].title();
+      localStorage.setItem(`savedStreamTitle_${slot}`, streamTitleInput.value);
+      localStorage.setItem("savedStreamTitle", streamTitleInput.value);
+    }
+    if (streamDescInput) {
+      streamDescInput.value = savedDesc !== null ? savedDesc : defaultTemplates[slot].desc();
+      localStorage.setItem(`savedStreamDesc_${slot}`, streamDescInput.value);
+      localStorage.setItem("savedStreamDesc", streamDescInput.value);
+      window.ytDescTextarea = document.getElementById("yt-desc-textarea");
+      if (ytDescTextarea) {
+        ytDescTextarea.value = streamDescInput.value;
+        window.charcount = document.getElementById("yt-desc-charcount");
+        if (charcount) charcount.textContent = `${ytDescTextarea.value.length}文字`;
+      }
+    }
+  }
+
+  if (slotMorningBtn) {
+    slotMorningBtn.addEventListener("click", () => {
+      if (activeStreamSlot !== "morning") {
+        // 保存してから切替
+        if (streamTitleInput) localStorage.setItem(`savedStreamTitle_${activeStreamSlot}`, streamTitleInput.value);
+        if (streamDescInput) localStorage.setItem(`savedStreamDesc_${activeStreamSlot}`, streamDescInput.value);
+        loadSlotContent("morning");
+      }
+    });
+  }
+
+  if (slotEveningBtn) {
+    slotEveningBtn.addEventListener("click", () => {
+      if (activeStreamSlot !== "evening") {
+        // 保存してから切替
+        if (streamTitleInput) localStorage.setItem(`savedStreamTitle_${activeStreamSlot}`, streamTitleInput.value);
+        if (streamDescInput) localStorage.setItem(`savedStreamDesc_${activeStreamSlot}`, streamDescInput.value);
+        loadSlotContent("evening");
+      }
+    });
+  }
+
+  if (slotTemplateBtn) {
+    slotTemplateBtn.addEventListener("click", () => {
+      const template = defaultTemplates[activeStreamSlot];
+      if (streamTitleInput) {
+        streamTitleInput.value = template.title();
+        localStorage.setItem(`savedStreamTitle_${activeStreamSlot}`, streamTitleInput.value);
+        localStorage.setItem("savedStreamTitle", streamTitleInput.value);
+      }
+      if (streamDescInput) {
+        streamDescInput.value = template.desc();
+        localStorage.setItem(`savedStreamDesc_${activeStreamSlot}`, streamDescInput.value);
+        localStorage.setItem("savedStreamDesc", streamDescInput.value);
+        window.ytDescTextarea = document.getElementById("yt-desc-textarea");
+        if (ytDescTextarea) {
+          ytDescTextarea.value = streamDescInput.value;
+          window.charcount = document.getElementById("yt-desc-charcount");
+          if (charcount) charcount.textContent = `${ytDescTextarea.value.length}文字`;
+        }
+      }
+      slotTemplateBtn.textContent = "✅ 定番タイトルを適用しました";
+      setTimeout(() => (slotTemplateBtn.textContent = "⚡ 定番タイトルを適用"), 1500);
+    });
+  }
+
   if (streamTitleInput) {
-    const savedTitle = localStorage.getItem("savedStreamTitle");
-    if (savedTitle) streamTitleInput.value = savedTitle;
     streamTitleInput.addEventListener("input", () => {
+      localStorage.setItem(`savedStreamTitle_${activeStreamSlot}`, streamTitleInput.value);
       localStorage.setItem("savedStreamTitle", streamTitleInput.value);
     });
   }
 
   if (streamDescInput) {
-    const savedDesc = localStorage.getItem("savedStreamDesc");
-    if (savedDesc) streamDescInput.value = savedDesc;
     streamDescInput.addEventListener("input", () => {
+      localStorage.setItem(`savedStreamDesc_${activeStreamSlot}`, streamDescInput.value);
       localStorage.setItem("savedStreamDesc", streamDescInput.value);
       window.ytDescTextarea = document.getElementById("yt-desc-textarea");
       if (ytDescTextarea) {
@@ -28,6 +143,9 @@
       }
     });
   }
+
+  // 初期ロード
+  loadSlotContent(activeStreamSlot);
 
   window.aiStreamSnsInput = document.getElementById("ai-stream-sns");
   if (aiStreamSnsInput) {
@@ -663,16 +781,21 @@
   // AI生成（概要欄向け詳細文）
   if (aiGenerateYtDescBtn) {
     aiGenerateYtDescBtn.addEventListener("click", async () => {
-      const apiKey = localStorage.getItem("savedAiApiKey");
+      const apiKey = localStorage.getItem("savedAiApiKey") || "";
       const provider = localStorage.getItem("savedAiProvider") || "gemini";
       const aiModel =
         localStorage.getItem("savedAiModel") ||
-        (provider === "openai" ? "gpt-4o-mini" : "gemini-1.5-flash");
+        (provider === "openai" ? "gpt-4o-mini" : (provider === "ollama" ? "qwen2.5:7b" : "gemini-1.5-flash"));
 
-      if (!apiKey) {
+      if (!apiKey && provider !== "ollama") {
         alert("AI設定タブでAPIキーを設定してください。");
         return;
       }
+
+      const slot = window.activeStreamSlot || (new Date().getHours() >= 4 && new Date().getHours() < 12 ? "morning" : "evening");
+      const slotDescContext = slot === "morning"
+        ? "【配信時間帯】: 🌅 朝の生放送（出勤・通学前の爽やかな挨拶、今日一日の見通し、元気なトーン）"
+        : "【配信時間帯】: 🌙 夜の生放送（お仕事お疲れ様の挨拶、今日一日の振り返り・総まとめ、落ち着いたトーン）";
 
       const title = streamTitleInput ? streamTitleInput.value.trim() : "";
       const shortDesc = streamDescInput ? streamDescInput.value.trim() : "";
@@ -681,6 +804,7 @@
       const prompt = `あなたはプロのVTuber配信マネージャーです。
 以下の配信情報をもとに、YouTubeの概要欄（説明欄）に書く長文テキストを1本だけ作成してください。
 
+${slotDescContext}
 配信タイトル: ${title || "（未設定）"}
 配信テーマ: ${theme || shortDesc || "（未設定）"}
 
@@ -704,7 +828,16 @@
 
       try {
         let result = "";
-        if (provider === "openai") {
+        if (provider === "ollama") {
+          const res = await fetch("http://localhost:11434/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model: aiModel, prompt: prompt, stream: false }),
+          });
+          if (!res.ok) throw new Error("Ollama API Error");
+          const data = await res.json();
+          result = data.response;
+        } else if (provider === "openai") {
           const res = await fetch(
             "https://api.openai.com/v1/chat/completions",
             {
@@ -757,16 +890,21 @@
 
   if (aiGenerateStreamBtn) {
     aiGenerateStreamBtn.addEventListener("click", async () => {
-      const apiKey = localStorage.getItem("savedAiApiKey");
+      const apiKey = localStorage.getItem("savedAiApiKey") || "";
       const provider = localStorage.getItem("savedAiProvider") || "gemini";
       const aiModel =
         localStorage.getItem("savedAiModel") ||
-        (provider === "openai" ? "gpt-4o-mini" : "gemini-1.5-flash");
+        (provider === "openai" ? "gpt-4o-mini" : (provider === "ollama" ? "qwen2.5:7b" : "gemini-1.5-flash"));
 
-      if (!apiKey) {
+      if (!apiKey && provider !== "ollama") {
         alert("AI設定タブでAPIキーを設定してください。");
         return;
       }
+
+      const slot = window.activeStreamSlot || (new Date().getHours() >= 4 && new Date().getHours() < 12 ? "morning" : "evening");
+      const slotTitleContext = slot === "morning"
+        ? "【配信時間帯】: 🌅 朝の生放送（出勤・通学前に見たくなる爽やかなタイトル、今日一日の見通し。タイトル例: 【朝の生放送】〜☀️）"
+        : "【配信時間帯】: 🌙 夜の生放送（今日一日の総まとめ、お仕事お疲れ様の癒やし。タイトル例: 【夜の生放送】〜🌙）";
 
       const theme = aiStreamThemeInput.value.trim() || "おまかせ（今日の配信）";
       const jpNames = {
@@ -805,6 +943,8 @@
         : `5. 素材・モデルのクレジット表記（以下の内容を必ず含めてください）\n   - Live2Dモデル: 「${charName}」© Live2D Inc. (Live2D Creative Studio サンプルモデル)\n   - BGMやその他素材（ダミーで構いません）`;
 
       const prompt = `あなたはプロのVTuber配信マネージャーです。
+${slotTitleContext}
+
 ${themeContext}
 
 【概要文の要件】
@@ -826,7 +966,16 @@ ${creditsInstruction}
 
       try {
         let jsonText = "";
-        if (provider === "openai") {
+        if (provider === "ollama") {
+          const res = await fetch("http://localhost:11434/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model: aiModel, prompt: prompt, stream: false }),
+          });
+          if (!res.ok) throw new Error("Ollama API Error");
+          const data = await res.json();
+          jsonText = data.response;
+        } else if (provider === "openai") {
           const res = await fetch(
             "https://api.openai.com/v1/chat/completions",
             {

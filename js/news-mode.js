@@ -898,17 +898,22 @@ window.playNextContinuousNews = playNextContinuousNews;
         return;
       }
 
-      const apiKey = localStorage.getItem("savedAiApiKey");
+      const apiKey = localStorage.getItem("savedAiApiKey") || "";
       const provider = localStorage.getItem("savedAiProvider") || "gemini";
-      const aiModel = localStorage.getItem("savedAiModel") || (provider === "openai" ? "gpt-4o-mini" : "gemini-1.5-flash");
+      const aiModel = localStorage.getItem("savedAiModel") || (provider === "openai" ? "gpt-4o-mini" : (provider === "ollama" ? "qwen2.5:7b" : "gemini-1.5-flash"));
 
-      if (!apiKey) {
+      if (!apiKey && provider !== "ollama") {
         alert("AI設定タブでAPIキーを設定してください。");
         return;
       }
 
       const jpNames = { hiyori: "ひより", akari: "あかり", hijiki: "ひじき", tororo: "とろろ", wanko: "わんこ" };
       const charName = typeof currentModelId !== "undefined" && jpNames[currentModelId] ? jpNames[currentModelId] : "VTuber";
+
+      const slot = window.activeStreamSlot || (new Date().getHours() >= 4 && new Date().getHours() < 12 ? "morning" : "evening");
+      const slotInfo = slot === "morning"
+        ? "【配信時間帯】: 🌅 朝の生放送（出勤・通学前にサクッとチェック、爽やかで元気な挨拶、今日1日の見通し。タイトル例: 【朝の生放送】〜☀️）"
+        : "【配信時間帯】: 🌙 夜の生放送（今日1日の重要ニュース総ざらい、お仕事お疲れ様の挨拶、おやすみ前のニュースまとめ。タイトル例: 【夜の生放送】〜🌙）";
 
       const userSns = document.getElementById("ai-stream-sns")?.value.trim() || "";
       const userCredits = document.getElementById("ai-stream-credits")?.value.trim() || "";
@@ -930,6 +935,8 @@ window.playNextContinuousNews = playNextContinuousNews;
 
       const prompt = `あなたはプロのVTuber配信マネージャーです。
 本日のニュース番組配信に向けた、YouTubeの「配信タイトル」と「概要文」のセットを5通り作成してください。
+
+${slotInfo}
 
 【本日の主要ニュース（抜粋）】
 ${topNews}
@@ -953,7 +960,16 @@ ${creditsInstruction}
 
       try {
         let jsonText = "";
-        if (provider === "openai") {
+        if (provider === "ollama") {
+          const res = await fetch("http://localhost:11434/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model: aiModel, prompt: prompt, stream: false }),
+          });
+          if (!res.ok) throw new Error("Ollama API Error");
+          const data = await res.json();
+          jsonText = data.response;
+        } else if (provider === "openai") {
           const res = await fetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
