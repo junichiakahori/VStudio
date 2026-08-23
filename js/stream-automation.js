@@ -191,7 +191,9 @@ window.executeStreamEndProcess = function () {
         }, 1000);
       }
 
-      if (
+      if (typeof window.ensureObsStreamingStopped === "function") {
+        window.ensureObsStreamingStopped();
+      } else if (
         typeof isObsWsConnected !== "undefined" &&
         isObsWsConnected &&
         typeof obsWsClient !== "undefined" &&

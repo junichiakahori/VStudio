@@ -121,6 +121,16 @@ let isStartingStreamInProgress = false;
 let startStreamPromise = null;
 
 window.ensureObsStreamingStarted = async function (onProgress = null) {
+  // 未接続の場合は自動で接続を試みる
+  if (typeof isObsWsConnected === "undefined" || !isObsWsConnected) {
+    if (typeof window.toggleObsWsConnection === "function") {
+      console.log("[OBS] OBS WebSocketが未接続のため、自動接続を試みます...");
+      if (onProgress) onProgress("OBS WebSocketに自動接続中...");
+      await window.toggleObsWsConnection(true);
+      await new Promise(r => setTimeout(r, 600));
+    }
+  }
+
   if (typeof isObsWsConnected === "undefined" || !isObsWsConnected || typeof obsWsClient === "undefined" || !obsWsClient) {
     console.log("[OBS] OBS WebSocket未接続のため、配信状態チェックをスキップします。");
     return true;
@@ -178,4 +188,31 @@ window.ensureObsStreamingStarted = async function (onProgress = null) {
   })();
 
   return await startStreamPromise;
+};
+
+// OBS配信終了確認とコマンド送信
+window.ensureObsStreamingStopped = async function () {
+  if (typeof isObsWsConnected === "undefined" || !isObsWsConnected) {
+    if (typeof window.toggleObsWsConnection === "function") {
+      try {
+        await window.toggleObsWsConnection(true);
+        await new Promise(r => setTimeout(r, 400));
+      } catch (e) {}
+    }
+  }
+
+  if (typeof isObsWsConnected !== "undefined" && isObsWsConnected && typeof obsWsClient !== "undefined" && obsWsClient) {
+    console.log("[OBS] Sending StopStream command to OBS...");
+    try {
+      await obsWsClient.call("StopStream");
+      window.isObsStreaming = false;
+      console.log("[OBS] ✅ OBS配信を正常に停止しました！");
+      return true;
+    } catch (err) {
+      console.warn("[OBS] StopStream呼び出しエラー (既に停止している可能性があります):", err);
+      window.isObsStreaming = false;
+      return false;
+    }
+  }
+  return false;
 };
