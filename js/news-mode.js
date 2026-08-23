@@ -1548,6 +1548,7 @@ ${creditsInstruction}
     };
 
     let hasAnnouncedOutage = false;
+    let retryFailCount = 0;
 
     while (newsBroadcastState.isRunning) {
       if (!apiKey) {
@@ -1656,15 +1657,17 @@ ${creditsInstruction}
       }
 
       // 3. Local APIサーバーの自動再起動を試みる (Vite Backend Manager経由)
-      try {
-        console.log("[ニュース番組] 🚀 Local APIサーバーの自動復旧(start)コマンドを送信中...");
-        await fetch("/_api/servers/local_api_server/start", { method: "POST" });
-      } catch (smErr) {
-        // 無視
+      if (retryFailCount === 0) {
+        try {
+          console.log("[ニュース番組] 🚀 Local APIサーバーの自動復旧(start)コマンドを送信中...");
+          await fetch("/_api/servers/local_api_server/start", { method: "POST" });
+        } catch (smErr) {}
       }
 
-      // 4. 3秒待機して再試行
-      await new Promise(r => setTimeout(r, 3000));
+      // 4. API無駄打ち防止バックオフ待機（初回5秒、以降は20秒間隔）
+      retryFailCount++;
+      const waitTimeMs = (retryFailCount > 2) ? 20000 : 5000;
+      await new Promise(r => setTimeout(r, waitTimeMs));
     }
 
     return false;

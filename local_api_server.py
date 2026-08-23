@@ -674,9 +674,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     deduped_sentences.append(s)
                 raw_sentences = deduped_sentences if deduped_sentences else split_sentences
                 
-                # ▼▼▼ VOICEVOX カタカナ取得 ✕ Gemini 自動照合・自己補正パイプライン ▼▼▼
-                speaker_id = 1
-                final_sentences = auto_correct_phonetics_with_ai(raw_sentences, api_key, provider, model_name, speaker_id)
+                # 音声読みはローカル辞書適用済みのテキストをそのまま使用（API無駄打ちを完全排除）
+                final_sentences = [apply_backend_pronunciation_dict(s) for s in raw_sentences]
                 
                 items = []
                 for orig_s, speech_s in zip(raw_sentences, final_sentences):
@@ -752,38 +751,31 @@ def apply_backend_pronunciation_dict(text):
                     processed = processed.replace(src, dst)
     return processed
 
-def call_gemini_backend(prompt, api_key, model="gemini-3.6-flash"):
-    models_to_try = [model] if model else []
-    for default_m in ["gemini-3.6-flash", "gemini-flash-latest", "gemini-3.5-flash", "gemini-3.7-flash"]:
-        if default_m not in models_to_try:
-            models_to_try.append(default_m)
-
-    for m in models_to_try:
-        try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent"
-            headers = {
-                "Content-Type": "application/json",
-                "x-goog-api-key": api_key
-            }
-            body = {
-                "contents": [{"role": "user", "parts": [{"text": prompt}]}]
-            }
-            req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), headers=headers, method="POST")
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, context=ctx, timeout=15) as res:
-                res_json = json.loads(res.read().decode("utf-8"))
-                candidates = res_json.get("candidates", [])
-                if candidates and "content" in candidates[0] and "parts" in candidates[0]["content"]:
-                    return candidates[0]["content"]["parts"][0]["text"].strip()
-        except urllib.error.HTTPError as he:
-            err_body = he.read().decode('utf-8') if hasattr(he, 'read') else ''
-            print(f"[Gemini Backend] モデル '{m}' HTTPエラー {he.code}: {he.reason} - {err_body}", flush=True)
-            continue
-        except Exception as e:
-            print(f"[Gemini Backend] モデル '{m}' 試行エラー: {e}", flush=True)
-            continue
+def call_gemini_backend(prompt, api_key, model="gemini-1.5-flash"):
+    target_model = model or "gemini-1.5-flash"
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{target_model}:generateContent"
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key
+        }
+        body = {
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}]
+        }
+        req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), headers=headers, method="POST")
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(req, context=ctx, timeout=15) as res:
+            res_json = json.loads(res.read().decode("utf-8"))
+            candidates = res_json.get("candidates", [])
+            if candidates and "content" in candidates[0] and "parts" in candidates[0]["content"]:
+                return candidates[0]["content"]["parts"][0]["text"].strip()
+    except urllib.error.HTTPError as he:
+        err_body = he.read().decode('utf-8') if hasattr(he, 'read') else ''
+        print(f"[Gemini Backend] モデル '{target_model}' HTTPエラー {he.code}: {he.reason} - {err_body}", flush=True)
+    except Exception as e:
+        print(f"[Gemini Backend] モデル '{target_model}' 試行エラー: {e}", flush=True)
     return ""
 
 def call_openai_backend(prompt, api_key, model="gpt-4o-mini"):
