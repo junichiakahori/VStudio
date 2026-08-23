@@ -754,7 +754,7 @@ def apply_backend_pronunciation_dict(text):
 
 def call_gemini_backend(prompt, api_key, model="gemini-1.5-flash"):
     models_to_try = [model] if model else []
-    for default_m in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
+    for default_m in ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-pro"]:
         if default_m not in models_to_try:
             models_to_try.append(default_m)
 
@@ -779,10 +779,10 @@ def call_gemini_backend(prompt, api_key, model="gemini-1.5-flash"):
                     return candidates[0]["content"]["parts"][0]["text"].strip()
         except urllib.error.HTTPError as he:
             err_body = he.read().decode('utf-8') if hasattr(he, 'read') else ''
-            print(f"[Gemini Backend] モデル '{m}' HTTPエラー {he.code}: {he.reason} - {err_body}")
+            print(f"[Gemini Backend] モデル '{m}' HTTPエラー {he.code}: {he.reason} - {err_body}", flush=True)
             continue
         except Exception as e:
-            print(f"[Gemini Backend] モデル '{m}' 試行エラー: {e}")
+            print(f"[Gemini Backend] モデル '{m}' 試行エラー: {e}", flush=True)
             continue
     return ""
 
