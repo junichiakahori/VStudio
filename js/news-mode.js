@@ -368,12 +368,36 @@ ${plainDesc}`;
       categorySpanForLog.textContent = displayCatName;
     }
     console.log(`[ニュースモード] 【${displayCatName}】AIにリクエスト中...`);
-    const generatedText = await aiFeatures.callAI(
-      prompt,
-      apiKey,
-      provider,
-      true,
-    );
+
+    const modelInput = document.getElementById("ai-model-input");
+    const modelName = (modelInput ? modelInput.value.trim() : "") || localStorage.getItem("savedAiModel") || (provider === "ollama" ? "qwen2.5:7b" : "gemini-1.5-flash");
+
+    let scriptItems = [];
+    try {
+      const res = await fetch("/api/news/generate_item_script", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: item.title,
+          description: plainDesc,
+          categoryName: item.categoryName || "",
+          modelId: currentModelId,
+          isFirst: isOneOff,
+          isCategoryChanged: false,
+          apiKey: apiKey,
+          provider: provider,
+          modelName: modelName
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === "ok" && Array.isArray(data.items) && data.items.length > 0) {
+          scriptItems = data.items;
+        }
+      }
+    } catch (apiErr) {
+      console.warn("[ニュースモード] AI原稿API呼び出し失敗:", apiErr);
+    }
 
     // API待機中に配信終了画面になった場合は中断する
     if (typeof isStreamEndedState !== "undefined" && isStreamEndedState) {
@@ -385,36 +409,39 @@ ${plainDesc}`;
       return;
     }
 
-    let phraseToSpeak = generatedText;
-    if (!phraseToSpeak) {
+    if (scriptItems.length === 0) {
       console.warn("[ニュースモード] AI生成が空欄のため、フォールバック原稿を使用します");
       const isZunda = currentModelId === "zundamon" || currentModelId === "zundamon_human";
       const prefix = isOneOff ? "" : (isZunda ? "次のニュースなのだ！" : "次のニュースですにゃ！");
       const suffix = isZunda ? "なのだ。" : "にゃ。";
-      phraseToSpeak = `${prefix} ${item.title}。${plainDesc ? plainDesc.slice(0, 100) : ""}${suffix}`;
+      const fallbackText = `${prefix} ${item.title}。${plainDesc ? plainDesc.slice(0, 100) : ""}${suffix}`;
+      scriptItems = [{ display: fallbackText, speech: fallbackText }];
     }
 
-    // VOICEVOXにキュー追加
+    // 各文をVOICEVOXに順次キュー追加して再生
     setTimeout(() => {
-      phraseToSpeak = aiFeatures.adjustIdlePhraseForModel(
-        phraseToSpeak,
-        currentModelId,
-      );
       const idleFirstPerson = document.getElementById("idle-first-person");
-      if (idleFirstPerson && idleFirstPerson.value) {
-        const fp = idleFirstPerson.value;
-        phraseToSpeak = phraseToSpeak.replace(
-          /わたくし|わたし|あたし|私|ぼく|僕|おれ|俺|うち/g,
-          fp,
-        );
-      }
+      const fp = idleFirstPerson ? idleFirstPerson.value : "";
 
-      if (typeof aiChatHistory !== "undefined") {
-        aiChatHistory.push({ role: "assistant", content: phraseToSpeak });
-        if (aiChatHistory.length > 10) aiChatHistory.shift();
-      }
+      scriptItems.forEach((sItem) => {
+        let displayTxt = sItem.display || sItem.speech;
+        let speechTxt = sItem.speech || sItem.display;
 
-      queueVoicevoxAudio(phraseToSpeak, true).catch((e) => console.warn(e));
+        displayTxt = aiFeatures.adjustIdlePhraseForModel(displayTxt, currentModelId);
+        speechTxt = aiFeatures.adjustIdlePhraseForModel(speechTxt, currentModelId);
+
+        if (fp) {
+          displayTxt = displayTxt.replace(/わたくし|わたし|あたし|私|ぼく|僕|おれ|俺|うち/g, fp);
+          speechTxt = speechTxt.replace(/わたくし|わたし|あたし|私|ぼく|僕|おれ|俺|うち/g, fp);
+        }
+
+        if (typeof aiChatHistory !== "undefined") {
+          aiChatHistory.push({ role: "assistant", content: displayTxt });
+          if (aiChatHistory.length > 10) aiChatHistory.shift();
+        }
+
+        queueVoicevoxAudio(speechTxt, true, displayTxt).catch((e) => console.warn(e));
+      });
 
       // 読み上げ完了を監視
       const checkInterval = setInterval(() => {
