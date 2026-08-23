@@ -622,6 +622,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 【ニュースタイトル】: {title}
 【概要】: {description}"""
 
+                print(f"[generate_item_script] タイトル: {title[:20]}..., APIキー文字数: {len(api_key)}, provider: {provider}, model: {model_name}")
                 raw_text = ""
                 if api_key:
                     try:
@@ -776,6 +777,10 @@ def call_gemini_backend(prompt, api_key, model="gemini-1.5-flash"):
                 candidates = res_json.get("candidates", [])
                 if candidates and "content" in candidates[0] and "parts" in candidates[0]["content"]:
                     return candidates[0]["content"]["parts"][0]["text"].strip()
+        except urllib.error.HTTPError as he:
+            err_body = he.read().decode('utf-8') if hasattr(he, 'read') else ''
+            print(f"[Gemini Backend] モデル '{m}' HTTPエラー {he.code}: {he.reason} - {err_body}")
+            continue
         except Exception as e:
             print(f"[Gemini Backend] モデル '{m}' 試行エラー: {e}")
             continue
