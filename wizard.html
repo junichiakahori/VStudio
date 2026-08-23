@@ -766,6 +766,17 @@
             const selectedCat = catSelect ? catSelect.value : "cat_all";
             const maxCount = countSelect ? parseInt(countSelect.value, 10) : 3;
 
+            if (openerWin) {
+                const mainCat = openerWin.document.getElementById("news-rss-select");
+                if (mainCat && catSelect) mainCat.value = catSelect.value;
+                const mainCount = openerWin.document.getElementById("news-count-select");
+                if (mainCount && countSelect) mainCount.value = countSelect.value;
+                const mainStart = openerWin.document.getElementById("news-date-start");
+                if (mainStart && startDate) mainStart.value = startDate;
+                const mainEnd = openerWin.document.getElementById("news-date-end");
+                if (mainEnd && endDate) mainEnd.value = endDate;
+            }
+
             btn.disabled = true;
             btn.textContent = "⏳ 取得中...";
             
@@ -1294,6 +1305,14 @@
         // 配信開始
         document.getElementById("nav-finish-btn").addEventListener("click", async () => {
             if (openerWin) {
+                // 0. タイトル・概要欄のメイン画面への同期
+                const titleVal = document.getElementById("wizard-suggested-title")?.value || "";
+                const descVal = document.getElementById("wizard-suggested-desc")?.value || "";
+                const mainTitle = openerWin.document.getElementById("stream-title");
+                const mainDesc = openerWin.document.getElementById("stream-description");
+                if (mainTitle && titleVal) mainTitle.value = titleVal;
+                if (mainDesc && descVal) mainDesc.value = descVal;
+
                 // 1. YouTube枠ID
                 const ytVal = document.getElementById("wizard-yt-input").value.trim();
                 const mainYt = openerWin.document.getElementById("youtube-video-input");
@@ -1358,7 +1377,58 @@
                     }
                 }
 
-                // 4. 配信種別に応じた番組スタート（即時開始の場合のみ直ちに実行）
+                // 4. メイン画面のUIタブ・番組コントロール・トグルを完全同期
+                if (selectedMode === "news") {
+                    // 配信/OBSタブに切り替え
+                    const streamTabBtn = openerWin.document.querySelector('.tab-btn[data-target="tab-stream"]');
+                    if (streamTabBtn) streamTabBtn.click();
+
+                    // 「OBS配信を同時に開始する」トグルをONにしてUI反映
+                    const mainNewsObsToggle = openerWin.document.getElementById("news-obs-auto-stream-toggle");
+                    if (mainNewsObsToggle) {
+                        mainNewsObsToggle.checked = true;
+                        mainNewsObsToggle.dispatchEvent(new Event("change"));
+                    }
+
+                    // 開始件数を第1件目(#1)に同期
+                    const mainNewsStartIdx = openerWin.document.getElementById("news-broadcast-start-index");
+                    if (mainNewsStartIdx) {
+                        mainNewsStartIdx.value = 1;
+                    }
+
+                    // ラジオモードはOFFにする
+                    const mainRadioToggle = openerWin.document.getElementById("ai-radio-mode-toggle");
+                    if (mainRadioToggle && mainRadioToggle.checked) {
+                        mainRadioToggle.checked = false;
+                        mainRadioToggle.dispatchEvent(new Event("change"));
+                    }
+                } else if (selectedMode === "radio") {
+                    // 配信/OBSタブに切り替え
+                    const streamTabBtn = openerWin.document.querySelector('.tab-btn[data-target="tab-stream"]');
+                    if (streamTabBtn) streamTabBtn.click();
+
+                    // ラジオモードトグルをONにしてUI反映
+                    const mainRadioToggle = openerWin.document.getElementById("ai-radio-mode-toggle");
+                    if (mainRadioToggle) {
+                        mainRadioToggle.checked = true;
+                        mainRadioToggle.dispatchEvent(new Event("change"));
+                    }
+
+                    // 開始行数を第1行目(#1)に同期
+                    const mainRadioStartLine = openerWin.document.getElementById("radio-script-start-line");
+                    if (mainRadioStartLine) {
+                        mainRadioStartLine.value = 1;
+                    }
+                } else {
+                    // 雑談配信
+                    const mainRadioToggle = openerWin.document.getElementById("ai-radio-mode-toggle");
+                    if (mainRadioToggle && mainRadioToggle.checked) {
+                        mainRadioToggle.checked = false;
+                        mainRadioToggle.dispatchEvent(new Event("change"));
+                    }
+                }
+
+                // 5. 配信種別に応じた番組スタート（即時開始の場合のみ直ちに実行）
                 if (!startToggleVal) {
                     // OBS配信開始（OBS WebSocket接続時）
                     if (typeof openerWin.ensureObsStreamingStarted === "function") {
