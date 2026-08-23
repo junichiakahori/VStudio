@@ -618,6 +618,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 4. **自然な日本語表記**: 字幕用として読みやすい自然な日本語（漢字・ひらがな・カタカナ）で表記してください。
 5. **前置き挨拶の重複禁止**: {transition}は冒頭に1度だけ発話し、2文目以降に「次のニュースです」「続いてのニュース」などの前置きを絶対に重複させないこと。
 6. **余計な注釈の禁止**: セリフ以外の前置きや解説（「」「（）」等）は出力せず、発話するセリフのみを出力してください。
+7. **誤読しやすい言葉の平仮名化**: 音声合成が誤読しやすい漢字（例: 辛い→つらい、焦る→あせる、お家→おうち、何事→なにごと、〜件→〜けん、一日中→いちにちじゅう等）は最初から自然な平仮名で表記してください。
 
 【ニュースタイトル】: {title}
 【概要】: {description}"""
@@ -843,81 +844,6 @@ def save_learned_pronunciations(new_words):
                 json.dump(existing, f, ensure_ascii=False, indent=4)
     except Exception as e:
         print(f"[辞書自動保存エラー]: {e}")
-
-def auto_correct_phonetics_with_ai(sentences, api_key, provider='gemini', model_name='gemini-1.5-flash', speaker_id=1):
-    """
-    各文についてVOICEVOXのカタカナ読みを取得し、
-    Geminiに照合させて誤読がある単語のみを平仮名表記にピンポイント補正する。
-    """
-    if not sentences or not api_key:
-        return sentences
-
-    try:
-        items_to_check = []
-        for i, s in enumerate(sentences):
-            applied_s = apply_backend_pronunciation_dict(s)
-            kana = get_voicevox_kana(applied_s, speaker_id)
-            items_to_check.append({
-                "index": i,
-                "original": s,
-                "applied": applied_s,
-                "kana": kana
-            })
-
-        lines_str = "\n".join([f"{item['index'] + 1}. 【文】: {item['applied']}\n   【VOICEVOXの読み（カタカナ）】: {item['kana']}" for item in items_to_check])
-
-        prompt = f"""あなたは日本語音声合成の校正エキスパートです。
-以下はニュース原稿の各文と、VOICEVOX（音声合成エンジン）が判定したカタカナの読みです。
-文脈に照らし合わせて、VOICEVOXが誤読・不自然な読み（例: 焦る→コゲル、お家→オイエ、何事も→ナニコトモ、辛い→カライ/ツライの誤判定等）をしている箇所を特定してください。
-
-【出力ルール】:
-1. 誤読がある文については、VOICEVOXが100%正しい発音で読めるよう、【誤読単語のみを自然な平仮名に置換した修正後テキスト】を出力してください。
-2. 誤読がない文については、元のテキストをそのまま出力してください。
-3. 元の文章の意味、助詞、語尾、単語を勝手に変更・削除・追加しないでください（誤読漢字の平仮名化のみ許可）。
-4. 必ず以下のJSONフォーマットのみを出力してください（Markdownコードブロック ```json も不要です）:
-{{
-  "corrections": [
-    {{"index": 0, "corrected": "修正後（または元）のテキスト", "learned_words": {{"誤読漢字": "正しいひらがな"}}}},
-    ...
-  ]
-}}
-
-【検査対象】:
-{lines_str}"""
-
-        if provider == 'openai':
-            raw_res = call_openai_backend(prompt, api_key, model_name or "gpt-4o-mini")
-        else:
-            raw_res = call_gemini_backend(prompt, api_key, model_name or "gemini-1.5-flash")
-
-        clean_json_str = re.sub(r'^```(?:json)?\s*', '', raw_res.strip(), flags=re.IGNORECASE)
-        clean_json_str = re.sub(r'\s*```$', '', clean_json_str).strip()
-        result_data = json.loads(clean_json_str)
-
-        corrected_sentences = list(sentences)
-        new_learned_dict = {}
-
-        for entry in result_data.get('corrections', []):
-            idx = entry.get('index', -1)
-            corr_text = entry.get('corrected', '').strip()
-            if 0 <= idx < len(corrected_sentences) and corr_text:
-                if corrected_sentences[idx] != corr_text:
-                    print(f"[AI自動校正] 補正前: '{corrected_sentences[idx]}' -> 補正後: '{corr_text}'")
-                corrected_sentences[idx] = corr_text
-
-            learned = entry.get('learned_words', {})
-            if isinstance(learned, dict):
-                for k, v in learned.items():
-                    if k and v and k != v:
-                        new_learned_dict[k] = v
-
-        if new_learned_dict:
-            save_learned_pronunciations(new_learned_dict)
-
-        return corrected_sentences
-    except Exception as e:
-        print(f"[AI Phonetic Correction Error]: {e}")
-        return sentences
 
 def synthesize_voicevox_backend(text, speaker_id=1, speed=1.0, pitch=0.0):
     import urllib.parse
