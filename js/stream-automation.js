@@ -268,10 +268,14 @@ window.executeStreamEndProcess = executeStreamEndProcess;
       localScheduleTime &&
       localScheduleTime.value
     ) {
-      const [hours, minutes] = localScheduleTime.value.split(":").map(Number);
-
-      let targetTime = new Date();
-      targetTime.setHours(hours, minutes, 0, 0);
+      let targetTime;
+      if (localScheduleTime.value.includes("T")) {
+        targetTime = new Date(localScheduleTime.value);
+      } else {
+        const [hours, minutes] = localScheduleTime.value.split(":").map(Number);
+        targetTime = new Date();
+        targetTime.setHours(hours, minutes, 0, 0);
+      }
 
       const nowSetup = new Date();
       const pastDiffMs = nowSetup.getTime() - targetTime.getTime();
@@ -280,7 +284,7 @@ window.executeStreamEndProcess = executeStreamEndProcess;
       if (pastDiffMs > 0) {
         // 直近30分以内の遅れ（準備が少し押した場合など）は、直ちに配信を開始する！
         if (pastDiffMs <= 30 * 60 * 1000) {
-          console.log("[Local Schedule] 指定時刻を既に過ぎていますが直近のため、直ちに配信を開始します！");
+          console.log("[Local Schedule] 指定日時を既に過ぎていますが直近のため、直ちに配信を開始します！");
           if (localScheduleCountdown) localScheduleCountdown.textContent = "00:00:00";
           
           // 配信開始プロセスを直ちに実行
@@ -316,8 +320,8 @@ window.executeStreamEndProcess = executeStreamEndProcess;
             }, 600);
           }, 300);
           return;
-        } else if (pastDiffMs > 12 * 60 * 60 * 1000) {
-          // 12時間以上過去の設定なら明日の設定とみなす
+        } else if (!localScheduleTime.value.includes("T") && pastDiffMs > 12 * 60 * 60 * 1000) {
+          // 時刻のみ指定で12時間以上過去の設定なら明日の設定とみなす
           targetTime.setDate(targetTime.getDate() + 1);
         } else {
           // 30分以上前〜12時間未満なら停止

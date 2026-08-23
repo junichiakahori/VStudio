@@ -468,18 +468,18 @@
                     </div>
                 </div>
 
-                <!-- 配信開始予定時刻の設定 -->
+                <!-- 配信開始予定日時の設定 -->
                 <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 10px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                        <label style="font-size: 0.8rem; font-weight: bold; color: var(--primary, #00d2d3);">⏰ 配信開始予定時刻</label>
+                        <label style="font-size: 0.8rem; font-weight: bold; color: var(--primary, #00d2d3);">📅 配信開始予定日時</label>
                         <label style="font-size: 0.75rem; color: #fff; display: flex; align-items: center; gap: 4px; cursor: pointer;">
                             <input type="checkbox" id="wizard-start-schedule-toggle" style="cursor: pointer;">
-                            <span>指定時刻に自動開始する</span>
+                            <span>指定日時に自動開始する</span>
                         </label>
                     </div>
                     <div style="display: flex; gap: 8px; align-items: center;">
-                        <input id="wizard-start-time" type="time" style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid var(--border-neon, #00d2d3); border-radius: 6px; padding: 6px 10px; color: #fff; font-size: 0.9rem; outline: none;">
-                        <span id="wizard-start-time-hint" style="font-size: 0.75rem; color: var(--text-muted);">（チェックなしで即時開始）</span>
+                        <input id="wizard-start-time" type="datetime-local" style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid var(--border-neon, #00d2d3); border-radius: 6px; padding: 6px 10px; color: #fff; font-size: 0.88rem; outline: none; font-family: sans-serif;">
+                        <span id="wizard-start-time-hint" style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap;">（チェックなしで即時開始）</span>
                     </div>
                 </div>
 
@@ -1202,18 +1202,21 @@
                         schedEl.textContent = `⏰ 配信予定: ${schedStr}`;
                         schedEl.style.color = "#00d2d3";
 
-                        // 入力欄にも自動反映して自動開始をON
+                        // 入力欄にも自動反映（YYYY-MM-DDTHH:mm）して自動開始をON
+                        const yyyy = parsedDate.getFullYear();
+                        const mm = String(parsedDate.getMonth() + 1).padStart(2, "0");
+                        const dd = String(parsedDate.getDate()).padStart(2, "0");
                         const hh = String(parsedDate.getHours()).padStart(2, "0");
-                        const mm = String(parsedDate.getMinutes()).padStart(2, "0");
-                        if (startTimeInput) startTimeInput.value = `${hh}:${mm}`;
+                        const mi = String(parsedDate.getMinutes()).padStart(2, "0");
+                        if (startTimeInput) startTimeInput.value = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
                         if (startToggle) startToggle.checked = true;
                     } else if (info.status === "channel_autodetect") {
                         const currentInputVal = startTimeInput ? startTimeInput.value : "";
-                        schedEl.textContent = currentInputVal ? `⏰ 配信予定: 本日 ${currentInputVal}` : "⏰ 配信開始時に最新枠を自動取得";
+                        schedEl.textContent = currentInputVal ? `⏰ 配信予定: ${currentInputVal}` : "⏰ 配信開始時に最新枠を自動取得";
                         schedEl.style.color = "#00d2d3";
                     } else if (info.status === "scheduled_private") {
                         const currentInputVal = startTimeInput ? startTimeInput.value : "";
-                        schedEl.textContent = currentInputVal ? `⏰ 配信予定: 本日 ${currentInputVal}` : "⏰ 配信予定: YouTube Studioにて設定済";
+                        schedEl.textContent = currentInputVal ? `⏰ 配信予定: ${currentInputVal}` : "⏰ 配信予定: YouTube Studioにて設定済";
                         schedEl.style.color = "#00d2d3";
                     } else {
                         schedEl.textContent = "⏰ 予定日時: 指定なし (即時開始)";
@@ -1260,8 +1263,14 @@
         document.getElementById("wizard-start-time")?.addEventListener("input", (e) => {
             const schedEl = document.getElementById("wizard-yt-schedule");
             if (schedEl && e.target.value) {
-                schedEl.textContent = `⏰ 配信予定: 本日 ${e.target.value}`;
-                schedEl.style.color = "#00d2d3";
+                try {
+                    const d = new Date(e.target.value);
+                    if (!isNaN(d.getTime())) {
+                        const schedStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+                        schedEl.textContent = `⏰ 配信予定: ${schedStr}`;
+                        schedEl.style.color = "#00d2d3";
+                    }
+                } catch(err) {}
             }
         });
 
@@ -1349,9 +1358,12 @@
                     } else {
                         const now = new Date();
                         now.setMinutes(now.getMinutes() + 5);
+                        const yyyy = now.getFullYear();
+                        const mm = String(now.getMonth() + 1).padStart(2, "0");
+                        const dd = String(now.getDate()).padStart(2, "0");
                         const h = String(now.getHours()).padStart(2, "0");
                         const m = String(now.getMinutes()).padStart(2, "0");
-                        wizardStartTime.value = `${h}:${m}`;
+                        wizardStartTime.value = `${yyyy}-${mm}-${dd}T${h}:${m}`;
                     }
                 }
                 if (wizardStartToggle && mainScheduleToggle) {
@@ -2206,7 +2218,14 @@
             const startTimeVal = document.getElementById("wizard-start-time")?.value || "";
 
             if (startToggleVal && startTimeVal) {
-                alert(`⏰ 配信準備が完了しました！\n指定時刻（${startTimeVal}）になると自動的に配信がスタートします。`);
+                let displayTime = startTimeVal;
+                try {
+                    const d = new Date(startTimeVal);
+                    if (!isNaN(d.getTime())) {
+                        displayTime = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+                    }
+                } catch (e) {}
+                alert(`⏰ 配信準備が完了しました！\n指定日時（${displayTime}）になると自動的に配信がスタートします。`);
             } else {
                 alert("🚀 配信準備が完了しました！\n設定が適用され、配信がスタートします。");
             }
