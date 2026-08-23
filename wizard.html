@@ -370,7 +370,7 @@
                         </div>
                         <div style="display:flex; gap:6px;">
                             <input id="wizard-yt-input" type="text" placeholder="https://www.youtube.com/watch?v=... または 11桁の動画ID" style="flex:1; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-neon, #00d2d3); border-radius: 6px; padding: 7px 10px; color: #fff; font-size: 0.85rem; outline: none;">
-                            <button id="wizard-yt-select-modal-btn" type="button" class="btn" style="background: linear-gradient(135deg, #0984e3, #00cec9); color: #fff; border: none; font-size: 0.72rem; padding: 6px 10px; border-radius: 6px; cursor: pointer; white-space: nowrap; font-weight: bold;">📋 枠一覧から選択</button>
+                            <button id="wizard-yt-select-modal-btn" onclick="window.openBroadcastPickerModal()" type="button" class="btn" style="background: linear-gradient(135deg, #0984e3, #00cec9); color: #fff; border: none; font-size: 0.72rem; padding: 6px 10px; border-radius: 6px; cursor: pointer; white-space: nowrap; font-weight: bold;">📋 枠一覧から選択</button>
                             <button id="wizard-yt-check-btn" type="button" class="btn" style="background: rgba(0,210,211,0.2); border: 1px solid #00d2d3; color: #00d2d3; font-size: 0.72rem; padding: 6px 10px; border-radius: 6px; cursor: pointer; white-space: nowrap; font-weight: bold;">🔍 確認</button>
                         </div>
                         <!-- 枠情報の詳細カード -->
@@ -521,6 +521,25 @@
             <div style="flex: 1;"></div>
             <button id="nav-next-btn" class="btn-nav btn-next">次へ ▶</button>
             <button id="nav-finish-btn" class="btn-nav btn-finish" style="display: none;">🚀 配信準備完了・スタート！</button>
+        </div>
+    </div>
+
+    <!-- 配信枠一覧から選択モーダル -->
+    <div id="modal-broadcast-picker" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.75); backdrop-filter:blur(4px); z-index:9999; justify-content:center; align-items:center;">
+        <div style="width:90%; max-width:540px; max-height:85vh; background:#1e1e2f; border:1px solid var(--border-neon, #00d2d3); border-radius:10px; display:flex; flex-direction:column; box-shadow:0 10px 30px rgba(0,0,0,0.8); overflow:hidden;">
+            <div style="padding:12px 16px; background:rgba(0,0,0,0.4); border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.9rem; font-weight:bold; color:#00d2d3;">📋 配信枠・予約枠の選択</span>
+                <button type="button" id="btn-close-broadcast-picker" style="background:none; border:none; color:#aaa; font-size:1.2rem; cursor:pointer;">✕</button>
+            </div>
+            <div style="padding:10px 16px; background:rgba(0,0,0,0.2); border-bottom:1px solid rgba(255,255,255,0.05); display:flex; gap:6px; align-items:center;">
+                <span style="font-size:0.75rem; color:var(--text-muted);">絞り込み:</span>
+                <button type="button" id="filter-all-broadcasts" class="btn" style="background:rgba(0,210,211,0.2); border:1px solid #00d2d3; color:#00d2d3; font-size:0.7rem; padding:3px 8px; border-radius:4px; cursor:pointer;">すべて</button>
+                <button type="button" id="filter-upcoming-broadcasts" class="btn" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.2); color:#aaa; font-size:0.7rem; padding:3px 8px; border-radius:4px; cursor:pointer;">🟢 予約・待機中のみ</button>
+                <button type="button" id="btn-refresh-broadcasts" class="btn" style="margin-left:auto; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; font-size:0.7rem; padding:3px 8px; border-radius:4px; cursor:pointer;">🔄 更新</button>
+            </div>
+            <div id="broadcast-picker-list" style="flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px;">
+                <div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:20px;">配信枠を読み込み中...</div>
+            </div>
         </div>
     </div>
 
@@ -2183,14 +2202,22 @@
         // =====================================================================
         // 配信枠一覧から選択モーダル ロジック
         // =====================================================================
-        const modalPicker = document.getElementById("modal-broadcast-picker");
-        const btnClosePicker = document.getElementById("btn-close-broadcast-picker");
-        const btnOpenPicker = document.getElementById("wizard-yt-select-modal-btn");
-        const listContainer = document.getElementById("broadcast-picker-list");
         let cachedBroadcasts = [];
         let activeBroadcastFilter = "all";
 
+        window.openBroadcastPickerModal = function() {
+            const m = document.getElementById("modal-broadcast-picker");
+            if (m) m.style.display = "flex";
+            loadAndRenderBroadcasts();
+        };
+
+        window.closeBroadcastPickerModal = function() {
+            const m = document.getElementById("modal-broadcast-picker");
+            if (m) m.style.display = "none";
+        };
+
         async function loadAndRenderBroadcasts() {
+            const listContainer = document.getElementById("broadcast-picker-list");
             if (!listContainer) return;
             listContainer.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:20px;">⏳ 配信枠一覧を取得中...</div>';
             try {
@@ -2208,6 +2235,7 @@
         }
 
         function renderBroadcastList() {
+            const listContainer = document.getElementById("broadcast-picker-list");
             if (!listContainer) return;
             listContainer.innerHTML = "";
 
@@ -2282,24 +2310,19 @@
                         }
                     }
                     fetchYoutubeVideoInfo(item.id);
-                    if (modalPicker) modalPicker.style.display = "none";
+                    window.closeBroadcastPickerModal();
                 });
 
                 listContainer.appendChild(card);
             });
         }
 
-        btnOpenPicker?.addEventListener("click", () => {
-            if (modalPicker) modalPicker.style.display = "flex";
-            loadAndRenderBroadcasts();
+        document.getElementById("btn-close-broadcast-picker")?.addEventListener("click", () => {
+            window.closeBroadcastPickerModal();
         });
 
-        btnClosePicker?.addEventListener("click", () => {
-            if (modalPicker) modalPicker.style.display = "none";
-        });
-
-        modalPicker?.addEventListener("click", (e) => {
-            if (e.target === modalPicker) modalPicker.style.display = "none";
+        document.getElementById("modal-broadcast-picker")?.addEventListener("click", (e) => {
+            if (e.target.id === "modal-broadcast-picker") window.closeBroadcastPickerModal();
         });
 
         document.getElementById("filter-all-broadcasts")?.addEventListener("click", (e) => {
@@ -2334,24 +2357,5 @@
             loadAndRenderBroadcasts();
         });
     </script>
-
-    <!-- 配信枠一覧から選択モーダル -->
-    <div id="modal-broadcast-picker" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.75); backdrop-filter:blur(4px); z-index:9999; justify-content:center; align-items:center;">
-        <div style="width:90%; max-width:540px; max-height:85vh; background:#1e1e2f; border:1px solid var(--border-neon, #00d2d3); border-radius:10px; display:flex; flex-direction:column; box-shadow:0 10px 30px rgba(0,0,0,0.8); overflow:hidden;">
-            <div style="padding:12px 16px; background:rgba(0,0,0,0.4); border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:0.9rem; font-weight:bold; color:#00d2d3;">📋 配信枠・予約枠の選択</span>
-                <button type="button" id="btn-close-broadcast-picker" style="background:none; border:none; color:#aaa; font-size:1.2rem; cursor:pointer;">✕</button>
-            </div>
-            <div style="padding:10px 16px; background:rgba(0,0,0,0.2); border-bottom:1px solid rgba(255,255,255,0.05); display:flex; gap:6px; align-items:center;">
-                <span style="font-size:0.75rem; color:var(--text-muted);">絞り込み:</span>
-                <button type="button" id="filter-all-broadcasts" class="btn" style="background:rgba(0,210,211,0.2); border:1px solid #00d2d3; color:#00d2d3; font-size:0.7rem; padding:3px 8px; border-radius:4px; cursor:pointer;">すべて</button>
-                <button type="button" id="filter-upcoming-broadcasts" class="btn" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.2); color:#aaa; font-size:0.7rem; padding:3px 8px; border-radius:4px; cursor:pointer;">🟢 予約・待機中のみ</button>
-                <button type="button" id="btn-refresh-broadcasts" class="btn" style="margin-left:auto; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; font-size:0.7rem; padding:3px 8px; border-radius:4px; cursor:pointer;">🔄 更新</button>
-            </div>
-            <div id="broadcast-picker-list" style="flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px;">
-                <div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:20px;">配信枠を読み込み中...</div>
-            </div>
-        </div>
-    </div>
 </body>
 </html>
