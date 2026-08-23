@@ -752,9 +752,9 @@ def apply_backend_pronunciation_dict(text):
                     processed = processed.replace(src, dst)
     return processed
 
-def call_gemini_backend(prompt, api_key, model="gemini-1.5-flash"):
+def call_gemini_backend(prompt, api_key, model="gemini-3.6-flash"):
     models_to_try = [model] if model else []
-    for default_m in ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-pro"]:
+    for default_m in ["gemini-3.6-flash", "gemini-flash-latest", "gemini-3.5-flash", "gemini-3.7-flash"]:
         if default_m not in models_to_try:
             models_to_try.append(default_m)
 
