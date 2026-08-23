@@ -354,12 +354,18 @@
                     <div id="tiktok-status" style="font-size:0.72rem;margin-top:0.5rem;color:var(--text-muted);">未接続</div>
                 </div>
                 <div class="control-group" style="margin-top:10px;">
-                    <label style="display:block;margin-bottom:0.5rem;font-size:0.8rem;color:var(--text-muted);">YouTube 配信URL / @チャンネル名 / 動画ID</label>
-                    <div style="display:flex;gap:0.5rem;">
-                        <input type="text" id="youtube-video-input" placeholder="@drone.akahori または 配信URL" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.8rem;outline:none;">
-                        <button id="youtube-connect-btn" class="btn" style="background:#ff0000;color:#fff;border:none;border-radius:6px;padding:0 1rem;font-weight:bold;cursor:pointer;">接続</button>
+                    <label style="display:block;margin-bottom:0.3rem;font-size:0.78rem;color:var(--text-muted);">📺 配信者ID / @チャンネル名</label>
+                    <div style="display:flex;gap:0.4rem;margin-bottom:0.5rem;">
+                        <input type="text" id="youtube-channel-input" placeholder="@drone.akahori" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:0.45rem;color:#fff;font-size:0.8rem;outline:none;">
+                        <button id="youtube-detect-btn" class="btn" style="background:rgba(0,210,211,0.2);border:1px solid #00d2d3;color:#00d2d3;border-radius:6px;padding:0 0.6rem;font-size:0.72rem;font-weight:bold;cursor:pointer;white-space:nowrap;">📡 枠を検出</button>
                     </div>
-                    <div id="youtube-status" style="font-size:0.72rem;margin-top:0.5rem;color:var(--text-muted);">未接続</div>
+
+                    <label style="display:block;margin-bottom:0.3rem;font-size:0.78rem;color:var(--text-muted);">🔴 配信枠・動画ID (Video ID)</label>
+                    <div style="display:flex;gap:0.4rem;">
+                        <input type="text" id="youtube-video-input" placeholder="11桁の動画ID または 配信URL" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.45rem;color:#fff;font-size:0.8rem;outline:none;">
+                        <button id="youtube-connect-btn" class="btn" style="background:#ff0000;color:#fff;border:none;border-radius:6px;padding:0 0.8rem;font-weight:bold;cursor:pointer;white-space:nowrap;">接続</button>
+                    </div>
+                    <div id="youtube-status" style="font-size:0.72rem;margin-top:0.4rem;color:var(--text-muted);">未接続</div>
                     
                     <!-- 予約配信自動開始UI -->
                     <div id="youtube-schedule-container" style="display:none; margin-top:10px; background:rgba(255,165,0,0.1); border:1px solid #ffa500; border-radius:6px; padding:10px;">

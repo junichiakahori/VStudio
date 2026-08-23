@@ -420,6 +420,51 @@ function initChatClient() {
     }
   };
 
+  const youtubeChannelInput = document.getElementById("youtube-channel-input");
+  const youtubeDetectBtn = document.getElementById("youtube-detect-btn");
+  if (youtubeChannelInput) {
+    const savedChannel = localStorage.getItem("savedYoutubeChannel") || "@drone.akahori";
+    youtubeChannelInput.value = savedChannel;
+    youtubeChannelInput.addEventListener("input", () => {
+      localStorage.setItem("savedYoutubeChannel", youtubeChannelInput.value);
+    });
+  }
+  if (youtubeDetectBtn) {
+    youtubeDetectBtn.addEventListener("click", async () => {
+      const channelVal = youtubeChannelInput ? youtubeChannelInput.value.trim() : "";
+      if (!channelVal) {
+        alert("配信者ID / @チャンネル名を入力してください");
+        return;
+      }
+      youtubeDetectBtn.disabled = true;
+      youtubeDetectBtn.textContent = "検出中...";
+      try {
+        const res = await fetch("http://localhost:8001/get_youtube_video_info", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ videoId: channelVal })
+        });
+        if (res.ok) {
+          const info = await res.json();
+          if (info && info.videoId && info.videoId.length === 11) {
+            if (youtubeUserInput) {
+              youtubeUserInput.value = info.videoId;
+              localStorage.setItem("savedYoutubeVideoId", info.videoId);
+            }
+            alert(`✅ 配信枠を検出しました: ${info.title} (${info.videoId})`);
+          } else {
+            alert(`⚠️ 枠情報: ${info.title || "現在進行中/予約中の枠が見つかりませんでした"}`);
+          }
+        }
+      } catch (e) {
+        alert("検出エラー: " + e.message);
+      } finally {
+        youtubeDetectBtn.disabled = false;
+        youtubeDetectBtn.textContent = "📡 枠を検出";
+      }
+    });
+  }
+
   if (youtubeUserInput) {
     youtubeUserInput.addEventListener("change", () => {
       const newId = youtubeUserInput.value.trim();

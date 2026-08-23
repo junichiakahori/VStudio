@@ -348,21 +348,37 @@
         <div id="step-4" class="wizard-step-content" style="display: none; flex-direction: column; gap: 14px;">
             <p style="font-size: 0.85rem; color: var(--text-primary); margin: 0;">配信枠情報と配信の終了方法を設定して、配信準備を完了します：</p>
             <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 12px;">
-                <div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
-                        <label style="font-size: 0.8rem; color: var(--text-muted);">YouTube 配信枠 URL または 動画ID</label>
-                        <span id="wizard-yt-info-status" style="font-size: 0.75rem; color: var(--text-muted);"></span>
+                <!-- YouTube 接続先設定（配信者ID & 配信枠ID） -->
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+                    <!-- 1. 配信者ID / チャンネル -->
+                    <div>
+                        <label style="font-size: 0.78rem; color: var(--text-muted); display:flex; justify-content:space-between; margin-bottom:4px;">
+                            <span>📺 配信者ID / チャンネル名 (ハンドル)</span>
+                            <span style="font-size:0.72rem; color:var(--text-muted);">例: @drone.akahori</span>
+                        </label>
+                        <div style="display:flex; gap:6px;">
+                            <input id="wizard-yt-channel" type="text" placeholder="@your_channel または チャンネル名" style="flex:1; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 7px 10px; color: #fff; font-size: 0.85rem; outline: none;">
+                            <button id="wizard-yt-detect-live-btn" type="button" class="btn" style="background: rgba(0,210,211,0.15); border: 1px solid #00d2d3; color: #00d2d3; font-size: 0.72rem; padding: 6px 10px; border-radius: 6px; cursor: pointer; white-space: nowrap; font-weight: bold;">📡 枠を自動検出</button>
+                        </div>
                     </div>
-                    <div style="display:flex; gap:6px;">
-                        <input id="wizard-yt-input" type="text" placeholder="https://www.youtube.com/watch?v=... または 動画ID" style="flex:1; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-neon, #00d2d3); border-radius: 6px; padding: 8px 10px; color: #fff; font-size: 0.9rem; outline: none;">
-                        <button id="wizard-yt-check-btn" class="btn" style="background: rgba(0,210,211,0.2); border: 1px solid #00d2d3; color: #00d2d3; font-size: 0.75rem; padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap; font-weight: bold;">🔍 枠情報確認</button>
-                    </div>
-                    <!-- 枠情報の詳細カード -->
-                    <div id="wizard-yt-info-card" style="display:none; margin-top:6px; background: rgba(0,0,0,0.4); border: 1px solid rgba(0,210,211,0.3); border-radius:6px; padding: 8px 10px; font-size: 0.8rem;">
-                        <div id="wizard-yt-title" style="font-weight:bold; color:#fff; margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
-                        <div style="display:flex; justify-content:space-between; font-size: 0.75rem;">
-                            <span id="wizard-yt-schedule" style="color: #00d2d3;">⏰ 予定日時: 取得中...</span>
-                            <span id="wizard-yt-live-badge" style="font-weight:bold;"></span>
+
+                    <!-- 2. 個別の配信枠・動画ID -->
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+                            <label style="font-size: 0.78rem; color: var(--text-muted);">🔴 個別の配信枠・動画ID (Video ID)</label>
+                            <span id="wizard-yt-info-status" style="font-size: 0.75rem; color: var(--text-muted);"></span>
+                        </div>
+                        <div style="display:flex; gap:6px;">
+                            <input id="wizard-yt-input" type="text" placeholder="https://www.youtube.com/watch?v=... または 11桁の動画ID" style="flex:1; box-sizing: border-box; background: rgba(0,0,0,0.3); border: 1px solid var(--border-neon, #00d2d3); border-radius: 6px; padding: 7px 10px; color: #fff; font-size: 0.85rem; outline: none;">
+                            <button id="wizard-yt-check-btn" type="button" class="btn" style="background: rgba(0,210,211,0.2); border: 1px solid #00d2d3; color: #00d2d3; font-size: 0.72rem; padding: 6px 10px; border-radius: 6px; cursor: pointer; white-space: nowrap; font-weight: bold;">🔍 枠情報確認</button>
+                        </div>
+                        <!-- 枠情報の詳細カード -->
+                        <div id="wizard-yt-info-card" style="display:none; margin-top:6px; background: rgba(0,0,0,0.4); border: 1px solid rgba(0,210,211,0.3); border-radius:6px; padding: 8px 10px; font-size: 0.8rem;">
+                            <div id="wizard-yt-title" style="font-weight:bold; color:#fff; margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
+                            <div style="display:flex; justify-content:space-between; font-size: 0.75rem;">
+                                <span id="wizard-yt-schedule" style="color: #00d2d3;">⏰ 予定日時: 取得中...</span>
+                                <span id="wizard-yt-live-badge" style="font-weight:bold;"></span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1215,14 +1231,72 @@
             }
         });
 
+        // チャンネルハンドルの保存リスナー
+        const wizardYtChannel = document.getElementById("wizard-yt-channel");
+        if (wizardYtChannel) {
+            wizardYtChannel.addEventListener("input", () => {
+                localStorage.setItem("savedYoutubeChannel", wizardYtChannel.value);
+                if (openerWin) {
+                    openerWin.localStorage.setItem("savedYoutubeChannel", wizardYtChannel.value);
+                }
+            });
+        }
+
+        // チャンネルから最新の配信枠を自動検出
+        document.getElementById("wizard-yt-detect-live-btn")?.addEventListener("click", async () => {
+            const channelVal = document.getElementById("wizard-yt-channel")?.value.trim() || "";
+            if (!channelVal) {
+                alert("配信者ID / チャンネル名（例: @drone.akahori）を入力してください。");
+                return;
+            }
+            const btn = document.getElementById("wizard-yt-detect-live-btn");
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = "📡 検出中...";
+            }
+            try {
+                const info = await fetchYoutubeVideoInfo(channelVal);
+                if (info && info.videoId && info.videoId.length === 11) {
+                    const ytInput = document.getElementById("wizard-yt-input");
+                    if (ytInput) {
+                        ytInput.value = info.videoId;
+                        localStorage.setItem("savedYoutubeVideoId", info.videoId);
+                        if (openerWin) {
+                            const mainYt = openerWin.document.getElementById("youtube-video-input");
+                            if (mainYt) mainYt.value = info.videoId;
+                            openerWin.localStorage.setItem("savedYoutubeVideoId", info.videoId);
+                        }
+                    }
+                    fetchYoutubeVideoInfo(info.videoId);
+                }
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = "📡 枠を自動検出";
+                }
+            }
+        });
+
         // Step 4 初期化
         function updateStep4Inputs() {
+            const channelInput = document.getElementById("wizard-yt-channel");
+            const savedChannel = localStorage.getItem("savedYoutubeChannel") || (openerWin && openerWin.localStorage.getItem("savedYoutubeChannel")) || "@drone.akahori";
+            if (channelInput && !channelInput.value) {
+                channelInput.value = savedChannel;
+            }
+
             if (openerWin) {
                 const mainYt = openerWin.document.getElementById("youtube-video-input");
                 const wizardYt = document.getElementById("wizard-yt-input");
                 if (mainYt && wizardYt && !wizardYt.value) {
                     wizardYt.value = mainYt.value;
-                    if (wizardYt.value) fetchYoutubeVideoInfo(wizardYt.value);
+                }
+                if (wizardYt && wizardYt.value.startsWith("@")) {
+                    if (channelInput) channelInput.value = wizardYt.value;
+                    wizardYt.value = "";
+                }
+                if (wizardYt && wizardYt.value) {
+                    fetchYoutubeVideoInfo(wizardYt.value);
                 }
 
                 const mainEnd = openerWin.document.getElementById("stream-end-time");
