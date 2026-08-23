@@ -1060,19 +1060,19 @@
             }
         }
 
-        document.getElementById("wizard-yt-check-btn").addEventListener("click", () => {
-            const val = document.getElementById("wizard-yt-input").value;
-            fetchYoutubeVideoInfo(val);
+        document.getElementById("wizard-yt-check-btn")?.addEventListener("click", () => {
+            const val = document.getElementById("wizard-yt-input")?.value;
+            if (val) fetchYoutubeVideoInfo(val);
         });
 
-        document.getElementById("wizard-yt-input").addEventListener("blur", () => {
-            const val = document.getElementById("wizard-yt-input").value;
+        document.getElementById("wizard-yt-input")?.addEventListener("blur", () => {
+            const val = document.getElementById("wizard-yt-input")?.value;
             if (val && val.trim().length >= 5) {
                 fetchYoutubeVideoInfo(val);
             }
         });
 
-        document.getElementById("wizard-start-time").addEventListener("input", (e) => {
+        document.getElementById("wizard-start-time")?.addEventListener("input", (e) => {
             const schedEl = document.getElementById("wizard-yt-schedule");
             if (schedEl && e.target.value) {
                 schedEl.textContent = `⏰ 配信予定: 本日 ${e.target.value}`;
@@ -1080,7 +1080,7 @@
             }
         });
 
-        // Step 4
+        // Step 4 初期化
         function updateStep4Inputs() {
             if (openerWin) {
                 const mainYt = openerWin.document.getElementById("youtube-video-input");
@@ -1129,7 +1129,7 @@
                 selectEl.dispatchEvent(new Event("change"));
             }
 
-            generateStreamReservationMetadata(true);
+            generateStreamReservationMetadata(false);
         }
 
         // 配信予約用メタデータ（タイトル・説明欄）自動生成
@@ -1161,17 +1161,53 @@
 
         document.getElementById("wizard-slot-morning-btn")?.addEventListener("click", () => {
             if (wizardActiveSlot !== "morning") {
+                // 切り替え前の内容を保存
+                const currentTitle = document.getElementById("wizard-suggested-title")?.value;
+                const currentDesc = document.getElementById("wizard-suggested-desc")?.value;
+                if (currentTitle !== undefined) localStorage.setItem(`savedStreamTitle_${wizardActiveSlot}`, currentTitle);
+                if (currentDesc !== undefined) localStorage.setItem(`savedStreamDesc_${wizardActiveSlot}`, currentDesc);
+
                 wizardActiveSlot = "morning";
                 updateWizardSlotUI();
-                generateStreamReservationMetadata(true);
+                localStorage.setItem("savedStreamSlot", "morning");
+
+                // 保存されたものがあれば復元、なければ生成
+                const savedTitle = localStorage.getItem("savedStreamTitle_morning");
+                const savedDesc = localStorage.getItem("savedStreamDesc_morning");
+                if (savedTitle || savedDesc) {
+                    const titleInput = document.getElementById("wizard-suggested-title");
+                    const descInput = document.getElementById("wizard-suggested-desc");
+                    if (titleInput && savedTitle) titleInput.value = savedTitle;
+                    if (descInput && savedDesc) descInput.value = savedDesc;
+                } else {
+                    generateStreamReservationMetadata(true);
+                }
             }
         });
 
         document.getElementById("wizard-slot-evening-btn")?.addEventListener("click", () => {
             if (wizardActiveSlot !== "evening") {
+                // 切り替え前の内容を保存
+                const currentTitle = document.getElementById("wizard-suggested-title")?.value;
+                const currentDesc = document.getElementById("wizard-suggested-desc")?.value;
+                if (currentTitle !== undefined) localStorage.setItem(`savedStreamTitle_${wizardActiveSlot}`, currentTitle);
+                if (currentDesc !== undefined) localStorage.setItem(`savedStreamDesc_${wizardActiveSlot}`, currentDesc);
+
                 wizardActiveSlot = "evening";
                 updateWizardSlotUI();
-                generateStreamReservationMetadata(true);
+                localStorage.setItem("savedStreamSlot", "evening");
+
+                // 保存されたものがあれば復元、なければ生成
+                const savedTitle = localStorage.getItem("savedStreamTitle_evening");
+                const savedDesc = localStorage.getItem("savedStreamDesc_evening");
+                if (savedTitle || savedDesc) {
+                    const titleInput = document.getElementById("wizard-suggested-title");
+                    const descInput = document.getElementById("wizard-suggested-desc");
+                    if (titleInput && savedTitle) titleInput.value = savedTitle;
+                    if (descInput && savedDesc) descInput.value = savedDesc;
+                } else {
+                    generateStreamReservationMetadata(true);
+                }
             }
         });
 
@@ -1275,17 +1311,53 @@
 
             const titleInput = document.getElementById("wizard-suggested-title");
             const descInput = document.getElementById("wizard-suggested-desc");
-            const currentCount = (openerWin && openerWin.latestFetchedNews) ? openerWin.latestFetchedNews.length : 0;
-            const countChanged = (currentCount !== lastMetaNewsCount);
-            lastMetaNewsCount = currentCount;
 
-            if (titleInput && (forceRegen || countChanged || !titleInput.value)) titleInput.value = suggestedTitle;
-            if (descInput && (forceRegen || countChanged || !descInput.value)) descInput.value = suggestedDesc;
+            // 保存済みテキストの確認
+            const savedTitleForSlot = localStorage.getItem(`savedStreamTitle_${wizardActiveSlot}`);
+            const savedDescForSlot = localStorage.getItem(`savedStreamDesc_${wizardActiveSlot}`);
 
-            // ユーザーが説明欄を編集した場合はフッター（クレジット）部分を自動学習・永続保存
+            if (forceRegen) {
+                if (titleInput) {
+                    titleInput.value = suggestedTitle;
+                    localStorage.setItem(`savedStreamTitle_${wizardActiveSlot}`, suggestedTitle);
+                }
+                if (descInput) {
+                    descInput.value = suggestedDesc;
+                    localStorage.setItem(`savedStreamDesc_${wizardActiveSlot}`, suggestedDesc);
+                }
+            } else {
+                if (titleInput) {
+                    if (savedTitleForSlot !== null && savedTitleForSlot !== "") {
+                        titleInput.value = savedTitleForSlot;
+                    } else if (!titleInput.value) {
+                        titleInput.value = suggestedTitle;
+                        localStorage.setItem(`savedStreamTitle_${wizardActiveSlot}`, suggestedTitle);
+                    }
+                }
+                if (descInput) {
+                    if (savedDescForSlot !== null && savedDescForSlot !== "") {
+                        descInput.value = savedDescForSlot;
+                    } else if (!descInput.value) {
+                        descInput.value = suggestedDesc;
+                        localStorage.setItem(`savedStreamDesc_${wizardActiveSlot}`, suggestedDesc);
+                    }
+                }
+            }
+
+            // 入力時の自動保存バインド
+            if (titleInput && !titleInput._hasBoundInput) {
+                titleInput._hasBoundInput = true;
+                titleInput.addEventListener("input", () => {
+                    localStorage.setItem(`savedStreamTitle_${wizardActiveSlot}`, titleInput.value);
+                    localStorage.setItem("savedStreamTitle", titleInput.value);
+                });
+            }
+
             if (descInput && !descInput._hasBoundInput) {
                 descInput._hasBoundInput = true;
                 descInput.addEventListener("input", () => {
+                    localStorage.setItem(`savedStreamDesc_${wizardActiveSlot}`, descInput.value);
+                    localStorage.setItem("savedStreamDesc", descInput.value);
                     const val = descInput.value;
                     const ruleIdx = val.indexOf("【配信ルール");
                     const creditIdx = val.indexOf("音声：");
