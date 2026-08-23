@@ -264,6 +264,8 @@ def list_my_broadcasts(max_results=15):
     for item in res.get("items", []):
         snippet = item.get("snippet", {})
         status = item.get("status", {})
+        thumbnails = snippet.get("thumbnails", {})
+        thumb_url = thumbnails.get("medium", {}).get("url") or thumbnails.get("default", {}).get("url") or f"https://i.ytimg.com/vi/{item.get('id')}/hqdefault.jpg"
         items.append({
             "id": item.get("id"),
             "title": snippet.get("title", "無題の配信"),
@@ -271,6 +273,7 @@ def list_my_broadcasts(max_results=15):
             "scheduledStartTime": snippet.get("scheduledStartTime"),
             "lifeCycleStatus": status.get("lifeCycleStatus"),
             "privacyStatus": status.get("privacyStatus"),
+            "thumbnail": thumb_url,
             "url": f"https://www.youtube.com/watch?v={item.get('id')}"
         })
     return items

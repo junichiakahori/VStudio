@@ -503,7 +503,7 @@ function initChatClient() {
     }
     filtered.forEach(item => {
       const card = document.createElement("div");
-      card.style.cssText = "background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 10px 12px; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; gap: 4px;";
+      card.style.cssText = "background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; cursor: pointer; transition: all 0.2s; display: flex; gap: 12px; align-items: center;";
       card.onmouseenter = () => { card.style.background = "rgba(0, 210, 211, 0.12)"; card.style.borderColor = "#00d2d3"; };
       card.onmouseleave = () => { card.style.background = "rgba(255,255,255,0.05)"; card.style.borderColor = "rgba(255,255,255,0.1)"; };
 
@@ -522,18 +522,22 @@ function initChatClient() {
       }
 
       let privacyBadge = item.privacyStatus === "public" ? "🌐 公開" : (item.privacyStatus === "unlisted" ? "🔒 限定公開" : "👁️ 非公開");
+      const thumbUrl = item.thumbnail || `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`;
 
       card.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span style="font-size:0.72rem; font-weight:bold; color:${statusColor};">${statusBadge}</span>
-          <span style="font-size:0.7rem; color:var(--text-muted); background:rgba(0,0,0,0.3); padding:2px 6px; border-radius:4px;">${privacyBadge}</span>
-        </div>
-        <div style="font-size:0.85rem; font-weight:bold; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-          ${item.title || "無題の配信"}
-        </div>
-        <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:var(--text-muted); margin-top:2px;">
-          <span>⏰ 予定: ${timeStr}</span>
-          <span style="font-family:monospace; color:#00d2d3;">ID: ${item.id}</span>
+        <img src="${thumbUrl}" alt="Thumbnail" style="width: 110px; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; background: #000; border: 1px solid rgba(255,255,255,0.15); flex-shrink: 0;" onerror="this.src='https://i.ytimg.com/vi/${item.id}/hqdefault.jpg'">
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:0.72rem; font-weight:bold; color:${statusColor};">${statusBadge}</span>
+            <span style="font-size:0.7rem; color:var(--text-muted); background:rgba(0,0,0,0.3); padding:2px 6px; border-radius:4px;">${privacyBadge}</span>
+          </div>
+          <div style="font-size:0.85rem; font-weight:bold; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            ${item.title || "無題の配信"}
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:var(--text-muted); margin-top:2px;">
+            <span>⏰ 予定: ${timeStr}</span>
+            <span style="font-family:monospace; color:#00d2d3;">ID: ${item.id}</span>
+          </div>
         </div>
       `;
 
