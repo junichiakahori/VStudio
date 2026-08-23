@@ -211,7 +211,10 @@ def update_live_broadcast(video_id, title=None, description=None, start_time_iso
     status = item.get("status", {})
     if title: snippet["title"] = title
     if description is not None: snippet["description"] = description
-    if start_time_iso: snippet["scheduledStartTime"] = start_time_iso
+    if start_time_iso:
+        if "T" in start_time_iso and not (start_time_iso.endswith("Z") or "+" in start_time_iso):
+            start_time_iso = f"{start_time_iso}:00+09:00"
+        snippet["scheduledStartTime"] = start_time_iso
     if privacy_status: status["privacyStatus"] = privacy_status
 
     up_req = service.liveBroadcasts().update(

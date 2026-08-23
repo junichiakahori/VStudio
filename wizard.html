@@ -1716,6 +1716,18 @@
             const titleVal = document.getElementById("wizard-suggested-title")?.value || "";
             const descVal = document.getElementById("wizard-suggested-desc")?.value || "";
             const privacyStatus = document.getElementById("wizard-privacy-status")?.value || "unlisted";
+            const startTimeInputVal = document.getElementById("wizard-start-time")?.value;
+
+            let scheduledStartTime = null;
+            if (startTimeInputVal) {
+                const now = new Date();
+                const [h, m] = startTimeInputVal.split(":").map(Number);
+                const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+                if (targetDate < now && (now.getTime() - targetDate.getTime()) > 10 * 60 * 1000) {
+                    targetDate.setDate(targetDate.getDate() + 1); // 過去なら翌日
+                }
+                scheduledStartTime = targetDate.toISOString();
+            }
 
             const btn = document.getElementById("btn-api-update-broadcast");
             if (btn) {
@@ -1732,12 +1744,13 @@
                         videoId: videoId,
                         title: titleVal,
                         description: descVal,
+                        scheduledStartTime: scheduledStartTime,
                         privacyStatus: privacyStatus
                     })
                 });
                 const data = await res.json();
                 if (data.success) {
-                    showYtApiFeedback(`✅ YouTube枠 (${videoId}) のタイトル・説明文を更新しました！`, true);
+                    showYtApiFeedback(`✅ YouTube枠 (${videoId}) のタイトル・説明文・配信予定時刻を更新しました！`, true);
                     fetchYoutubeVideoInfo(videoId);
                 } else {
                     showYtApiFeedback(`❌ 更新エラー: ${data.error || "不明なエラー"}`, false);

@@ -253,17 +253,29 @@
       }
       const title = streamTitleInput ? streamTitleInput.value : "";
       const desc = streamDescInput ? streamDescInput.value : "";
+      const scheduleInput = document.getElementById("local-schedule-time");
+      let scheduledStartTime = null;
+      if (scheduleInput && scheduleInput.value) {
+        const now = new Date();
+        const [h, m] = scheduleInput.value.split(":").map(Number);
+        const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+        if (targetDate < now && (now.getTime() - targetDate.getTime()) > 10 * 60 * 1000) {
+          targetDate.setDate(targetDate.getDate() + 1);
+        }
+        scheduledStartTime = targetDate.toISOString();
+      }
+
       panelBtnUpdate.disabled = true;
       panelBtnUpdate.textContent = "⏳ 更新中...";
       try {
         const res = await fetch("http://localhost:8001/api/youtube/update_broadcast", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ videoId, title, description: desc })
+          body: JSON.stringify({ videoId, title, description: desc, scheduledStartTime: scheduledStartTime })
         });
         const data = await res.json();
         if (data.success) {
-          showPanelYtFeedback(`✅ YouTube枠 (${videoId}) の情報を更新しました！`, true);
+          showPanelYtFeedback(`✅ YouTube枠 (${videoId}) の情報・配信予定時刻を更新しました！`, true);
         } else {
           showPanelYtFeedback(`❌ 更新エラー: ${data.error || "エラー"}`, false);
         }
