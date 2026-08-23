@@ -634,10 +634,13 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                         raw_text = ""
 
                 if not raw_text:
-                    prefix = transition.replace("「", "").replace("」", "")
-                    clean_title = re.sub(r'\s*[-|｜]\s*[^|｜-]+$', '', title).strip()
-                    comment = "リスナーのみんなもぜひチェックしてほしいのだ！" if is_zunda else ("リスナーのみんなもぜひチェックしてほしいにゃ！" if is_cat else "リスナーの皆様もぜひチェックしてください！")
-                    raw_text = f"{prefix}\n{clean_title}。\n{comment}"
+                    print(f"[AI生成失敗] AI原稿の生成に失敗しました（空のレスポンスまたはエラー）。待機画面（しばらくお待ちください）へ移行させるため500エラーを返却します。")
+                    self.send_response(500)
+                    self.send_header('Content-type', 'application/json; charset=utf-8')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": "AI generation failed. Switching to standby waiting mode."}).encode('utf-8'))
+                    return
 
                 # クリーンアップ
                 clean_text = raw_text.replace("「", "").replace("」", "").replace("（", "").replace("）", "").strip()

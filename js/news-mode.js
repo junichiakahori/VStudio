@@ -1510,9 +1510,8 @@ ${creditsInstruction}
   }
 
   async function readOneNewsItem(item, config, isCategoryChanged, isFirst) {
-    if (!newsBroadcastState.isRunning) return;
+    if (!newsBroadcastState.isRunning) return false;
 
-    // 画面テロップ更新
     const newsTitleEl = document.getElementById("news-article-title");
     const newsDescEl = document.getElementById("news-article-desc");
     const newsBoardEl = document.getElementById("news-board");
@@ -1524,48 +1523,10 @@ ${creditsInstruction}
     tmpDiv.innerHTML = item.description || "";
     let plainDesc = (tmpDiv.textContent || tmpDiv.innerText || "").replace(/\s+/g, " ").trim();
     if (plainDesc.length > 120) plainDesc = plainDesc.substring(0, 120) + "…";
-    if (newsTitleEl) newsTitleEl.textContent = item.title;
-    if (newsDescEl) newsDescEl.textContent = plainDesc;
-    if (newsBoardEl) newsBoardEl.classList.add("active");
-    if (catEl) catEl.textContent = item.categoryName || "";
-    if (progressBadge) {
-      progressBadge.style.display = "inline-block";
-      progressBadge.textContent = `${newsBroadcastState.currentIndex} / ${newsBroadcastState.totalCount}`;
-    }
 
-    if (newsDateEl) {
-      if (item.pubDate) {
-        const d = new Date(item.pubDate);
-        if (!isNaN(d.getTime())) {
-          const y = d.getFullYear();
-          const m = String(d.getMonth() + 1).padStart(2, "0");
-          const day = String(d.getDate()).padStart(2, "0");
-          const hh = String(d.getHours()).padStart(2, "0");
-          const mm = String(d.getMinutes()).padStart(2, "0");
-          newsDateEl.textContent = `${y}/${m}/${day} ${hh}:${mm}`;
-        } else {
-          newsDateEl.textContent = item.pubDate;
-        }
-      } else {
-        newsDateEl.textContent = "";
-      }
-    }
     newsBroadcastState.currentTitle = item.title;
     window.newsBroadcastState = newsBroadcastState;
     updateBroadcastProgress(item);
-
-    console.log(`[ニュース番組] 📰 [${newsBroadcastState.currentIndex}/${newsBroadcastState.totalCount}件] 【${item.categoryName || "ニュース"}】 「${item.title}」`);
-
-    // セットリストボードの進行目印を更新
-    updateNewsSetlistProgress(item.categoryKey || "cat_top", newsBroadcastState.currentIndex, newsBroadcastState.totalCount);
-
-    // 既読マーク
-    readNewsTitles.add(item.title);
-    if (window.readNewsTitles) window.readNewsTitles.add(item.title);
-    try { localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles))); } catch (e) { }
-    if (typeof window.updateNewsListPopup === "function") {
-      window.updateNewsListPopup();
-    }
 
     const apiKeyInput = document.getElementById("ai-api-key");
     const providerSelect = document.getElementById("ai-provider-select");
@@ -1573,17 +1534,6 @@ ${creditsInstruction}
     const apiKey = (apiKeyInput ? apiKeyInput.value.trim() : "") || localStorage.getItem("savedAiApiKey") || localStorage.getItem("ai_api_key") || "";
     const provider = (providerSelect ? providerSelect.value : "") || localStorage.getItem("savedAiProvider") || "gemini";
     const modelName = (modelInput ? modelInput.value.trim() : "") || localStorage.getItem("savedAiModel") || "gemini-1.5-flash";
-
-    if (!apiKey) {
-      console.warn("[ニュース番組] APIキーが設定されていません。AI設定を確認してください。");
-      const isZunda = ["zundamon", "zundamon_human"].includes(currentModelId);
-      const warnMsg = isZunda
-        ? "AIのAPIキーが設定されていないのだ。AI設定を確認してほしいのだ！"
-        : "AIのAPIキーが設定されていません。AI設定をご確認くださいにゃ！";
-      await queueVoicevoxAudio(warnMsg, true);
-      await waitForVoicevoxFinish();
-      return false;
-    }
 
     const payload = {
       title: item.title,
@@ -1600,25 +1550,56 @@ ${creditsInstruction}
     let hasAnnouncedOutage = false;
 
     while (newsBroadcastState.isRunning) {
+      if (!apiKey) {
+        console.warn("[ニュース番組] ⚠️ APIキーが未設定です。復旧待機画面に移行します...");
+      }
+
       let res = null;
-      try {
-        res = await fetch("/api/news/generate_item_script", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-      } catch (netErr) {
-        console.warn("[ニュース番組] 通信エラー検知 (Local API / Network):", netErr);
+      if (apiKey) {
+        try {
+          res = await fetch("/api/news/generate_item_script", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+        } catch (netErr) {
+          console.warn("[ニュース番組] 通信エラー検知 (Local API / Network):", netErr);
+        }
       }
 
       if (res && res.ok) {
         try {
           const data = await res.json();
-          if (data && (data.items || data.sentences)) {
-            // テロップを最新ニュースに戻す
+          if (data && data.status === "ok" && (data.items || data.sentences)) {
+            // ▼▼▼ AI生成が完全に成功した段階で初めてテロップと日付を表示！ ▼▼▼
             if (newsTitleEl) newsTitleEl.textContent = item.title;
             if (newsDescEl) newsDescEl.textContent = plainDesc;
             if (newsBoardEl) newsBoardEl.classList.add("active");
+            if (catEl) catEl.textContent = item.categoryName || "";
+            if (progressBadge) {
+              progressBadge.style.display = "inline-block";
+              progressBadge.textContent = `${newsBroadcastState.currentIndex} / ${newsBroadcastState.totalCount}`;
+            }
+            if (newsDateEl) {
+              if (item.pubDate) {
+                const d = new Date(item.pubDate);
+                if (!isNaN(d.getTime())) {
+                  const y = d.getFullYear();
+                  const m = String(d.getMonth() + 1).padStart(2, "0");
+                  const day = String(d.getDate()).padStart(2, "0");
+                  const hh = String(d.getHours()).padStart(2, "0");
+                  const mm = String(d.getMinutes()).padStart(2, "0");
+                  newsDateEl.textContent = `${y}/${m}/${day} ${hh}:${mm}`;
+                } else {
+                  newsDateEl.textContent = item.pubDate;
+                }
+              } else {
+                newsDateEl.textContent = "";
+              }
+            }
+
+            // セットリストボードの進行目印を更新
+            updateNewsSetlistProgress(item.categoryKey || "cat_top", newsBroadcastState.currentIndex, newsBroadcastState.totalCount);
 
             const count = (data.items || data.sentences || []).length;
             console.log(`[ニュース原稿(Backend)] [${newsBroadcastState.currentIndex}/${newsBroadcastState.totalCount}件] 「${data.fullText}」 (${count}文)`);
@@ -1650,14 +1631,16 @@ ${creditsInstruction}
         }
       }
 
-      // ▼▼▼ サーバー未起動、502/504エラー、または通信断線時の待機＆自己修復 ▼▼▼
-      console.warn("[ニュース番組] ⚠️ 原稿サーバー未応答またはエラー検知。復旧待機＆サーバー自動再起動を試行中...");
+      // ▼▼▼ 異常発生時: ニュースは絶対に読まない！「しばらくお待ちください」待機画面に切り替え ▼▼▼
+      console.warn("[ニュース番組] ⚠️ 異常検知（AI未応答・エラーまたはAPIキー未設定）。待機画面へ移行し復旧を待ちます...");
 
-      // 1. テロップを待機画面へ切り替え
+      // 1. テロップを「しばらくお待ちください」待機画面へ切り替え
       const newsArticleTitleEl = document.getElementById("news-article-title");
       const newsArticleDescEl = document.getElementById("news-article-desc");
       if (newsArticleTitleEl) newsArticleTitleEl.textContent = "📡 通信状況を確認中...";
       if (newsArticleDescEl) newsArticleDescEl.textContent = "原稿サーバーまたはネットワークの復旧を待機しています。しばらくお待ちください...";
+      if (catEl) catEl.textContent = "待機中";
+      if (newsBoardEl) newsBoardEl.classList.add("active");
 
       // 2. 待機アナウンス（初回のみ発話）
       if (!hasAnnouncedOutage) {
