@@ -454,10 +454,15 @@ function initChatClient() {
     if (window.youtubeScheduleTimer) clearInterval(window.youtubeScheduleTimer);
   }
 
-  function startYoutubeConnection(videoId) {
+  async function startYoutubeConnection(videoId) {
     if (!videoId) return;
     window.isYoutubeIntendedConnect = true;
     if (youtubeStatus) youtubeStatus.textContent = "接続中...";
+
+    // サーバーが未起動の場合は自動起動
+    try {
+      fetch("/_api/servers/youtube_comment_server/start", { method: "POST" }).catch(() => {});
+    } catch (e) {}
 
     if (youtubeWs) {
       try { youtubeWs.close(); } catch (e) {}

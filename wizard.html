@@ -223,7 +223,7 @@
                     <span id="status-local-api" style="font-weight: bold; color: #ff7675;">🔴 確認中...</span>
                 </div>
                 <div class="status-row">
-                    <span>YouTube コメントサーバー (port 8002)</span>
+                    <span>YouTube コメントサーバー (port 8768)</span>
                     <span id="status-yt-server" style="font-weight: bold; color: #ff7675;">🔴 確認中...</span>
                 </div>
                 <div class="status-row">
@@ -541,18 +541,39 @@
                 }
             }
 
-            // YouTube Comment Server
+            // YouTube Comment Server (WebSocket port 8768)
             const elYt = document.getElementById("status-yt-server");
             try {
-                const r = await fetch("http://localhost:8002/comments", { cache: "no-store" });
-                if (elYt) {
-                    elYt.textContent = "🟢 正常動作中";
-                    elYt.style.color = "#00e676";
+                let isUp = false;
+                try {
+                    const statusRes = await fetch("/_api/servers", { cache: "no-store" });
+                    if (statusRes.ok) {
+                        const statusData = await statusRes.json();
+                        if (statusData.youtube_comment_server) isUp = true;
+                    }
+                } catch(e) {}
+
+                if (!isUp) {
+                    const wsTest = new WebSocket("ws://localhost:8768");
+                    isUp = await new Promise((resolve) => {
+                        wsTest.onopen = () => { wsTest.close(); resolve(true); };
+                        wsTest.onerror = () => { resolve(false); };
+                        setTimeout(() => { try { wsTest.close(); } catch(e){} resolve(false); }, 1000);
+                    });
+                }
+
+                if (isUp) {
+                    if (elYt) {
+                        elYt.textContent = "🟢 正常動作中";
+                        elYt.style.color = "#00e676";
+                    }
+                } else {
+                    throw new Error("unconnected");
                 }
             } catch (e) {
                 if (elYt) {
-                    elYt.textContent = "🟡 未起動 (コメント受信時に起動)";
-                    elYt.style.color = "#ffeaa7";
+                    elYt.textContent = "🔴 停止中 (配信開始時に自動起動)";
+                    elYt.style.color = "#ff7675";
                 }
             }
 
@@ -1477,7 +1498,11 @@
                     }
                 }
 
-                // 1. YouTube枠ID
+                // 1. YouTube枠ID & コメントサーバー自動起動
+                try {
+                    fetch("/_api/servers/youtube_comment_server/start", { method: "POST" }).catch(() => {});
+                } catch(e) {}
+
                 const ytVal = document.getElementById("wizard-yt-input").value.trim();
                 const mainYt = openerWin.document.getElementById("youtube-video-input");
                 if (ytVal) {
