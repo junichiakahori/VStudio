@@ -634,18 +634,10 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                         raw_text = ""
 
                 if not raw_text:
-                    suffix = "なのだ。" if is_zunda else ("にゃ。" if is_cat else "です。")
                     prefix = transition.replace("「", "").replace("」", "")
-                    clean_desc = (description or "").strip()
-                    if title and clean_desc.startswith(title):
-                        clean_desc = clean_desc[len(title):].strip()
-                    if clean_desc.startswith(" - ") or clean_desc.startswith(" ｜ ") or clean_desc.startswith("｜"):
-                        clean_desc = clean_desc.lstrip(" -｜")
-                    desc_summary = clean_desc[:120].strip() if clean_desc else ""
-                    if desc_summary:
-                        raw_text = f"{prefix}\n{title}。\n{desc_summary}{suffix}"
-                    else:
-                        raw_text = f"{prefix}\n{title}{suffix}"
+                    clean_title = re.sub(r'\s*[-|｜]\s*[^|｜-]+$', '', title).strip()
+                    comment = "リスナーのみんなもぜひチェックしてほしいのだ！" if is_zunda else ("リスナーのみんなもぜひチェックしてほしいにゃ！" if is_cat else "リスナーの皆様もぜひチェックしてください！")
+                    raw_text = f"{prefix}\n{clean_title}。\n{comment}"
 
                 # クリーンアップ
                 clean_text = raw_text.replace("「", "").replace("」", "").replace("（", "").replace("）", "").strip()
@@ -757,23 +749,33 @@ def apply_backend_pronunciation_dict(text):
     return processed
 
 def call_gemini_backend(prompt, api_key, model="gemini-1.5-flash"):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    headers = {
-        "Content-Type": "application/json",
-        "x-goog-api-key": api_key
-    }
-    body = {
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}]
-    }
-    req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), headers=headers, method="POST")
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    with urllib.request.urlopen(req, context=ctx, timeout=15) as res:
-        res_json = json.loads(res.read().decode("utf-8"))
-        candidates = res_json.get("candidates", [])
-        if candidates:
-            return candidates[0]["content"]["parts"][0]["text"].strip()
+    models_to_try = [model] if model else []
+    for default_m in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
+        if default_m not in models_to_try:
+            models_to_try.append(default_m)
+
+    for m in models_to_try:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent"
+            headers = {
+                "Content-Type": "application/json",
+                "x-goog-api-key": api_key
+            }
+            body = {
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}]
+            }
+            req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), headers=headers, method="POST")
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, context=ctx, timeout=15) as res:
+                res_json = json.loads(res.read().decode("utf-8"))
+                candidates = res_json.get("candidates", [])
+                if candidates and "content" in candidates[0] and "parts" in candidates[0]["content"]:
+                    return candidates[0]["content"]["parts"][0]["text"].strip()
+        except Exception as e:
+            print(f"[Gemini Backend] モデル '{m}' 試行エラー: {e}")
+            continue
     return ""
 
 def call_openai_backend(prompt, api_key, model="gpt-4o-mini"):

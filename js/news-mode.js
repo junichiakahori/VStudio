@@ -1257,12 +1257,13 @@ ${creditsInstruction}
   // ========================
   // ニュース番組 全自動進行
   // ========================
-  let newsBroadcastState = {
+  let newsBroadcastState = window.newsBroadcastState || {
     isRunning: false,
     currentIndex: 0,
     totalCount: 0,
     lastCategory: ""
   };
+  window.newsBroadcastState = newsBroadcastState;
 
   function getTimeBasedGreeting(isZunda = false, title = "ニュース番組") {
     const hour = new Date().getHours();
@@ -1569,9 +1570,9 @@ ${creditsInstruction}
     const apiKeyInput = document.getElementById("ai-api-key");
     const providerSelect = document.getElementById("ai-provider-select");
     const modelInput = document.getElementById("ai-model-input");
-    const apiKey = apiKeyInput ? apiKeyInput.value.trim() : "";
-    const provider = providerSelect ? providerSelect.value : "gemini";
-    const modelName = modelInput ? modelInput.value.trim() : "gemini-1.5-flash";
+    const apiKey = (apiKeyInput ? apiKeyInput.value.trim() : "") || localStorage.getItem("savedAiApiKey") || localStorage.getItem("ai_api_key") || "";
+    const provider = (providerSelect ? providerSelect.value : "") || localStorage.getItem("savedAiProvider") || "gemini";
+    const modelName = (modelInput ? modelInput.value.trim() : "") || localStorage.getItem("savedAiModel") || "gemini-1.5-flash";
 
     if (!apiKey) {
       console.warn("[ニュース番組] APIキーが設定されていません。AI設定を確認してください。");
