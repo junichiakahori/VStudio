@@ -92,6 +92,21 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             self.wfile.write(json.dumps(status, ensure_ascii=False).encode('utf-8'))
+        elif self.path.startswith('/api/youtube/list_broadcasts'):
+            import youtube_api_helper
+            try:
+                items = youtube_api_helper.list_my_broadcasts()
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True, "items": items}, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode('utf-8'))
         elif self.path == '/radio_script':
             # 既存のラジオ台本を返す
             if os.path.exists(RADIO_SCRIPT_FILE):

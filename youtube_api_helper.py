@@ -247,3 +247,31 @@ def upload_thumbnail(video_id, image_data):
         media_body=media
     )
     return req.execute()
+
+def list_my_broadcasts(max_results=15):
+    """自身のチャンネルの配信枠（upcoming/active/all）一覧を取得"""
+    service = get_authenticated_service()
+    if not service:
+        raise ValueError("YouTube API未認証です。Googleアカウント連携を行ってください。")
+
+    req = service.liveBroadcasts().list(
+        part="id,snippet,status,contentDetails",
+        mine=True,
+        maxResults=max_results
+    )
+    res = req.execute()
+    items = []
+    for item in res.get("items", []):
+        snippet = item.get("snippet", {})
+        status = item.get("status", {})
+        items.append({
+            "id": item.get("id"),
+            "title": snippet.get("title", "無題の配信"),
+            "description": snippet.get("description", ""),
+            "scheduledStartTime": snippet.get("scheduledStartTime"),
+            "lifeCycleStatus": status.get("lifeCycleStatus"),
+            "privacyStatus": status.get("privacyStatus"),
+            "url": f"https://www.youtube.com/watch?v={item.get('id')}"
+        })
+    return items
+

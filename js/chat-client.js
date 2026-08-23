@@ -465,6 +465,112 @@ function initChatClient() {
     });
   }
 
+  // メイン画面用 配信枠一覧モーダル
+  const mainModalPicker = document.getElementById("main-modal-broadcast-picker");
+  const mainBtnClosePicker = document.getElementById("main-btn-close-broadcast-picker");
+  const mainBtnOpenPicker = document.getElementById("youtube-select-modal-btn");
+  const mainListContainer = document.getElementById("main-broadcast-picker-list");
+  let mainCachedBroadcasts = [];
+  let mainActiveFilter = "all";
+
+  async function mainLoadBroadcasts() {
+    if (!mainListContainer) return;
+    mainListContainer.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:20px;">⏳ 配信枠一覧を取得中...</div>';
+    try {
+      const res = await fetch("http://localhost:8001/api/youtube/list_broadcasts", { cache: "no-store" });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.items)) {
+        mainCachedBroadcasts = data.items;
+        mainRenderBroadcasts();
+      } else {
+        mainListContainer.innerHTML = `<div style="color:#ff7675; font-size:0.8rem; text-align:center; padding:20px;">⚠️ 取得エラー: ${data.error || "未認証です"}</div>`;
+      }
+    } catch (err) {
+      mainListContainer.innerHTML = `<div style="color:#ff7675; font-size:0.8rem; text-align:center; padding:20px;">❌ 通信エラー: ${err.message}</div>`;
+    }
+  }
+
+  function mainRenderBroadcasts() {
+    if (!mainListContainer) return;
+    mainListContainer.innerHTML = "";
+    let filtered = mainCachedBroadcasts;
+    if (mainActiveFilter === "upcoming") {
+      filtered = mainCachedBroadcasts.filter(b => b.lifeCycleStatus === "ready" || b.lifeCycleStatus === "created" || b.lifeCycleStatus === "upcoming");
+    }
+    if (filtered.length === 0) {
+      mainListContainer.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:20px;">該当する配信枠が見つかりませんでした。</div>';
+      return;
+    }
+    filtered.forEach(item => {
+      const card = document.createElement("div");
+      card.style.cssText = "background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 10px 12px; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; gap: 4px;";
+      card.onmouseenter = () => { card.style.background = "rgba(0, 210, 211, 0.12)"; card.style.borderColor = "#00d2d3"; };
+      card.onmouseleave = () => { card.style.background = "rgba(255,255,255,0.05)"; card.style.borderColor = "rgba(255,255,255,0.1)"; };
+
+      let statusBadge = "⚪️ 待機中";
+      let statusColor = "#aaa";
+      if (item.lifeCycleStatus === "live") { statusBadge = "🟢 配信中 (Live)"; statusColor = "#00e676"; }
+      else if (item.lifeCycleStatus === "ready" || item.lifeCycleStatus === "upcoming") { statusBadge = "🟡 予約・待機中"; statusColor = "#ffb400"; }
+      else if (item.lifeCycleStatus === "complete") { statusBadge = "⚪️ 終了済"; statusColor = "#777"; }
+
+      let timeStr = "指定なし";
+      if (item.scheduledStartTime) {
+        try {
+          const d = new Date(item.scheduledStartTime);
+          timeStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        } catch (e) {}
+      }
+
+      let privacyBadge = item.privacyStatus === "public" ? "🌐 公開" : (item.privacyStatus === "unlisted" ? "🔒 限定公開" : "👁️ 非公開");
+
+      card.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:0.72rem; font-weight:bold; color:${statusColor};">${statusBadge}</span>
+          <span style="font-size:0.7rem; color:var(--text-muted); background:rgba(0,0,0,0.3); padding:2px 6px; border-radius:4px;">${privacyBadge}</span>
+        </div>
+        <div style="font-size:0.85rem; font-weight:bold; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+          ${item.title || "無題の配信"}
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:var(--text-muted); margin-top:2px;">
+          <span>⏰ 予定: ${timeStr}</span>
+          <span style="font-family:monospace; color:#00d2d3;">ID: ${item.id}</span>
+        </div>
+      `;
+
+      card.addEventListener("click", () => {
+        if (youtubeUserInput) {
+          youtubeUserInput.value = item.id;
+          localStorage.setItem("savedYoutubeVideoId", item.id);
+        }
+        if (mainModalPicker) mainModalPicker.style.display = "none";
+      });
+
+      mainListContainer.appendChild(card);
+    });
+  }
+
+  mainBtnOpenPicker?.addEventListener("click", () => {
+    if (mainModalPicker) mainModalPicker.style.display = "flex";
+    mainLoadBroadcasts();
+  });
+  mainBtnClosePicker?.addEventListener("click", () => {
+    if (mainModalPicker) mainModalPicker.style.display = "none";
+  });
+  mainModalPicker?.addEventListener("click", (e) => {
+    if (e.target === mainModalPicker) mainModalPicker.style.display = "none";
+  });
+  document.getElementById("main-filter-all-broadcasts")?.addEventListener("click", (e) => {
+    mainActiveFilter = "all";
+    mainRenderBroadcasts();
+  });
+  document.getElementById("main-filter-upcoming-broadcasts")?.addEventListener("click", (e) => {
+    mainActiveFilter = "upcoming";
+    mainRenderBroadcasts();
+  });
+  document.getElementById("main-btn-refresh-broadcasts")?.addEventListener("click", () => {
+    mainLoadBroadcasts();
+  });
+
   if (youtubeUserInput) {
     youtubeUserInput.addEventListener("change", () => {
       const newId = youtubeUserInput.value.trim();
