@@ -617,8 +617,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 3. **テンポの良い短文構成**: 1文は20〜35文字程度で句点「。」で区切り、長文を1文でダラダラ話さないようにしてください。
 4. **自然な日本語表記**: 字幕用として読みやすい自然な日本語（漢字・ひらがな・カタカナ）で表記してください。
 5. **前置き挨拶の重複禁止**: {transition}は冒頭に1度だけ発話し、2文目以降に「次のニュースです」「続いてのニュース」などの前置きを絶対に重複させないこと。
-6. **余計な注釈の禁止**: セリフ以外の前置きや解説（「」「（）」等）は出力せず、発話するセリフのみを出力してください。
-7. **誤読しやすい言葉の平仮名化**: 音声合成が誤読しやすい漢字（例: 辛い→つらい、焦る→あせる、お家→おうち、何事→なにごと、〜件→〜けん、一日中→いちにちじゅう等）は最初から自然な平仮名で表記してください。
+6. **余計な注釈の禁止**: セリフ以外の前置きや解説（「」等）は出力せず、発話するセリフのみを出力してください。
+7. **人名・固有名詞・難読語のふりがな付与**:
+   日本の人名、著名人、選手、政治家、芸能人、グループ名など、読み間違いやすい固有名詞は、必ず【漢字（ひらがな）】または【英語（カタカナ）】の形式で出力してください。
+   （例: 角田裕毅（つのだ ゆうき）選手、松村北斗（まつむら ほくと）さん、大谷翔平（おおたに しょうへい）選手、SixTONES（ストーンズ）、ランド・ノリス選手）
+8. **誤読しやすい日常語の平仮名化**: 音声合成が誤読しやすい漢字（例: 辛い→つらい、焦る→あせる、お家→おうち、何事→なにごと、〜件→〜けん、一日中→いちにちじゅう等）は最初から自然な平仮名で表記してください。
 
 【ニュースタイトル】: {title}
 【概要】: {description}"""
@@ -644,8 +647,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps({"error": "AI generation failed. Switching to standby waiting mode."}).encode('utf-8'))
                     return
 
-                # クリーンアップ
-                clean_text = raw_text.replace("「", "").replace("」", "").replace("（", "").replace("）", "").strip()
+                # クリーンアップ（カギ括弧のみ除去し、ルビ用の括弧（）は保持）
+                clean_text = raw_text.replace("「", "").replace("」", "").strip()
                 
                 # 1文ずつ（句点・感嘆符・疑問符・改行）に正確に分割（M!LK等の単語内感嘆符は除外）
                 split_sentences = [s.strip() for s in re.split(r'(?<=[。！？\n])|(?<=[!?])(?![A-Za-z0-9])', clean_text) if s.strip()]
@@ -675,15 +678,23 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     deduped_sentences.append(s)
                 raw_sentences = deduped_sentences if deduped_sentences else split_sentences
                 
-                # 音声読みはローカル辞書適用済みのテキストをそのまま使用（API無駄打ちを完全排除）
-                final_sentences = [apply_backend_pronunciation_dict(s) for s in raw_sentences]
-                
+                # ▼▼▼ 字幕用テキスト(display) と VOICEVOX発音用テキスト(speech) のスマート分離 ▼▼▼
                 items = []
-                for orig_s, speech_s in zip(raw_sentences, final_sentences):
+                for s in raw_sentences:
+                    # 字幕用: 漢字（ふりがな）から（ふりがな）を除去して綺麗な漢字表記にする
+                    display_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\1', s)
+                    display_s = display_s.replace("（", "").replace("）", "").replace("(", "").replace(")", "").strip()
+
+                    # 音声用: 漢字（ふりがな）を【ふりがな】に置換してVOICEVOXに100%正確に読ませる
+                    speech_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\2', s)
+                    speech_s = apply_backend_pronunciation_dict(speech_s)
+
                     items.append({
-                        "display": orig_s,
+                        "display": display_s,
                         "speech": speech_s
                     })
+                
+                final_sentences = [it["speech"] for it in items]
 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json; charset=utf-8')
