@@ -216,3 +216,40 @@ window.ensureObsStreamingStopped = async function () {
   }
   return false;
 };
+
+// OBS内のテキストソース（テロップやタイトル表示枠）へ自動反映
+window.updateObsTextInputs = async function (title) {
+  if (!title) return;
+  if (typeof isObsWsConnected === "undefined" || !isObsWsConnected || !window.obsWsClient) {
+    return;
+  }
+  try {
+    const inputs = await window.obsWsClient.call("GetInputList");
+    if (inputs && inputs.inputs) {
+      for (const input of inputs.inputs) {
+        const name = input.inputName || "";
+        const kind = input.inputKind || "";
+        // テキストソース、または名前に「タイトル」「Title」「テロップ」が含まれるソースを更新
+        if (
+          kind.includes("text") ||
+          name.includes("タイトル") ||
+          name.toLowerCase().includes("title") ||
+          name.includes("テロップ")
+        ) {
+          try {
+            await window.obsWsClient.call("SetInputSettings", {
+              inputName: name,
+              inputSettings: { text: title }
+            });
+            console.log(`[OBS] ✅ テキストソース「${name}」に配信タイトルを自動反映しました: ${title}`);
+          } catch (err) {
+            console.warn(`[OBS] ソース「${name}」への書き込みスキップ:`, err);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("[OBS] テキストソース一覧取得エラー:", e);
+  }
+};
+
