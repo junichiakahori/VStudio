@@ -256,13 +256,14 @@
       const scheduleInput = document.getElementById("local-schedule-time");
       let scheduledStartTime = null;
       if (scheduleInput && scheduleInput.value) {
-        const now = new Date();
-        const [h, m] = scheduleInput.value.split(":").map(Number);
-        const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
-        if (targetDate < now && (now.getTime() - targetDate.getTime()) > 10 * 60 * 1000) {
-          targetDate.setDate(targetDate.getDate() + 1);
+        if (scheduleInput.value.includes("T")) {
+          scheduledStartTime = new Date(scheduleInput.value).toISOString();
+        } else {
+          const now = new Date();
+          const [h, m] = scheduleInput.value.split(":").map(Number);
+          const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+          scheduledStartTime = targetDate.toISOString();
         }
-        scheduledStartTime = targetDate.toISOString();
       }
 
       panelBtnUpdate.disabled = true;

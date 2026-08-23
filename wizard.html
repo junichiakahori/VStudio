@@ -1758,13 +1758,14 @@
             
             let scheduledStartTime = null;
             if (startTimeInputVal) {
-                const now = new Date();
-                const [h, m] = startTimeInputVal.split(":").map(Number);
-                const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
-                if (targetDate < now) {
-                    targetDate.setDate(targetDate.getDate() + 1); // 翌日
+                if (startTimeInputVal.includes("T")) {
+                    scheduledStartTime = new Date(startTimeInputVal).toISOString();
+                } else {
+                    const now = new Date();
+                    const [h, m] = startTimeInputVal.split(":").map(Number);
+                    const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+                    scheduledStartTime = targetDate.toISOString();
                 }
-                scheduledStartTime = targetDate.toISOString();
             }
 
             const btn = document.getElementById("btn-api-create-broadcast");
@@ -1840,13 +1841,14 @@
 
             let scheduledStartTime = null;
             if (startTimeInputVal) {
-                const now = new Date();
-                const [h, m] = startTimeInputVal.split(":").map(Number);
-                const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
-                if (targetDate < now && (now.getTime() - targetDate.getTime()) > 10 * 60 * 1000) {
-                    targetDate.setDate(targetDate.getDate() + 1); // 過去なら翌日
+                if (startTimeInputVal.includes("T")) {
+                    scheduledStartTime = new Date(startTimeInputVal).toISOString();
+                } else {
+                    const now = new Date();
+                    const [h, m] = startTimeInputVal.split(":").map(Number);
+                    const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+                    scheduledStartTime = targetDate.toISOString();
                 }
-                scheduledStartTime = targetDate.toISOString();
             }
 
             const btn = document.getElementById("btn-api-update-broadcast");
