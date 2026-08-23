@@ -369,6 +369,12 @@
                         <span style="font-size: 0.82rem; font-weight: bold; color: #00d2d3;">📋 OBS「配信の管理」/ YouTube予約用データ</span>
                         <button id="btn-copy-all-obs-info" class="btn" style="background: rgba(0,210,211,0.25); border: 1px solid #00d2d3; color: #fff; font-size: 0.7rem; padding: 3px 8px; border-radius: 4px; cursor: pointer;">📋 まとめてコピー</button>
                     </div>
+
+                    <!-- 朝 / 夜 スイッチ -->
+                    <div style="display:flex; gap:6px; margin-bottom:8px; background:rgba(0,0,0,0.3); padding:4px; border-radius:6px; border:1px solid rgba(255,255,255,0.1);">
+                        <button type="button" id="wizard-slot-morning-btn" class="btn" style="flex:1; background:rgba(255,180,0,0.25); border:1px solid #ffb400; color:#ffb400; font-size:0.75rem; font-weight:bold; padding:4px 2px; cursor:pointer; border-radius:4px; white-space:nowrap; transition:all 0.2s;">🌅 朝の配信 (4〜12時)</button>
+                        <button type="button" id="wizard-slot-evening-btn" class="btn" style="flex:1; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15); color:var(--text-muted); font-size:0.75rem; font-weight:bold; padding:4px 2px; cursor:pointer; border-radius:4px; white-space:nowrap; transition:all 0.2s;">🌙 夜の配信 (12〜4時)</button>
+                    </div>
                     
                     <!-- 配信タイトル -->
                     <div style="margin-bottom: 8px;">
@@ -1129,7 +1135,48 @@
         // 配信予約用メタデータ（タイトル・説明欄）自動生成
         let titlePatternIdx = 0;
         let lastMetaNewsCount = -1;
+        let wizardActiveSlot = (openerWin && openerWin.activeStreamSlot) || localStorage.getItem("savedStreamSlot") || (new Date().getHours() >= 4 && new Date().getHours() < 12 ? "morning" : "evening");
+
+        function updateWizardSlotUI() {
+            const morningBtn = document.getElementById("wizard-slot-morning-btn");
+            const eveningBtn = document.getElementById("wizard-slot-evening-btn");
+            if (morningBtn && eveningBtn) {
+                if (wizardActiveSlot === "morning") {
+                    morningBtn.style.background = "rgba(255,180,0,0.25)";
+                    morningBtn.style.borderColor = "#ffb400";
+                    morningBtn.style.color = "#ffb400";
+                    eveningBtn.style.background = "rgba(255,255,255,0.05)";
+                    eveningBtn.style.borderColor = "rgba(255,255,255,0.15)";
+                    eveningBtn.style.color = "var(--text-muted)";
+                } else {
+                    morningBtn.style.background = "rgba(255,255,255,0.05)";
+                    morningBtn.style.borderColor = "rgba(255,255,255,0.15)";
+                    morningBtn.style.color = "var(--text-muted)";
+                    eveningBtn.style.background = "rgba(108,92,231,0.25)";
+                    eveningBtn.style.borderColor = "#a29bfe";
+                    eveningBtn.style.color = "#a29bfe";
+                }
+            }
+        }
+
+        document.getElementById("wizard-slot-morning-btn")?.addEventListener("click", () => {
+            if (wizardActiveSlot !== "morning") {
+                wizardActiveSlot = "morning";
+                updateWizardSlotUI();
+                generateStreamReservationMetadata(true);
+            }
+        });
+
+        document.getElementById("wizard-slot-evening-btn")?.addEventListener("click", () => {
+            if (wizardActiveSlot !== "evening") {
+                wizardActiveSlot = "evening";
+                updateWizardSlotUI();
+                generateStreamReservationMetadata(true);
+            }
+        });
+
         function generateStreamReservationMetadata(forceRegen = false) {
+            updateWizardSlotUI();
             const today = new Date();
             const y = today.getFullYear();
             const m = today.getMonth() + 1;
@@ -1176,20 +1223,29 @@
             const defaultTororoFooter = `\n忙しいあなたも、これを見れば今日のニュースがバッチリわかる！今日も楽しくおしゃべりしながら見ていってね！\n\n◆オリジナルハッシュタグ\n#とろろニュース #とろろ生放送 #今日の気になる\n\n◆X（旧Twitter）はこちら！\nhttps://x.com/drone_akahori\n\n◆クレジット表記\n・Live2Dモデル: 「とろろ」© Live2D Inc. (Live2D Creative Studio サンプルモデル)\n・VOICE：VOICEVOX ずんだもん\n・BGM：ドローン赤堀 - Nukadaki\n・配信背景：喫茶あかほり ミクスタカフェ\n\n◆配信のルール・お願い\n・話題に出ていない他の配信者さんの名前を出すのは控えてね！\n・他の配信者さんの枠でとろろの名前を出す「伝書鳩行為」もNGだよ！\n・荒らしやスパムを見かけても、反応せずにブロック＆スルーのご協力をお願いします。\nみんなで楽しく居心地の良い配信にしようね！チャンネル登録と高評価もよろしくお願いします！`;
             const savedFooter = localStorage.getItem("savedCustomStreamDescFooter") || defaultTororoFooter;
 
+            const isMorning = (wizardActiveSlot === "morning");
             if (selectedMode === "news") {
                 const newsItems = (openerWin && openerWin.latestFetchedNews) ? openerWin.latestFetchedNews : [];
                 const count = newsItems.length;
                 
-                const titleTemplates = [
-                    `【${dateStr} 最新ニュース速報】注目の話題 ${count > 0 ? `${count}件` : ''}を一挙お届け！【AITuber生放送】`,
-                    `【最新ニュース生配信】国内・海外・ITの注目話題まとめ (${fullDateStr})`,
-                    `【生放送ニュース】最新の出来事を分かりやすく解説＆お届け！ (${dateStr})`,
-                    `【${fullDateStr} ニュース速報】今日知っておきたい最新ニュース (${count}件)`
+                const titleTemplates = isMorning ? [
+                    `【${dateStr} 朝の最新ニュース速報】出勤・通学前にサクッとチェック！☀️【AITuber生放送】`,
+                    `【朝の生放送】今日の最新ニュース速報＆注目トピックまとめ！☀️ (${fullDateStr})`,
+                    `【朝活ニュース速報】今日知っておきたい注目話題 ${count > 0 ? `${count}件` : ''}を一挙お届け！☀️`,
+                    `【${fullDateStr} 朝ニュース】今朝の最新出来事をお届け (${count}件)`
+                ] : [
+                    `【${dateStr} 夜の最新ニュース総ざらい】今日1日の重要トピックまとめ！🌙【AITuber生放送】`,
+                    `【夜の生放送】今日1日の重要ニュースを総ざらい！今夜のまとめ生配信🌙 (${fullDateStr})`,
+                    `【夜のニュース速報】今日起きた出来事をわかりやすく総まとめ！ (${count > 0 ? `${count}件` : ''})🌙`,
+                    `【${fullDateStr} 夜ニュース】今日押さえておきたい最新出来事 (${count}件)`
                 ];
                 suggestedTitle = titleTemplates[titlePatternIdx % titleTemplates.length];
 
                 // 説明欄（概要欄）の生成
-                suggestedDesc = `こんとろ〜！バーチャルキャスターのとろろがお送りする本日の総まとめニュース配信！\nパパッと今日の重要トピックをおさらいしちゃいます✨\n\n今回の振り返り項目：\n`;
+                const greeting = isMorning
+                    ? `おはようございます！バーチャルキャスターのとろろがお送りする朝の最新ニュース生配信！\n出勤・通学前にサクッと今日の重要トピックをチェックしちゃいましょう☀️\n\n本日の注目ニュース：\n`
+                    : `こんとろ〜！バーチャルキャスターのとろろがお送りする夜の総まとめニュース生配信！\n一日の終わりに今日の重要トピックをまるごとおさらいしちゃいます🌙\n\n今回の振り返り項目：\n`;
+                suggestedDesc = greeting;
                 if (newsItems.length > 0) {
                     newsItems.slice(0, 15).forEach((item) => {
                         suggestedDesc += `・${item.title}\n`;
@@ -1202,11 +1258,19 @@
                 }
                 suggestedDesc += savedFooter;
             } else if (selectedMode === "radio") {
-                suggestedTitle = `【まったりラジオ生放送】作業用BGM・フリートーク・お便り紹介 (${dateStr})`;
-                suggestedDesc = `ようこそ！まったりラジオ配信へ！\n\n作業のお供や就寝前のリラックスタイムにどうぞ☕️\nコメント・お便りお待ちしています！\n` + savedFooter;
+                suggestedTitle = isMorning
+                    ? `【朝のまったりラジオ生放送】爽やかな朝のBGM・フリートーク・お便り紹介 (${dateStr}) ☀️`
+                    : `【夜のまったりラジオ生放送】作業用BGM・フリートーク・お便り紹介 (${dateStr}) 🌙`;
+                suggestedDesc = (isMorning
+                    ? `おはようございます！朝のまったりラジオ配信へようこそ！\n\n朝の支度や作業のお供にどうぞ☕️\nコメント・お便りお待ちしています！\n`
+                    : `ようこそ！まったりラジオ配信へ！\n\n作業のお供や就寝前のリラックスタイムにどうぞ☕️\nコメント・お便りお待ちしています！\n`) + savedFooter;
             } else {
-                suggestedTitle = `【雑談・作業配信】初見さん大歓迎！コメント拾ってのんびりお話し (${dateStr})`;
-                suggestedDesc = `雑談配信へようこそ！\nコメントたくさん拾ってお話しします✨\n初見さんもお気軽にコメントしていってくださいね！\n` + savedFooter;
+                suggestedTitle = isMorning
+                    ? `【朝の雑談・作業配信】おはよう！初見さん大歓迎！朝のんびりトーク (${dateStr}) ☀️`
+                    : `【夜の雑談・作業配信】初見さん大歓迎！今日もお疲れ様トーク (${dateStr}) 🌙`;
+                suggestedDesc = (isMorning
+                    ? `おはようございます！朝の雑談配信へようこそ！\nコメントたくさん拾ってお話しします✨\n初見さんもお気軽にコメントしていってくださいね！\n`
+                    : `雑談配信へようこそ！\nコメントたくさん拾ってお話しします✨\n初見さんもお気軽にコメントしていってくださいね！\n`) + savedFooter;
             }
 
             const titleInput = document.getElementById("wizard-suggested-title");
@@ -1305,13 +1369,41 @@
         // 配信開始
         document.getElementById("nav-finish-btn").addEventListener("click", async () => {
             if (openerWin) {
-                // 0. タイトル・概要欄のメイン画面への同期
+                // 0. タイトル・概要欄のメイン画面への同期＆スロット保存
                 const titleVal = document.getElementById("wizard-suggested-title")?.value || "";
                 const descVal = document.getElementById("wizard-suggested-desc")?.value || "";
                 const mainTitle = openerWin.document.getElementById("stream-title");
                 const mainDesc = openerWin.document.getElementById("stream-description");
                 if (mainTitle && titleVal) mainTitle.value = titleVal;
                 if (mainDesc && descVal) mainDesc.value = descVal;
+
+                openerWin.activeStreamSlot = wizardActiveSlot;
+                openerWin.localStorage.setItem(`savedStreamTitle_${wizardActiveSlot}`, titleVal);
+                openerWin.localStorage.setItem(`savedStreamDesc_${wizardActiveSlot}`, descVal);
+                openerWin.localStorage.setItem("savedStreamTitle", titleVal);
+                openerWin.localStorage.setItem("savedStreamDesc", descVal);
+                openerWin.localStorage.setItem("savedStreamSlot", wizardActiveSlot);
+
+                // メイン画面側のスロットボタンスタイルも同期
+                const mainMorningBtn = openerWin.document.getElementById("stream-slot-morning-btn");
+                const mainEveningBtn = openerWin.document.getElementById("stream-slot-evening-btn");
+                if (mainMorningBtn && mainEveningBtn) {
+                    if (wizardActiveSlot === "morning") {
+                        mainMorningBtn.style.background = "rgba(255,180,0,0.25)";
+                        mainMorningBtn.style.borderColor = "#ffb400";
+                        mainMorningBtn.style.color = "#ffb400";
+                        mainEveningBtn.style.background = "rgba(255,255,255,0.05)";
+                        mainEveningBtn.style.borderColor = "rgba(255,255,255,0.15)";
+                        mainEveningBtn.style.color = "var(--text-muted)";
+                    } else {
+                        mainMorningBtn.style.background = "rgba(255,255,255,0.05)";
+                        mainMorningBtn.style.borderColor = "rgba(255,255,255,0.15)";
+                        mainMorningBtn.style.color = "var(--text-muted)";
+                        mainEveningBtn.style.background = "rgba(108,92,231,0.25)";
+                        mainEveningBtn.style.borderColor = "#a29bfe";
+                        mainEveningBtn.style.color = "#a29bfe";
+                    }
+                }
 
                 // 1. YouTube枠ID
                 const ytVal = document.getElementById("wizard-yt-input").value.trim();
