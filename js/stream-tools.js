@@ -165,6 +165,156 @@
     });
   }
 
+  // =====================================================================
+  // YouTube API 直接連携（パネル側）
+  // =====================================================================
+  const panelYtBadge = document.getElementById("panel-yt-oauth-badge");
+  const panelFeedback = document.getElementById("panel-yt-api-feedback");
+  const panelBtnCreate = document.getElementById("panel-btn-create-broadcast");
+  const panelBtnUpdate = document.getElementById("panel-btn-update-broadcast");
+  const panelBtnThumb = document.getElementById("panel-btn-upload-thumbnail");
+
+  function showPanelYtFeedback(msg, isSuccess = true) {
+    if (!panelFeedback) return;
+    panelFeedback.style.display = "block";
+    panelFeedback.textContent = msg;
+    panelFeedback.style.background = isSuccess ? "rgba(0,230,118,0.2)" : "rgba(255,118,117,0.2)";
+    panelFeedback.style.border = `1px solid ${isSuccess ? "#00e676" : "#ff7675"}`;
+    panelFeedback.style.color = isSuccess ? "#00e676" : "#ff7675";
+  }
+
+  async function updatePanelYtStatus() {
+    if (!panelYtBadge) return;
+    try {
+      const res = await fetch("http://localhost:8001/api/youtube/oauth_status", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.authenticated) {
+          panelYtBadge.textContent = `✅ 連携中 (${data.channel_title || "YouTube"})`;
+          panelYtBadge.style.color = "#00e676";
+          return true;
+        } else {
+          panelYtBadge.textContent = "⚠️ 未連携 (ウィザード等で認証可)";
+          panelYtBadge.style.color = "#ffeaa7";
+          return false;
+        }
+      }
+    } catch (e) {
+      panelYtBadge.textContent = "未確認";
+      panelYtBadge.style.color = "var(--text-muted)";
+    }
+    return false;
+  }
+
+  updatePanelYtStatus();
+
+  if (panelBtnCreate) {
+    panelBtnCreate.addEventListener("click", async () => {
+      const title = streamTitleInput ? streamTitleInput.value : "";
+      const desc = streamDescInput ? streamDescInput.value : "";
+      panelBtnCreate.disabled = true;
+      panelBtnCreate.textContent = "⏳ 作成中...";
+      showPanelYtFeedback("YouTube枠を作成中...", true);
+      try {
+        const res = await fetch("http://localhost:8001/api/youtube/create_broadcast", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, description: desc, privacyStatus: "unlisted" })
+        });
+        const data = await res.json();
+        if (data.success && data.id) {
+          showPanelYtFeedback(`✅ YouTube枠「${data.title}」を作成しました！(ID: ${data.id})`, true);
+          const ytInput = document.getElementById("youtube-video-input");
+          if (ytInput) {
+            ytInput.value = data.id;
+            localStorage.setItem("savedYoutubeVideoId", data.id);
+          }
+        } else {
+          showPanelYtFeedback(`❌ 枠作成エラー: ${data.error || "未認証またはエラー"}`, false);
+        }
+      } catch (err) {
+        showPanelYtFeedback(`❌ 通信エラー: ${err.message}`, false);
+      } finally {
+        panelBtnCreate.disabled = false;
+        panelBtnCreate.textContent = "🔴 枠を新規作成";
+      }
+    });
+  }
+
+  if (panelBtnUpdate) {
+    panelBtnUpdate.addEventListener("click", async () => {
+      const ytInput = document.getElementById("youtube-video-input");
+      const rawYt = ytInput ? ytInput.value.trim() : "";
+      const match = rawYt.match(/(?:v=|\/live\/|\/watch\?v=|youtu\.be\/|^)([a-zA-Z0-9_-]{11})/);
+      const videoId = match ? match[1] : rawYt;
+      if (!videoId || videoId.length < 5 || videoId.startsWith("@")) {
+        showPanelYtFeedback("⚠️ 更新対象の動画IDを「YouTube連携」枠に入力してください。", false);
+        return;
+      }
+      const title = streamTitleInput ? streamTitleInput.value : "";
+      const desc = streamDescInput ? streamDescInput.value : "";
+      panelBtnUpdate.disabled = true;
+      panelBtnUpdate.textContent = "⏳ 更新中...";
+      try {
+        const res = await fetch("http://localhost:8001/api/youtube/update_broadcast", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ videoId, title, description: desc })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showPanelYtFeedback(`✅ YouTube枠 (${videoId}) の情報を更新しました！`, true);
+        } else {
+          showPanelYtFeedback(`❌ 更新エラー: ${data.error || "エラー"}`, false);
+        }
+      } catch (err) {
+        showPanelYtFeedback(`❌ 通信エラー: ${err.message}`, false);
+      } finally {
+        panelBtnUpdate.disabled = false;
+        panelBtnUpdate.textContent = "📝 枠情報を更新";
+      }
+    });
+  }
+
+  if (panelBtnThumb) {
+    panelBtnThumb.addEventListener("click", async () => {
+      const ytInput = document.getElementById("youtube-video-input");
+      const rawYt = ytInput ? ytInput.value.trim() : "";
+      const match = rawYt.match(/(?:v=|\/live\/|\/watch\?v=|youtu\.be\/|^)([a-zA-Z0-9_-]{11})/);
+      const videoId = match ? match[1] : rawYt;
+      if (!videoId || videoId.length < 5 || videoId.startsWith("@")) {
+        showPanelYtFeedback("⚠️ 反映対象の動画IDを「YouTube連携」枠に入力してください。", false);
+        return;
+      }
+      const canvas = document.getElementById("thumb-preview-canvas") || document.getElementById("thumb-canvas");
+      if (!canvas) {
+        showPanelYtFeedback("⚠️ サムネイルエディタでサムネイルを生成してください。", false);
+        return;
+      }
+      const imageData = canvas.toDataURL("image/png");
+      panelBtnThumb.disabled = true;
+      panelBtnThumb.textContent = "⏳ 送信中...";
+      try {
+        const res = await fetch("http://localhost:8001/api/youtube/upload_thumbnail", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ videoId, imageData })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showPanelYtFeedback(`✅ サムネイルをYouTube枠 (${videoId}) に反映しました！`, true);
+        } else {
+          showPanelYtFeedback(`❌ サムネ反映エラー: ${data.error || "エラー"}`, false);
+        }
+      } catch (err) {
+        showPanelYtFeedback(`❌ 通信エラー: ${err.message}`, false);
+      } finally {
+        panelBtnThumb.disabled = false;
+        panelBtnThumb.textContent = "🖼️ サムネをYouTubeに送信";
+      }
+    });
+  }
+
   // サムネイルエディタ
   window.openThumbEditorBtn = document.getElementById("open-thumb-editor-btn");
   window.thumbEditorModal = document.getElementById("thumbnail-editor-modal");

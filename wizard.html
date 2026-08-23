@@ -367,6 +367,41 @@
                     </div>
                 </div>
 
+                <!-- 🚀 YouTube API 直接連携（自動枠作成・情報更新・サムネ反映） -->
+                <div style="background: rgba(255, 0, 0, 0.08); border: 1px solid rgba(255, 0, 0, 0.35); border-radius: 8px; padding: 12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                        <span style="font-size: 0.82rem; font-weight: bold; color: #ff7675;">🚀 YouTube API 直接連携（自動反映）</span>
+                        <div id="yt-oauth-status-container" style="font-size: 0.75rem; display:flex; align-items:center; gap:6px;">
+                            <span id="yt-oauth-badge" style="color: var(--text-muted);">認証確認中...</span>
+                            <button id="btn-yt-oauth-login" type="button" class="btn" style="display:none; background: #ff4444; color: #fff; font-size: 0.7rem; padding: 3px 8px; border-radius: 4px; border:none; cursor:pointer; font-weight:bold;">🔑 Google連携</button>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:6px; margin-bottom: 8px; align-items:center;">
+                        <label style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap;">公開設定:</label>
+                        <select id="wizard-privacy-status" style="flex:1; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.2); border-radius:4px; padding:4px 8px; color:#fff; font-size:0.75rem; outline:none;">
+                            <option value="unlisted" selected>🔒 限定公開 (推奨・テスト用)</option>
+                            <option value="public">🌐 公開 (一般リスナー向け)</option>
+                            <option value="private">👁️ 非公開 (自分のみ)</option>
+                        </select>
+                    </div>
+
+                    <div style="display:flex; flex-direction:column; gap:6px;">
+                        <div style="display:flex; gap:6px;">
+                            <button type="button" id="btn-api-create-broadcast" class="btn" style="flex:1; background: linear-gradient(135deg, #ff0000, #c0392b); color: #fff; font-size: 0.75rem; font-weight: bold; padding: 7px 6px; border-radius: 4px; border: none; cursor: pointer; white-space: nowrap; transition: all 0.2s;">
+                                🔴 YouTube枠を自動作成・予約
+                            </button>
+                            <button type="button" id="btn-api-update-broadcast" class="btn" style="flex:1; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25); color: #fff; font-size: 0.75rem; font-weight: bold; padding: 7px 6px; border-radius: 4px; cursor: pointer; white-space: nowrap; transition: all 0.2s;">
+                                📝 既存枠の情報を更新
+                            </button>
+                        </div>
+                        <button type="button" id="btn-api-upload-thumbnail" class="btn" style="width:100%; background: rgba(0, 210, 211, 0.15); border: 1px solid #00d2d3; color: #00d2d3; font-size: 0.75rem; font-weight: bold; padding: 6px 10px; border-radius: 4px; cursor: pointer; transition: all 0.2s;">
+                            🖼️ 現在のサムネイルをYouTubeに自動アップロード
+                        </button>
+                    </div>
+                    <div id="yt-api-feedback-msg" style="display:none; margin-top:6px; font-size:0.75rem; padding:5px 8px; border-radius:4px;"></div>
+                </div>
+
                 <!-- 📋 OBS / YouTube 配信予約用データ（ワンクリックコピー） -->
                 <div style="background: rgba(0, 210, 211, 0.08); border: 1px solid rgba(0, 210, 211, 0.35); border-radius: 8px; padding: 12px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
@@ -1225,6 +1260,7 @@
             }
 
             generateStreamReservationMetadata(false);
+            if (typeof checkYoutubeOAuthStatus === "function") checkYoutubeOAuthStatus();
         }
 
         // 配信予約用メタデータ（タイトル・説明欄）自動生成
@@ -1502,6 +1538,270 @@
         document.getElementById("btn-regen-title")?.addEventListener("click", () => {
             titlePatternIdx++;
             generateStreamReservationMetadata(true);
+        });
+
+        // =====================================================================
+        // YouTube API 直接連携ハンドラ (枠作成・更新・サムネ反映)
+        // =====================================================================
+        function showYtApiFeedback(msg, isSuccess = true, isWarning = false) {
+            const el = document.getElementById("yt-api-feedback-msg");
+            if (!el) return;
+            el.style.display = "block";
+            el.textContent = msg;
+            if (isWarning) {
+                el.style.background = "rgba(255, 180, 0, 0.2)";
+                el.style.border = "1px solid #ffb400";
+                el.style.color = "#ffeaa7";
+            } else if (isSuccess) {
+                el.style.background = "rgba(0, 230, 118, 0.2)";
+                el.style.border = "1px solid #00e676";
+                el.style.color = "#00e676";
+            } else {
+                el.style.background = "rgba(255, 118, 117, 0.2)";
+                el.style.border = "1px solid #ff7675";
+                el.style.color = "#ff7675";
+            }
+        }
+
+        async function checkYoutubeOAuthStatus() {
+            const badge = document.getElementById("yt-oauth-badge");
+            const loginBtn = document.getElementById("btn-yt-oauth-login");
+            try {
+                const res = await fetch("http://localhost:8001/api/youtube/oauth_status", { cache: "no-store" });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.authenticated) {
+                        if (badge) {
+                            badge.textContent = `✅ 連携中 (${data.channel_title || "YouTube"})`;
+                            badge.style.color = "#00e676";
+                        }
+                        if (loginBtn) loginBtn.style.display = "none";
+                        return true;
+                    } else {
+                        if (badge) {
+                            badge.textContent = data.has_client_secret ? "⚠️ Google未連携" : "⚠️ client_secret.json 未検出";
+                            badge.style.color = "#ffeaa7";
+                        }
+                        if (loginBtn) {
+                            loginBtn.style.display = data.has_client_secret ? "inline-block" : "none";
+                        }
+                        return false;
+                    }
+                }
+            } catch (e) {
+                if (badge) {
+                    badge.textContent = "⚠️ サーバー確認中";
+                    badge.style.color = "var(--text-muted)";
+                }
+            }
+            return false;
+        }
+
+        document.getElementById("btn-yt-oauth-login")?.addEventListener("click", async () => {
+            const btn = document.getElementById("btn-yt-oauth-login");
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = "認証中...";
+            }
+            showYtApiFeedback("🌐 ブラウザでGoogleログイン・アクセス許可を行ってください...", true, true);
+            try {
+                const res = await fetch("http://localhost:8001/api/youtube/start_oauth", { method: "POST" });
+                const data = await res.json();
+                if (data.success && data.authenticated) {
+                    showYtApiFeedback(`✅ Google連携が完了しました！（チャンネル: ${data.channel_title}）`, true);
+                    checkYoutubeOAuthStatus();
+                } else {
+                    showYtApiFeedback(`❌ 連携に失敗しました: ${data.error || "ユーザーキャンセルまたはエラー"}`, false);
+                }
+            } catch (err) {
+                showYtApiFeedback(`❌ 連携通信エラー: ${err.message}`, false);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = "🔑 Google連携";
+                }
+                checkYoutubeOAuthStatus();
+            }
+        });
+
+        // 🔴 YouTube枠の新規作成
+        document.getElementById("btn-api-create-broadcast")?.addEventListener("click", async () => {
+            const titleVal = document.getElementById("wizard-suggested-title")?.value || "";
+            const descVal = document.getElementById("wizard-suggested-desc")?.value || "";
+            const privacyStatus = document.getElementById("wizard-privacy-status")?.value || "unlisted";
+            const startTimeInputVal = document.getElementById("wizard-start-time")?.value;
+            
+            let scheduledStartTime = null;
+            if (startTimeInputVal) {
+                const now = new Date();
+                const [h, m] = startTimeInputVal.split(":").map(Number);
+                const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+                if (targetDate < now) {
+                    targetDate.setDate(targetDate.getDate() + 1); // 翌日
+                }
+                scheduledStartTime = targetDate.toISOString();
+            }
+
+            const btn = document.getElementById("btn-api-create-broadcast");
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = "⏳ 作成中...";
+            }
+            showYtApiFeedback("🚀 YouTube上に新規配信予約枠を作成中...", true, true);
+
+            try {
+                const isAuthed = await checkYoutubeOAuthStatus();
+                if (!isAuthed) {
+                    showYtApiFeedback("⚠️ 先に「🔑 Google連携」ボタンを押してログインしてください。", false);
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = "🔴 YouTube枠を自動作成・予約";
+                    }
+                    return;
+                }
+
+                const res = await fetch("http://localhost:8001/api/youtube/create_broadcast", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        title: titleVal,
+                        description: descVal,
+                        scheduledStartTime: scheduledStartTime,
+                        privacyStatus: privacyStatus
+                    })
+                });
+                const data = await res.json();
+                if (data.success && data.id) {
+                    showYtApiFeedback(`✅ YouTube枠「${data.title}」を自動作成しました！ (ID: ${data.id})`, true);
+                    const ytInput = document.getElementById("wizard-yt-input");
+                    if (ytInput) {
+                        ytInput.value = data.id;
+                        fetchYoutubeVideoInfo(data.id);
+                    }
+                    // メイン画面の動画IDも即時更新
+                    if (openerWin) {
+                        const mainYt = openerWin.document.getElementById("youtube-video-input");
+                        if (mainYt) mainYt.value = data.id;
+                        openerWin.localStorage.setItem("savedYoutubeVideoId", data.id);
+                    }
+                } else {
+                    showYtApiFeedback(`❌ 枠作成エラー: ${data.error || "不明なエラー"}`, false);
+                }
+            } catch (err) {
+                showYtApiFeedback(`❌ 通信エラー: ${err.message}`, false);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = "🔴 YouTube枠を自動作成・予約";
+                }
+            }
+        });
+
+        // 📝 既存枠のタイトル・概要欄をYouTubeに更新反映
+        document.getElementById("btn-api-update-broadcast")?.addEventListener("click", async () => {
+            const rawYt = document.getElementById("wizard-yt-input")?.value.trim() || "";
+            const match = rawYt.match(/(?:v=|\/live\/|\/watch\?v=|youtu\.be\/|^)([a-zA-Z0-9_-]{11})/);
+            const videoId = match ? match[1] : rawYt;
+
+            if (!videoId || videoId.length < 5 || videoId.startsWith("@")) {
+                showYtApiFeedback("⚠️ 更新対象のYouTube動画IDを入力するか、「枠を自動作成」してください。", false);
+                return;
+            }
+
+            const titleVal = document.getElementById("wizard-suggested-title")?.value || "";
+            const descVal = document.getElementById("wizard-suggested-desc")?.value || "";
+            const privacyStatus = document.getElementById("wizard-privacy-status")?.value || "unlisted";
+
+            const btn = document.getElementById("btn-api-update-broadcast");
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = "⏳ 更新中...";
+            }
+            showYtApiFeedback("📝 YouTubeの配信枠情報を更新中...", true, true);
+
+            try {
+                const res = await fetch("http://localhost:8001/api/youtube/update_broadcast", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        videoId: videoId,
+                        title: titleVal,
+                        description: descVal,
+                        privacyStatus: privacyStatus
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showYtApiFeedback(`✅ YouTube枠 (${videoId}) のタイトル・説明文を更新しました！`, true);
+                    fetchYoutubeVideoInfo(videoId);
+                } else {
+                    showYtApiFeedback(`❌ 更新エラー: ${data.error || "不明なエラー"}`, false);
+                }
+            } catch (err) {
+                showYtApiFeedback(`❌ 通信エラー: ${err.message}`, false);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = "📝 既存枠の情報を更新";
+                }
+            }
+        });
+
+        // 🖼️ 現在のサムネイルをYouTubeに自動アップロード
+        document.getElementById("btn-api-upload-thumbnail")?.addEventListener("click", async () => {
+            const rawYt = document.getElementById("wizard-yt-input")?.value.trim() || "";
+            const match = rawYt.match(/(?:v=|\/live\/|\/watch\?v=|youtu\.be\/|^)([a-zA-Z0-9_-]{11})/);
+            const videoId = match ? match[1] : rawYt;
+
+            if (!videoId || videoId.length < 5 || videoId.startsWith("@")) {
+                showYtApiFeedback("⚠️ サムネイル反映対象のYouTube動画IDを入力するか、「枠を自動作成」してください。", false);
+                return;
+            }
+
+            // メイン画面のサムネイルCanvasから画像データを取得
+            let imageData = null;
+            if (openerWin) {
+                const canvas = openerWin.document.getElementById("thumb-canvas");
+                if (canvas && typeof canvas.toDataURL === "function") {
+                    imageData = canvas.toDataURL("image/png");
+                }
+            }
+
+            if (!imageData) {
+                showYtApiFeedback("⚠️ サムネイル画像が生成されていません。メイン画面の「サムネイルエディタ」で作成してください。", false);
+                return;
+            }
+
+            const btn = document.getElementById("btn-api-upload-thumbnail");
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = "⏳ アップロード中...";
+            }
+            showYtApiFeedback("🖼️ サムネイル画像をYouTubeに送信中...", true, true);
+
+            try {
+                const res = await fetch("http://localhost:8001/api/youtube/upload_thumbnail", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        videoId: videoId,
+                        imageData: imageData
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showYtApiFeedback(`✅ サムネイル画像をYouTube枠 (${videoId}) に反映完了しました！🎉`, true);
+                } else {
+                    showYtApiFeedback(`❌ サムネイル反映エラー: ${data.error || "不明なエラー"}`, false);
+                }
+            } catch (err) {
+                showYtApiFeedback(`❌ 通信エラー: ${err.message}`, false);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = "🖼️ 現在のサムネイルをYouTubeに自動アップロード";
+                }
+            }
         });
 
         // 終了方法モードの切り替え

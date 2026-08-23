@@ -84,6 +84,14 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                         se_files.append(name_without_ext)
             
             self.wfile.write(json.dumps({"files": se_files}, ensure_ascii=False).encode('utf-8'))
+        elif self.path == '/api/youtube/oauth_status':
+            import youtube_api_helper
+            status = youtube_api_helper.get_oauth_status()
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps(status, ensure_ascii=False).encode('utf-8'))
         elif self.path == '/radio_script':
             # 既存のラジオ台本を返す
             if os.path.exists(RADIO_SCRIPT_FILE):
@@ -576,6 +584,86 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
+        elif self.path == '/api/youtube/start_oauth':
+            import youtube_api_helper
+            try:
+                status = youtube_api_helper.start_oauth_flow()
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True, **status}, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode('utf-8'))
+        elif self.path == '/api/youtube/create_broadcast':
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            import youtube_api_helper
+            try:
+                payload = json.loads(post_data.decode('utf-8')) if post_data else {}
+                title = payload.get('title', '')
+                description = payload.get('description', '')
+                start_time_iso = payload.get('scheduledStartTime')
+                privacy_status = payload.get('privacyStatus', 'unlisted')
+                res = youtube_api_helper.create_live_broadcast(title, description, start_time_iso, privacy_status)
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True, **res}, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode('utf-8'))
+        elif self.path == '/api/youtube/update_broadcast':
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            import youtube_api_helper
+            try:
+                payload = json.loads(post_data.decode('utf-8')) if post_data else {}
+                video_id = payload.get('videoId', '').strip()
+                title = payload.get('title')
+                description = payload.get('description')
+                start_time_iso = payload.get('scheduledStartTime')
+                privacy_status = payload.get('privacyStatus')
+                res = youtube_api_helper.update_live_broadcast(video_id, title, description, start_time_iso, privacy_status)
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True, "videoId": video_id, "data": res}, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode('utf-8'))
+        elif self.path == '/api/youtube/upload_thumbnail':
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            import youtube_api_helper
+            try:
+                payload = json.loads(post_data.decode('utf-8')) if post_data else {}
+                video_id = payload.get('videoId', '').strip()
+                image_data = payload.get('imageData', '')
+                res = youtube_api_helper.upload_thumbnail(video_id, image_data)
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True, "videoId": video_id, "data": res}, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode('utf-8'))
         elif self.path == '/api/news/generate_item_script':
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
