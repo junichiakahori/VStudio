@@ -406,11 +406,12 @@ async def fetch_stats(video_id):
                     res = await asyncio.to_thread(req.execute)
                     if res and "items" in res and len(res["items"]) > 0:
                         item = res["items"][0]
+                        stats = item.get("statistics", {})
                         lsd = item.get("liveStreamingDetails", {})
-                        if "concurrentViewers" in lsd:
+                        if "viewCount" in stats:
+                            viewers = f"{int(stats['viewCount']):,}"
+                        elif "concurrentViewers" in lsd:
                             viewers = f"{int(lsd['concurrentViewers']):,}"
-                        elif "viewCount" in item.get("statistics", {}):
-                            viewers = f"{int(item['statistics']['viewCount']):,}"
                         
                         channel_id = item.get("snippet", {}).get("channelId")
                         if channel_id:
