@@ -441,40 +441,67 @@ function initChatClient() {
       localStorage.setItem("savedYoutubeVideoId", youtubeUserInput.value);
     });
   }
-  if (youtubeDetectBtn) {
-    youtubeDetectBtn.addEventListener("click", async () => {
-      const channelVal = youtubeChannelInput ? youtubeChannelInput.value.trim() : "";
-      if (!channelVal) {
-        alert("配信者ID / @チャンネル名を入力してください");
-        return;
-      }
+
+  // 枠を自動検出する共通関数（ボタンクリック・自動実行の両方で使用）
+  async function detectYoutubeVideo(silent = false) {
+    const channelVal = youtubeChannelInput ? youtubeChannelInput.value.trim() : "";
+    if (!channelVal) {
+      if (!silent) alert("配信者ID / @チャンネル名を入力してください");
+      return;
+    }
+    const youtubeStatus = document.getElementById("youtube-status");
+    if (youtubeDetectBtn) {
       youtubeDetectBtn.disabled = true;
       youtubeDetectBtn.textContent = "検出中...";
-      try {
-        const res = await fetch("http://localhost:8001/get_youtube_video_info", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ videoId: channelVal })
-        });
-        if (res.ok) {
-          const info = await res.json();
-          if (info && info.videoId && info.videoId.length === 11) {
-            if (youtubeUserInput) {
-              youtubeUserInput.value = info.videoId;
-              localStorage.setItem("savedYoutubeVideoId", info.videoId);
-            }
-            alert(`✅ 配信枠を検出しました: ${info.title} (${info.videoId})`);
-          } else {
-            alert(`⚠️ 枠情報: ${info.title || "現在進行中/予約中の枠が見つかりませんでした"}`);
+    }
+    if (silent && youtubeStatus) {
+      youtubeStatus.textContent = "🔍 配信枠を自動検出中...";
+    }
+    try {
+      const res = await fetch("http://localhost:8001/get_youtube_video_info", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoId: channelVal })
+      });
+      if (res.ok) {
+        const info = await res.json();
+        if (info && info.videoId && info.videoId.length === 11) {
+          if (youtubeUserInput) {
+            youtubeUserInput.value = info.videoId;
+            localStorage.setItem("savedYoutubeVideoId", info.videoId);
           }
+          if (silent) {
+            if (youtubeStatus) youtubeStatus.textContent = `✅ 動画IDを自動取得: ${info.videoId}`;
+          } else {
+            alert(`✅ 配信枠を検出しました: ${info.title} (${info.videoId})`);
+          }
+        } else {
+          if (!silent) alert(`⚠️ 枠情報: ${info.title || "現在進行中/予約中の枠が見つかりませんでした"}`);
+          else if (youtubeStatus) youtubeStatus.textContent = `⚠️ 配信中の枠が見つかりませんでした`;
         }
-      } catch (e) {
-        alert("検出エラー: " + e.message);
-      } finally {
+      }
+    } catch (e) {
+      if (!silent) alert("検出エラー: " + e.message);
+      else if (youtubeStatus) youtubeStatus.textContent = `検出エラー: ${e.message}`;
+    } finally {
+      if (youtubeDetectBtn) {
         youtubeDetectBtn.disabled = false;
         youtubeDetectBtn.textContent = "📡 枠を検出";
       }
-    });
+    }
+  }
+
+  if (youtubeDetectBtn) {
+    youtubeDetectBtn.addEventListener("click", () => detectYoutubeVideo(false));
+  }
+
+  // ページ読み込み時: 動画IDが未設定なら配信者IDから自動取得
+  {
+    const currentVid = localStorage.getItem("savedYoutubeVideoId") || "";
+    const hasChannel = !!(localStorage.getItem("savedYoutubeChannel") || "").trim();
+    if (hasChannel && (!currentVid || currentVid.length !== 11)) {
+      setTimeout(() => detectYoutubeVideo(true), 1500);
+    }
   }
 
   // メイン画面用 配信枠一覧モーダル
