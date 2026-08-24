@@ -7,6 +7,7 @@ import urllib.request
 import ssl
 import re
 import time
+import threading
 
 PORT = 8001
 DATA_FILE = "custom_idle_phrases.json"
@@ -33,7 +34,8 @@ def save_data(data, file_path=DATA_FILE):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 current_hot_reload_timestamp = int(time.time() * 1000)
-ARTICLE_URLS_FILE = "article_urls.json"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ARTICLE_URLS_FILE = os.path.join(BASE_DIR, "article_urls.json")
 
 def load_article_url_cache():
     if os.path.exists(ARTICLE_URLS_FILE):
@@ -53,6 +55,63 @@ def save_article_url_cache(cache):
 
 ARTICLE_URL_CACHE = load_article_url_cache()
 LAST_PLAYING_ARTICLE_URL = ""
+
+def init_preload_all_rss_urls():
+    """サーバー起動時に全カテゴリのRSSからタイトルとURLのマップを即座に事前取得して永続化"""
+    def _worker():
+        try:
+            urls = [
+                "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja",
+                "https://news.yahoo.co.jp/rss/topics/top-picks.xml",
+                "https://www.nhk.or.jp/rss/news/cat0.xml",
+                "https://news.yahoo.co.jp/rss/topics/domestic.xml",
+                "https://www.nhk.or.jp/rss/news/cat1.xml",
+                "https://news.yahoo.co.jp/rss/topics/world.xml",
+                "https://www.nhk.or.jp/rss/news/cat6.xml",
+                "https://news.yahoo.co.jp/rss/topics/business.xml",
+                "https://www.nhk.or.jp/rss/news/cat5.xml",
+                "https://www.nhk.or.jp/rss/news/cat4.xml",
+                "https://news.yahoo.co.jp/rss/topics/entertainment.xml",
+                "https://www.nhk.or.jp/rss/news/cat2.xml",
+                "https://news.yahoo.co.jp/rss/topics/sports.xml",
+                "https://www.nhk.or.jp/rss/news/cat7.xml",
+                "https://news.yahoo.co.jp/rss/topics/it.xml",
+                "https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml",
+                "https://news.yahoo.co.jp/rss/topics/science.xml",
+                "https://www.nhk.or.jp/rss/news/cat3.xml",
+                "https://news.yahoo.co.jp/rss/topics/local.xml"
+            ]
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            cached = 0
+            for u in urls:
+                try:
+                    req = urllib.request.Request(u, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req, context=ctx, timeout=5) as res:
+                        xml_str = res.read().decode('utf-8', errors='ignore')
+                        items = re.findall(r'<item>(.*?)</item>', xml_str, flags=re.DOTALL)
+                        for it in items:
+                            t_m = re.search(r'<title>(.*?)</title>', it, flags=re.DOTALL)
+                            l_m = re.search(r'<link>(.*?)</link>', it, flags=re.DOTALL) or re.search(r'<guid[^>]*>(.*?)</guid>', it, flags=re.DOTALL)
+                            if t_m and l_m:
+                                t_clean = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', t_m.group(1)).strip()
+                                l_clean = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', l_m.group(1)).strip()
+                                if t_clean and l_clean.startswith('http'):
+                                    ARTICLE_URL_CACHE[t_clean] = l_clean
+                                    cached += 1
+                except Exception:
+                    pass
+            if cached > 0:
+                save_article_url_cache(ARTICLE_URL_CACHE)
+                print(f"[RSS URLマップ初期化完了] {len(ARTICLE_URL_CACHE)}件の記事URLをキャッシュ＆article_urls.jsonに保存しました")
+        except Exception as e:
+            print(f"[RSS URL初期化エラー]: {e}")
+            
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+
+init_preload_all_rss_urls()
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
