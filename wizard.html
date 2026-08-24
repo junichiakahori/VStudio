@@ -972,7 +972,7 @@
                     await new Promise(r => setTimeout(r, 2500));
                 }
                 renderWizardNewsList();
-                generateStreamReservationMetadata(true);
+                generateStreamReservationMetadata(false);
             } catch (e) {
                 console.error("ニュース取得エラー:", e);
             } finally {
@@ -1576,13 +1576,15 @@
             // 保存済みテキストの確認
             const savedTitleForSlot = localStorage.getItem(`savedStreamTitle_${wizardActiveSlot}`);
             const savedDescForSlot = localStorage.getItem(`savedStreamDesc_${wizardActiveSlot}`);
+            const isUserEditedDesc = localStorage.getItem(`savedUserEditedDesc_${wizardActiveSlot}`) === "true";
 
             if (forceRegen) {
                 if (titleInput) {
                     titleInput.value = suggestedTitle;
                     localStorage.setItem(`savedStreamTitle_${wizardActiveSlot}`, suggestedTitle);
                 }
-                if (descInput) {
+                // ユーザーが自ら編集した概要欄がある場合は、強制再生成時でも勝手に消さない
+                if (descInput && (!isUserEditedDesc || !savedDescForSlot)) {
                     descInput.value = suggestedDesc;
                     localStorage.setItem(`savedStreamDesc_${wizardActiveSlot}`, suggestedDesc);
                 }
@@ -1605,20 +1607,24 @@
                 }
             }
 
-            // 入力時の自動保存バインド
+            // 入力時の自動保存バインド（input, change, blurですべて即時保存）
             if (titleInput && !titleInput._hasBoundInput) {
                 titleInput._hasBoundInput = true;
-                titleInput.addEventListener("input", () => {
+                const saveTitle = () => {
                     localStorage.setItem(`savedStreamTitle_${wizardActiveSlot}`, titleInput.value);
                     localStorage.setItem("savedStreamTitle", titleInput.value);
-                });
+                };
+                titleInput.addEventListener("input", saveTitle);
+                titleInput.addEventListener("change", saveTitle);
+                titleInput.addEventListener("blur", saveTitle);
             }
 
             if (descInput && !descInput._hasBoundInput) {
                 descInput._hasBoundInput = true;
-                descInput.addEventListener("input", () => {
+                const saveDesc = () => {
                     localStorage.setItem(`savedStreamDesc_${wizardActiveSlot}`, descInput.value);
                     localStorage.setItem("savedStreamDesc", descInput.value);
+                    localStorage.setItem(`savedUserEditedDesc_${wizardActiveSlot}`, "true");
                     const val = descInput.value;
                     const ruleIdx = val.indexOf("【配信ルール");
                     const creditIdx = val.indexOf("音声：");
@@ -1627,7 +1633,10 @@
                         const customFooter = val.substring(splitIdx - 1);
                         localStorage.setItem("savedCustomStreamDescFooter", customFooter);
                     }
-                });
+                };
+                descInput.addEventListener("input", saveDesc);
+                descInput.addEventListener("change", saveDesc);
+                descInput.addEventListener("blur", saveDesc);
             }
         }
 
@@ -1665,9 +1674,48 @@
             copyToClipboard(text, e.target, "✅ まとめてコピー完了！");
         });
 
+        // タイトル別案ボタン（概要欄は一切変更せず、タイトルのみを切り替え）
         document.getElementById("btn-regen-title")?.addEventListener("click", () => {
             titlePatternIdx++;
-            generateStreamReservationMetadata(true);
+            const today = new Date();
+            const y = today.getFullYear();
+            const m = today.getMonth() + 1;
+            const d = today.getDate();
+            const dateStr = `${m}/${d}`;
+            const fullDateStr = `${y}/${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}`;
+            const isMorning = (wizardActiveSlot === "morning");
+            const newsItems = (openerWin && openerWin.latestFetchedNews) ? openerWin.latestFetchedNews : [];
+            const count = newsItems.length;
+
+            let titleTemplates = [];
+            if (selectedMode === "news") {
+                titleTemplates = isMorning ? [
+                    `【${dateStr} 朝の最新ニュース速報】出勤・通学前にサクッとチェック！☀️【AITuber生放送】`,
+                    `【朝の生放送】今日の最新ニュース速報＆注目トピックまとめ！☀️ (${fullDateStr})`,
+                    `【朝活ニュース速報】今日知っておきたい注目話題 ${count > 0 ? `${count}件` : ''}を一挙お届け！☀️`,
+                    `【${fullDateStr} 朝ニュース】今朝の最新出来事をお届け (${count}件)`
+                ] : [
+                    `【${dateStr} 夜の最新ニュース総ざらい】今日1日の重要トピックまとめ！🌙【AITuber生放送】`,
+                    `【夜の生放送】今日1日の重要ニュースを総ざらい！今夜のまとめ生配信🌙 (${fullDateStr})`,
+                    `【夜のニュース速報】今日起きた出来事をわかりやすく総まとめ！ (${count > 0 ? `${count}件` : ''})🌙`,
+                    `【${fullDateStr} 夜ニュース】今日押さえておきたい最新出来事 (${count}件)`
+                ];
+            } else if (selectedMode === "radio") {
+                titleTemplates = isMorning
+                    ? [`【朝のまったりラジオ生放送】爽やかな朝のBGM・フリートーク・お便り紹介 (${dateStr}) ☀️`]
+                    : [`【夜のまったりラジオ生放送】作業用BGM・フリートーク・お便り紹介 (${dateStr}) 🌙`];
+            } else {
+                titleTemplates = isMorning
+                    ? [`【朝の雑談・作業配信】おはよう！初見さん大歓迎！朝のんびりトーク (${dateStr}) ☀️`]
+                    : [`【夜の雑談・作業配信】初見さん大歓迎！今日もお疲れ様トーク (${dateStr}) 🌙`];
+            }
+            const newTitle = titleTemplates[titlePatternIdx % titleTemplates.length];
+            const titleInput = document.getElementById("wizard-suggested-title");
+            if (titleInput && newTitle) {
+                titleInput.value = newTitle;
+                localStorage.setItem(`savedStreamTitle_${wizardActiveSlot}`, newTitle);
+                localStorage.setItem("savedStreamTitle", newTitle);
+            }
         });
 
         // =====================================================================
