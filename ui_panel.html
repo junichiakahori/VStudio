@@ -9,17 +9,19 @@
                         <span class="live-dot"></span>
                         <span>Live2D Studio</span>
                     </div>
-                    <div class="header-action-group">
-                        <button class="btn-wizard-compact" id="stream-wizard-launch-btn" title="YouTube配信準備ウィザードを起動">
-                            <span>🚀 ウィザード</span>
-                        </button>
-                        <button class="btn-wizard-compact" id="hot-reload-header-btn" onclick="window.hotReloadAll && window.hotReloadAll()" title="即時ホット更新 (Shift+Alt+R)" style="background:rgba(255,210,0,0.12);border:1px solid rgba(255,210,0,0.4) !important;color:#ffd700 !important;box-shadow:none;">
-                            <span>⚡ 更新</span>
-                        </button>
-                        <button class="btn-header-icon hide-panel-action-btn" id="hide-panel-header-btn" title="パネルを隠して全画面表示">
-                            <span>👁️</span>
-                        </button>
-                    </div>
+                    <!-- 👁️ パネル隠しボタンだけ右端に残す -->
+                    <button class="btn-header-icon hide-panel-action-btn" id="hide-panel-header-btn" title="パネルを隠して全画面表示">
+                        <span>👁️</span>
+                    </button>
+                </div>
+                <!-- ▼ ウィザード・ホット更新ボタン（下段に独立配置） -->
+                <div class="header-action-group" style="margin-bottom:6px;">
+                    <button class="btn-wizard-compact" id="stream-wizard-launch-btn" title="YouTube配信準備ウィザードを起動">
+                        <span>🚀 ウィザード</span>
+                    </button>
+                    <button class="btn-wizard-compact" id="hot-reload-header-btn" onclick="window.hotReloadAll && window.hotReloadAll()" title="即時ホット更新 (Shift+Alt+R)" style="background:rgba(255,210,0,0.12);border:1px solid rgba(255,210,0,0.4) !important;color:#ffd700 !important;box-shadow:none;">
+                        <span>⚡ ホット更新</span>
+                    </button>
                 </div>
                 <div class="tabs-pill-container">
                     <button class="tab-btn active" data-target="tab-avatar">🎭 アバター</button>
