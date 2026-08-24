@@ -459,7 +459,10 @@
                     <div>
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 2px;">
                             <label style="font-size: 0.75rem; color: var(--text-muted);">📝 説明欄（概要欄 / ニュース一覧自動挿入）</label>
-                            <button id="btn-copy-desc" style="background: none; border: none; color: #00e676; font-size: 0.7rem; cursor: pointer; text-decoration: underline; padding: 0;">説明欄をコピー</button>
+                            <div style="display:flex; gap: 8px; align-items:center;">
+                                <button type="button" id="btn-regen-desc" title="最新ニュース・挨拶・ルール・クレジットから説明欄を再生成" style="background: rgba(0, 210, 211, 0.15); border: 1px solid #00d2d3; color: #00d2d3; font-size: 0.7rem; font-weight: bold; border-radius: 4px; padding: 2px 6px; cursor: pointer; transition: all 0.2s;">🔄 自動生成</button>
+                                <button type="button" id="btn-copy-desc" style="background: none; border: none; color: #00e676; font-size: 0.7rem; cursor: pointer; text-decoration: underline; padding: 0;">説明欄をコピー</button>
+                            </div>
                         </div>
                         <textarea id="wizard-suggested-desc" rows="4" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; padding: 6px 8px; color: #ccc; font-size: 0.75rem; font-family: monospace; outline: none; resize: vertical;"></textarea>
                     </div>
@@ -1716,6 +1719,62 @@
                 localStorage.setItem(`savedStreamTitle_${wizardActiveSlot}`, newTitle);
                 localStorage.setItem("savedStreamTitle", newTitle);
             }
+        });
+
+        // 🔄 説明欄の自動再生成ボタン
+        document.getElementById("btn-regen-desc")?.addEventListener("click", (e) => {
+            const isMorning = (wizardActiveSlot === "morning");
+            const today = new Date();
+            const dateStr = `${today.getMonth() + 1}/${today.getDate()}`;
+            const defaultTororoFooter = `\n忙しいあなたも、これを見れば今日のニュースがバッチリわかる！今日も楽しくおしゃべりしながら見ていってね！\n\n◆オリジナルハッシュタグ\n#とろろニュース #とろろ生放送 #今日の気になる\n\n◆X（旧Twitter）はこちら！\nhttps://x.com/drone_akahori\n\n◆クレジット表記\n・Live2Dモデル: 「とろろ」© Live2D Inc. (Live2D Creative Studio サンプルモデル)\n・VOICE：VOICEVOX ずんだもん\n・BGM：ドローン赤堀 - Nukadaki\n・配信背景：喫茶あかほり ミクスタカフェ\n\n◆配信のルール・お願い\n・話題に出ていない他の配信者さんの名前を出すのは控えてね！\n・他の配信者さんの枠でとろろの名前を出す「伝書鳩行為」もNGだよ！\n・荒らしやスパムを見かけても、反応せずにブロック＆スルーのご協力をお願いします。\nみんなで楽しく居心地の良い配信にしようね！チャンネル登録と高評価もよろしくお願いします！`;
+            const savedFooter = localStorage.getItem("savedCustomStreamDescFooter") || defaultTororoFooter;
+
+            let newDesc = "";
+            if (selectedMode === "news") {
+                const newsItems = (openerWin && openerWin.latestFetchedNews) ? openerWin.latestFetchedNews : [];
+                const greeting = isMorning
+                    ? `おはようございます！バーチャルキャスターのとろろがお送りする朝の最新ニュース生配信！\n出勤・通学前にサクッと今日の重要トピックをチェックしちゃいましょう☀️\n\n本日の注目ニュース：\n`
+                    : `こんとろ〜！バーチャルキャスターのとろろがお送りする夜の総まとめニュース生配信！\n一日の終わりに今日の重要トピックをまるごとおさらいしちゃいます🌙\n\n今回の振り返り項目：\n`;
+                newDesc = greeting;
+                if (newsItems.length > 0) {
+                    newsItems.slice(0, 15).forEach((item) => {
+                        newDesc += `・${item.title}\n`;
+                    });
+                    if (newsItems.length > 15) {
+                        newDesc += `...他 全${newsItems.length}件\n`;
+                    }
+                } else {
+                    newDesc += `・最新ニュースを随時更新・お届けします\n`;
+                }
+                newDesc += savedFooter;
+            } else if (selectedMode === "radio") {
+                newDesc = (isMorning
+                    ? `おはようございます！朝のまったりラジオ配信へようこそ！\n\n朝の支度や作業のお供にどうぞ☕️\nコメント・お便りお待ちしています！\n`
+                    : `ようこそ！まったりラジオ配信へ！\n\n作業のお供や就寝前のリラックスタイムにどうぞ☕️\nコメント・お便りお待ちしています！\n`) + savedFooter;
+            } else {
+                newDesc = (isMorning
+                    ? `おはようございます！朝の雑談配信へようこそ！\nコメントたくさん拾ってお話しします✨\n初見さんもお気軽にコメントしていってくださいね！\n`
+                    : `雑談配信へようこそ！\nコメントたくさん拾ってお話しします✨\n初見さんもお気軽にコメントしていってくださいね！\n`) + savedFooter;
+            }
+
+            const descInput = document.getElementById("wizard-suggested-desc");
+            if (descInput && newDesc) {
+                descInput.value = newDesc;
+                localStorage.setItem(`savedStreamDesc_${wizardActiveSlot}`, newDesc);
+                localStorage.setItem("savedStreamDesc", newDesc);
+                localStorage.setItem(`savedUserEditedDesc_${wizardActiveSlot}`, "true");
+            }
+
+            const btn = e.target;
+            const orig = btn.textContent;
+            btn.textContent = "✅ 生成完了！";
+            btn.style.color = "#00e676";
+            btn.style.borderColor = "#00e676";
+            setTimeout(() => {
+                btn.textContent = orig;
+                btn.style.color = "#00d2d3";
+                btn.style.borderColor = "#00d2d3";
+            }, 2000);
         });
 
         // =====================================================================
