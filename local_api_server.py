@@ -1517,13 +1517,6 @@ def synthesize_voicevox_backend(text, speaker_id=1, speed=1.0, pitch=0.0):
     
     kana_str = query_json.get("kana", "")
     if kana_str:
-        now_iso = time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime())
-        log_line = f"[{now_iso}] [LOG] [VOICEVOX発音カナ] 🗣️ {kana_str}"
-        try:
-            with open('browser_console.log', 'a', encoding='utf-8') as f:
-                f.write(log_line + '\n')
-        except Exception:
-            pass
         print(f"[VOICEVOX発音カナ] {kana_str}")
 
     if speed != 1.0:
