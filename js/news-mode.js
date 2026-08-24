@@ -620,27 +620,38 @@ window.playNextContinuousNews = playNextContinuousNews;
     const isBroadcasting = m !== null || (window.newsBroadcastState && window.newsBroadcastState.isRunning);
     const curTitle = (document.getElementById("news-title") ? document.getElementById("news-title").textContent.trim() : "") || (window.newsBroadcastState && window.newsBroadcastState.currentTitle) || "";
 
+    let firstUnreadMarked = false;
+
     sortedNews.forEach((item, idx) => {
       const isCurrentByTitle = curTitle && item.title && (item.title.includes(curTitle.slice(0, 10)) || curTitle.includes(item.title.slice(0, 10)));
       const isPlaying = isBroadcasting && (isCurrentByTitle || (curIdx > 0 && idx === curIdx - 1));
       const isRead = isBroadcasting ? ((curIdx > 0 && idx < curIdx - 1) || (!isPlaying && isCurrentByTitle)) : (currentRead.has(item.title) || storedReadList.includes(item.title));
 
       const card = doc.createElement("div");
+      if (isPlaying) {
+        card.id = "current-playing-news-card";
+      } else if (!isRead && !firstUnreadMarked) {
+        card.classList.add("is-unread-first");
+        firstUnreadMarked = true;
+      }
       card.style.display = "flex";
       card.style.flexDirection = "column";
       card.style.gap = "6px";
       card.style.padding = "10px 14px";
       card.style.background = isPlaying
-        ? "linear-gradient(135deg, rgba(0, 230, 118, 0.16), rgba(0, 230, 118, 0.06))"
+        ? "linear-gradient(135deg, rgba(0, 230, 118, 0.2), rgba(0, 230, 118, 0.08))"
         : (isRead ? "rgba(255, 255, 255, 0.03)" : "linear-gradient(135deg, rgba(108, 92, 231, 0.12), rgba(255, 255, 255, 0.04))");
       card.style.borderRadius = "8px";
       card.style.border = isPlaying
-        ? "1px solid rgba(0, 230, 118, 0.45)"
+        ? "1px solid rgba(0, 230, 118, 0.6)"
         : (isRead ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid rgba(108, 92, 231, 0.25)");
       card.style.borderLeft = isPlaying
-        ? "4px solid #00e676"
+        ? "5px solid #00e676"
         : (isRead ? "4px solid #555" : "4px solid #6c5ce7");
-      card.style.transition = "all 0.2s ease";
+      if (isPlaying) {
+        card.style.boxShadow = "0 0 16px rgba(0, 230, 118, 0.35)";
+      }
+      card.style.transition = "all 0.25s ease";
 
       // 上段: 番号 + バッジ + カテゴリ/配信元/日時 + 右端の再開ボタン
       const headerRow = doc.createElement("div");
@@ -869,12 +880,39 @@ window.playNextContinuousNews = playNextContinuousNews;
             margin-bottom: 14px;
             padding-bottom: 10px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            position: sticky;
+            top: 0;
+            background: rgba(15, 18, 29, 0.95);
+            backdrop-filter: blur(8px);
+            z-index: 100;
           }
           h3 {
             margin: 0;
             font-size: 1.05rem;
             font-weight: 700;
             color: #fff;
+          }
+          .jump-btn {
+            background: linear-gradient(135deg, #00e676, #00b894);
+            color: #000;
+            border: none;
+            border-radius: 16px;
+            padding: 5px 12px;
+            font-size: 0.78rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            box-shadow: 0 2px 10px rgba(0, 230, 118, 0.35);
+            transition: all 0.2s ease;
+          }
+          .jump-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 14px rgba(0, 230, 118, 0.6);
+          }
+          .jump-btn:active {
+            transform: scale(0.96);
           }
           #news-list-container {
             display: flex;
@@ -885,14 +923,38 @@ window.playNextContinuousNews = playNextContinuousNews;
           ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
           ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
           ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.35); }
+          
+          @keyframes focusPulse {
+            0% { transform: scale(1); box-shadow: 0 0 16px rgba(0, 230, 118, 0.4); }
+            50% { transform: scale(1.02); box-shadow: 0 0 24px rgba(0, 230, 118, 0.8); }
+            100% { transform: scale(1); box-shadow: 0 0 16px rgba(0, 230, 118, 0.4); }
+          }
+          .pulse-active {
+            animation: focusPulse 0.8s ease;
+          }
         </style>
       </head>
       <body>
         <header>
           <h3>📰 取得済みのニュース一覧</h3>
+          <button class="jump-btn" id="jump-to-current-btn" onclick="scrollToPlayingNews(true)">
+            🎯 放送中へジャンプ
+          </button>
         </header>
         <div id="news-list-container"></div>
         <script>
+          window.scrollToPlayingNews = function(smooth = true) {
+            const target = document.getElementById("current-playing-news-card") || document.querySelector(".is-unread-first");
+            if (target) {
+              target.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "center" });
+              target.classList.remove("pulse-active");
+              void target.offsetWidth; // reflow
+              target.classList.add("pulse-active");
+            } else {
+              window.scrollTo({ top: 0, behavior: smooth ? "smooth" : "auto" });
+            }
+          };
+
           setInterval(() => {
             if (window.opener && typeof window.opener.updateNewsListPopup === 'function') {
               window.opener.updateNewsListPopup();
@@ -906,6 +968,12 @@ window.playNextContinuousNews = playNextContinuousNews;
 
     setTimeout(() => {
       window.updateNewsListPopup();
+      // 初回表示時にも自動で放送中の位置までスクロール
+      setTimeout(() => {
+        if (window.newsListPopup && typeof window.newsListPopup.scrollToPlayingNews === "function") {
+          window.newsListPopup.scrollToPlayingNews(true);
+        }
+      }, 250);
     }, 100);
   };
 
