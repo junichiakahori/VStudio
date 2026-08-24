@@ -763,24 +763,17 @@ function initChatClient() {
                     }
 
                     // 1. OBSの配信を開始する
-                    if (
+                    if (typeof window.ensureObsStreamingStarted === "function") {
+                      window.ensureObsStreamingStarted().catch((e) => console.warn(e));
+                    } else if (
                       typeof isObsWsConnected !== "undefined" &&
                       isObsWsConnected &&
                       typeof obsWsClient !== "undefined" &&
                       obsWsClient
                     ) {
-                      console.log("[OBS] OBSのストリーミングを開始します...");
                       obsWsClient.call("StartStream").catch((err) => {
-                        console.error("[OBS] Failed to start OBS stream:", err);
-                        alert(
-                          "[OBSエラー] 配信の開始に失敗しました。OBS側の設定（ストリームキー等）を確認してください。\n" +
-                            err,
-                        );
+                        console.warn("[OBS] StartStream warning:", err);
                       });
-                    } else {
-                      console.log(
-                        "[OBS] OBS連携が未接続のため、OBS開始処理をスキップします。",
-                      );
                     }
 
                     // 2. 映像がYouTubeに届くまで少し待機してから、YouTubeのステータスをLiveにする
@@ -857,24 +850,17 @@ function initChatClient() {
                   "この配信はすでにYouTube上で「Live」状態です。\nOBSのストリーミングとラジオの自動再生だけを開始しますか？",
                 )
               ) {
-                if (
+                if (typeof window.ensureObsStreamingStarted === "function") {
+                  window.ensureObsStreamingStarted().catch((e) => console.warn(e));
+                } else if (
                   typeof isObsWsConnected !== "undefined" &&
                   isObsWsConnected &&
                   typeof obsWsClient !== "undefined" &&
                   obsWsClient
                 ) {
-                  console.log("[OBS] OBSのストリーミングを開始します...");
                   obsWsClient.call("StartStream").catch((err) => {
-                    console.error("[OBS] Failed to start OBS stream:", err);
-                    alert(
-                      "[OBSエラー] 配信の開始に失敗しました。OBS側の設定を確認してください。\n" +
-                        err,
-                    );
+                    console.warn("[OBS] StartStream warning:", err);
                   });
-                } else {
-                  alert(
-                    "[OBS] OBS連携が未接続のため、OBS開始処理をスキップしました。手動で開始してください。",
-                  );
                 }
 
                 setTimeout(() => {

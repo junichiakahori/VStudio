@@ -145,11 +145,15 @@ window.ensureObsStreamingStarted = async function (onProgress = null) {
   startStreamPromise = (async () => {
     try {
       if (onProgress) onProgress("OBS配信ステータスを確認中...");
-      const status = await obsWsClient.call("GetStreamStatus");
-      if (status && status.outputActive) {
-        console.log("[OBS] OBSは既に配信中です！");
-        window.isObsStreaming = true;
-        return true;
+      try {
+        const status = await obsWsClient.call("GetStreamStatus");
+        if (status && (status.outputActive || status.outputReconnecting)) {
+          console.log("[OBS] OBSは既に配信中です（StartStreamをスキップ）");
+          window.isObsStreaming = true;
+          return true;
+        }
+      } catch (statusErr) {
+        console.warn("[OBS] GetStreamStatus確認スキップ:", statusErr);
       }
 
       console.log("[OBS] OBSがまだ配信開始していないため、StartStreamコマンドを送信します...");
@@ -157,6 +161,12 @@ window.ensureObsStreamingStarted = async function (onProgress = null) {
       try {
         await obsWsClient.call("StartStream");
       } catch (startErr) {
+        const errStr = String(startErr?.message || startErr || "");
+        if (errStr.includes("OutputRunning") || errStr.includes("already") || errStr.includes("active") || errStr.includes("500")) {
+          console.log("[OBS] OBSは既に配信中でした（正常継続）");
+          window.isObsStreaming = true;
+          return true;
+        }
         console.warn("[OBS] StartStream呼び出し警告:", startErr);
       }
 
@@ -167,7 +177,7 @@ window.ensureObsStreamingStarted = async function (onProgress = null) {
         await new Promise((r) => setTimeout(r, 1000));
         try {
           const curStatus = await obsWsClient.call("GetStreamStatus");
-          if (curStatus && curStatus.outputActive) {
+          if (curStatus && (curStatus.outputActive || curStatus.outputReconnecting)) {
             console.log("[OBS] OBSの配信開始を確認しました！");
             window.isObsStreaming = true;
             // バッファ安定のため1.5秒待機
