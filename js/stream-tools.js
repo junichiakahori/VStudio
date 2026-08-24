@@ -374,8 +374,27 @@
       const ctx = cachedAvatarCanvas.getContext("2d");
       ctx.clearRect(0, 0, view.width, view.height);
       ctx.drawImage(view, 0, 0);
+      try {
+        const avatarDataUrl = cachedAvatarCanvas.toDataURL("image/png");
+        localStorage.setItem("savedThumb_avatarData", avatarDataUrl);
+      } catch (e) {}
     }
   };
+
+  // 起動時に保存済みアバター画像を復元
+  const savedAvatarData = localStorage.getItem("savedThumb_avatarData");
+  if (savedAvatarData && !cachedAvatarCanvas) {
+    cachedAvatarCanvas = document.createElement("canvas");
+    const aImg = new Image();
+    aImg.onload = () => {
+      cachedAvatarCanvas.width = aImg.width;
+      cachedAvatarCanvas.height = aImg.height;
+      const aCtx = cachedAvatarCanvas.getContext("2d");
+      aCtx.drawImage(aImg, 0, 0);
+      if (typeof drawThumbPreview === "function") drawThumbPreview();
+    };
+    aImg.src = savedAvatarData;
+  }
 
   if (thumbRecaptureBtn) {
     thumbRecaptureBtn.addEventListener("click", () => {
@@ -386,6 +405,18 @@
 
   // AI背景生成
   let cachedAiBgImage = null; // AI生成した背景画像を保持
+
+  // 起動時に保存済みAI背景画像を自動復元
+  const savedAiBgData = localStorage.getItem("savedThumb_aiBgData");
+  if (savedAiBgData) {
+    const bgImg = new Image();
+    bgImg.crossOrigin = "anonymous";
+    bgImg.onload = () => {
+      cachedAiBgImage = bgImg;
+      if (typeof drawThumbPreview === "function") drawThumbPreview();
+    };
+    bgImg.src = savedAiBgData;
+  }
 
   window.thumbAiBgPromptEl = document.getElementById("thumb-ai-bg-prompt");
   window.thumbAiBgGenerateBtn = document.getElementById(
@@ -498,8 +529,11 @@
           imageBase64 = `data:${mime};base64,${base64Data}`;
         }
 
-        // 画像をキャッシュ
+        // 画像をキャッシュ＆永続化
         const finalSrc = imageBase64 || imageUrl;
+        try {
+          localStorage.setItem("savedThumb_aiBgData", finalSrc);
+        } catch (e) {}
         await new Promise((resolve, reject) => {
           const img = new Image();
           img.crossOrigin = "anonymous";
@@ -700,6 +734,14 @@
         baseY += dSize * 1.5;
       }
     }
+
+    // 🌟 サムネイル完成画像のリアルタイム自動永続化（ダウンロードしなくても状態保持）
+    if (thumbPreviewCanvas && typeof thumbPreviewCanvas.toDataURL === "function") {
+      try {
+        const currentDataUrl = thumbPreviewCanvas.toDataURL("image/png");
+        localStorage.setItem("savedThumb_latestDataUrl", currentDataUrl);
+      } catch (e) {}
+    }
   };
 
   window.openThumbnailEditorModal = function () {
@@ -731,14 +773,20 @@
   };
 
   window.generateThumbnailDataUrl = async function () {
-    if (thumbEditTitle && streamTitleInput) {
+    if (thumbEditTitle && streamTitleInput && !thumbEditTitle.value) {
       thumbEditTitle.value = streamTitleInput.value;
     }
     captureAvatarFrame();
     await drawThumbPreview();
     if (thumbPreviewCanvas && typeof thumbPreviewCanvas.toDataURL === "function") {
-      return thumbPreviewCanvas.toDataURL("image/png");
+      const dataUrl = thumbPreviewCanvas.toDataURL("image/png");
+      if (dataUrl && dataUrl.length > 500) {
+        return dataUrl;
+      }
     }
+    // フォールバック: 保存されている直前のサムネイルデータ
+    const savedLatest = localStorage.getItem("savedThumb_latestDataUrl");
+    if (savedLatest) return savedLatest;
     return null;
   };
 
