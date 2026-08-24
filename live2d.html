@@ -114,22 +114,25 @@
                 </div>
             </div>
             <canvas id="live2d-canvas"></canvas>
-            <!-- リアルタイム字幕テロップ（ドラッグ＆ドロップ可能） -->
-            <div class="avatar-subtitles" id="avatar-subtitles" style="display:none;">
-                <div class="subtitles-drag-handle" id="subtitles-drag-handle" title="ドラッグして字幕の位置を移動できます">⋮⋮</div>
-                <div class="subtitles-text" id="avatar-subtitles-text"></div>
+            <!-- HTMLオーバーレイ群: Chrome GPU合成ちらつき防止のため独立レイヤー化 -->
+            <div id="html-overlay-wrapper" style="position:absolute;inset:0;pointer-events:none;will-change:transform;transform:translateZ(0);z-index:3;">
+                <!-- リアルタイム字幕テロップ（ドラッグ＆ドロップ可能） -->
+                <div class="avatar-subtitles" id="avatar-subtitles" style="display:none;pointer-events:auto;">
+                    <div class="subtitles-drag-handle" id="subtitles-drag-handle" title="ドラッグして字幕の位置を移動できます">⋮⋮</div>
+                    <div class="subtitles-text" id="avatar-subtitles-text"></div>
+                </div>
+                <div class="comment-viewer" id="comment-viewer" style="pointer-events:auto;"></div>
+                <div class="camera-preview-container" id="camera-preview-container" style="pointer-events:auto;">
+                    <video id="webcam" autoplay playsinline></video>
+                    <div class="camera-label">Webcam</div>
+                </div>
+                <div class="loading-overlay" id="loading-overlay" style="pointer-events:auto;">
+                    <div class="spinner"></div>
+                    <p id="loading-text">Live2Dモデルを読み込み中...</p>
+                </div>
+                <!-- 配信オーバーレイ -->
+                <div class="overlay-screen" id="stream-overlay" style="pointer-events:auto;"></div>
             </div>
-            <div class="comment-viewer" id="comment-viewer"></div>
-            <div class="camera-preview-container" id="camera-preview-container">
-                <video id="webcam" autoplay playsinline></video>
-                <div class="camera-label">Webcam</div>
-            </div>
-            <div class="loading-overlay" id="loading-overlay">
-                <div class="spinner"></div>
-                <p id="loading-text">Live2Dモデルを読み込み中...</p>
-            </div>
-            <!-- 配信オーバーレイ -->
-            <div class="overlay-screen" id="stream-overlay"></div>
         </div>
     </div>
     <!-- PixiJS v6 -->
