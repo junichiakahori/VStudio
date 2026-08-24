@@ -912,8 +912,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 4. **余計な注釈の禁止**: セリフ以外の前置きや解説（「」等）は出力せず、発話するセリフのみを出力してください。
 5. **人名・作品タイトルのルビ必須ルール**: 日本の人名や作品タイトル（『』「」）は必ず【漢字・英字（正しいひらがな・カタカナ読み）】の形式でルビを振ってください（例: 『ONE PIECE（ワンピース）』、孫正義（そん まさよし）氏、SixTONES（ストーンズ））。
 6. **【事実に基づく解説・具体例や固有名詞の捏造絶対禁止（最重要）】**:
-   ・【ニュースタイトル】や【記事内容】に明記されていない固有名詞（架空のゲーム名・作品名・選手名・人名・企業名・架空の日付や数値）を「例えば…」などと勝手に想像・でっち上げて創作することは絶対に禁止です。
-   ・個別のタイトル名や人名が本文・概要に書かれていない場合は、決して勝手に有名な名前を並べず、「記事では今週サービス終了を迎える対象タイトルやスケジュールが一覧でまとめられています」と、書かれている事実の範囲内でのみ忠実に解説してください。
+   ・【ニュースタイトル】や【記事内容】に明記されていない固有名詞（ゲーム名・作品名・選手名・人名・企業名・日付や数値）を勝手に想像・創作することは絶対に禁止です。
+   ・個別のタイトル名や人名が本文・概要に書かれていない場合は、決して勝手に想像上の名前を並べず、「記事では今週サービス終了を迎える対象タイトルやスケジュールが一覧でまとめられています」と、書かれている事実の範囲内でのみ忠実に解説してください。
 
 【ニュースタイトル】: {title}
 【記事内容（概要・詳細本文）】: {full_article_content}"""
@@ -994,7 +994,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 
                 # ▼▼▼ 字幕用テキスト(display) と VOICEVOX発音用テキスト(speech) のスマート分離 ▼▼▼
                 # ▼▼▼ VOICEVOXの読み予想と照合する二重チェック＆自動学習エンジン ▼▼▼
-                items = inspect_and_correct_pronunciation(raw_sentences, provider, api_key, model_name)
+                items = inspect_and_correct_pronunciation(raw_sentences, provider, api_key, model_name, full_article_content + " " + title)
 
                 # 万が一中国語フィルター等ですべての文が除去された場合の安全な日本語フォールバック生成
                 if not items:
@@ -1055,7 +1055,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key="", model_name=""):
+def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key="", model_name="", article_context=""):
     """VOICEVOXの予想読みと原稿を照合し、誤読（同音異字・人名・特殊読み）を検出してspeechテキストを自動補正＆学習"""
     corrected_items = []
     new_learned_dict = {}
@@ -1067,6 +1067,21 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
         display_s = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)のかた([たち|がた|も|は|が|に|へ|で|を|、|。|！|？\s]|$)', r'\1の方\2', display_s)
         display_s = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)なかた([たち|がた|も|は|が|に|へ|で|を|、|。|！|？\s]|$)', r'\1な方\2', display_s)
         display_s = display_s.replace("とろろにゃん", "とろろ").replace("お知らせしてあげる", "お知らせします").replace("教えてあげる", "ご紹介します").replace("安心しなさい", "ご安心ください")
+
+        # 🚫 記事本文・タイトルに存在しない勝手な『作品名・ゲーム名』の捏造をPython側で完全排除
+        if article_context:
+            invented_titles = re.findall(r'『(.*?)』', display_s)
+            has_invented = False
+            for inv_t in invented_titles:
+                if inv_t and inv_t not in article_context:
+                    print(f"[ハルシネーション検知] 🚫 記事に存在しない作品名捏造を検知・除去: 『{inv_t}』")
+                    has_invented = True
+                    display_s = re.sub(rf'『{re.escape(inv_t)}』[や、と・\s]*', '', display_s)
+            
+            if has_invented:
+                # 「例えば、、、など」のように中身が抜け落ちた場合を安全な文に修正
+                if re.search(r'例えば[、\s]*(など|等|が|は|、|。)', display_s) or len(display_s.strip()) < 10:
+                    display_s = "記事では今週サービス終了を迎える対象タイトルやスケジュールがまとめられています。"
 
         # 音声用初期値
         speech_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\2', s)
