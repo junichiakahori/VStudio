@@ -48,6 +48,27 @@ const CATEGORY_NAMES = {
   "cat_local": "地域"
 };
 
+/**
+ * RSS XMLのitemノードから記事のURL（link/guid）を確実に抽出する
+ */
+function extractLinkFromXmlNode(node) {
+  if (!node) return "";
+  const linkNode = node.querySelector("link") || node.getElementsByTagName("link")[0] || node.querySelector("guid");
+  if (linkNode) {
+    const text = (linkNode.textContent || linkNode.getAttribute("href") || "").trim();
+    if (text.startsWith("http")) return text;
+  }
+  // 全タグからhttpで始まるものを探すフォールバック
+  const allNodes = node.getElementsByTagName("*");
+  for (let i = 0; i < allNodes.length; i++) {
+    const val = (allNodes[i].textContent || "").trim();
+    if (val.startsWith("http://") || val.startsWith("https://")) {
+      return val;
+    }
+  }
+  return "";
+}
+
 async function playNextContinuousNews(isOneOff = false, isFetchOnly = false) {
   if (isReadingNews) return;
   if (!isOneOff && !isContinuousNewsMode) return;
@@ -184,8 +205,7 @@ async function playNextContinuousNews(isOneOff = false, isFetchOnly = false) {
             else if (target.url.includes('nhk.or.jp')) publisherName = 'NHK';
             else if (target.url.includes('itmedia.co.jp')) publisherName = 'ITmedia';
 
-            const linkNode = node.querySelector("link") || node.querySelector("guid");
-            let linkUrl = linkNode ? (linkNode.textContent || linkNode.getAttribute("href") || "") : "";
+            const linkUrl = extractLinkFromXmlNode(node);
 
             return {
               title: titleNode ? titleNode.textContent : "",
@@ -2068,8 +2088,7 @@ ${creditsInstruction}
           else if (target.url.includes('nhk.or.jp')) publisherName = 'NHK';
           else if (target.url.includes('itmedia.co.jp')) publisherName = 'ITmedia';
 
-          const linkNode = node.querySelector("link") || node.querySelector("guid");
-          let linkUrl = linkNode ? (linkNode.textContent || linkNode.getAttribute("href") || "") : "";
+          const linkUrl = extractLinkFromXmlNode(node);
 
           return {
             title: titleNode ? titleNode.textContent : "",
@@ -2912,4 +2931,51 @@ ${creditsInstruction}
       window.initNewsResumeSystem();
     }
   }, 1200);
+
+  // 🚀 現在メモリ上のニュースリスト（以前取得したもの）にURLが欠けている場合、裏側で自動マージ補完
+  async function enrichCurrentNewsWithLinks() {
+    if (!window.latestFetchedNews || window.latestFetchedNews.length === 0) return;
+    const needEnrich = window.latestFetchedNews.some(item => !item.link);
+    if (!needEnrich) return;
+
+    try {
+      const fetchTargets = [];
+      for (const catKey of Object.keys(NEWS_CATEGORIES)) {
+        NEWS_CATEGORIES[catKey].forEach(u => fetchTargets.push(u));
+      }
+      const map = new Map();
+      await Promise.all(fetchTargets.map(async (u) => {
+        try {
+          const res = await fetch("/fetch_rss", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: u })
+          });
+          if (!res.ok) return;
+          const xmlText = await res.text();
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+          const items = xmlDoc.querySelectorAll("item");
+          items.forEach(node => {
+            const t = node.querySelector("title") ? node.querySelector("title").textContent.trim() : "";
+            const l = extractLinkFromXmlNode(node);
+            if (t && l) map.set(t, l);
+          });
+        } catch (e) {}
+      }));
+
+      if (map.size > 0) {
+        let enrichedCount = 0;
+        window.latestFetchedNews.forEach(item => {
+          if (!item.link && map.has(item.title)) {
+            item.link = map.get(item.title);
+            enrichedCount++;
+          }
+        });
+        console.log(`[ニュースURL補完] 🔗 現在のニュースリストに記事URLを自動紐付け完了 (${enrichedCount}件にURLを反映)`);
+      }
+    } catch (e) {}
+  }
+
+  enrichCurrentNewsWithLinks();
 });
