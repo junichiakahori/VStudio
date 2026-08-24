@@ -1446,7 +1446,10 @@
         // 配信予約用メタデータ（タイトル・説明欄）自動生成
         let titlePatternIdx = 0;
         let lastMetaNewsCount = -1;
-        let wizardActiveSlot = (openerWin && openerWin.activeStreamSlot) || localStorage.getItem("savedStreamSlot") || (new Date().getHours() >= 4 && new Date().getHours() < 12 ? "morning" : "evening");
+        // 現在の時刻 (4:00〜11:59は朝、それ以外は夜) を最優先に初期判定
+        const currentHour = new Date().getHours();
+        const defaultTimeSlot = (currentHour >= 4 && currentHour < 12) ? "morning" : "evening";
+        let wizardActiveSlot = (openerWin && openerWin.activeStreamSlot) || defaultTimeSlot;
 
         function updateWizardSlotUI() {
             const morningBtn = document.getElementById("wizard-slot-morning-btn");
@@ -1777,7 +1780,7 @@
         // 🔄 説明欄の自動再生成ボタン
         document.getElementById("btn-regen-desc")?.addEventListener("click", (e) => {
             // タイトルは維持したまま、説明欄をカスタム挨拶・最新ニュース・フッターから再生成
-            updateSuggestedMetadata(true);
+            generateStreamReservationMetadata(true);
 
             const btn = e.target;
             const orig = btn.textContent;
@@ -2614,9 +2617,13 @@
             closeGreetingModal();
 
             // 即座に説明欄を再生成して画面に反映
-            updateSuggestedMetadata(true);
+            generateStreamReservationMetadata(true);
             showYtApiFeedback("✅ 冒頭挨拶テンプレートを保存し、説明欄を更新しました！", true);
         });
+
+        // グローバルエイリアス
+        window.generateStreamReservationMetadata = generateStreamReservationMetadata;
+        window.updateSuggestedMetadata = generateStreamReservationMetadata;
     </script>
 </body>
 </html>
