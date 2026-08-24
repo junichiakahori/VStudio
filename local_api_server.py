@@ -878,7 +878,10 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
             "方々": "かたがた",
             "調光": "ちょうこう",
             "世知辛い": "せちづらい",
-            "世知つらい": "せちづらい"
+            "世知つらい": "せちづらい",
+            "今話題の": "いまわだいの",
+            "今話題": "いまわだい",
+            "今現在": "いまげんざい"
         }
         for k, v in known_fixes.items():
             if k in speech_s:
