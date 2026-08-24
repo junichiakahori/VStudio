@@ -459,9 +459,10 @@
                     <div>
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 2px;">
                             <label style="font-size: 0.75rem; color: var(--text-muted);">📝 説明欄（概要欄 / ニュース一覧自動挿入）</label>
-                            <div style="display:flex; gap: 8px; align-items:center;">
-                                <button type="button" id="btn-regen-desc" title="最新ニュース・挨拶・ルール・クレジットから説明欄を再生成" style="background: rgba(0, 210, 211, 0.15); border: 1px solid #00d2d3; color: #00d2d3; font-size: 0.7rem; font-weight: bold; border-radius: 4px; padding: 2px 6px; cursor: pointer; transition: all 0.2s;">🔄 自動生成</button>
-                                <button type="button" id="btn-copy-desc" style="background: none; border: none; color: #00e676; font-size: 0.7rem; cursor: pointer; text-decoration: underline; padding: 0;">説明欄をコピー</button>
+                            <div style="display:flex; gap: 6px; align-items:center;">
+                                <button type="button" id="btn-open-greeting-modal" title="説明欄の冒頭挨拶文テンプレートを編集" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2); color: #e0e0e0; font-size: 0.7rem; border-radius: 4px; padding: 2px 6px; cursor: pointer; transition: all 0.2s; white-space: nowrap;">⚙️ 挨拶設定</button>
+                                <button type="button" id="btn-regen-desc" title="最新ニュース・挨拶・ルール・クレジットから説明欄を再生成" style="background: rgba(0, 210, 211, 0.15); border: 1px solid #00d2d3; color: #00d2d3; font-size: 0.7rem; font-weight: bold; border-radius: 4px; padding: 2px 6px; cursor: pointer; transition: all 0.2s; white-space: nowrap;">🔄 自動生成</button>
+                                <button type="button" id="btn-copy-desc" style="background: none; border: none; color: #00e676; font-size: 0.7rem; cursor: pointer; text-decoration: underline; padding: 0; white-space: nowrap;">説明欄をコピー</button>
                             </div>
                         </div>
                         <textarea id="wizard-suggested-desc" rows="4" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; padding: 6px 8px; color: #ccc; font-size: 0.75rem; font-family: monospace; outline: none; resize: vertical;"></textarea>
@@ -548,6 +549,52 @@
             </div>
             <div id="broadcast-picker-list" style="flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px;">
                 <div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:20px;">配信枠を読み込み中...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 冒頭挨拶テンプレート設定モーダル -->
+    <div id="modal-greeting-template" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.75); backdrop-filter:blur(4px); z-index:9999; justify-content:center; align-items:center;">
+        <div style="width:90%; max-width:540px; max-height:85vh; background:#1e1e2f; border:1px solid var(--border-neon, #00d2d3); border-radius:10px; display:flex; flex-direction:column; box-shadow:0 10px 30px rgba(0,0,0,0.8); overflow:hidden;">
+            <div style="padding:12px 16px; background:rgba(0,0,0,0.4); border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.9rem; font-weight:bold; color:#00d2d3;">⚙️ 説明欄 冒頭の挨拶テンプレート設定</span>
+                <button type="button" id="btn-close-greeting-modal" style="background:none; border:none; color:#aaa; font-size:1.2rem; cursor:pointer;">✕</button>
+            </div>
+            <div style="flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:12px;">
+                <div>
+                    <label style="font-size:0.75rem; font-weight:bold; color:#ffeaa7; display:flex; align-items:center; gap:4px; margin-bottom:4px;">
+                        ☀️ 朝配信の冒頭挨拶（ニュースモード）
+                    </label>
+                    <textarea id="tpl-greeting-morning" rows="3" style="width:100%; box-sizing:border-box; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:4px; padding:6px 8px; color:#fff; font-size:0.75rem; font-family:sans-serif; outline:none; resize:vertical;"></textarea>
+                </div>
+                <div>
+                    <label style="font-size:0.75rem; font-weight:bold; color:#74b9ff; display:flex; align-items:center; gap:4px; margin-bottom:4px;">
+                        🌙 夜配信の冒頭挨拶（ニュースモード）
+                    </label>
+                    <textarea id="tpl-greeting-evening" rows="3" style="width:100%; box-sizing:border-box; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:4px; padding:6px 8px; color:#fff; font-size:0.75rem; font-family:sans-serif; outline:none; resize:vertical;"></textarea>
+                </div>
+                <div>
+                    <label style="font-size:0.75rem; font-weight:bold; color:#a29bfe; display:flex; align-items:center; gap:4px; margin-bottom:4px;">
+                        📻 ラジオ配信の冒頭挨拶
+                    </label>
+                    <textarea id="tpl-greeting-radio" rows="3" style="width:100%; box-sizing:border-box; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:4px; padding:6px 8px; color:#fff; font-size:0.75rem; font-family:sans-serif; outline:none; resize:vertical;"></textarea>
+                </div>
+                <div>
+                    <label style="font-size:0.75rem; font-weight:bold; color:#55efc4; display:flex; align-items:center; gap:4px; margin-bottom:4px;">
+                        💬 雑談配信の冒頭挨拶
+                    </label>
+                    <textarea id="tpl-greeting-chat" rows="3" style="width:100%; box-sizing:border-box; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:4px; padding:6px 8px; color:#fff; font-size:0.75rem; font-family:sans-serif; outline:none; resize:vertical;"></textarea>
+                </div>
+                <div style="font-size:0.7rem; color:var(--text-muted); line-height:1.4;">
+                    💡 挨拶文の末尾の「本日の注目ニュース：」などの直下に、自動取得された最新ニュース一覧が挿入されます。
+                </div>
+            </div>
+            <div style="padding:10px 16px; background:rgba(0,0,0,0.3); border-top:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center;">
+                <button type="button" id="btn-reset-greeting-template" style="background:none; border:none; color:#ff7675; font-size:0.75rem; cursor:pointer; text-decoration:underline;">🔄 初期値に戻す</button>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" id="btn-cancel-greeting-template" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; font-size:0.75rem; padding:5px 12px; border-radius:4px; cursor:pointer;">キャンセル</button>
+                    <button type="button" id="btn-save-greeting-template" style="background:linear-gradient(135deg, #0984e3, #00cec9); border:none; color:#fff; font-weight:bold; font-size:0.75rem; padding:5px 14px; border-radius:4px; cursor:pointer;">💾 保存して反映</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1523,6 +1570,17 @@
             const defaultTororoFooter = `\n忙しいあなたも、これを見れば今日のニュースがバッチリわかる！今日も楽しくおしゃべりしながら見ていってね！\n\n◆オリジナルハッシュタグ\n#とろろニュース #とろろ生放送 #今日の気になる\n\n◆X（旧Twitter）はこちら！\nhttps://x.com/drone_akahori\n\n◆クレジット表記\n・Live2Dモデル: 「とろろ」© Live2D Inc. (Live2D Creative Studio サンプルモデル)\n・VOICE：VOICEVOX ずんだもん\n・BGM：ドローン赤堀 - Nukadaki\n・配信背景：喫茶あかほり ミクスタカフェ\n\n◆配信のルール・お願い\n・話題に出ていない他の配信者さんの名前を出すのは控えてね！\n・他の配信者さんの枠でとろろの名前を出す「伝書鳩行為」もNGだよ！\n・荒らしやスパムを見かけても、反応せずにブロック＆スルーのご協力をお願いします。\nみんなで楽しく居心地の良い配信にしようね！チャンネル登録と高評価もよろしくお願いします！`;
             const savedFooter = localStorage.getItem("savedCustomStreamDescFooter") || defaultTororoFooter;
 
+            // 冒頭挨拶テンプレートの取得（カスタム設定またはデフォルト）
+            const DEFAULT_GREETING_NEWS_MORNING = "おはようございます！バーチャルキャスターのとろろがお送りする朝の最新ニュース生配信！\n出勤・通学前にサクッと今日の重要トピックをチェックしちゃいましょう☀️\n\n本日の注目ニュース：";
+            const DEFAULT_GREETING_NEWS_EVENING = "こんとろ〜！バーチャルキャスターのとろろがお送りする夜の総まとめニュース生配信！\n一日の終わりに今日の重要トピックをまるごとおさらいしちゃいます🌙\n\n今回の振り返り項目：";
+            const DEFAULT_GREETING_RADIO = "ようこそ！まったりラジオ配信へ！\n\n作業のお供やリラックスタイムにどうぞ☕️\nコメント・お便りお待ちしています！";
+            const DEFAULT_GREETING_CHAT = "雑談配信へようこそ！\nコメントたくさん拾ってお話しします✨\n初見さんもお気軽にコメントしていってくださいね！";
+
+            const customGreetingNewsMorning = localStorage.getItem("savedGreeting_news_morning") || DEFAULT_GREETING_NEWS_MORNING;
+            const customGreetingNewsEvening = localStorage.getItem("savedGreeting_news_evening") || DEFAULT_GREETING_NEWS_EVENING;
+            const customGreetingRadio = localStorage.getItem("savedGreeting_radio") || DEFAULT_GREETING_RADIO;
+            const customGreetingChat = localStorage.getItem("savedGreeting_chat") || DEFAULT_GREETING_CHAT;
+
             const isMorning = (wizardActiveSlot === "morning");
             if (selectedMode === "news") {
                 const newsItems = (openerWin && openerWin.latestFetchedNews) ? openerWin.latestFetchedNews : [];
@@ -1542,9 +1600,8 @@
                 suggestedTitle = titleTemplates[titlePatternIdx % titleTemplates.length];
 
                 // 説明欄（概要欄）の生成
-                const greeting = isMorning
-                    ? `おはようございます！バーチャルキャスターのとろろがお送りする朝の最新ニュース生配信！\n出勤・通学前にサクッと今日の重要トピックをチェックしちゃいましょう☀️\n\n本日の注目ニュース：\n`
-                    : `こんとろ〜！バーチャルキャスターのとろろがお送りする夜の総まとめニュース生配信！\n一日の終わりに今日の重要トピックをまるごとおさらいしちゃいます🌙\n\n今回の振り返り項目：\n`;
+                const rawGreeting = isMorning ? customGreetingNewsMorning : customGreetingNewsEvening;
+                const greeting = rawGreeting.trim() + "\n";
                 suggestedDesc = greeting;
                 if (newsItems.length > 0) {
                     newsItems.slice(0, 15).forEach((item) => {
@@ -1561,16 +1618,12 @@
                 suggestedTitle = isMorning
                     ? `【朝のまったりラジオ生放送】爽やかな朝のBGM・フリートーク・お便り紹介 (${dateStr}) ☀️`
                     : `【夜のまったりラジオ生放送】作業用BGM・フリートーク・お便り紹介 (${dateStr}) 🌙`;
-                suggestedDesc = (isMorning
-                    ? `おはようございます！朝のまったりラジオ配信へようこそ！\n\n朝の支度や作業のお供にどうぞ☕️\nコメント・お便りお待ちしています！\n`
-                    : `ようこそ！まったりラジオ配信へ！\n\n作業のお供や就寝前のリラックスタイムにどうぞ☕️\nコメント・お便りお待ちしています！\n`) + savedFooter;
+                suggestedDesc = customGreetingRadio.trim() + "\n" + savedFooter;
             } else {
                 suggestedTitle = isMorning
                     ? `【朝の雑談・作業配信】おはよう！初見さん大歓迎！朝のんびりトーク (${dateStr}) ☀️`
                     : `【夜の雑談・作業配信】初見さん大歓迎！今日もお疲れ様トーク (${dateStr}) 🌙`;
-                suggestedDesc = (isMorning
-                    ? `おはようございます！朝の雑談配信へようこそ！\nコメントたくさん拾ってお話しします✨\n初見さんもお気軽にコメントしていってくださいね！\n`
-                    : `雑談配信へようこそ！\nコメントたくさん拾ってお話しします✨\n初見さんもお気軽にコメントしていってくださいね！\n`) + savedFooter;
+                suggestedDesc = customGreetingChat.trim() + "\n" + savedFooter;
             }
 
             const titleInput = document.getElementById("wizard-suggested-title");
@@ -2531,6 +2584,77 @@
 
         document.getElementById("btn-refresh-broadcasts")?.addEventListener("click", () => {
             loadAndRenderBroadcasts();
+        });
+
+        // ══════════════════════════════════════════════════════════════════════
+        // ⚙️ 説明欄 冒頭挨拶テンプレート設定モーダル処理
+        // ══════════════════════════════════════════════════════════════════════
+        const GREETING_DEFAULTS = {
+            morning: "おはようございます！バーチャルキャスターのとろろがお送りする朝の最新ニュース生配信！\n出勤・通学前にサクッと今日の重要トピックをチェックしちゃいましょう☀️\n\n本日の注目ニュース：",
+            evening: "こんとろ〜！バーチャルキャスターのとろろがお送りする夜の総まとめニュース生配信！\n一日の終わりに今日の重要トピックをまるごとおさらいしちゃいます🌙\n\n今回の振り返り項目：",
+            radio: "ようこそ！まったりラジオ配信へ！\n\n作業のお供やリラックスタイムにどうぞ☕️\nコメント・お便りお待ちしています！",
+            chat: "雑談配信へようこそ！\nコメントたくさん拾ってお話しします✨\n初見さんもお気軽にコメントしていってくださいね！"
+        };
+
+        function openGreetingModal() {
+            const m = document.getElementById("modal-greeting-template");
+            if (!m) return;
+            const tplM = document.getElementById("tpl-greeting-morning");
+            const tplE = document.getElementById("tpl-greeting-evening");
+            const tplR = document.getElementById("tpl-greeting-radio");
+            const tplC = document.getElementById("tpl-greeting-chat");
+
+            if (tplM) tplM.value = localStorage.getItem("savedGreeting_news_morning") || GREETING_DEFAULTS.morning;
+            if (tplE) tplE.value = localStorage.getItem("savedGreeting_news_evening") || GREETING_DEFAULTS.evening;
+            if (tplR) tplR.value = localStorage.getItem("savedGreeting_radio") || GREETING_DEFAULTS.radio;
+            if (tplC) tplC.value = localStorage.getItem("savedGreeting_chat") || GREETING_DEFAULTS.chat;
+
+            m.style.display = "flex";
+        }
+
+        function closeGreetingModal() {
+            const m = document.getElementById("modal-greeting-template");
+            if (m) m.style.display = "none";
+        }
+
+        document.getElementById("btn-open-greeting-modal")?.addEventListener("click", openGreetingModal);
+        document.getElementById("btn-close-greeting-modal")?.addEventListener("click", closeGreetingModal);
+        document.getElementById("btn-cancel-greeting-template")?.addEventListener("click", closeGreetingModal);
+        document.getElementById("modal-greeting-template")?.addEventListener("click", (e) => {
+            if (e.target.id === "modal-greeting-template") closeGreetingModal();
+        });
+
+        // 🔄 初期値に戻す
+        document.getElementById("btn-reset-greeting-template")?.addEventListener("click", () => {
+            if (!confirm("冒頭挨拶テンプレートを公式デフォルトの初期値に戻しますか？")) return;
+            const tplM = document.getElementById("tpl-greeting-morning");
+            const tplE = document.getElementById("tpl-greeting-evening");
+            const tplR = document.getElementById("tpl-greeting-radio");
+            const tplC = document.getElementById("tpl-greeting-chat");
+
+            if (tplM) tplM.value = GREETING_DEFAULTS.morning;
+            if (tplE) tplE.value = GREETING_DEFAULTS.evening;
+            if (tplR) tplR.value = GREETING_DEFAULTS.radio;
+            if (tplC) tplC.value = GREETING_DEFAULTS.chat;
+        });
+
+        // 💾 保存して反映
+        document.getElementById("btn-save-greeting-template")?.addEventListener("click", () => {
+            const tplM = document.getElementById("tpl-greeting-morning")?.value;
+            const tplE = document.getElementById("tpl-greeting-evening")?.value;
+            const tplR = document.getElementById("tpl-greeting-radio")?.value;
+            const tplC = document.getElementById("tpl-greeting-chat")?.value;
+
+            if (tplM !== undefined) localStorage.setItem("savedGreeting_news_morning", tplM);
+            if (tplE !== undefined) localStorage.setItem("savedGreeting_news_evening", tplE);
+            if (tplR !== undefined) localStorage.setItem("savedGreeting_radio", tplR);
+            if (tplC !== undefined) localStorage.setItem("savedGreeting_chat", tplC);
+
+            closeGreetingModal();
+
+            // 即座に説明欄を再生成して画面に反映
+            updateSuggestedMetadata(true);
+            showYtApiFeedback("✅ 冒頭挨拶テンプレートを保存し、説明欄を更新しました！", true);
         });
     </script>
 </body>
