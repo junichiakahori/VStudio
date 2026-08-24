@@ -77,14 +77,28 @@ async function fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal
       });
       if (synthRes.ok) {
         const kanaHeader = synthRes.headers.get("X-Voicevox-Kana");
-        if (kanaHeader) {
-          try {
-            console.log(`[VOICEVOX発音カナ] 🗣️ ${decodeURIComponent(kanaHeader)}`);
-          } catch (e) {}
-        }
+        const cleanKanaHeader = synthRes.headers.get("X-Voicevox-Clean-Kana");
+        const finalTextHeader = synthRes.headers.get("X-Voicevox-Final-Text");
         const corrected = synthRes.headers.get("X-Voicevox-Corrected");
+
+        let rawKana = "";
+        let cleanKana = "";
+        let finalText = text.trim();
+
+        if (kanaHeader) {
+          try { rawKana = decodeURIComponent(kanaHeader); } catch (e) {}
+        }
+        if (cleanKanaHeader) {
+          try { cleanKana = decodeURIComponent(cleanKanaHeader); } catch (e) {}
+        }
+        if (finalTextHeader) {
+          try { finalText = decodeURIComponent(finalTextHeader); } catch (e) {}
+        }
+
         if (corrected === "1") {
-          console.warn(`[VOICEVOX誤読補正] ⚠️ 誤読を検知し自動補正しました: "${text.trim()}"`);
+          console.warn(`[VOICEVOX誤読補正] ⚠️ 補正適用: "${text.trim()}" ➔ 補正後: "${finalText}" ➔ 実際の読み: 🗣️ "${cleanKana || rawKana}"`);
+        } else {
+          console.log(`[VOICEVOX発音確認] 🗣️ 読み: "${cleanKana || rawKana}"`);
         }
         return await synthRes.arrayBuffer();
       }

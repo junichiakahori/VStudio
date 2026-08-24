@@ -1141,16 +1141,21 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 if not text:
                     raise ValueError("text is required")
 
-                wav_bytes, kana_str, corrected = synthesize_voicevox_backend(text, speaker_id, speed, pitch)
+                wav_bytes, kana_str, corrected, final_text = synthesize_voicevox_backend(text, speaker_id, speed, pitch)
 
                 self.send_response(200)
                 self.send_header('Content-type', 'audio/wav')
                 self.send_header('Access-Control-Allow-Origin', '*')
-                expose = 'X-Voicevox-Kana, X-Voicevox-Corrected'
+                expose = 'X-Voicevox-Kana, X-Voicevox-Clean-Kana, X-Voicevox-Corrected, X-Voicevox-Final-Text'
                 self.send_header('Access-Control-Expose-Headers', expose)
                 if kana_str:
                     # URLエンコードしてヘッダーに乗せる（ASCII安全）
                     self.send_header('X-Voicevox-Kana', urllib.parse.quote(kana_str))
+                    clean_kana = clean_kana_for_display(kana_str)
+                    if clean_kana:
+                        self.send_header('X-Voicevox-Clean-Kana', urllib.parse.quote(clean_kana))
+                if final_text:
+                    self.send_header('X-Voicevox-Final-Text', urllib.parse.quote(final_text))
                 if corrected:
                     self.send_header('X-Voicevox-Corrected', '1')
                 self.send_header('Content-Length', str(len(wav_bytes)))
@@ -1700,9 +1705,18 @@ def enrich_dict_from_text(text):
 
     return added
 
+def clean_kana_for_display(kana_str):
+    """VOICEVOX内部のアクセント記号（'や_や/）を除去して、人間が読める読みやすいカナ文字列に整形"""
+    if not kana_str:
+        return ""
+    # / は単語区切りなのでスペースに、' や _ はアクセント記号なので削除
+    cleaned = kana_str.replace('/', ' ').replace("'", "").replace("_", "").strip()
+    return cleaned
+
 def synthesize_voicevox_backend(text, speaker_id=1, speed=1.0, pitch=0.0):
     import urllib.parse
     processed_text = apply_backend_pronunciation_dict(text)
+    final_text = processed_text
     corrected = False
 
     def _audio_query(t):
@@ -1724,15 +1738,18 @@ def synthesize_voicevox_backend(text, speaker_id=1, speed=1.0, pitch=0.0):
         if wiki_added > 0:
             # 辞書更新後に再適用
             processed_text = apply_backend_pronunciation_dict(text)
+            final_text = processed_text
             print(f"[誤読補正] Wikipedia登録後 再変換: {processed_text!r}")
 
         # Step2: まだ漢字が残るなら pykakasi で完全ひらがな化
         if needs_misread_correction(processed_text, None):
             yomi_text = convert_to_hiragana_yomi(processed_text)
+            final_text = yomi_text
             print(f"[誤読補正] pykakasi適用: {yomi_text!r}")
             query_json = _audio_query(yomi_text)
         else:
             # Wikipedia だけで解決した場合はそのまま再合成
+            final_text = processed_text
             query_json = _audio_query(processed_text)
 
         kana_str = query_json.get("kana", kana_str)
@@ -1755,7 +1772,7 @@ def synthesize_voicevox_backend(text, speaker_id=1, speed=1.0, pitch=0.0):
     )
     with urllib.request.urlopen(req_synth, timeout=15) as s_res:
         wav_bytes = s_res.read()
-    return wav_bytes, kana_str, corrected
+    return wav_bytes, kana_str, corrected, final_text
 
 def run():
     socketserver.ThreadingTCPServer.allow_reuse_address = True
