@@ -1753,6 +1753,7 @@
         // 🔴 YouTube枠の新規作成
         document.getElementById("btn-api-create-broadcast")?.addEventListener("click", async () => {
             const titleVal = document.getElementById("wizard-suggested-title")?.value || "";
+            const descVal = document.getElementById("wizard-suggested-desc")?.value || "";
             let privacyStatus = document.getElementById("wizard-privacy-status")?.value || "public";
             if (privacyStatus === "keep") {
                 privacyStatus = "public"; // 新規枠作成時はデフォルトで公開として作成
