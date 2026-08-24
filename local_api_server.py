@@ -568,8 +568,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 except Exception:
                     log_message = post_data.decode('utf-8', errors='ignore')
                 if log_message:
-                    # 🔗 ニュースログにURLが欠けている場合、サーバー側のURLキャッシュから自動補完して書き込み
-                    if "[ニュース原稿(Backend)]" in log_message and "🔗" not in log_message:
+                    # 🔗 ニュースログにURLが欠けている（またはURLなし）場合、サーバー側のURLキャッシュから自動補完して書き込み
+                    if "[ニュース原稿(Backend)]" in log_message:
                         matched_url = LAST_PLAYING_ARTICLE_URL or ""
                         # ログメッセージからキーワードでタイトル探索
                         for t_key, u_val in ARTICLE_URL_CACHE.items():
@@ -577,18 +577,26 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                                 matched_url = u_val
                                 break
                         if matched_url:
-                            # [ニュース原稿(Backend)] [220/298件] 🔗 https://... 「...」
-                            log_message = re.sub(
-                                r'(\[ニュース原稿\(Backend\)\]\s*\[[0-9]+/[0-9]+件\])',
-                                r'\1 🔗 ' + matched_url + '\n',
-                                log_message
-                            )
+                            if "🔗 URLなし" in log_message:
+                                log_message = log_message.replace("🔗 URLなし", f"🔗 {matched_url}")
+                            elif "🔗" not in log_message:
+                                log_message = re.sub(
+                                    r'(\[ニュース原稿\(Backend\)\]\s*\[[0-9]+/[0-9]+件\])',
+                                    r'\1 🔗 ' + matched_url + '\n',
+                                    log_message
+                                )
 
-                    elif "[ニュース先読み]" in log_message and "🔗" not in log_message:
+                    elif "[ニュース先読み]" in log_message:
+                        matched_url = ""
                         for t_key, u_val in ARTICLE_URL_CACHE.items():
                             if t_key and (t_key[:10] in log_message or t_key in log_message):
-                                log_message = log_message.replace("を先行生成中...", f"🔗 {u_val} を先行生成中...")
+                                matched_url = u_val
                                 break
+                        if matched_url:
+                            if "🔗 URLなし" in log_message:
+                                log_message = log_message.replace("🔗 URLなし", f"🔗 {matched_url}")
+                            elif "🔗" not in log_message:
+                                log_message = log_message.replace("を先行生成中...", f"🔗 {matched_url} を先行生成中...")
 
                     with open('browser_console.log', 'a', encoding='utf-8') as f:
                         f.write(log_message + '\n')
@@ -1014,6 +1022,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({
                     "status": "ok",
+                    "url": article_url or "",
                     "items": items,
                     "sentences": final_sentences,
                     "fullText": "\n".join([it["display"] for it in items])
