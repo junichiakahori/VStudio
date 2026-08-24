@@ -7,6 +7,8 @@ import urllib.request
 import ssl
 import re
 import time
+import datetime
+import shutil
 import threading
 
 PORT = 8001
@@ -20,6 +22,49 @@ NEWS_SCRIPT_FILE = "news_script.txt"
 NEWS_SCRIPT_YOMI_FILE = "news_script_yomi.txt"
 NEWS_SCRIPT_CONFIG_FILE = "news_script_config.json"
 
+current_hot_reload_timestamp = int(time.time() * 1000)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ARTICLE_URLS_FILE = os.path.join(BASE_DIR, "article_urls.json")
+PROMPT_TEMPLATE_FILE = os.path.join(BASE_DIR, "news_prompt_template.txt")
+LOG_FILE = os.path.join(BASE_DIR, "browser_console.log")
+LOG_BACKUP_DIR = os.path.join(BASE_DIR, "logs_backup")
+
+_log_lock = threading.Lock()
+_current_log_date = datetime.date.today().strftime('%Y-%m-%d')
+
+def check_and_rotate_browser_log():
+    """日付が変わった際に browser_console.log を logs_backup/ にバックアップし、1行目からリセット"""
+    global _current_log_date
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    with _log_lock:
+        if today_str != _current_log_date:
+            try:
+                if not os.path.exists(LOG_BACKUP_DIR):
+                    os.makedirs(LOG_BACKUP_DIR, exist_ok=True)
+                if os.path.exists(LOG_FILE) and os.path.getsize(LOG_FILE) > 0:
+                    backup_filename = f"browser_console_{_current_log_date}.log"
+                    backup_path = os.path.join(LOG_BACKUP_DIR, backup_filename)
+                    shutil.copy2(LOG_FILE, backup_path)
+                    # 1行目からスタート
+                    with open(LOG_FILE, 'w', encoding='utf-8') as f:
+                        now_str = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S.000Z')
+                        f.write(f"[{now_str}] [SYSTEM] === Log rotated for {today_str} (Previous: {backup_filename}) ===\n")
+                    print(f"[LogRotation] 📅 日付変更を検知: {backup_filename} にバックアップし、browser_console.log を1行目から再スタートしました")
+            except Exception as e:
+                print(f"[LogRotationエラー]: {e}")
+            finally:
+                _current_log_date = today_str
+
+def write_browser_console_log(log_message):
+    """日次ローテーション管理付きの安全なログ書き込み"""
+    check_and_rotate_browser_log()
+    with _log_lock:
+        try:
+            with open(LOG_FILE, 'a', encoding='utf-8') as f:
+                f.write(log_message + '\n')
+        except Exception as e:
+            print(f"[ログ書き込みエラー]: {e}")
+
 def load_data(file_path=DATA_FILE):
     if not os.path.exists(file_path):
         return {}
@@ -32,11 +77,6 @@ def load_data(file_path=DATA_FILE):
 def save_data(data, file_path=DATA_FILE):
     with open(file_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
-
-current_hot_reload_timestamp = int(time.time() * 1000)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ARTICLE_URLS_FILE = os.path.join(BASE_DIR, "article_urls.json")
-PROMPT_TEMPLATE_FILE = os.path.join(BASE_DIR, "news_prompt_template.txt")
 
 def build_news_prompt(char_desc, transition, title, full_article_content):
     """外部プロンプトファイル news_prompt_template.txt からテンプレートを動的読み込みしてプロンプトを構築"""
@@ -644,8 +684,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                             elif "🔗" not in log_message:
                                 log_message = log_message.replace("を先行生成中...", f"🔗 {matched_url} を先行生成中...")
 
-                    with open('browser_console.log', 'a', encoding='utf-8') as f:
-                        f.write(log_message + '\n')
+                    write_browser_console_log(log_message)
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
                 self.send_header('Access-Control-Allow-Origin', '*')
@@ -964,8 +1003,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     save_article_url_cache(ARTICLE_URL_CACHE)
                     # 🔗 browser_console.log に記事URLを直接記録
                     now_iso = time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime())
-                    with open('browser_console.log', 'a', encoding='utf-8') as f:
-                        f.write(f"[{now_iso}] [LOG] [ニュース記事URL] 🔗 {article_url} | 記事: 「{title}」\n")
+                    write_browser_console_log(f"[{now_iso}] [LOG] [ニュース記事URL] 🔗 {article_url} | 記事: 「{title}」")
                     print(f"[記事URL特定成功] 🔗 {article_url} ({title[:20]}...)")
 
                 full_article_content = description
