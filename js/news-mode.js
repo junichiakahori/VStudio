@@ -732,11 +732,66 @@ window.playNextContinuousNews = playNextContinuousNews;
         }
       };
 
-      headerRow.appendChild(leftMeta);
-      headerRow.appendChild(playBtn);
+      const btnGroup = doc.createElement("div");
+      btnGroup.style.display = "flex";
+      btnGroup.style.alignItems = "center";
+      btnGroup.style.gap = "6px";
 
-      // 下段: 全幅を使った読みやすいタイトル
-      const titleSpan = doc.createElement("div");
+      const articleUrl = item.link || item.url || "";
+      if (articleUrl) {
+        const linkBtn = doc.createElement("a");
+        linkBtn.href = articleUrl;
+        linkBtn.target = "_blank";
+        linkBtn.rel = "noopener noreferrer";
+        linkBtn.textContent = "🔗 記事元";
+        linkBtn.style.background = "rgba(255, 255, 255, 0.08)";
+        linkBtn.style.color = "#74b9ff";
+        linkBtn.style.border = "1px solid rgba(116, 185, 255, 0.4)";
+        linkBtn.style.borderRadius = "12px";
+        linkBtn.style.padding = "3px 8px";
+        linkBtn.style.fontSize = "0.72rem";
+        linkBtn.style.fontWeight = "600";
+        linkBtn.style.textDecoration = "none";
+        linkBtn.style.whiteSpace = "nowrap";
+        linkBtn.style.transition = "all 0.15s ease";
+        linkBtn.onmouseenter = () => { linkBtn.style.background = "rgba(116, 185, 255, 0.25)"; linkBtn.style.color = "#fff"; };
+        linkBtn.onmouseleave = () => { linkBtn.style.background = "rgba(255, 255, 255, 0.08)"; linkBtn.style.color = "#74b9ff"; };
+        btnGroup.appendChild(linkBtn);
+      } else {
+        const searchBtn = doc.createElement("a");
+        searchBtn.href = `https://www.google.com/search?q=${encodeURIComponent(item.title)}`;
+        searchBtn.target = "_blank";
+        searchBtn.rel = "noopener noreferrer";
+        searchBtn.textContent = "🔍 検索";
+        searchBtn.style.background = "rgba(255, 255, 255, 0.05)";
+        searchBtn.style.color = "#a4b0be";
+        searchBtn.style.border = "1px solid rgba(255, 255, 255, 0.15)";
+        searchBtn.style.borderRadius = "12px";
+        searchBtn.style.padding = "3px 8px";
+        searchBtn.style.fontSize = "0.72rem";
+        searchBtn.style.textDecoration = "none";
+        searchBtn.style.whiteSpace = "nowrap";
+        searchBtn.onmouseenter = () => { searchBtn.style.background = "rgba(255, 255, 255, 0.15)"; searchBtn.style.color = "#fff"; };
+        searchBtn.onmouseleave = () => { searchBtn.style.background = "rgba(255, 255, 255, 0.05)"; searchBtn.style.color = "#a4b0be"; };
+        btnGroup.appendChild(searchBtn);
+      }
+
+      btnGroup.appendChild(playBtn);
+      headerRow.appendChild(leftMeta);
+      headerRow.appendChild(btnGroup);
+
+      // 下段: 全幅を使った読みやすいタイトル（クリックでも記事元へ飛べるリンク対応）
+      const titleSpan = doc.createElement(articleUrl ? "a" : "div");
+      if (articleUrl) {
+        titleSpan.href = articleUrl;
+        titleSpan.target = "_blank";
+        titleSpan.rel = "noopener noreferrer";
+        titleSpan.style.display = "block";
+        titleSpan.style.textDecoration = "none";
+        titleSpan.style.cursor = "pointer";
+        titleSpan.onmouseenter = () => { titleSpan.style.textDecoration = "underline"; };
+        titleSpan.onmouseleave = () => { titleSpan.style.textDecoration = "none"; };
+      }
       titleSpan.style.fontSize = "0.88rem";
       titleSpan.style.lineHeight = "1.45";
       titleSpan.style.fontWeight = isPlaying ? "bold" : "normal";
