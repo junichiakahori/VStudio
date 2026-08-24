@@ -1159,13 +1159,8 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
                 display_s = "記事では関連する詳細なスケジュールがまとめられています。"
                 s = display_s
 
-        # 🎭 有名作品の属性誤認（VIVANTを雑誌/ゲーム/VTuberと捏造）の自動矯正
-        if "VIVANT" in display_s or "ヴィヴァン" in display_s:
-            display_s = re.sub(r'『?VIVANT』?(という雑誌|というゲーム|というVTuber|という映画)', '大人気ドラマ『VIVANT』', display_s)
-            display_s = re.sub(r'人気VTuber\s*VIVANT', '大人気ドラマ『VIVANT』', display_s)
-            s = display_s
-
         # 🛡️ 記事コンテキストに基づいた「虚偽の属性・ジャンル捏造」自動検知＆自動修復エンジン
+        # 元記事に記載がないのにAIが勝手に付けたジャンル修飾語（〜という雑誌、〜というゲーム等）を汎用的に検知・除去
         if article_context:
             GENRE_KEYWORDS = ["雑誌", "ゲーム", "VTuber", "Vtuber", "YouTuber", "アニメ", "映画", "漫画", "マンガ", "ドラマ", "アプリ", "SNS", "バンド", "アイドル", "小説", "新曲"]
             for genre in GENRE_KEYWORDS:
@@ -1188,88 +1183,10 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
                             display_s = display_s.replace(target_full, target_name)
             s = display_s
 
-        # 音声用初期値
+        # 音声用初期値（ルビ付き表記からの読み抽出 ＆ 外部辞書 hiragana_dict.json の最長一致適用）
         speech_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\2', s)
         speech_s = speech_s.replace("とろろにゃん", "とろろ").replace("お知らせしてあげる", "お知らせします").replace("教えてあげる", "ご紹介します").replace("安心しなさい", "ご安心ください")
         speech_s = apply_backend_pronunciation_dict(speech_s)
-
-        # 🇨🇳 中国語固有語彙 ➔ 🇯🇵 自然な日本語への自動置換
-        CHINESE_TO_JAPANESE = {
-            "如此": "このような",
-            "巴弟": "バディ",
-            "巴娣": "バディ",
-            "那么": "それでは",
-            "这里": "ここ",
-            "那里": "そこ",
-            "开心": "嬉しく",
-            "厉害": "すごい",
-            "选手": "選手",
-            "首发": "スタメン",
-            "登场": "登場",
-            "进球": "ゴール",
-            "比赛": "試合",
-            "粉丝": "ファン"
-        }
-        for c_word, j_word in CHINESE_TO_JAPANESE.items():
-            if c_word in display_s:
-                display_s = display_s.replace(c_word, j_word)
-            if c_word in speech_s:
-                speech_s = speech_s.replace(c_word, j_word)
-
-        # ============================================================
-        # 🎙️ 事前誤読検知＆自動補正・学習エンジン (Pre-Speech Pronunciation Interceptor)
-        # 読み上げる前にVOICEVOXの予想読み（audio_query）を事前取得して検査
-        # ============================================================
-        try:
-            predicted_kana = get_voicevox_kana(speech_s)
-            if predicted_kana:
-                # 1. 橋下徹 ➔ 「ハシシタ」誤読検知
-                if ("橋下" in speech_s or "橋下徹" in speech_s) and "ハシシタ" in predicted_kana.replace(" ", ""):
-                    speech_s = re.sub(r'橋下(徹氏|徹さん|徹|氏)?', r'はしもと\1', speech_s)
-                    new_learned_dict["橋下徹"] = "はしもととおる"
-                    new_learned_dict["橋下"] = "はしもと"
-                    print(f"[事前誤読検知] 🎯 橋下の誤読(ハシシタ)を事前検知 ➔ 'はしもと' に自動補正＆学習")
-
-                # 2. 〜外（予想外、想定外、規格外等） ➔ 「〜ソト」誤読検知
-                gai_matches = re.findall(r'([一-龥ぁ-ん]{2,4})外', speech_s)
-                for g_word in gai_matches:
-                    full_g_word = g_word + "外"
-                    # 音声カナで「ソト」と読まれてしまっている場合
-                    if "ソト" in predicted_kana:
-                        # 予想外 ➔ よそうがい、想定外 ➔ そうていがい、規格外 ➔ きかくがい 等
-                        if full_g_word in ["予想外", "想定外", "規格外", "対象外", "時間外", "営業時間外", "例外", "範囲外", "枠外"]:
-                            yomi_gai = apply_backend_pronunciation_dict(g_word) + "がい"
-                            speech_s = speech_s.replace(full_g_word, yomi_gai)
-                            new_learned_dict[full_g_word] = yomi_gai
-                            print(f"[事前誤読検知] 🎯 '{full_g_word}' の誤読(ソト)を事前検知 ➔ '{yomi_gai}' に自動補正＆学習")
-
-                # 3. 路線・鉄道名（外房線、総武線、山手線等）の区切り途切れ検知
-                if "外房線" in speech_s and "ソト" in predicted_kana and "ボオセン" in predicted_kana:
-                    speech_s = speech_s.replace("外房線", "そとぼうせん").replace("ＪＲ外房線", "ジェイアールそとぼうせん")
-                    new_learned_dict["外房線"] = "そとぼうせん"
-                    print(f"[事前誤読検知] 🎯 '外房線' の区切り途切れを事前検知 ➔ 'そとぼうせん' に自動補正＆学習")
-
-                # 4. JRなどの鉄道会社名の途切れ検知
-                if "JR" in speech_s or "ＪＲ" in speech_s:
-                    for jr_k, jr_v in [("JR東日本", "ジェイアールひがしにほん"), ("JR西日本", "ジェイアールにしにほん"), ("JR東海", "ジェイアールとうかい"), ("JR北海道", "ジェイアールほっかいどう"), ("JR九州", "ジェイアールきゅうしゅう")]:
-                        if jr_k in speech_s or jr_k.replace("JR", "ＪＲ") in speech_s:
-                            speech_s = speech_s.replace(jr_k, jr_v).replace(jr_k.replace("JR", "ＪＲ"), jr_v)
-                            new_learned_dict[jr_k] = jr_v
-
-                # 5. 上田綺世、三浦璃来等のスポーツ選手名検知
-                if "上田綺世" in speech_s and "アヤセ" not in predicted_kana.replace(" ", ""):
-                    speech_s = speech_s.replace("上田綺世", "うえだあやせ")
-                    new_learned_dict["上田綺世"] = "うえだあやせ"
-                    print(f"[事前誤読検知] 🎯 '上田綺世' の誤読を事前検知 ➔ 'うえだあやせ' に自動補正＆学習")
-
-                # 6. 何らか ➔ 「ナニラカ」誤読検知
-                if "何らか" in speech_s and "ナニラカ" in predicted_kana.replace(" ", ""):
-                    speech_s = speech_s.replace("何らかの", "なんらかの").replace("何らか", "なんらか")
-                    new_learned_dict["何らかの"] = "なんらかの"
-                    new_learned_dict["何らか"] = "なんらか"
-                    print(f"[事前誤読検知] 🎯 '何らか' の誤読(ナニラカ)を事前検知 ➔ 'なんらか' に自動補正＆学習")
-        except Exception as pred_err:
-            pass
 
         # ============================================================
         # 🛡️ 鉄壁の中国語混入検知・完全除去フィルター
