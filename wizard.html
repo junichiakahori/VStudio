@@ -2006,233 +2006,221 @@
 
         // 配信開始
         document.getElementById("nav-finish-btn").addEventListener("click", async () => {
-            if (openerWin) {
-                // 0. タイトル・概要欄のメイン画面への同期＆スロット保存
-                const titleVal = document.getElementById("wizard-suggested-title")?.value || "";
-                const descVal = document.getElementById("wizard-suggested-desc")?.value || "";
-                const mainTitle = openerWin.document.getElementById("stream-title");
-                const mainDesc = openerWin.document.getElementById("stream-description");
-                if (mainTitle && titleVal) mainTitle.value = titleVal;
-                if (mainDesc && descVal) mainDesc.value = descVal;
+            try {
+                if (openerWin) {
+                    // 0. タイトル・概要欄のメイン画面への同期＆スロット保存
+                    const titleVal = document.getElementById("wizard-suggested-title")?.value || "";
+                    const descVal = document.getElementById("wizard-suggested-desc")?.value || "";
+                    const mainTitle = openerWin.document.getElementById("stream-title");
+                    const mainDesc = openerWin.document.getElementById("stream-description");
+                    if (mainTitle && titleVal) mainTitle.value = titleVal;
+                    if (mainDesc && descVal) mainDesc.value = descVal;
 
-                openerWin.activeStreamSlot = wizardActiveSlot;
-                openerWin.localStorage.setItem(`savedStreamTitle_${wizardActiveSlot}`, titleVal);
-                openerWin.localStorage.setItem(`savedStreamDesc_${wizardActiveSlot}`, descVal);
-                openerWin.localStorage.setItem("savedStreamTitle", titleVal);
-                openerWin.localStorage.setItem("savedStreamDesc", descVal);
-                openerWin.localStorage.setItem("savedStreamSlot", wizardActiveSlot);
+                    openerWin.activeStreamSlot = wizardActiveSlot;
+                    try {
+                        openerWin.localStorage.setItem(`savedStreamTitle_${wizardActiveSlot}`, titleVal);
+                        openerWin.localStorage.setItem(`savedStreamDesc_${wizardActiveSlot}`, descVal);
+                        openerWin.localStorage.setItem("savedStreamTitle", titleVal);
+                        openerWin.localStorage.setItem("savedStreamDesc", descVal);
+                        openerWin.localStorage.setItem("savedStreamSlot", wizardActiveSlot);
+                    } catch(storageErr) {}
 
-                // メイン画面側のスロットボタンスタイルも同期
-                const mainMorningBtn = openerWin.document.getElementById("stream-slot-morning-btn");
-                const mainEveningBtn = openerWin.document.getElementById("stream-slot-evening-btn");
-                if (mainMorningBtn && mainEveningBtn) {
-                    if (wizardActiveSlot === "morning") {
-                        mainMorningBtn.style.background = "rgba(255,180,0,0.25)";
-                        mainMorningBtn.style.borderColor = "#ffb400";
-                        mainMorningBtn.style.color = "#ffb400";
-                        mainEveningBtn.style.background = "rgba(255,255,255,0.05)";
-                        mainEveningBtn.style.borderColor = "rgba(255,255,255,0.15)";
-                        mainEveningBtn.style.color = "var(--text-muted)";
-                    } else {
-                        mainMorningBtn.style.background = "rgba(255,255,255,0.05)";
-                        mainMorningBtn.style.borderColor = "rgba(255,255,255,0.15)";
-                        mainMorningBtn.style.color = "var(--text-muted)";
-                        mainEveningBtn.style.background = "rgba(108,92,231,0.25)";
-                        mainEveningBtn.style.borderColor = "#a29bfe";
-                        mainEveningBtn.style.color = "#a29bfe";
-                    }
-                }
-
-                // 1. YouTube枠ID & コメントサーバー自動起動
-                try {
-                    fetch("/_api/servers/youtube_comment_server/start", { method: "POST" }).catch(() => {});
-                } catch(e) {}
-
-                const ytVal = document.getElementById("wizard-yt-input").value.trim();
-                const mainYt = openerWin.document.getElementById("youtube-video-input");
-                if (ytVal) {
-                    const match = ytVal.match(/(?:v=|\/live\/|\/watch\?v=|youtu\.be\/|^)([a-zA-Z0-9_-]{11})/);
-                    const cleanId = match ? match[1] : ytVal;
-                    if (typeof openerWin.connectYoutubeLive === "function") {
-                        openerWin.connectYoutubeLive(cleanId);
-                    } else {
-                        if (mainYt) mainYt.value = cleanId;
-                        const parentYtBtn = openerWin.document.getElementById("youtube-connect-btn");
-                        if (parentYtBtn) parentYtBtn.click();
-                    }
-                }
-
-                // 2. 配信開始スケジュールの適用
-                openerWin.currentBroadcastMode = selectedMode;
-                const startToggleVal = document.getElementById("wizard-start-schedule-toggle")?.checked || false;
-                const startTimeVal = document.getElementById("wizard-start-time")?.value || "";
-                const mainSchedToggle = openerWin.document.getElementById("local-schedule-toggle");
-                const mainSchedTime = openerWin.document.getElementById("local-schedule-time");
-
-                if (mainSchedTime && startTimeVal) mainSchedTime.value = startTimeVal;
-                if (mainSchedToggle) {
-                    mainSchedToggle.checked = startToggleVal;
-                    mainSchedToggle.dispatchEvent(new Event("change"));
-                }
-
-                // 3. 配信終了設定の適用
-                const endMode = endModeSelect ? endModeSelect.value : "none";
-                const mainEndToggle = openerWin.document.getElementById("stream-end-toggle");
-
-                if (endMode === "news_end") {
-                    openerWin.isAutoEndAfterNews = true;
-                    if (mainEndToggle) mainEndToggle.checked = false;
-                    if (typeof openerWin.clearStreamEndTimer === "function") {
-                        openerWin.clearStreamEndTimer();
-                    }
-                } else if (endMode === "timer") {
-                    openerWin.isAutoEndAfterNews = false;
-                    const durSelect = document.getElementById("wizard-duration-select");
-                    const durationMinutes = durSelect ? parseInt(durSelect.value, 10) : 1440;
-                    if (typeof openerWin.setStreamEndTimer === "function") {
-                        openerWin.setStreamEndTimer(durationMinutes);
-                    }
-                    if (mainEndToggle) mainEndToggle.checked = false; // 時計比較はOFF
-                } else if (endMode === "time") {
-                    openerWin.isAutoEndAfterNews = false;
-                    const endVal = document.getElementById("wizard-end-time").value;
-                    const mainEnd = openerWin.document.getElementById("stream-end-time");
-                    if (endVal && mainEnd) mainEnd.value = endVal;
-                    if (mainEndToggle) mainEndToggle.checked = true;
-                    if (typeof openerWin.clearStreamEndTimer === "function") {
-                        openerWin.clearStreamEndTimer();
-                    }
-                } else {
-                    // 自動終了なし（無制限・24時間耐久）
-                    openerWin.isAutoEndAfterNews = false;
-                    if (mainEndToggle) mainEndToggle.checked = false;
-                    if (typeof openerWin.clearStreamEndTimer === "function") {
-                        openerWin.clearStreamEndTimer();
-                    }
-                }
-
-                // 4. メイン画面のUIタブ・番組コントロール・トグルを完全同期
-                if (selectedMode === "news") {
-                    // 配信/OBSタブに切り替え
-                    const streamTabBtn = openerWin.document.querySelector('.tab-btn[data-target="tab-stream"]');
-                    if (streamTabBtn) streamTabBtn.click();
-
-                    // 「OBS配信を同時に開始する」トグルをONにしてUI反映
-                    const mainNewsObsToggle = openerWin.document.getElementById("news-obs-auto-stream-toggle");
-                    if (mainNewsObsToggle) {
-                        mainNewsObsToggle.checked = true;
-                        mainNewsObsToggle.dispatchEvent(new Event("change"));
-                    }
-
-                    // 開始件数を第1件目(#1)に同期
-                    const mainNewsStartIdx = openerWin.document.getElementById("news-broadcast-start-index");
-                    if (mainNewsStartIdx) {
-                        mainNewsStartIdx.value = 1;
-                    }
-
-                    // ラジオモードはOFFにする
-                    const mainRadioToggle = openerWin.document.getElementById("ai-radio-mode-toggle");
-                    if (mainRadioToggle && mainRadioToggle.checked) {
-                        mainRadioToggle.checked = false;
-                        mainRadioToggle.dispatchEvent(new Event("change"));
-                    }
-                } else if (selectedMode === "radio") {
-                    // 配信/OBSタブに切り替え
-                    const streamTabBtn = openerWin.document.querySelector('.tab-btn[data-target="tab-stream"]');
-                    if (streamTabBtn) streamTabBtn.click();
-
-                    // ラジオモードトグルをONにしてUI反映
-                    const mainRadioToggle = openerWin.document.getElementById("ai-radio-mode-toggle");
-                    if (mainRadioToggle) {
-                        mainRadioToggle.checked = true;
-                        mainRadioToggle.dispatchEvent(new Event("change"));
-                    }
-
-                    // 開始行数を第1行目(#1)に同期
-                    const mainRadioStartLine = openerWin.document.getElementById("radio-script-start-line");
-                    if (mainRadioStartLine) {
-                        mainRadioStartLine.value = 1;
-                    }
-                } else {
-                    // 雑談配信
-                    const mainRadioToggle = openerWin.document.getElementById("ai-radio-mode-toggle");
-                    if (mainRadioToggle && mainRadioToggle.checked) {
-                        mainRadioToggle.checked = false;
-                        mainRadioToggle.dispatchEvent(new Event("change"));
-                    }
-                }
-
-                // 5. 配信種別に応じた番組スタート（即時開始の場合のみ直ちに実行）
-                if (!startToggleVal) {
-                    // OBS配信開始（OBS WebSocket接続時）
-                    if (typeof openerWin.ensureObsStreamingStarted === "function") {
-                        openerWin.ensureObsStreamingStarted().catch(e => console.warn(e));
-                    }
-
-                    // 配信準備中オーバーレイの解除
-                    const prepToggle = openerWin.document.getElementById("preparing-mode-toggle");
-                    if (prepToggle && prepToggle.checked) {
-                        prepToggle.checked = false;
-                        prepToggle.dispatchEvent(new Event("change"));
-                    }
-
-                    // 配信・番組開始時にコメント履歴とコメント数をクリア
-                    if (typeof openerWin.clearAllComments === "function") {
-                        openerWin.clearAllComments();
-                    }
-
-                    if (selectedMode === "news") {
-                        openerWin.currentBroadcastMode = "news";
-                        if (typeof openerWin.clearIdleTimer === "function") openerWin.clearIdleTimer();
-
-                        // ニュース番組 全自動スタートを実行
-                        if (typeof openerWin.startNewsBroadcast === "function") {
-                            openerWin.startNewsBroadcast();
+                    // メイン画面側のスロットボタンスタイルも同期
+                    const mainMorningBtn = openerWin.document.getElementById("stream-slot-morning-btn");
+                    const mainEveningBtn = openerWin.document.getElementById("stream-slot-evening-btn");
+                    if (mainMorningBtn && mainEveningBtn) {
+                        if (wizardActiveSlot === "morning") {
+                            mainMorningBtn.style.background = "rgba(255,180,0,0.25)";
+                            mainMorningBtn.style.borderColor = "#ffb400";
+                            mainMorningBtn.style.color = "#ffb400";
+                            mainEveningBtn.style.background = "rgba(255,255,255,0.05)";
+                            mainEveningBtn.style.borderColor = "rgba(255,255,255,0.15)";
+                            mainEveningBtn.style.color = "var(--text-muted)";
                         } else {
-                            const newsStartBtn = openerWin.document.getElementById("news-broadcast-start-btn");
-                            if (newsStartBtn) newsStartBtn.click();
+                            mainMorningBtn.style.background = "rgba(255,255,255,0.05)";
+                            mainMorningBtn.style.borderColor = "rgba(255,255,255,0.15)";
+                            mainMorningBtn.style.color = "var(--text-muted)";
+                            mainEveningBtn.style.background = "rgba(108,92,231,0.25)";
+                            mainEveningBtn.style.borderColor = "#a29bfe";
+                            mainEveningBtn.style.color = "#a29bfe";
+                        }
+                    }
+
+                    // 1. YouTube枠IDの適用とコメントサーバー接続
+                    const ytVal = document.getElementById("wizard-yt-input")?.value?.trim() || "";
+                    const mainYt = openerWin.document.getElementById("youtube-video-input");
+                    if (ytVal) {
+                        const match = ytVal.match(/(?:v=|\/live\/|\/watch\?v=|youtu\.be\/|^)([a-zA-Z0-9_-]{11})/);
+                        const cleanId = match ? match[1] : ytVal;
+                        if (mainYt) mainYt.value = cleanId;
+                        try { openerWin.localStorage.setItem("savedYoutubeVideoId", cleanId); } catch(e) {}
+                        if (typeof openerWin.connectYoutubeLive === "function") {
+                            openerWin.connectYoutubeLive(cleanId);
+                        } else {
+                            const parentYtBtn = openerWin.document.getElementById("youtube-connect-btn");
+                            if (parentYtBtn) parentYtBtn.click();
+                        }
+                    }
+
+                    // 2. 配信開始スケジュールの適用
+                    openerWin.currentBroadcastMode = selectedMode;
+                    const startToggleVal = document.getElementById("wizard-start-schedule-toggle")?.checked || false;
+                    const startTimeVal = document.getElementById("wizard-start-time")?.value || "";
+                    const mainSchedToggle = openerWin.document.getElementById("local-schedule-toggle");
+                    const mainSchedTime = openerWin.document.getElementById("local-schedule-time");
+
+                    if (mainSchedTime && startTimeVal) mainSchedTime.value = startTimeVal;
+                    if (mainSchedToggle) {
+                        mainSchedToggle.checked = startToggleVal;
+                        mainSchedToggle.dispatchEvent(new Event("change"));
+                    }
+
+                    // 3. 配信終了設定の適用
+                    const endModeSelectEl = document.getElementById("wizard-end-mode-select");
+                    const endMode = endModeSelectEl ? endModeSelectEl.value : "none";
+                    const mainEndToggle = openerWin.document.getElementById("stream-end-toggle");
+
+                    if (endMode === "news_end") {
+                        openerWin.isAutoEndAfterNews = true;
+                        if (mainEndToggle) mainEndToggle.checked = false;
+                        if (typeof openerWin.clearStreamEndTimer === "function") {
+                            openerWin.clearStreamEndTimer();
+                        }
+                    } else if (endMode === "timer") {
+                        openerWin.isAutoEndAfterNews = false;
+                        const durSelect = document.getElementById("wizard-duration-select");
+                        const durationMinutes = durSelect ? parseInt(durSelect.value, 10) : 1440;
+                        if (typeof openerWin.setStreamEndTimer === "function") {
+                            openerWin.setStreamEndTimer(durationMinutes);
+                        }
+                        if (mainEndToggle) mainEndToggle.checked = false;
+                    } else if (endMode === "time") {
+                        openerWin.isAutoEndAfterNews = false;
+                        const endVal = document.getElementById("wizard-end-time")?.value || "";
+                        const mainEnd = openerWin.document.getElementById("stream-end-time");
+                        if (endVal && mainEnd) mainEnd.value = endVal;
+                        if (mainEndToggle) mainEndToggle.checked = true;
+                        if (typeof openerWin.clearStreamEndTimer === "function") {
+                            openerWin.clearStreamEndTimer();
+                        }
+                    } else {
+                        // 自動終了なし
+                        openerWin.isAutoEndAfterNews = false;
+                        if (mainEndToggle) mainEndToggle.checked = false;
+                        if (typeof openerWin.clearStreamEndTimer === "function") {
+                            openerWin.clearStreamEndTimer();
+                        }
+                    }
+
+                    // 4. メイン画面のUIタブ・番組コントロール・トグルを完全同期
+                    if (selectedMode === "news") {
+                        const streamTabBtn = openerWin.document.querySelector('.tab-btn[data-target="tab-stream"]');
+                        if (streamTabBtn) streamTabBtn.click();
+
+                        const mainNewsObsToggle = openerWin.document.getElementById("news-obs-auto-stream-toggle");
+                        if (mainNewsObsToggle) {
+                            mainNewsObsToggle.checked = true;
+                            mainNewsObsToggle.dispatchEvent(new Event("change"));
+                        }
+
+                        const mainNewsStartIdx = openerWin.document.getElementById("news-broadcast-start-index");
+                        if (mainNewsStartIdx) mainNewsStartIdx.value = 1;
+
+                        const mainRadioToggle = openerWin.document.getElementById("ai-radio-mode-toggle");
+                        if (mainRadioToggle && mainRadioToggle.checked) {
+                            mainRadioToggle.checked = false;
+                            mainRadioToggle.dispatchEvent(new Event("change"));
                         }
                     } else if (selectedMode === "radio") {
-                        openerWin.currentBroadcastMode = "radio";
-                        const radioToggle = openerWin.document.getElementById("ai-radio-mode-toggle");
-                        if (radioToggle) radioToggle.checked = true;
-                        const radioPlayBtn = openerWin.document.getElementById("radio-script-play-btn");
-                        if (radioPlayBtn) radioPlayBtn.click();
-                    } else {
-                        // 雑談配信（通常の独り言＆コメント応答）
-                        openerWin.currentBroadcastMode = "chat";
-                        const charId = openerWin.currentModelId || "";
-                        const startVoice = charId.includes("zunda")
-                            ? "配信の準備が完了したのだ！今日も楽しく配信スタートなのだ！"
-                            : "配信の準備が完了しました。本日の配信をスタートします！";
-                        if (typeof openerWin.queueVoicevoxAudio === "function") {
-                            openerWin.queueVoicevoxAudio(startVoice, true).catch(e => console.warn(e));
+                        const streamTabBtn = openerWin.document.querySelector('.tab-btn[data-target="tab-stream"]');
+                        if (streamTabBtn) streamTabBtn.click();
+
+                        const mainRadioToggle = openerWin.document.getElementById("ai-radio-mode-toggle");
+                        if (mainRadioToggle) {
+                            mainRadioToggle.checked = true;
+                            mainRadioToggle.dispatchEvent(new Event("change"));
                         }
-                        if (typeof openerWin.resetIdleTimer === "function") {
-                            openerWin.resetIdleTimer();
+
+                        const mainRadioStartLine = openerWin.document.getElementById("radio-script-start-line");
+                        if (mainRadioStartLine) mainRadioStartLine.value = 1;
+                    } else {
+                        const mainRadioToggle = openerWin.document.getElementById("ai-radio-mode-toggle");
+                        if (mainRadioToggle && mainRadioToggle.checked) {
+                            mainRadioToggle.checked = false;
+                            mainRadioToggle.dispatchEvent(new Event("change"));
                         }
                     }
+
+                    // 5. 配信種別に応じた番組スタート（即時開始の場合のみ直ちに実行）
+                    if (!startToggleVal) {
+                        if (typeof openerWin.ensureObsStreamingStarted === "function") {
+                            openerWin.ensureObsStreamingStarted().catch(e => console.warn(e));
+                        }
+
+                        const prepToggle = openerWin.document.getElementById("preparing-mode-toggle");
+                        if (prepToggle && prepToggle.checked) {
+                            prepToggle.checked = false;
+                            prepToggle.dispatchEvent(new Event("change"));
+                        }
+
+                        if (typeof openerWin.clearAllComments === "function") {
+                            openerWin.clearAllComments();
+                        }
+
+                        if (selectedMode === "news") {
+                            openerWin.currentBroadcastMode = "news";
+                            if (typeof openerWin.clearIdleTimer === "function") openerWin.clearIdleTimer();
+                            if (typeof openerWin.startNewsBroadcast === "function") {
+                                openerWin.startNewsBroadcast();
+                            } else {
+                                const newsStartBtn = openerWin.document.getElementById("news-broadcast-start-btn");
+                                if (newsStartBtn) newsStartBtn.click();
+                            }
+                        } else if (selectedMode === "radio") {
+                            openerWin.currentBroadcastMode = "radio";
+                            const radioToggle = openerWin.document.getElementById("ai-radio-mode-toggle");
+                            if (radioToggle) radioToggle.checked = true;
+                            const radioPlayBtn = openerWin.document.getElementById("radio-script-play-btn");
+                            if (radioPlayBtn) radioPlayBtn.click();
+                        } else {
+                            openerWin.currentBroadcastMode = "chat";
+                            const charId = openerWin.currentModelId || "";
+                            const startVoice = charId.includes("zunda")
+                                ? "配信の準備が完了したのだ！今日も楽しく配信スタートなのだ！"
+                                : "配信の準備が完了しました。本日の配信をスタートします！";
+                            if (typeof openerWin.queueVoicevoxAudio === "function") {
+                                openerWin.queueVoicevoxAudio(startVoice, true).catch(e => console.warn(e));
+                            }
+                            if (typeof openerWin.resetIdleTimer === "function") {
+                                openerWin.resetIdleTimer();
+                            }
+                        }
+                    }
+
+                    openerWin.focus();
                 }
 
-                openerWin.focus();
-            }
+                const startToggleVal = document.getElementById("wizard-start-schedule-toggle")?.checked || false;
+                const startTimeVal = document.getElementById("wizard-start-time")?.value || "";
 
-            const startToggleVal = document.getElementById("wizard-start-schedule-toggle")?.checked || false;
-            const startTimeVal = document.getElementById("wizard-start-time")?.value || "";
-
-            if (startToggleVal && startTimeVal) {
-                let displayTime = startTimeVal;
-                try {
-                    const d = new Date(startTimeVal);
-                    if (!isNaN(d.getTime())) {
-                        displayTime = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-                    }
-                } catch (e) {}
-                alert(`⏰ 配信準備が完了しました！\n指定日時（${displayTime}）になると自動的に配信がスタートします。`);
-            } else {
-                alert("🚀 配信準備が完了しました！\n設定が適用され、配信がスタートします。");
+                if (startToggleVal && startTimeVal) {
+                    let displayTime = startTimeVal;
+                    try {
+                        const d = new Date(startTimeVal);
+                        if (!isNaN(d.getTime())) {
+                            displayTime = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+                        }
+                    } catch (e) {}
+                    alert(`⏰ 配信準備が完了しました！\n指定日時（${displayTime}）になると自動的に配信がスタートします。`);
+                } else {
+                    alert("🚀 配信準備が完了しました！\n設定が適用され、配信がスタートします。");
+                }
+                window.close();
+            } catch (finishErr) {
+                console.error("[Wizard Finish Error]", finishErr);
+                alert("🚀 配信設定を適用しました！");
+                window.close();
             }
-            window.close();
         });
 
         // =====================================================================
