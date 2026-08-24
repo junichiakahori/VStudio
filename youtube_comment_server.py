@@ -496,6 +496,20 @@ def resolve_youtube_video_id(input_str: str) -> tuple[str, str]:
     if re.match(r'^[a-zA-Z0-9_-]{11}$', input_str):
         return input_str, f"Direct Video ID: {input_str}"
 
+    # 0. API認証済みの場合、進行中/予約枠から自動解決
+    global youtube_api_client
+    if youtube_api_client and (input_str.startswith("@") or len(input_str) != 11):
+        try:
+            b_req = youtube_api_client.liveBroadcasts().list(part="id,status", mine=True, maxResults=10)
+            b_res = b_req.execute()
+            for b in b_res.get("items", []):
+                st = b.get("status", {}).get("lifeCycleStatus")
+                if st in ["live", "testStarting", "liveStarting", "ready"]:
+                    logging.info(f"[AutoDetect] Found active broadcast via API: {b['id']} ({st})")
+                    return b["id"], f"Authenticated Live Stream: {b['id']} ({st})"
+        except Exception as e:
+            logging.debug(f"API live broadcast check: {e}")
+
     # 2. 通常の動画URL（watch?v=... / youtu.be/... / live/...）
     v_match = re.search(r'(?:v=|\/live\/|\/embed\/|youtu\.be\/)([a-zA-Z0-9_-]{11})', input_str)
     if v_match and not "@" in input_str and not "/channel/" in input_str:

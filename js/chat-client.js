@@ -429,6 +429,18 @@ function initChatClient() {
       localStorage.setItem("savedYoutubeChannel", youtubeChannelInput.value);
     });
   }
+
+  if (youtubeUserInput) {
+    let savedVid = localStorage.getItem("savedYoutubeVideoId") || "";
+    if (savedVid.startsWith("@") || savedVid.includes("channel") || (savedVid.length !== 11 && savedVid.length > 0)) {
+      savedVid = "";
+      localStorage.removeItem("savedYoutubeVideoId");
+    }
+    youtubeUserInput.value = savedVid;
+    youtubeUserInput.addEventListener("input", () => {
+      localStorage.setItem("savedYoutubeVideoId", youtubeUserInput.value);
+    });
+  }
   if (youtubeDetectBtn) {
     youtubeDetectBtn.addEventListener("click", async () => {
       const channelVal = youtubeChannelInput ? youtubeChannelInput.value.trim() : "";
