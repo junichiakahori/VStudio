@@ -1139,7 +1139,6 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
         display_s = display_s.replace("（", "").replace("）", "").replace("(", "").replace(")", "").strip()
         display_s = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)のかた([たち|がた|も|は|が|に|へ|で|を|、|。|！|？\s]|$)', r'\1の方\2', display_s)
         display_s = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)なかた([たち|がた|も|は|が|に|へ|で|を|、|。|！|？\s]|$)', r'\1な方\2', display_s)
-        display_s = display_s.replace("とろろにゃん", "とろろ").replace("お知らせしてあげる", "お知らせします").replace("教えてあげる", "ご紹介します").replace("安心しなさい", "ご安心ください")
 
         # 🚫 記事本文・タイトルに存在しない勝手な『作品名・ゲーム名』の捏造をPython側で完全排除
         if article_context:
@@ -1185,7 +1184,6 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
 
         # 音声用初期値（ルビ付き表記からの読み抽出 ＆ 外部辞書 hiragana_dict.json の最長一致適用）
         speech_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\2', s)
-        speech_s = speech_s.replace("とろろにゃん", "とろろ").replace("お知らせしてあげる", "お知らせします").replace("教えてあげる", "ご紹介します").replace("安心しなさい", "ご安心ください")
         speech_s = apply_backend_pronunciation_dict(speech_s)
 
         # ============================================================
@@ -1286,38 +1284,6 @@ def apply_backend_pronunciation_dict(text):
                 src, dst = parts[0].strip(), parts[1].strip()
                 if src and dst and src in processed:
                     processed = processed.replace(src, dst)
-
-    # ニュースで頻出する主要英単語・IT用語の自動カタカナ変換（棒読み防止セーフティネット）
-    COMMON_ENGLISH_WORDS = {
-        "AI": "エーアイ", "IT": "アイティー", "SNS": "エスエヌエス", "EV": "イーブイ",
-        "DX": "ディーエックス", "SDGs": "エスディージーズ", "LIVE": "ライブ", "Live": "ライブ",
-        "NEWS": "ニュース", "News": "ニュース", "WORLD": "ワールド", "World": "ワールド",
-        "TOP": "トップ", "Top": "トップ", "NEW": "ニュー", "New": "ニュー",
-        "STUDIO": "スタジオ", "Studio": "スタジオ", "GAME": "ゲーム", "Game": "ゲーム",
-        "MUSIC": "ミュージック", "Music": "ミュージック", "MOVIE": "ムービー", "Movie": "ムービー",
-        "DRAMA": "ドラマ", "Drama": "ドラマ", "EVENT": "イベント", "Event": "イベント",
-        "TOUR": "ツアー", "Tour": "ツアー", "SHOW": "ショー", "Show": "ショー",
-        "FESTIVAL": "フェスティバル", "Festival": "フェスティバル", "FES": "フェス", "Fes": "フェス",
-        "STAGE": "ステージ", "Stage": "ステージ", "STAR": "スター", "Star": "スター",
-        "TEAM": "チーム", "Team": "チーム", "CLUB": "クラブ", "Club": "クラブ",
-        "LINE": "ライン", "Line": "ライン", "APP": "アップ", "App": "アップ", "Apps": "アップス",
-        "WEB": "ウェブ", "Web": "ウェブ", "ONLINE": "オンライン", "Online": "オンライン",
-        "SITE": "サイト", "Site": "サイト", "PAGE": "ページ", "Page": "ページ",
-        "POST": "ポスト", "Post": "ポスト", "FAN": "ファン", "Fan": "ファン",
-        "GOODS": "グッズ", "Goods": "グッズ", "SHOP": "ショップ", "Shop": "ショップ",
-        "STORE": "ストア", "Store": "ストア", "MARKET": "マーケット", "Market": "マーケット",
-        "SALE": "セール", "Sale": "セール", "PRICE": "プライス", "Price": "プライス",
-        "RANKING": "ランキング", "Ranking": "ランキング", "BEST": "ベスト", "Best": "ベスト",
-        "HOT": "ホット", "Hot": "ホット", "TREND": "トレンド", "Trend": "トレンド",
-        "PROJECT": "プロジェクト", "Project": "プロジェクト", "GROUP": "グループ", "Group": "グループ",
-        "MEMBER": "メンバー", "Member": "メンバー", "VOICE": "ボイス", "Voice": "ボイス",
-        "AUDIO": "オーディオ", "Audio": "オーディオ", "VIDEO": "ビデオ", "Video": "ビデオ",
-        "CHANNEL": "チャンネル", "Channel": "チャンネル", "STREAM": "ストリーム", "Stream": "ストリーム",
-        "ROOM": "ルーム", "Room": "ルーム", "STATION": "ステーション", "Station": "ステーション"
-    }
-    # 単語境界または記号で囲まれた英単語を安全に置換
-    for en_word, kana_word in sorted(COMMON_ENGLISH_WORDS.items(), key=lambda x: len(x[0]), reverse=True):
-        processed = re.sub(r'(?<![A-Za-z0-9])' + re.escape(en_word) + r'(?![A-Za-z0-9])', kana_word, processed)
 
     # 人を指す「〜方（かた）」のVOICEVOX誤読（ホウ）完全・網羅的自動補正
     # ※ 直前が平仮名（大切な方、〜の方、〜る方、〜た方、〜ない方、この方 等）は100%「かた」に補正
