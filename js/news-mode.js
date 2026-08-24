@@ -586,6 +586,11 @@ window.playNextContinuousNews = playNextContinuousNews;
       } catch (e) { }
     }
 
+    // 🔗 未取得URLがある場合はバックグラウンドで全件一括逆引き解決を実行
+    if (typeof window.enrichCurrentNewsWithLinks === "function") {
+      window.enrichCurrentNewsWithLinks();
+    }
+
     container.innerHTML = "";
     if (!window.latestFetchedNews || window.latestFetchedNews.length === 0) {
       container.innerHTML = '<p style="color:#aaa; font-size:0.8rem; text-align:center; padding:20px;">まだニュースが取得されていません。<br><span style="font-size:0.75rem; color:#888;">「⬇️ ニュースを取得」を押してください。</span></p>';
@@ -3002,50 +3007,83 @@ ${creditsInstruction}
     }
   }, 1200);
 
-  // 🚀 現在メモリ上のニュースリスト（以前取得したもの）にURLが欠けている場合、裏側で自動マージ補完
-  async function enrichCurrentNewsWithLinks() {
-    if (!window.latestFetchedNews || window.latestFetchedNews.length === 0) return;
-    const needEnrich = window.latestFetchedNews.some(item => !item.link);
-    if (!needEnrich) return;
-
+  // 🔗 ニュースリストの全件（298件）に対して記事URLを一括事前取得・自動補完する強力エンジン
+  window.enrichCurrentNewsWithLinks = async function () {
     try {
-      const fetchTargets = [];
-      for (const catKey of Object.keys(NEWS_CATEGORIES)) {
-        NEWS_CATEGORIES[catKey].forEach(u => fetchTargets.push(u));
-      }
-      const map = new Map();
-      await Promise.all(fetchTargets.map(async (u) => {
+      if (!window.latestFetchedNews || window.latestFetchedNews.length === 0) {
         try {
-          const res = await fetch("/fetch_rss", {
+          const saved = localStorage.getItem("latestFetchedNews");
+          if (saved) window.latestFetchedNews = JSON.parse(saved);
+        } catch (e) {}
+      }
+      if (!window.latestFetchedNews || window.latestFetchedNews.length === 0) return;
+
+      // 1. サーバーのURLキャッシュ（article_urls.json）から全URLマップを取得
+      let serverUrlMap = {};
+      try {
+        const res = await fetch("/api/news/get_all_urls");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.urls) serverUrlMap = data.urls;
+        }
+      } catch (e) {}
+
+      let enrichedCount = 0;
+      const missingTitles = [];
+
+      window.latestFetchedNews.forEach(item => {
+        if (!item.link) {
+          if (serverUrlMap[item.title]) {
+            item.link = serverUrlMap[item.title];
+            enrichedCount++;
+          } else {
+            const tPrefix = (item.title || "").replace(/[【】『』「」\s　・、。！？!?]+/g, "").slice(0, 10);
+            if (tPrefix) {
+              for (const [k, u] of Object.entries(serverUrlMap)) {
+                if (k.includes(tPrefix) || tPrefix.includes(k.slice(0, 8))) {
+                  item.link = u;
+                  enrichedCount++;
+                  break;
+                }
+              }
+            }
+          }
+        }
+        if (!item.link) {
+          missingTitles.push(item.title);
+        }
+      });
+
+      console.log(`[ニュースURL補完] 🔗 キャッシュから全ニュースリストに記事URLを反映完了 (${enrichedCount}件反映 / 未取得: ${missingTitles.length}件)`);
+
+      // 2. それでも未取得のタイトルがあれば、バックエンドの一括解決APIに投げて全件取得！
+      if (missingTitles.length > 0) {
+        try {
+          const batchRes = await fetch("/api/news/batch_resolve_urls", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url: u })
+            body: JSON.stringify({ titles: missingTitles.slice(0, 80) })
           });
-          if (!res.ok) return;
-          const xmlText = await res.text();
-          const parser = new DOMParser();
-          const xmlDoc = parser.parseFromString(xmlText, "text/xml");
-          const items = xmlDoc.querySelectorAll("item");
-          items.forEach(node => {
-            const t = node.querySelector("title") ? node.querySelector("title").textContent.trim() : "";
-            const l = extractLinkFromXmlNode(node);
-            if (t && l) map.set(t, l);
-          });
-        } catch (e) {}
-      }));
-
-      if (map.size > 0) {
-        let enrichedCount = 0;
-        window.latestFetchedNews.forEach(item => {
-          if (!item.link && map.has(item.title)) {
-            item.link = map.get(item.title);
-            enrichedCount++;
+          if (batchRes.ok) {
+            const batchData = await batchRes.json();
+            if (batchData && batchData.urls) {
+              let batchCount = 0;
+              window.latestFetchedNews.forEach(item => {
+                if (!item.link && batchData.urls[item.title]) {
+                  item.link = batchData.urls[item.title];
+                  batchCount++;
+                }
+              });
+              console.log(`[ニュースURL補完] 🌐 未取得URLの一括逆引き取得完了 (新たに${batchCount}件のURLを紐付け)`);
+              if (typeof window.updateNewsListPopup === "function") {
+                window.updateNewsListPopup();
+              }
+            }
           }
-        });
-        console.log(`[ニュースURL補完] 🔗 現在のニュースリストに記事URLを自動紐付け完了 (${enrichedCount}件にURLを反映)`);
+        } catch (batchErr) {}
       }
     } catch (e) {}
-  }
+  };
 
-  enrichCurrentNewsWithLinks();
+  window.enrichCurrentNewsWithLinks();
 });

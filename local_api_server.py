@@ -258,6 +258,23 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(json.dumps(default_config, ensure_ascii=False).encode('utf-8'))
+        elif self.path == '/api/news/get_all_urls':
+            try:
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "status": "ok",
+                    "urls": ARTICLE_URL_CACHE,
+                    "count": len(ARTICLE_URL_CACHE)
+                }, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
         elif self.path == '/news_script_config':
             try:
                 with open(NEWS_SCRIPT_CONFIG_FILE, 'r', encoding='utf-8') as f:
@@ -847,6 +864,33 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode('utf-8'))
+        elif self.path == '/api/news/batch_resolve_urls':
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            try:
+                payload = json.loads(post_data.decode('utf-8')) if post_data else {}
+                titles = payload.get('titles', [])
+                results = {}
+                for t in titles:
+                    if not t:
+                        continue
+                    if t in ARTICLE_URL_CACHE:
+                        results[t] = ARTICLE_URL_CACHE[t]
+                    else:
+                        url = search_news_url_by_title(t)
+                        if url:
+                            results[t] = url
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "ok", "urls": results}, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
         elif self.path == '/api/news/generate_item_script':
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
