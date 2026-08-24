@@ -458,10 +458,14 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
             try:
-                payload = json.loads(post_data.decode('utf-8'))
-                log_message = payload.get('message', '')
-                with open('browser_console.log', 'a', encoding='utf-8') as f:
-                    f.write(log_message + '\n')
+                try:
+                    payload = json.loads(post_data.decode('utf-8'))
+                    log_message = payload.get('message', '')
+                except Exception:
+                    log_message = post_data.decode('utf-8', errors='ignore')
+                if log_message:
+                    with open('browser_console.log', 'a', encoding='utf-8') as f:
+                        f.write(log_message + '\n')
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
                 self.send_header('Access-Control-Allow-Origin', '*')

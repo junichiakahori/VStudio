@@ -140,7 +140,7 @@ export default defineConfig({
     strictPort: true,
     hmr: false, // 配信中やテスト中の勝手な画面強制リロードを防止
     proxy: {
-      '^/api/|/news_script|log|update_hiragana_data|radio_script|radio_script_yomi|radio_script_config|custom_idle_phrases|hiragana_data|se_list|add_idle_phrase|convert_remaining_kanji|fetch_rss|get_youtube_video_info': {
+      '^/(api|news_script|log|update_hiragana_data|radio_script|radio_script_yomi|radio_script_config|custom_idle_phrases|hiragana_data|se_list|add_idle_phrase|convert_remaining_kanji|fetch_rss|get_youtube_video_info)': {
         target: 'http://localhost:8001',
         changeOrigin: true,
         secure: false,
