@@ -1083,17 +1083,17 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
             has_invented = False
             for inv_t in invented_titles:
                 if inv_t and inv_t not in article_context:
-                    print(f"[ハルシネーション検知] 🚫 記事に存在しない作品名捏造を検知・除去: 『{inv_t}』")
+                    print(f"[ハルシネーション検知] 🚫 記事に存在しない作品名捏造を検知: 『{inv_t}』 ➔ 文全体を安全な解説文へ置換")
                     has_invented = True
-                    display_s = re.sub(rf'『{re.escape(inv_t)}』[や、と・\s]*', '', display_s)
+                    break
             
             if has_invented:
-                # 「例えば、、、など」のように中身が抜け落ちた場合を安全な文に修正
-                if re.search(r'例えば[、\s]*(など|等|が|は|、|。)', display_s) or len(display_s.strip()) < 10:
-                    display_s = "記事では今週サービス終了を迎える対象タイトルやスケジュールがまとめられています。"
-                    s = display_s  # 🚀 音声(speech_s)の元データも完全に安全な文へ同期！
-                else:
-                    s = display_s
+                display_s = "記事では今週サービス終了を迎える対象タイトルやスケジュールがまとめられています。"
+                s = display_s  # 🚀 音声(speech_s)の元データも完全に安全な文へ同期！
+            elif re.search(r'([、\s]|^)(が[0-9]+日|は[0-9]+日|そしては[0-9]+日)', display_s):
+                # 万が一『』なしで主語抜け日付羅列が発生した場合の完全救済
+                display_s = "記事では今週サービス終了を迎える対象タイトルやスケジュールがまとめられています。"
+                s = display_s
 
         # 音声用初期値
         speech_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\2', s)
