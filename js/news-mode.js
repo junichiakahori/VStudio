@@ -11,6 +11,17 @@ try {
   window.latestFetchedNews = [];
 }
 
+// HTMLタグ・実体参照（&lt;, &gt;, <ol>, <a> 等）を安全かつ完全に除去して平文にする共通関数
+function stripHtmlTags(htmlStr) {
+  if (!htmlStr) return "";
+  let clean = String(htmlStr).replace(/<[^>]*>/g, " ");
+  try {
+    const doc = new DOMParser().parseFromString(clean, "text/html");
+    clean = doc.body.textContent || "";
+  } catch (e) {}
+  return clean.replace(/<[^>]*>/g, " ").replace(/&[a-zA-Z0-9#]+;/g, " ").replace(/\s+/g, " ").trim();
+}
+
 const NEWS_CATEGORIES = {
   "cat_top": ["https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja", "https://news.yahoo.co.jp/rss/topics/top-picks.xml", "https://www.nhk.or.jp/rss/news/cat0.xml"],
   "cat_society": ["https://news.google.com/news/rss/headlines/section/topic/NATION?hl=ja&gl=JP&ceid=JP:ja", "https://news.yahoo.co.jp/rss/topics/domestic.xml", "https://www.nhk.or.jp/rss/news/cat1.xml"],
@@ -175,7 +186,7 @@ async function playNextContinuousNews(isOneOff = false, isFetchOnly = false) {
 
             return {
               title: titleNode ? titleNode.textContent : "",
-              description: descNode ? descNode.textContent : "",
+              description: stripHtmlTags(descNode ? descNode.textContent : ""),
               pubDate: pubDateNode ? pubDateNode.textContent : "",
               categoryName: target.categoryName,
               categoryKey: target.categoryKey,
@@ -1563,9 +1574,7 @@ ${creditsInstruction}
     const provider = (providerSelect ? providerSelect.value : "") || localStorage.getItem("savedAiProvider") || "gemini";
     const modelName = (modelInput ? modelInput.value.trim() : "") || localStorage.getItem("savedAiModel") || "gemini-1.5-flash";
 
-    const tmpDiv = document.createElement("div");
-    tmpDiv.innerHTML = item.description || "";
-    let plainDesc = (tmpDiv.textContent || tmpDiv.innerText || "").replace(/\s+/g, " ").trim();
+    let plainDesc = stripHtmlTags(item.description || "");
     if (plainDesc.length > 120) plainDesc = plainDesc.substring(0, 120) + "…";
 
     const payload = {
@@ -1614,9 +1623,7 @@ ${creditsInstruction}
     const newsDateEl = document.getElementById("news-article-date");
     const progressBadge = document.getElementById("news-board-progress");
 
-    const tmpDiv = document.createElement("div");
-    tmpDiv.innerHTML = item.description || "";
-    let plainDesc = (tmpDiv.textContent || tmpDiv.innerText || "").replace(/\s+/g, " ").trim();
+    let plainDesc = stripHtmlTags(item.description || "");
     if (plainDesc.length > 120) plainDesc = plainDesc.substring(0, 120) + "…";
 
     newsBroadcastState.currentTitle = item.title;
@@ -2031,7 +2038,7 @@ ${creditsInstruction}
 
           return {
             title: titleNode ? titleNode.textContent : "",
-            description: descNode ? descNode.textContent : "",
+            description: stripHtmlTags(descNode ? descNode.textContent : ""),
             pubDate: pubDateNode ? pubDateNode.textContent : "",
             categoryName: target.categoryName,
             categoryKey: target.categoryKey,
@@ -2814,7 +2821,7 @@ ${creditsInstruction}
     const progressBadge = document.getElementById("news-board-progress");
 
     if (newsTitleEl) newsTitleEl.textContent = saved.item.title;
-    if (newsDescEl) newsDescEl.textContent = saved.item.description || "";
+    if (newsDescEl) newsDescEl.textContent = stripHtmlTags(saved.item.description || "");
     if (newsBoardEl) newsBoardEl.classList.add("active");
     if (catEl) catEl.textContent = saved.item.categoryName || "";
     if (progressBadge) {
