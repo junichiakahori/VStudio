@@ -1007,13 +1007,17 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 clean_text = re.sub(r'にゃ{2,}', 'にゃ', clean_text)
                 clean_text = re.sub(r'にゃ[か？\?]+にゃ', 'かにゃ', clean_text)
                 clean_text = re.sub(r'のだ{2,}', 'のだ', clean_text)
-                # 🐾 「ですねにゃ」「ますねにゃ」等の不自然な二重語尾の自動置換
+                # 🐾 「ですねにゃ」「ますねにゃ」「かもしれませんねにゃ」「ねにゃ」等の不自然な二重語尾の包括的自動置換
+                clean_text = re.sub(r'かもしれませんねにゃ([！\s　。！？]|$)', r'かもしれませんね\1', clean_text)
                 clean_text = re.sub(r'ですねにゃ([！\s　。！？]|$)', r'ですね\1', clean_text)
                 clean_text = re.sub(r'ますねにゃ([！\s　。！？]|$)', r'ますね\1', clean_text)
                 clean_text = re.sub(r'ですよねにゃ([！\s　。！？]|$)', r'ですよね\1', clean_text)
                 clean_text = re.sub(r'でしたにゃ([！\s　。！？]|$)', r'でした\1', clean_text)
                 clean_text = re.sub(r'ませんにゃ([！\s　。！？]|$)', r'ません\1', clean_text)
                 clean_text = re.sub(r'にゃね([！\s　。！？]|$)', r'ですね\1', clean_text)
+                clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)ねにゃ([！\s　。！？]|$)', r'\1ですね\2', clean_text)
+                clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)ねのだ([！\s　。！？]|$)', r'\1なのだ\2', clean_text)
+                clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)かなにゃ([！\s　。！？]|$)', r'\1かにゃ\2', clean_text)
                 clean_text = clean_text.replace("使えへん", "使えない").replace("出来へん", "出来ない").replace("分からへん", "分からない").replace("知らへん", "知らない")
                 clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)へん([の|ね|よ|な|にゃ|！|？|。|、]|$)', r'\1ない\2', clean_text)
                 clean_text = re.sub(r'\b[a-z]{3,}な', '大変な', clean_text)
