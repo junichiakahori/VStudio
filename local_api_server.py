@@ -1652,7 +1652,7 @@ def lookup_wikipedia_reading(term):
         return None, None
 
 def extract_kanji_terms(text):
-    """テキストから漢字を含む固有名詞・単語を的確に抽出する（3文字以上の固有名詞・人名を優先）"""
+    """テキストから漢字を含む固有名詞・人名を的確に抽出する（「満島ひかり」「広瀬すず」等のひらがな混じり人名にも対応）"""
     # 一般的な日常語でWikipedia検索不要なワード（VOICEVOXが自然に読める基本語）
     COMMON_BASIC_WORDS = {
         "今日", "明日", "昨日", "現在", "過去", "未来", "時間", "場所", "理由", "原因",
@@ -1664,30 +1664,41 @@ def extract_kanji_terms(text):
         "費用", "修理", "白菜", "調査", "中国", "首相", "総裁", "波紋", "非難", "批判",
         "対応", "政府", "声明", "反応", "超党派", "事業", "展開", "状況", "安定", "金融",
         "成長", "機関", "役割", "関与", "強化", "財政", "株主", "基盤", "企業", "利益",
-        "価値", "最大", "銀行", "主幹事", "空港", "銘柄", "政策", "兵士", "望遠", "統一"
+        "価値", "最大", "銀行", "主幹事", "空港", "銘柄", "政策", "兵士", "望遠", "統一",
+        "使用", "保持", "化学", "物質", "農家", "関連", "健康", "食品", "注意", "野菜",
+        "信頼", "結果", "初夏", "浅野", "出産", "彼女", "俳優", "自然", "消費者", "化学物質"
     }
 
-    raw_terms = re.findall(r'[\u4e00-\u9fff\u3400-\u4dbf]{2,}', text)
     terms = set()
 
-    suffixes = ['市長', '選手', '知事', '首相', '総理', '大臣', '社長', '会長', '教授', '監督', '議員', '代表', 'アナ']
-    for t in raw_terms:
+    # 1. 漢字のみの語句（例: 三浦大知、河北省、小川航基）
+    raw_kanji = re.findall(r'[\u4e00-\u9fff\u3400-\u4dbf]{2,}', text)
+    for t in raw_kanji:
         if t not in COMMON_BASIC_WORDS:
             terms.add(t)
+
+    # 2. 「漢字＋ひらがな」の人名・芸名（例: 満島ひかり、広瀬すず、藤原さくら、百田夏菜子）
+    mixed_hiragana = re.findall(r'[\u4e00-\u9fff\u3400-\u4dbf]{1,4}[ぁ-ん]{2,4}', text)
+    for t in mixed_hiragana:
+        if t not in COMMON_BASIC_WORDS and len(t) >= 3:
+            terms.add(t)
+
+    # 3. 「漢字＋カタカナ」の人名・芸名（例: 柴咲コウ、大野拓朗）
+    mixed_katakana = re.findall(r'[\u4e00-\u9fff\u3400-\u4dbf]{1,4}[ァ-ヶー]{2,4}', text)
+    for t in mixed_katakana:
+        if t not in COMMON_BASIC_WORDS and len(t) >= 3:
+            terms.add(t)
+
+    # 4. 役職サフィックス（市長、選手、知事等）の分離
+    suffixes = ['市長', '選手', '知事', '首相', '総理', '大臣', '社長', '会長', '教授', '監督', '議員', '代表', 'アナ']
+    for t in list(terms):
         for s in suffixes:
             if t.endswith(s) and len(t) > len(s) + 1:
                 base = t[:-len(s)]
                 if base not in COMMON_BASIC_WORDS:
                     terms.add(base)
-        # 4文字以上の人名・複合語（例: 小川航基、高島宗一郎）
-        if len(t) == 4:
-            p1, p2 = t[:2], t[2:]
-            if p1 not in COMMON_BASIC_WORDS: terms.add(p1)
-            if p2 not in COMMON_BASIC_WORDS: terms.add(p2)
-        elif len(t) >= 5:
-            terms.add(t)
 
-    # 3文字以上の固有名詞を最優先、2文字は未知の固有名詞のみ
+    # 長い固有名詞優先（三浦大知 > 三浦 など）でソート
     return sorted(list(set(t for t in terms if len(t) >= 2)), key=lambda x: len(x), reverse=True)
 
 def enrich_dict_from_text(text):
