@@ -76,6 +76,12 @@ async function fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal
         })
       });
       if (synthRes.ok) {
+        const kanaHeader = synthRes.headers.get("X-Voicevox-Kana");
+        if (kanaHeader) {
+          try {
+            console.log(`[VOICEVOX発音カナ] 🗣️ ${decodeURIComponent(kanaHeader)}`);
+          } catch (e) {}
+        }
         return await synthRes.arrayBuffer();
       }
       throw new Error("Backend synthesis failed: " + synthRes.statusText);
@@ -87,6 +93,9 @@ async function fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal
       );
       if (!queryRes.ok) throw new Error("Audio query failed");
       const queryJson = await queryRes.json();
+      if (queryJson.kana) {
+        console.log(`[VOICEVOX発音カナ] 🗣️ ${queryJson.kana}`);
+      }
       const directSynthRes = await fetch(
         `http://localhost:50021/synthesis?speaker=${speakerId}`,
         {

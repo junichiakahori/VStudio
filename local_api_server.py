@@ -1106,11 +1106,15 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 if not text:
                     raise ValueError("text is required")
 
-                wav_bytes = synthesize_voicevox_backend(text, speaker_id, speed, pitch)
+                wav_bytes, kana_str = synthesize_voicevox_backend(text, speaker_id, speed, pitch)
                 
                 self.send_response(200)
                 self.send_header('Content-type', 'audio/wav')
                 self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Access-Control-Expose-Headers', 'X-Voicevox-Kana')
+                if kana_str:
+                    # URLエンコードしてヘッダーに乗せる（ASCII安全）
+                    self.send_header('X-Voicevox-Kana', urllib.parse.quote(kana_str))
                 self.send_header('Content-Length', str(len(wav_bytes)))
                 self.end_headers()
                 self.wfile.write(wav_bytes)
@@ -1511,6 +1515,17 @@ def synthesize_voicevox_backend(text, speaker_id=1, speed=1.0, pitch=0.0):
     with urllib.request.urlopen(req, timeout=10) as q_res:
         query_json = json.loads(q_res.read().decode("utf-8"))
     
+    kana_str = query_json.get("kana", "")
+    if kana_str:
+        now_iso = time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime())
+        log_line = f"[{now_iso}] [LOG] [VOICEVOX発音カナ] 🗣️ {kana_str}"
+        try:
+            with open('browser_console.log', 'a', encoding='utf-8') as f:
+                f.write(log_line + '\n')
+        except Exception:
+            pass
+        print(f"[VOICEVOX発音カナ] {kana_str}")
+
     if speed != 1.0:
         query_json["speedScale"] = speed
     if pitch != 0.0:
@@ -1520,7 +1535,7 @@ def synthesize_voicevox_backend(text, speaker_id=1, speed=1.0, pitch=0.0):
     req_synth = urllib.request.Request(synth_url, data=json.dumps(query_json).encode("utf-8"), headers={"Content-Type": "application/json"}, method="POST")
     with urllib.request.urlopen(req_synth, timeout=15) as s_res:
         wav_bytes = s_res.read()
-    return wav_bytes
+    return wav_bytes, kana_str
 
 def run():
     socketserver.ThreadingTCPServer.allow_reuse_address = True
