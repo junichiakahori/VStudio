@@ -509,6 +509,14 @@
                         <option value="3">ずんだもん (ノーマル)</option>
                     </select>
                 </div>
+                <div class="slider-container" style="margin-top:10px;">
+                    <label>話速（読み上げ速度） <span id="voicevox-speed-val">1.0</span>x</label>
+                    <input type="range" id="voicevox-speed" min="0.5" max="2.0" value="1.0" step="0.05" oninput="const valEl = document.getElementById('voicevox-speed-val'); if(valEl) valEl.textContent = parseFloat(this.value).toFixed(2);">
+                </div>
+                <div class="slider-container" style="margin-top:10px;">
+                    <label>音高（ピッチ） <span id="voicevox-pitch-val">0.0</span></label>
+                    <input type="range" id="voicevox-pitch" min="-0.15" max="0.15" value="0.0" step="0.01" oninput="const valEl = document.getElementById('voicevox-pitch-val'); if(valEl) valEl.textContent = (parseFloat(this.value) > 0 ? '+' : '') + parseFloat(this.value).toFixed(2);">
+                </div>
                 <div class="control-group" style="margin-top:10px;">
                     <label class="switch-label">
                         <span style="font-size:0.75rem;">無言時(5秒)に適当に喋る</span>
