@@ -495,15 +495,6 @@ function initChatClient() {
     youtubeDetectBtn.addEventListener("click", () => detectYoutubeVideo(false));
   }
 
-  // ページ読み込み時: 動画IDが未設定なら配信者IDから自動取得
-  {
-    const currentVid = localStorage.getItem("savedYoutubeVideoId") || "";
-    const hasChannel = !!(localStorage.getItem("savedYoutubeChannel") || "").trim();
-    if (hasChannel && (!currentVid || currentVid.length !== 11)) {
-      setTimeout(() => detectYoutubeVideo(true), 1500);
-    }
-  }
-
   // メイン画面用 配信枠一覧モーダル
   const mainModalPicker = document.getElementById("main-modal-broadcast-picker");
   const mainBtnClosePicker = document.getElementById("main-btn-close-broadcast-picker");
