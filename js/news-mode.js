@@ -184,9 +184,13 @@ async function playNextContinuousNews(isOneOff = false, isFetchOnly = false) {
             else if (target.url.includes('nhk.or.jp')) publisherName = 'NHK';
             else if (target.url.includes('itmedia.co.jp')) publisherName = 'ITmedia';
 
+            const linkNode = node.querySelector("link") || node.querySelector("guid");
+            let linkUrl = linkNode ? (linkNode.textContent || linkNode.getAttribute("href") || "") : "";
+
             return {
               title: titleNode ? titleNode.textContent : "",
               description: stripHtmlTags(descNode ? descNode.textContent : ""),
+              link: linkUrl,
               pubDate: pubDateNode ? pubDateNode.textContent : "",
               categoryName: target.categoryName,
               categoryKey: target.categoryKey,
@@ -1580,6 +1584,7 @@ ${creditsInstruction}
     const payload = {
       title: item.title,
       description: plainDesc,
+      url: item.link || "",
       categoryName: item.categoryName || "",
       modelId: window.currentModelId || "hiyori",
       isFirst: isFirst,
@@ -1649,6 +1654,7 @@ ${creditsInstruction}
     const payload = {
       title: item.title,
       description: plainDesc,
+      url: item.link || "",
       categoryName: item.categoryName || "",
       modelId: currentModelId,
       isFirst: isFirst,
@@ -2061,9 +2067,13 @@ ${creditsInstruction}
           else if (target.url.includes('nhk.or.jp')) publisherName = 'NHK';
           else if (target.url.includes('itmedia.co.jp')) publisherName = 'ITmedia';
 
+          const linkNode = node.querySelector("link") || node.querySelector("guid");
+          let linkUrl = linkNode ? (linkNode.textContent || linkNode.getAttribute("href") || "") : "";
+
           return {
             title: titleNode ? titleNode.textContent : "",
             description: stripHtmlTags(descNode ? descNode.textContent : ""),
+            link: linkUrl,
             pubDate: pubDateNode ? pubDateNode.textContent : "",
             categoryName: target.categoryName,
             categoryKey: target.categoryKey,

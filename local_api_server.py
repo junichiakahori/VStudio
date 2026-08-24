@@ -715,14 +715,24 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 else:
                     transition = "「次のニュースなのだ！」" if is_zunda else ("「次のニュースですにゃ！」" if is_cat else "「次のニュースです！」")
 
+                article_url = (payload.get('url', '') or payload.get('link', '')).strip()
+                full_article_content = description
+
+                # 元記事のURLが存在する場合、裏側で本文テキストを軽量自動スクレイピング
+                if article_url:
+                    fetched_body = fetch_article_body(article_url)
+                    if fetched_body and len(fetched_body) > 30:
+                        full_article_content = f"{description}\n【元記事の詳細本文】: {fetched_body}"
+                        print(f"[元記事本文取得成功] {title[:20]}... ({len(fetched_body)}文字取得)")
+
                 prompt = f"""あなたは人気配信者である{char_desc}
-以下のニュース記事（タイトルと概要）の内容をしっかりと読み込み、出来事の経緯やポイントをリスナーに分かりやすく丁寧に紹介した上で、そのニュースに即した共感や感想を伝えてください。
+以下のニュース記事（タイトルと概要、詳細本文）の内容をしっかりと読み込み、出来事の経緯やポイントをリスナーに分かりやすく丁寧に紹介した上で、そのニュースに即した共感や感想を伝えてください。
 
 【構成のルール（全体で5〜7文程度の充実した構成）】:
 1. **冒頭**: {transition}
 2. **ニュースの丁寧な紹介（3〜4文）**:
-   ・【ニュースタイトル】と【概要】に書かれている出来事、背景、状況、関係者のコメントなどをしっかり拾って分かりやすく解説してください。
-   ・概要に書かれている事実を丁寧に拾い、単なるタイトルの一行要約で終わらせないこと。
+   ・【ニュースタイトル】と【記事内容（概要・詳細本文）】に書かれている出来事、背景、状況、関係者のコメントなどをしっかり拾って分かりやすく解説してください。
+   ・概要や詳細本文に書かれている事実を丁寧に拾い、単なるタイトルの一行要約で終わらせないこと。
 3. **内容に即した感想（1〜2文）**:
    ・「期待が高まりますね」などのワンパターンの定型句ではなく、ニュースの内容（驚き、感動、応援、共感など）にしっかり合わせた温かい感想を述べてください。
 
@@ -734,10 +744,10 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 4. **余計な注釈の禁止**: セリフ以外の前置きや解説（「」等）は出力せず、発話するセリフのみを出力してください。
 5. **人名・作品タイトルのルビ必須ルール**: 日本の人名や作品タイトル（『』「」）は必ず【漢字・英字（正しいひらがな・カタカナ読み）】の形式でルビを振ってください（例: 『ONE PIECE（ワンピース）』、孫正義（そん まさよし）氏、SixTONES（ストーンズ））。
 6. **事実に基づく解説（ハルシネーション厳禁）**:
-   概要に書かれている詳細情報を豊かに解説してください。ただし、概要に書かれていない全く無関係な人名やでっち上げの創作を勝手に追加することは厳禁です。
+   記事内容に書かれている詳細情報を豊かに解説してください。ただし、記事に書かれていない全く無関係な人名やでっち上げの創作を勝手に追加することは厳禁です。
 
 【ニュースタイトル】: {title}
-【概要】: {description}"""
+【記事内容（概要・詳細本文）】: {full_article_content}"""
 
                 print(f"[generate_item_script] タイトル: {title[:20]}..., APIキー文字数: {len(api_key)}, provider: {provider}, model: {model_name}")
                 raw_text = ""
@@ -1043,6 +1053,61 @@ def apply_backend_pronunciation_dict(text):
     processed = re.sub(r'([0-9０-９一二三四五六七八九十百千万]+人)の方', r'\1のかた', processed)
 
     return processed
+
+def fetch_article_body(url):
+    """ニュース元記事のURLにアクセスし、記事本文テキストを抽出して取得する（タイムアウト3.5秒）"""
+    if not url or not url.startswith("http"):
+        return ""
+    try:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
+        req = urllib.request.Request(
+            url,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8'
+            }
+        )
+        with urllib.request.urlopen(req, context=ctx, timeout=3.5) as res:
+            html_bytes = res.read()
+            
+            content_type = res.headers.get('Content-Type', '')
+            charset = 'utf-8'
+            if 'charset=' in content_type.lower():
+                charset = content_type.lower().split('charset=')[-1].split(';')[0].strip()
+            
+            try:
+                html_text = html_bytes.decode(charset, errors='replace')
+            except Exception:
+                html_text = html_bytes.decode('utf-8', errors='replace')
+                
+            # 不要なタグ（スクリプト、スタイル、ナビゲーション、広告）を除去
+            cleaned = re.sub(r'<(script|style|nav|header|footer|aside|noscript|iframe)[^>]*>.*?</\1>', '', html_text, flags=re.DOTALL | re.IGNORECASE)
+            
+            # <p>タグや記事本文要素からテキストを抽出
+            p_tags = re.findall(r'<p[^>]*>(.*?)</p>', cleaned, flags=re.DOTALL | re.IGNORECASE)
+            extracted_paragraphs = []
+            for p in p_tags:
+                text = re.sub(r'<[^>]+>', '', p).strip()
+                if len(text) >= 15 and not any(ng in text for ng in ["JavaScript", "Cookie", "利用規約", "プライバシーポリシー", "禁無断転載", "All Rights Reserved"]):
+                    extracted_paragraphs.append(text)
+            
+            if extracted_paragraphs:
+                body = " ".join(extracted_paragraphs)
+                if len(body) > 600:
+                    body = body[:600] + "…"
+                return body
+                
+            raw_clean = re.sub(r'<[^>]+>', ' ', cleaned)
+            raw_clean = re.sub(r'\s+', ' ', raw_clean).strip()
+            if len(raw_clean) > 50:
+                return raw_clean[:500] + "…"
+    except Exception as e:
+        print(f"[本文取得スキップ] URL: {url[:30]}... ({e})")
+    return ""
 
 def call_gemini_backend(prompt, api_key, model="gemini-1.5-flash"):
     target_model = model or "gemini-1.5-flash"
