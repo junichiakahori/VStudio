@@ -811,6 +811,17 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 # ▼▼▼ 字幕用テキスト(display) と VOICEVOX発音用テキスト(speech) のスマート分離 ▼▼▼
                 # ▼▼▼ VOICEVOXの読み予想と照合する二重チェック＆自動学習エンジン ▼▼▼
                 items = inspect_and_correct_pronunciation(raw_sentences, provider, api_key, model_name)
+
+                # 万が一中国語フィルター等ですべての文が除去された場合の安全な日本語フォールバック生成
+                if not items:
+                    fallback_plain = description.replace("「", "").replace("」", "").strip()
+                    if len(fallback_plain) > 80:
+                        fallback_plain = fallback_plain[:80] + "…"
+                    fallback_display = f"{transition} {title}についてです。{fallback_plain} 今後の展開にも注目ですね。"
+                    fallback_speech = apply_backend_pronunciation_dict(fallback_display)
+                    items = [{"display": fallback_display, "speech": fallback_speech}]
+                    print(f"[フォールバック生成] 中国語除去のためクリーンな日本語原稿を安全自動生成しました: 「{title}」")
+
                 final_sentences = [it["speech"] for it in items]
 
                 self.send_response(200)
@@ -821,7 +832,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     "status": "ok",
                     "items": items,
                     "sentences": final_sentences,
-                    "fullText": "\n".join(raw_sentences)
+                    "fullText": "\n".join([it["display"] for it in items])
                 }, ensure_ascii=False).encode('utf-8'))
             except Exception as e:
                 self.send_response(500)
@@ -910,17 +921,46 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
                 new_learned_dict[orig_word] = reading_word
 
         # ============================================================
-        # 中国語混入フィルター（Qwen2.5が中国語を混入させた文を自動除去）
-        # 日本語では使用されない簡体字・中国語固有表現を含む文を丸ごとスキップ
+        # 🛡️ 鉄壁の中国語混入検知・完全除去フィルター
+        # 1. 簡体字・中国語固有文字
+        # 2. ひらがなが0文字の漢字/英記号文（日本語会話文としてあり得ない）
+        # 3. ひらがな比率が極端に低い文（例: 冒頭だけ日本語で中身が中国語）
+        # 4. 中国語特有の句読点（，、“”）
         # ============================================================
-        CHINESE_ONLY_CHARS = re.compile(
-            r'[听说这那们你我他她它们们的地得了过着呢吗吧哦哈啊喔嗯'
-            r'很非常但是因为所以如果虽然已经还是就是不是是不是'
-            r'吃惊开始结束继续停止选择确认取消关注关闭'
-            r'啊哦嗯呢吧呀咧囧]'
-        )
-        if CHINESE_ONLY_CHARS.search(display_s):
-            print(f"[中国語フィルター] 中国語混入文を除去: 「{display_s}」")
+        def is_chinese_sentence(text):
+            if not text:
+                return False
+            t = text.strip()
+            # 簡体字・中国語固有の語彙
+            CHINESE_CHARS = re.compile(
+                r'[听说这那我他她它他们俩们呢吧吗么着过从让给于把被会能想说看吃写开关点去来里边头问做多真假现谁哪几没不'
+                r'好开心关注加油打气关系可爱封面消息大家为喜欢的人非常但是因为所以如果虽然已经还是就是是不是吃惊开始结束继续停止选择确认取消]'
+            )
+            hiragana_count = len(re.findall(r'[\u3040-\u309f]', t))
+            kanji_count = len(re.findall(r'[\u4e00-\u9fff]', t))
+            total_len = len(t)
+
+            # 中国語カンマ「，」や中国語引用符「“”」を含む
+            if '，' in t or '“' in t or '”' in t:
+                if hiragana_count < 4 or (total_len > 6 and (hiragana_count / total_len) < 0.25):
+                    return True
+
+            # ひらがなが0文字で漢字中心の文（例:「松村北斗和今田美桜的巴弟关系真是可爱」）
+            if total_len >= 5 and hiragana_count == 0 and kanji_count >= 2:
+                return True
+
+            # ひらがな比率が18%未満で漢字が多い文（例:「このニュース听到这里我觉得好开心呢」）
+            if total_len >= 7 and (hiragana_count / total_len) < 0.18:
+                return True
+
+            # 中国語固有文字が2文字以上
+            if len(CHINESE_CHARS.findall(t)) >= 2 and (hiragana_count / total_len) < 0.35:
+                return True
+
+            return False
+
+        if is_chinese_sentence(display_s) or is_chinese_sentence(speech_s):
+            print(f"[中国語フィルター] 🚫 中国語混入文を完全除去: 「{display_s}」")
             continue  # この文はスキップ
 
         # ============================================================
@@ -1029,6 +1069,7 @@ def call_ollama_backend(prompt, model="qwen2.5:7b", base_url="http://127.0.0.1:1
     body = {
         "model": target_model,
         "prompt": prompt,
+        "system": "You are a professional Japanese VTuber news anchor. Output 100% natural Japanese ONLY. Under no circumstances should you ever output any Chinese words, simplified Chinese characters, or Chinese sentences.",
         "stream": False
     }
     try:
