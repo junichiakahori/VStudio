@@ -1573,6 +1573,7 @@ def lookup_wikipedia_reading(term):
     """
     Wikipedia APIで固有名詞の読み（ひらがな）を取得する。
     記事名を直接指定して冒頭文から正確な読みを抽出。
+    ノイズワード（接続詞や外国語別称）は厳格に除外。
     返り値: (登録対象語句, 読みひらがな) のタプル、または (None, None)
     """
     if not term or len(term) < 2:
@@ -1587,6 +1588,9 @@ def lookup_wikipedia_reading(term):
     headers = {
         "User-Agent": "VStudio-TTS-Bot/1.0 (https://github.com/junichiakahori/VStudio)"
     }
+
+    # 明らかに除外すべきノイズ単語
+    INVALID_READINGS = {"あるいは", "または", "かつて", "えいご", "ちゅうごくご", "ちょうせんご", "かんこくご", "りゃくしょう", "つうしょう", "ほんみょう", "きゅうせい"}
 
     try:
         # Step1: 記事名を直接指定して抽出（最も高精度＆1リクエストで完了）
@@ -1605,24 +1609,33 @@ def lookup_wikipedia_reading(term):
             extract = page.get("extract", "")
             page_title = page.get("title", term)
 
-            # 「名前（よみ、...）」パターン
+            # 冒頭80文字以内の最初の括弧から読みを取得（後方の別名や外国語読みを拾わない）
+            intro_text = extract[:100]
             m = re.search(
-                r'[（(](?:[^（(]*?、)?([ぁ-んァ-ヶー\s　っッ]+?)(?:、[^ぁ-んァ-ヶー\s　っッ]|[）)])',
-                extract
+                r'[（(]([ぁ-んァ-ヶー\s　っッ]+?)(?:[、,\s　]|あるいは|または|[）)])',
+                intro_text
             )
             if m:
                 reading = re.sub(r"[\s　]", "", m.group(1))
-                if re.fullmatch(r"[ぁ-んァ-ヶーっッ]+", reading) and len(reading) >= 2:
+                if re.fullmatch(r"[ぁ-んァ-ヶーっッ]+", reading) and 2 <= len(reading) <= 20:
                     reading = reading.translate(str.maketrans(
                         "ァィゥェォァイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンッー",
                         "ぁぃぅぇぉあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんっー"
                     ))
+                    # ノイズ単語チェック
+                    if reading in INVALID_READINGS:
+                        continue
+
                     # 括弧などの曖昧さ回避表記を除去
                     clean_title = re.sub(r'\s*[\(（][^\)）]*[\)）]', '', page_title).strip()
-                    # 検索語と記事タイトルが一致または包含関係にない場合はスキップ（例: 出席→出欠 などのリダイレクト誤認を防止）
+                    # 検索語と記事タイトルが厳密一致または主要語であること
                     t_c = term.replace(" ", "")
                     p_c = clean_title.replace(" ", "")
-                    if not (t_c == p_c or (len(p_c) >= 2 and p_c in t_c) or (len(t_c) >= 2 and t_c in p_c)):
+                    if t_c != p_c and not (len(p_c) >= 3 and p_c in t_c) and not (len(t_c) >= 3 and t_c in p_c):
+                        continue
+
+                    # 2文字の日常語がマイナー専門用語や別名に化けるのを防止（文字数の比率が不自然なものは除外）
+                    if len(term) == 2 and (len(reading) > 6 or len(reading) < 2):
                         continue
 
                     target_term = clean_title if (len(clean_title) >= 2 and len(clean_title) <= len(term)) else term
@@ -1639,28 +1652,42 @@ def lookup_wikipedia_reading(term):
         return None, None
 
 def extract_kanji_terms(text):
-    """テキストから漢字を含む2文字以上の固有名詞・単語を的確に抽出する"""
-    # 漢字のみの連続語句（ひらがなは巻き込まない）
-    raw_terms = re.findall(r'[\u4e00-\u9fff\u3400-\u4dbf]{2,}', text)
-    terms = set(raw_terms)
+    """テキストから漢字を含む固有名詞・単語を的確に抽出する（3文字以上の固有名詞・人名を優先）"""
+    # 一般的な日常語でWikipedia検索不要なワード（VOICEVOXが自然に読める基本語）
+    COMMON_BASIC_WORDS = {
+        "今日", "明日", "昨日", "現在", "過去", "未来", "時間", "場所", "理由", "原因",
+        "日本", "世界", "全国", "東京", "大阪", "京都", "情報", "記事", "紹介", "普通",
+        "体験", "現代", "都市", "寄付", "後世", "歴史", "計画", "部分", "評価", "政治",
+        "丁寧", "合流", "政党", "海外", "移籍", "試合", "我慢", "限界", "経験", "連盟",
+        "対策", "改善", "男女", "事故", "花火", "途中", "安全", "死因", "死亡", "鉄道",
+        "警察", "押収", "大切", "侵略", "和平", "降伏", "侵攻", "期間", "戦争", "保険",
+        "費用", "修理", "白菜", "調査", "中国", "首相", "総裁", "波紋", "非難", "批判",
+        "対応", "政府", "声明", "反応", "超党派", "事業", "展開", "状況", "安定", "金融",
+        "成長", "機関", "役割", "関与", "強化", "財政", "株主", "基盤", "企業", "利益",
+        "価値", "最大", "銀行", "主幹事", "空港", "銘柄", "政策", "兵士", "望遠", "統一"
+    }
 
-    # 一般的な役職・接尾辞（市長、選手、知事、首相など）を取り除いた本体も候補に追加
+    raw_terms = re.findall(r'[\u4e00-\u9fff\u3400-\u4dbf]{2,}', text)
+    terms = set()
+
     suffixes = ['市長', '選手', '知事', '首相', '総理', '大臣', '社長', '会長', '教授', '監督', '議員', '代表', 'アナ']
     for t in raw_terms:
+        if t not in COMMON_BASIC_WORDS:
+            terms.add(t)
         for s in suffixes:
             if t.endswith(s) and len(t) > len(s) + 1:
-                terms.add(t[:-len(s)])
-        # 4文字以上の複合語・人名（例: 高島宗一郎 → 高島, 宗一郎）の分割候補
+                base = t[:-len(s)]
+                if base not in COMMON_BASIC_WORDS:
+                    terms.add(base)
+        # 4文字以上の人名・複合語（例: 小川航基、高島宗一郎）
         if len(t) == 4:
-            terms.add(t[:2])
-            terms.add(t[2:])
-        elif len(t) == 5:
-            terms.add(t[:2])
-            terms.add(t[2:])
-            terms.add(t[:3])
-            terms.add(t[3:])
+            p1, p2 = t[:2], t[2:]
+            if p1 not in COMMON_BASIC_WORDS: terms.add(p1)
+            if p2 not in COMMON_BASIC_WORDS: terms.add(p2)
+        elif len(t) >= 5:
+            terms.add(t)
 
-    # 長い語句優先でソート
+    # 3文字以上の固有名詞を最優先、2文字は未知の固有名詞のみ
     return sorted(list(set(t for t in terms if len(t) >= 2)), key=lambda x: len(x), reverse=True)
 
 def enrich_dict_from_text(text):
