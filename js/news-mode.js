@@ -1875,6 +1875,18 @@ ${creditsInstruction}
       console.log("[ニュース番組] OBS自動配信連携はOFFのため、OBS配信開始をスキップしてローカルで番組を進行します。");
     }
 
+    // YouTube接続の自動確認（未接続なら保存済みの動画ID/チャンネルへ自動接続して統計・コメントを取得開始）
+    if (typeof window.startYoutubeConnection === "function") {
+      const isConnected = window.youtubeWs && window.youtubeWs.readyState === WebSocket.OPEN;
+      if (!isConnected) {
+        const savedYt = localStorage.getItem("savedYoutubeVideoId") || localStorage.getItem("savedYoutubeChannel") || "@drone.akahori";
+        if (savedYt) {
+          console.log(`[ニュース番組] YouTubeコメント＆統計サーバーへ自動接続します: ${savedYt}`);
+          window.startYoutubeConnection(savedYt);
+        }
+      }
+    }
+
     if (!newsBroadcastState.isRunning) return;
 
     const config = getNewsConfig();
