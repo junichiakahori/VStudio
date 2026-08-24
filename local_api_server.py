@@ -1517,8 +1517,11 @@ _wiki_reading_cache = {}
 def lookup_wikipedia_reading(term):
     """
     Wikipedia APIで固有名詞の読み（ひらがな）を取得する。
-    「高島 宗一郎（たかしま そういちろう、...）」形式の冒頭文から抽出。
+    記事名を直接指定して冒頭文から正確な読みを抽出。
+    返り値: (登録対象語句, 読みひらがな) のタプル、または (None, None)
     """
+    if not term or len(term) < 2:
+        return None, None
     if term in _wiki_reading_cache:
         return _wiki_reading_cache[term]
 
@@ -1526,57 +1529,84 @@ def lookup_wikipedia_reading(term):
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
 
-    try:
-        # Step1: 検索
-        search_url = (
-            "https://ja.wikipedia.org/w/api.php"
-            "?action=query&list=search&srsearch={}&srlimit=1&format=json"
-        ).format(urllib.parse.quote(term))
-        req = urllib.request.Request(search_url, headers={"User-Agent": "VStudio-TTS/1.0"})
-        with urllib.request.urlopen(req, timeout=5, context=ctx) as r:
-            hits = json.loads(r.read().decode("utf-8")).get("query", {}).get("search", [])
-        if not hits:
-            _wiki_reading_cache[term] = None
-            return None
-        page_title = hits[0]["title"]
+    headers = {
+        "User-Agent": "VStudio-TTS-Bot/1.0 (https://github.com/junichiakahori/VStudio)"
+    }
 
-        # Step2: 冒頭テキスト取得
+    try:
+        # Step1: 記事名を直接指定して抽出（最も高精度＆1リクエストで完了）
         ext_url = (
             "https://ja.wikipedia.org/w/api.php"
             "?action=query&prop=extracts&exintro=true&exsentences=2"
-            "&explaintext=true&titles={}&format=json"
-        ).format(urllib.parse.quote(page_title))
-        req = urllib.request.Request(ext_url, headers={"User-Agent": "VStudio-TTS/1.0"})
+            "&explaintext=true&titles={}&redirects=1&format=json"
+        ).format(urllib.parse.quote(term))
+        req = urllib.request.Request(ext_url, headers=headers)
         with urllib.request.urlopen(req, timeout=5, context=ctx) as r:
             pages = json.loads(r.read().decode("utf-8")).get("query", {}).get("pages", {})
 
-        for page in pages.values():
+        for page_id, page in pages.items():
+            if page_id == "-1":
+                continue
             extract = page.get("extract", "")
-            # 「名前（よみ、...）」パターン: 括弧内で最初に現れるひらがな連続を取得
+            page_title = page.get("title", term)
+
+            # 「名前（よみ、...）」パターン
             m = re.search(
                 r'[（(](?:[^（(]*?、)?([ぁ-んァ-ヶー\s　っッ]+?)(?:、[^ぁ-んァ-ヶー\s　っッ]|[）)])',
                 extract
             )
             if m:
                 reading = re.sub(r"[\s　]", "", m.group(1))
-                # ひらがな・長音のみ、2文字以上
                 if re.fullmatch(r"[ぁ-んァ-ヶーっッ]+", reading) and len(reading) >= 2:
-                    print(f"[Wikipedia読み取得] '{term}' → '{reading}' (from: {extract[:60]})")
-                    _wiki_reading_cache[term] = reading
-                    return reading
+                    reading = reading.translate(str.maketrans(
+                        "ァィゥェォァイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンッー",
+                        "ぁぃぅぇぉあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんっー"
+                    ))
+                    # 括弧などの曖昧さ回避表記を除去
+                    clean_title = re.sub(r'\s*[\(（][^\)）]*[\)）]', '', page_title).strip()
+                    # 検索語と記事タイトルが一致または包含関係にない場合はスキップ（例: 出席→出欠 などのリダイレクト誤認を防止）
+                    t_c = term.replace(" ", "")
+                    p_c = clean_title.replace(" ", "")
+                    if not (t_c == p_c or (len(p_c) >= 2 and p_c in t_c) or (len(t_c) >= 2 and t_c in p_c)):
+                        continue
 
-        _wiki_reading_cache[term] = None
-        return None
+                    target_term = clean_title if (len(clean_title) >= 2 and len(clean_title) <= len(term)) else term
+                    print(f"[Wikipedia読み取得] '{term}' → 記事名:'{target_term}' 読み:'{reading}'")
+                    res = (target_term, reading)
+                    _wiki_reading_cache[term] = res
+                    return res
+
+        _wiki_reading_cache[term] = (None, None)
+        return None, None
     except Exception as e:
         print(f"[Wikipedia読み取得エラー] '{term}': {e}")
-        _wiki_reading_cache[term] = None
-        return None
+        _wiki_reading_cache[term] = (None, None)
+        return None, None
 
 def extract_kanji_terms(text):
-    """テキストから漢字を含む2文字以上の語句を抽出する"""
-    # 漢字+ひらがな混じりの語句（人名・地名等）も対象
-    terms = re.findall(r'[\u4e00-\u9fff\u3400-\u4dbf][\u4e00-\u9fff\u3400-\u4dbf\u3040-\u309f]{1,}', text)
-    return list(set(t for t in terms if len(t) >= 2))
+    """テキストから漢字を含む2文字以上の固有名詞・単語を的確に抽出する"""
+    # 漢字のみの連続語句（ひらがなは巻き込まない）
+    raw_terms = re.findall(r'[\u4e00-\u9fff\u3400-\u4dbf]{2,}', text)
+    terms = set(raw_terms)
+
+    # 一般的な役職・接尾辞（市長、選手、知事、首相など）を取り除いた本体も候補に追加
+    suffixes = ['市長', '選手', '知事', '首相', '総理', '大臣', '社長', '会長', '教授', '監督', '議員', '代表', 'アナ']
+    for t in raw_terms:
+        for s in suffixes:
+            if t.endswith(s) and len(t) > len(s) + 1:
+                terms.add(t[:-len(s)])
+        # 4文字以上の複合語・人名（例: 高島宗一郎 → 高島, 宗一郎）の分割候補
+        if len(t) == 4:
+            terms.add(t[:2])
+            terms.add(t[2:])
+        elif len(t) == 5:
+            terms.add(t[:2])
+            terms.add(t[2:])
+            terms.add(t[:3])
+            terms.add(t[3:])
+
+    # 長い語句優先でソート
+    return sorted(list(set(t for t in terms if len(t) >= 2)), key=lambda x: len(x), reverse=True)
 
 def enrich_dict_from_text(text):
     """
@@ -1600,18 +1630,15 @@ def enrich_dict_from_text(text):
         return 0
 
     added = 0
+    import time
     for term in unknown_terms:
-        reading = lookup_wikipedia_reading(term)
-        if reading:
-            # カタカナが混じる場合はひらがなに正規化
-            reading = reading.translate(str.maketrans(
-                "ァィゥェォァイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンッー",
-                "ぁぃぅぇぉあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんっー"
-            ))
-            if term not in existing:
-                existing[term] = reading
-                added += 1
-                print(f"[Wikipedia辞書自動登録] '{term}' → '{reading}'")
+        # Wikipedia検索
+        target_term, reading = lookup_wikipedia_reading(term)
+        time.sleep(0.05)  # APIレートリミット対策
+        if target_term and reading and target_term not in existing:
+            existing[target_term] = reading
+            added += 1
+            print(f"[Wikipedia辞書自動登録] '{target_term}' → '{reading}'")
 
     if added > 0:
         try:
