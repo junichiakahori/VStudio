@@ -849,7 +849,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 if is_zunda:
                     char_desc = "明るく元気なずんだ妖精のVTuber「ずんだもん」です。一人称は「ボク」で、ニュースの解説は自然なトーン（〜です、〜とのこと、〜みたい）を交えつつ、語尾は「〜のだ」「〜なのだ」「〜のだ？」を自然に使ってください（全文につけすぎずテンポよく話すこと）。※毎回「ボク、ずんだもんなのだ！」と自己紹介を挟むのは禁止です。"
                 elif is_cat:
-                    char_desc = "親しみやすく愛嬌のある猫VTuber「とろろ」です。一人称は「ボク」です。ニュース本文の解説は落ち着いた自然で聞き取りやすい言葉遣い（〜です、〜ですね、〜とのこと、〜みたい）を中心にし、語尾の「〜にゃ」「〜だにゃ」は毎文つけすぎず、全体の2〜3割程度や最後の感想に自然に添える程度にしてください。「にゃにゃ」「にゃかにゃ」などの連続語尾は絶対に禁止です。※記事ごとに毎回「ボク、とろろだにゃ！」と自己紹介を挟むのは禁止です。"
+                    char_desc = "親しみやすく愛嬌のある猫VTuber「とろろ」です。一人称は「ボク」です。ニュース本文の解説は落ち着いた自然で聞き取りやすい言葉遣い（〜です、〜ですね、〜とのこと、〜みたい）を中心にし、語尾の「〜にゃ」「〜だにゃ」は毎文つけすぎず、全体の2〜3割程度や最後の感想に自然に添える程度にしてください。「ですねにゃ」「ますねにゃ」「にゃね」「にゃにゃ」などの不自然な二重語尾は絶対に禁止です（『〜ですね』または『〜ですにゃ』のどちらかにすること）。※記事ごとに毎回「ボク、とろろだにゃ！」と自己紹介を挟むのは禁止です。"
                 else:
                     char_desc = "明るく聞き取りやすいニュースキャスター系VTuberです。親しみやすく丁寧なトーンで話してください。"
                 
@@ -951,6 +951,13 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 clean_text = re.sub(r'にゃ{2,}', 'にゃ', clean_text)
                 clean_text = re.sub(r'にゃ[か？\?]+にゃ', 'かにゃ', clean_text)
                 clean_text = re.sub(r'のだ{2,}', 'のだ', clean_text)
+                # 🐾 「ですねにゃ」「ますねにゃ」等の不自然な二重語尾の自動置換
+                clean_text = re.sub(r'ですねにゃ([！\s　。！？]|$)', r'ですね\1', clean_text)
+                clean_text = re.sub(r'ますねにゃ([！\s　。！？]|$)', r'ますね\1', clean_text)
+                clean_text = re.sub(r'ですよねにゃ([！\s　。！？]|$)', r'ですよね\1', clean_text)
+                clean_text = re.sub(r'でしたにゃ([！\s　。！？]|$)', r'でした\1', clean_text)
+                clean_text = re.sub(r'ませんにゃ([！\s　。！？]|$)', r'ません\1', clean_text)
+                clean_text = re.sub(r'にゃね([！\s　。！？]|$)', r'ですね\1', clean_text)
                 clean_text = clean_text.replace("使えへん", "使えない").replace("出来へん", "出来ない").replace("分からへん", "分からない").replace("知らへん", "知らない")
                 clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)へん([の|ね|よ|な|にゃ|！|？|。|、]|$)', r'\1ない\2', clean_text)
                 clean_text = re.sub(r'\b[a-z]{3,}な', '大変な', clean_text)
