@@ -757,6 +757,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     LAST_PLAYING_ARTICLE_URL = article_url
                     ARTICLE_URL_CACHE[title] = article_url
 
+                full_article_content = description
+
                 # 元記事のURLが存在する場合、裏側で本文テキストを軽量自動スクレイピング
                 if article_url:
                     fetched_body = fetch_article_body(article_url)
