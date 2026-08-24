@@ -1232,6 +1232,13 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
                     speech_s = speech_s.replace("上田綺世", "うえだあやせ")
                     new_learned_dict["上田綺世"] = "うえだあやせ"
                     print(f"[事前誤読検知] 🎯 '上田綺世' の誤読を事前検知 ➔ 'うえだあやせ' に自動補正＆学習")
+
+                # 6. 何らか ➔ 「ナニラカ」誤読検知
+                if "何らか" in speech_s and "ナニラカ" in predicted_kana.replace(" ", ""):
+                    speech_s = speech_s.replace("何らかの", "なんらかの").replace("何らか", "なんらか")
+                    new_learned_dict["何らかの"] = "なんらかの"
+                    new_learned_dict["何らか"] = "なんらか"
+                    print(f"[事前誤読検知] 🎯 '何らか' の誤読(ナニラカ)を事前検知 ➔ 'なんらか' に自動補正＆学習")
         except Exception as pred_err:
             pass
 
