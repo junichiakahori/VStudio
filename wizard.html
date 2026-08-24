@@ -1965,6 +1965,16 @@
                 const data = await res.json();
                 if (data.success) {
                     showYtApiFeedback(`✅ サムネイル画像をYouTube枠 (${videoId}) に反映完了しました！🎉`, true);
+                    // 🖼️ 画面上のサムネイルプレビューを即時更新！
+                    const previewImgs = document.querySelectorAll("#wizard-yt-info-card img, .wizard-yt-preview img");
+                    previewImgs.forEach(img => {
+                        img.src = imageData;
+                    });
+                    setTimeout(() => {
+                        if (typeof fetchYoutubeVideoInfo === "function") {
+                            fetchYoutubeVideoInfo(videoId);
+                        }
+                    }, 1500);
                 } else {
                     showYtApiFeedback(`❌ サムネイル反映エラー: ${data.error || "不明なエラー"}`, false);
                 }
@@ -1973,7 +1983,7 @@
             } finally {
                 if (btn) {
                     btn.disabled = false;
-                    btn.textContent = "🖼️ 現在のサムネイルをYouTubeに自動アップロード";
+                    btn.textContent = "🖼️ YouTubeにサムネ反映";
                 }
             }
         });
@@ -2310,7 +2320,8 @@
                 }
 
                 let privacyBadge = item.privacyStatus === "public" ? "🌐 公開" : (item.privacyStatus === "unlisted" ? "🔒 限定公開" : "👁️ 非公開");
-                const thumbUrl = item.thumbnail || `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`;
+                const baseThumb = item.thumbnail || `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`;
+                const thumbUrl = baseThumb.includes("?") ? `${baseThumb}&t=${Date.now()}` : `${baseThumb}?t=${Date.now()}`;
 
                 card.innerHTML = `
                     <img src="${thumbUrl}" alt="Thumbnail" style="width: 110px; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; background: #000; border: 1px solid rgba(255,255,255,0.15); flex-shrink: 0;" onerror="this.src='https://i.ytimg.com/vi/${item.id}/hqdefault.jpg'">
