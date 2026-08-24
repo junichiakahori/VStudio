@@ -1165,6 +1165,29 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
             display_s = re.sub(r'人気VTuber\s*VIVANT', '大人気ドラマ『VIVANT』', display_s)
             s = display_s
 
+        # 🛡️ 記事コンテキストに基づいた「虚偽の属性・ジャンル捏造」自動検知＆自動修復エンジン
+        if article_context:
+            GENRE_KEYWORDS = ["雑誌", "ゲーム", "VTuber", "Vtuber", "YouTuber", "アニメ", "映画", "漫画", "マンガ", "ドラマ", "アプリ", "SNS", "バンド", "アイドル", "小説", "新曲"]
+            for genre in GENRE_KEYWORDS:
+                if genre not in article_context:
+                    # パターンA: 『〇〇』という雑誌 / 〇〇というゲーム ➔ 『〇〇』 / 〇〇 に自動修復
+                    pattern_a = re.compile(r'([『「]?[A-Za-z0-9\u4e00-\u9fff\u30a0-\u30ffー・]{2,20}[』」]?)\s*(という|といった|などの|等の)' + re.escape(genre))
+                    for m in pattern_a.finditer(display_s):
+                        target_full = m.group(0)
+                        target_name = m.group(1)
+                        print(f"[属性ハルシネーション検知] 🚫 記事にないジャンル『{genre}』の捏造を検知: '{target_full}' ➔ '{target_name}' に自動修復")
+                        display_s = display_s.replace(target_full, target_name)
+                    
+                    # パターンB: 人気VTuber 〇〇 / 有名ゲーム 〇〇 ➔ 〇〇 に自動修復
+                    pattern_b = re.compile(r'(人気|有名|話題の|注目の)?' + re.escape(genre) + r'\s*([『「][A-Za-z0-9\u4e00-\u9fff\u30a0-\u30ffー・]{2,20}[』」])')
+                    for m in pattern_b.finditer(display_s):
+                        target_full = m.group(0)
+                        target_name = m.group(2)
+                        if target_name:
+                            print(f"[属性ハルシネーション検知] 🚫 記事にないジャンル冠詞『{genre}』の捏造を検知: '{target_full}' ➔ '{target_name}' に自動修復")
+                            display_s = display_s.replace(target_full, target_name)
+            s = display_s
+
         # 音声用初期値
         speech_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\2', s)
         speech_s = speech_s.replace("とろろにゃん", "とろろ").replace("お知らせしてあげる", "お知らせします").replace("教えてあげる", "ご紹介します").replace("安心しなさい", "ご安心ください")
