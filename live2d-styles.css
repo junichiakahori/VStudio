@@ -1543,83 +1543,89 @@ body.panel-hidden .avatar-viewport {
 }
 
 /* =========================================================================
-   🚨 配信中断・クイック復帰バナー
+   🚨 配信中断・クイック復帰バナー（コントロールパネル内・OBS映り込み完全防止）
    ========================================================================= */
 .news-resume-banner {
-    position: fixed;
-    top: 18px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 999999;
     background: rgba(15, 23, 42, 0.95);
-    backdrop-filter: blur(16px);
     border: 1px solid rgba(0, 240, 255, 0.6);
-    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.7), 0 0 25px rgba(0, 240, 255, 0.3);
-    border-radius: 12px;
-    padding: 12px 22px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 240, 255, 0.2);
+    border-radius: 8px;
+    padding: 10px 12px;
     display: flex;
-    align-items: center;
-    gap: 20px;
+    flex-direction: column;
+    gap: 8px;
     color: #ffffff;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    animation: resumeBannerSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    font-family: 'Outfit', 'Noto Sans JP', sans-serif;
+    animation: resumeBannerFadeIn 0.3s ease-out;
 }
 
-@keyframes resumeBannerSlideDown {
-    from {
-        transform: translate(-50%, -100%);
-        opacity: 0;
-    }
-    to {
-        transform: translate(-50%, 0);
-        opacity: 1;
-    }
+@keyframes resumeBannerFadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .news-resume-banner .resume-info {
     display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.news-resume-banner .resume-header-row {
+    display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: space-between;
 }
 
 .news-resume-banner .resume-badge {
     background: rgba(255, 170, 0, 0.2);
     color: #ffaa00;
     border: 1px solid rgba(255, 170, 0, 0.5);
-    border-radius: 6px;
-    padding: 4px 9px;
-    font-size: 12px;
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 0.72rem;
     font-weight: bold;
     white-space: nowrap;
 }
 
+.news-resume-banner .resume-progress-tag {
+    font-size: 0.72rem;
+    color: #00f0ff;
+    font-weight: 600;
+}
+
 .news-resume-banner .resume-text {
-    font-size: 13.5px;
+    font-size: 0.75rem;
     color: #e2e8f0;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
 }
 
 .news-resume-banner .resume-actions {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
+    margin-top: 2px;
 }
 
 .news-resume-banner .resume-btn {
-    padding: 7px 16px;
+    padding: 6px 10px;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 0.75rem;
     font-weight: bold;
     cursor: pointer;
     border: none;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
     white-space: nowrap;
+    text-align: center;
 }
 
 .news-resume-banner .resume-btn-primary {
+    flex: 1;
     background: linear-gradient(135deg, #00f0ff 0%, #0077ff 100%);
     color: #0b1120;
-    box-shadow: 0 2px 10px rgba(0, 240, 255, 0.4);
+    box-shadow: 0 2px 8px rgba(0, 240, 255, 0.35);
 }
 
 .news-resume-banner .resume-btn-primary:hover {
@@ -1628,13 +1634,13 @@ body.panel-hidden .avatar-viewport {
 }
 
 .news-resume-banner .resume-btn-secondary {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
     color: #94a3b8;
     border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .news-resume-banner .resume-btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.18);
     color: #ffffff;
 }
 

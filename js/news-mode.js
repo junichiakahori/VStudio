@@ -2768,6 +2768,7 @@ ${creditsInstruction}
         return;
       }
 
+      const container = document.getElementById("news-resume-container") || document.querySelector(".panel-header-wrapper") || document.body;
       const existing = document.getElementById("news-resume-banner");
       if (existing) existing.remove();
 
@@ -2777,26 +2778,39 @@ ${creditsInstruction}
       const totalS = (saved.scriptData.items || []).length;
       const currentS = (saved.sentenceIndex || 0) + 1;
       const artNum = (saved.articleIndex || 0) + 1;
-      const titleShort = saved.item.title.length > 20 ? saved.item.title.substring(0, 20) + "…" : saved.item.title;
+      const titleShort = saved.item.title.length > 22 ? saved.item.title.substring(0, 22) + "…" : saved.item.title;
 
       banner.innerHTML = `
         <div class="resume-info">
-          <span class="resume-badge">⚠️ 配信中断を検知</span>
-          <span class="resume-text">第${artNum}件「${titleShort}」の途中 (${currentS}/${totalS}文目) から1クリックで即座に復帰できます</span>
+          <div class="resume-header-row">
+            <span class="resume-badge">⚠️ 配信中断を検知</span>
+            <span class="resume-progress-tag">第${artNum}件 (${currentS}/${totalS}文目)</span>
+          </div>
+          <div class="resume-text" title="${saved.item.title}">「${titleShort}」</div>
         </div>
         <div class="resume-actions">
-          <button id="news-quick-resume-btn" class="resume-btn resume-btn-primary">⚡ 感想の途中から再開</button>
+          <button id="news-quick-resume-btn" class="resume-btn resume-btn-primary">⚡ 途中から再開</button>
           <button id="news-discard-resume-btn" class="resume-btn resume-btn-secondary">✕ 破棄</button>
         </div>
       `;
-      document.body.appendChild(banner);
+      
+      const resumeContainer = document.getElementById("news-resume-container");
+      if (resumeContainer) {
+        resumeContainer.innerHTML = "";
+        resumeContainer.appendChild(banner);
+        resumeContainer.style.display = "block";
+      } else {
+        container.appendChild(banner);
+      }
 
       document.getElementById("news-quick-resume-btn").onclick = async () => {
+        if (resumeContainer) resumeContainer.style.display = "none";
         banner.remove();
         await window.quickResumeNewsBroadcast(saved);
       };
 
       document.getElementById("news-discard-resume-btn").onclick = () => {
+        if (resumeContainer) resumeContainer.style.display = "none";
         banner.remove();
         localStorage.removeItem("newsActiveState");
       };
