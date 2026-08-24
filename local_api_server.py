@@ -1500,6 +1500,118 @@ def needs_misread_correction(processed_text, kana_str):
         return True
     return False
 
+# ── Wikipedia 読み取得キャッシュ（同一ワードの重複API呼び出しを防止）──
+_wiki_reading_cache = {}
+
+def lookup_wikipedia_reading(term):
+    """
+    Wikipedia APIで固有名詞の読み（ひらがな）を取得する。
+    「高島 宗一郎（たかしま そういちろう、...）」形式の冒頭文から抽出。
+    """
+    if term in _wiki_reading_cache:
+        return _wiki_reading_cache[term]
+
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
+    try:
+        # Step1: 検索
+        search_url = (
+            "https://ja.wikipedia.org/w/api.php"
+            "?action=query&list=search&srsearch={}&srlimit=1&format=json"
+        ).format(urllib.parse.quote(term))
+        req = urllib.request.Request(search_url, headers={"User-Agent": "VStudio-TTS/1.0"})
+        with urllib.request.urlopen(req, timeout=5, context=ctx) as r:
+            hits = json.loads(r.read().decode("utf-8")).get("query", {}).get("search", [])
+        if not hits:
+            _wiki_reading_cache[term] = None
+            return None
+        page_title = hits[0]["title"]
+
+        # Step2: 冒頭テキスト取得
+        ext_url = (
+            "https://ja.wikipedia.org/w/api.php"
+            "?action=query&prop=extracts&exintro=true&exsentences=2"
+            "&explaintext=true&titles={}&format=json"
+        ).format(urllib.parse.quote(page_title))
+        req = urllib.request.Request(ext_url, headers={"User-Agent": "VStudio-TTS/1.0"})
+        with urllib.request.urlopen(req, timeout=5, context=ctx) as r:
+            pages = json.loads(r.read().decode("utf-8")).get("query", {}).get("pages", {})
+
+        for page in pages.values():
+            extract = page.get("extract", "")
+            # 「名前（よみ、...）」パターン: 括弧内で最初に現れるひらがな連続を取得
+            m = re.search(
+                r'[（(](?:[^（(]*?、)?([ぁ-んァ-ヶー\s　っッ]+?)(?:、[^ぁ-んァ-ヶー\s　っッ]|[）)])',
+                extract
+            )
+            if m:
+                reading = re.sub(r"[\s　]", "", m.group(1))
+                # ひらがな・長音のみ、2文字以上
+                if re.fullmatch(r"[ぁ-んァ-ヶーっッ]+", reading) and len(reading) >= 2:
+                    print(f"[Wikipedia読み取得] '{term}' → '{reading}' (from: {extract[:60]})")
+                    _wiki_reading_cache[term] = reading
+                    return reading
+
+        _wiki_reading_cache[term] = None
+        return None
+    except Exception as e:
+        print(f"[Wikipedia読み取得エラー] '{term}': {e}")
+        _wiki_reading_cache[term] = None
+        return None
+
+def extract_kanji_terms(text):
+    """テキストから漢字を含む2文字以上の語句を抽出する"""
+    # 漢字+ひらがな混じりの語句（人名・地名等）も対象
+    terms = re.findall(r'[\u4e00-\u9fff\u3400-\u4dbf][\u4e00-\u9fff\u3400-\u4dbf\u3040-\u309f]{1,}', text)
+    return list(set(t for t in terms if len(t) >= 2))
+
+def enrich_dict_from_text(text):
+    """
+    テキスト中の漢字語句をWikipedia APIで読み検索し、
+    未登録のものを hiragana_dict.json に自動追加する。
+    返り値: 新規追加件数
+    """
+    dict_path = os.path.join(os.path.dirname(__file__), "hiragana_dict.json")
+    try:
+        existing = {}
+        if os.path.exists(dict_path):
+            with open(dict_path, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+    except Exception:
+        existing = {}
+
+    terms = extract_kanji_terms(text)
+    # 既に辞書登録済みはスキップ
+    unknown_terms = [t for t in terms if t not in existing]
+    if not unknown_terms:
+        return 0
+
+    added = 0
+    for term in unknown_terms:
+        reading = lookup_wikipedia_reading(term)
+        if reading:
+            # カタカナが混じる場合はひらがなに正規化
+            reading = reading.translate(str.maketrans(
+                "ァィゥェォァイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンッー",
+                "ぁぃぅぇぉあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんっー"
+            ))
+            if term not in existing:
+                existing[term] = reading
+                added += 1
+                print(f"[Wikipedia辞書自動登録] '{term}' → '{reading}'")
+
+    if added > 0:
+        try:
+            with open(dict_path, "w", encoding="utf-8") as f:
+                json.dump(existing, f, ensure_ascii=False, indent=4)
+            print(f"[Wikipedia辞書自動登録] 計{added}件を hiragana_dict.json に追加しました")
+        except Exception as e:
+            print(f"[Wikipedia辞書保存エラー]: {e}")
+
+    return added
+
 def synthesize_voicevox_backend(text, speaker_id=1, speed=1.0, pitch=0.0):
     import urllib.parse
     processed_text = apply_backend_pronunciation_dict(text)
@@ -1519,14 +1631,27 @@ def synthesize_voicevox_backend(text, speaker_id=1, speed=1.0, pitch=0.0):
 
     # ── 誤読チェック＆自動リトライ ──
     if needs_misread_correction(processed_text, kana_str):
-        yomi_text = convert_to_hiragana_yomi(processed_text)
-        print(f"[誤読補正] 元: {processed_text!r}")
-        print(f"[誤読補正] → : {yomi_text!r}")
-        query_json = _audio_query(yomi_text)
+        # Step1: Wikipedia で漢字語の読みを取得 → 辞書に自動登録
+        wiki_added = enrich_dict_from_text(processed_text)
+        if wiki_added > 0:
+            # 辞書更新後に再適用
+            processed_text = apply_backend_pronunciation_dict(text)
+            print(f"[誤読補正] Wikipedia登録後 再変換: {processed_text!r}")
+
+        # Step2: まだ漢字が残るなら pykakasi で完全ひらがな化
+        if needs_misread_correction(processed_text, None):
+            yomi_text = convert_to_hiragana_yomi(processed_text)
+            print(f"[誤読補正] pykakasi適用: {yomi_text!r}")
+            query_json = _audio_query(yomi_text)
+        else:
+            # Wikipedia だけで解決した場合はそのまま再合成
+            query_json = _audio_query(processed_text)
+
         kana_str = query_json.get("kana", kana_str)
         corrected = True
         if kana_str:
             print(f"[VOICEVOX発音カナ(補正後)] {kana_str}")
+
 
     if speed != 1.0:
         query_json["speedScale"] = speed
