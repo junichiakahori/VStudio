@@ -836,12 +836,20 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     transition = "「次のニュースなのだ！」" if is_zunda else ("「次のニュースですにゃ！」" if is_cat else "「次のニュースです！」")
 
                 article_url = (payload.get('url', '') or payload.get('link', '')).strip()
-                if not article_url and title in ARTICLE_URL_CACHE:
-                    article_url = ARTICLE_URL_CACHE[title]
+                if not article_url:
+                    # タイトルの部分一致でURLキャッシュから探索
+                    for t_k, u_v in ARTICLE_URL_CACHE.items():
+                        if t_k and (t_k[:10] in title or title[:10] in t_k or t_k in title or title in t_k):
+                            article_url = u_v
+                            break
 
                 if article_url:
                     LAST_PLAYING_ARTICLE_URL = article_url
                     ARTICLE_URL_CACHE[title] = article_url
+                    # 🔗 browser_console.log に記事URLを直接記録
+                    now_iso = time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime())
+                    with open('browser_console.log', 'a', encoding='utf-8') as f:
+                        f.write(f"[{now_iso}] [LOG] [ニュース記事URL] 🔗 {article_url} | 記事: 「{title}」\n")
 
                 full_article_content = description
 
