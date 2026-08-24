@@ -825,6 +825,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 payload = json.loads(post_data.decode('utf-8')) if post_data else {}
                 title = payload.get('title', '')
                 description = payload.get('description', '')
+                start_time_iso = payload.get('scheduledStartTime')
                 privacy_status = payload.get('privacyStatus', 'public')
                 if privacy_status not in ['public', 'unlisted', 'private']:
                     privacy_status = 'public'
