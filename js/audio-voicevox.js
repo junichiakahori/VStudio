@@ -82,6 +82,10 @@ async function fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal
             console.log(`[VOICEVOX発音カナ] 🗣️ ${decodeURIComponent(kanaHeader)}`);
           } catch (e) {}
         }
+        const corrected = synthRes.headers.get("X-Voicevox-Corrected");
+        if (corrected === "1") {
+          console.warn(`[VOICEVOX誤読補正] ⚠️ 誤読を検知し自動補正しました: "${text.trim()}"`);
+        }
         return await synthRes.arrayBuffer();
       }
       throw new Error("Backend synthesis failed: " + synthRes.statusText);

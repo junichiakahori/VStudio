@@ -1103,15 +1103,18 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 if not text:
                     raise ValueError("text is required")
 
-                wav_bytes, kana_str = synthesize_voicevox_backend(text, speaker_id, speed, pitch)
-                
+                wav_bytes, kana_str, corrected = synthesize_voicevox_backend(text, speaker_id, speed, pitch)
+
                 self.send_response(200)
                 self.send_header('Content-type', 'audio/wav')
                 self.send_header('Access-Control-Allow-Origin', '*')
-                self.send_header('Access-Control-Expose-Headers', 'X-Voicevox-Kana')
+                expose = 'X-Voicevox-Kana, X-Voicevox-Corrected'
+                self.send_header('Access-Control-Expose-Headers', expose)
                 if kana_str:
                     # URLエンコードしてヘッダーに乗せる（ASCII安全）
                     self.send_header('X-Voicevox-Kana', urllib.parse.quote(kana_str))
+                if corrected:
+                    self.send_header('X-Voicevox-Corrected', '1')
                 self.send_header('Content-Length', str(len(wav_bytes)))
                 self.end_headers()
                 self.wfile.write(wav_bytes)
@@ -1463,29 +1466,83 @@ def save_learned_pronunciations(new_words):
     except Exception as e:
         print(f"[辞書自動保存エラー]: {e}")
 
+# pykakasi インスタンス（起動時に一度だけ初期化してキャッシュ）
+_kakasi_instance = None
+def _get_kakasi():
+    global _kakasi_instance
+    if _kakasi_instance is None:
+        try:
+            import pykakasi
+            _kakasi_instance = pykakasi.kakasi()
+        except Exception as e:
+            print(f"[pykakasi 初期化エラー]: {e}")
+    return _kakasi_instance
+
+def convert_to_hiragana_yomi(text):
+    """pykakasiで漢字・英字を含むテキストをひらがな読みに変換する"""
+    kks = _get_kakasi()
+    if kks is None:
+        return text
+    try:
+        result = kks.convert(text)
+        return "".join(item.get("hira", item.get("orig", "")) for item in result)
+    except Exception as e:
+        print(f"[pykakasi変換エラー]: {e}")
+        return text
+
+def needs_misread_correction(processed_text, kana_str):
+    """
+    辞書変換後のテキストに漢字が残っていれば誤読リスクあり → 再合成が必要と判定。
+    ひらがな・カタカナ・英数字・記号のみなら誤読の余地なし。
+    """
+    # 漢字（CJK統合漢字）が1文字でも残っていれば補正対象
+    if re.search(r'[\u4e00-\u9fff\u3400-\u4dbf]', processed_text):
+        return True
+    return False
+
 def synthesize_voicevox_backend(text, speaker_id=1, speed=1.0, pitch=0.0):
     import urllib.parse
     processed_text = apply_backend_pronunciation_dict(text)
-    encoded_text = urllib.parse.quote(processed_text)
-    query_url = f"http://localhost:50021/audio_query?text={encoded_text}&speaker={speaker_id}"
-    req = urllib.request.Request(query_url, method="POST")
-    with urllib.request.urlopen(req, timeout=10) as q_res:
-        query_json = json.loads(q_res.read().decode("utf-8"))
-    
+    corrected = False
+
+    def _audio_query(t):
+        enc = urllib.parse.quote(t)
+        url = f"http://localhost:50021/audio_query?text={enc}&speaker={speaker_id}"
+        req = urllib.request.Request(url, method="POST")
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return json.loads(r.read().decode("utf-8"))
+
+    query_json = _audio_query(processed_text)
     kana_str = query_json.get("kana", "")
     if kana_str:
         print(f"[VOICEVOX発音カナ] {kana_str}")
+
+    # ── 誤読チェック＆自動リトライ ──
+    if needs_misread_correction(processed_text, kana_str):
+        yomi_text = convert_to_hiragana_yomi(processed_text)
+        print(f"[誤読補正] 元: {processed_text!r}")
+        print(f"[誤読補正] → : {yomi_text!r}")
+        query_json = _audio_query(yomi_text)
+        kana_str = query_json.get("kana", kana_str)
+        corrected = True
+        if kana_str:
+            print(f"[VOICEVOX発音カナ(補正後)] {kana_str}")
 
     if speed != 1.0:
         query_json["speedScale"] = speed
     if pitch != 0.0:
         query_json["pitchScale"] = pitch
-    
+
     synth_url = f"http://localhost:50021/synthesis?speaker={speaker_id}"
-    req_synth = urllib.request.Request(synth_url, data=json.dumps(query_json).encode("utf-8"), headers={"Content-Type": "application/json"}, method="POST")
+    req_synth = urllib.request.Request(
+        synth_url,
+        data=json.dumps(query_json).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
     with urllib.request.urlopen(req_synth, timeout=15) as s_res:
         wav_bytes = s_res.read()
-    return wav_bytes, kana_str
+    return wav_bytes, kana_str, corrected
 
 def run():
     socketserver.ThreadingTCPServer.allow_reuse_address = True
