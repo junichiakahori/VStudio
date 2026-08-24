@@ -3082,6 +3082,10 @@ ${creditsInstruction}
       }
       if (!window.latestFetchedNews || window.latestFetchedNews.length === 0) return;
 
+      // すでに全件URL取得済みなら何もせず静かに終了
+      const needsEnrichment = window.latestFetchedNews.some(item => !item.link);
+      if (!needsEnrichment) return;
+
       // 1. サーバーのURLキャッシュ（article_urls.json）から全URLマップを取得
       let serverUrlMap = {};
       try {
@@ -3118,7 +3122,9 @@ ${creditsInstruction}
         }
       });
 
-      console.log(`[ニュースURL補完] 🔗 キャッシュから全ニュースリストに記事URLを反映完了 (${enrichedCount}件反映 / 未取得: ${missingTitles.length}件)`);
+      if (enrichedCount > 0) {
+        console.log(`[ニュースURL補完] 🔗 キャッシュから記事URLを反映 (${enrichedCount}件反映 / 未取得: ${missingTitles.length}件)`);
+      }
 
       // 2. それでも未取得のタイトルがあれば、バックエンドの一括解決APIに投げて全件取得！
       if (missingTitles.length > 0) {
@@ -3138,7 +3144,9 @@ ${creditsInstruction}
                   batchCount++;
                 }
               });
-              console.log(`[ニュースURL補完] 🌐 未取得URLの一括逆引き取得完了 (新たに${batchCount}件のURLを紐付け)`);
+              if (batchCount > 0) {
+                console.log(`[ニュースURL補完] 🌐 未取得URLの一括逆引き取得完了 (新たに${batchCount}件のURLを紐付け)`);
+              }
               if (typeof window.updateNewsListPopup === "function") {
                 window.updateNewsListPopup();
               }
