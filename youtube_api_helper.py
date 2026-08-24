@@ -209,24 +209,59 @@ def update_live_broadcast(video_id, title=None, description=None, start_time_iso
     item = get_res["items"][0]
     snippet = item["snippet"]
     status = item.get("status", {})
+    lifecycle = status.get("lifeCycleStatus", "")
+
     if title: snippet["title"] = title
     if description is not None: snippet["description"] = description
-    if start_time_iso:
+    
+    # 既に配信中 (live / complete) の場合は scheduledStartTime を変更しない（APIエラー回避）
+    if start_time_iso and lifecycle not in ["live", "complete"]:
         if "T" in start_time_iso and not (start_time_iso.endswith("Z") or "+" in start_time_iso):
             start_time_iso = f"{start_time_iso}:00+09:00"
         snippet["scheduledStartTime"] = start_time_iso
+
     if privacy_status and privacy_status != "keep":
         status["privacyStatus"] = privacy_status
 
-    up_req = service.liveBroadcasts().update(
-        part="snippet,status",
-        body={
-            "id": video_id,
-            "snippet": snippet,
-            "status": status
-        }
-    )
-    return up_req.execute()
+    try:
+        if lifecycle in ["live", "complete"]:
+            # 配信中の場合は videos().update で安全にタイトル・説明文を即時更新
+            vid_req = service.videos().list(part="snippet", id=video_id)
+            vid_res = vid_req.execute()
+            if vid_res.get("items"):
+                v_snippet = vid_res["items"][0]["snippet"]
+                if title: v_snippet["title"] = title
+                if description is not None: v_snippet["description"] = description
+                up_req = service.videos().update(
+                    part="snippet",
+                    body={"id": video_id, "snippet": v_snippet}
+                )
+                return up_req.execute()
+
+        parts = "snippet,status" if (privacy_status and privacy_status != "keep") else "snippet"
+        body_data = {"id": video_id, "snippet": snippet}
+        if privacy_status and privacy_status != "keep":
+            body_data["status"] = status
+
+        up_req = service.liveBroadcasts().update(
+            part=parts,
+            body=body_data
+        )
+        return up_req.execute()
+    except Exception as e:
+        logging.warning(f"liveBroadcasts update failed ({e}), falling back to videos().update")
+        vid_req = service.videos().list(part="snippet", id=video_id)
+        vid_res = vid_req.execute()
+        if vid_res.get("items"):
+            v_snippet = vid_res["items"][0]["snippet"]
+            if title: v_snippet["title"] = title
+            if description is not None: v_snippet["description"] = description
+            up_req = service.videos().update(
+                part="snippet",
+                body={"id": video_id, "snippet": v_snippet}
+            )
+            return up_req.execute()
+        raise e
 
 def upload_thumbnail(video_id, image_data):
     """配信枠にサムネイル画像をアップロード"""
