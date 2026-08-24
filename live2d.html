@@ -13,43 +13,6 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
     <script>
-        (function () {
-            function sendLogToServer(level, args) {
-                try {
-                    const message = args.map(arg => {
-                        if (arg instanceof Error) return arg.stack || arg.message;
-                        return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
-                    }).join(' ').trim();
-                    if (!message || message.includes("[CSM]") || message.includes("Google Identity Services loaded") || message.includes("Model positioned:")) return;
-                    const timestamp = new Date().toISOString();
-                    const logString = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
-                    fetch('http://localhost:8001/log', {
-                        method: 'POST',
-                        mode: 'cors',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: logString })
-                    }).catch(err => { }); // エラー時は無限ループを防ぐため握りつぶす
-                } catch (e) { }
-            }
-
-            const originalLog = console.log;
-            const originalWarn = console.warn;
-            const originalError = console.error;
-
-            console.log = function (...args) {
-                originalLog.apply(console, args);
-                sendLogToServer('log', args);
-            };
-            console.warn = function (...args) {
-                originalWarn.apply(console, args);
-                sendLogToServer('warn', args);
-            };
-            console.error = function (...args) {
-                originalError.apply(console, args);
-                sendLogToServer('error', args);
-            };
-        })();
-
         // =====================================================================
         // UIイベント重複防止＆モジュール登録エンジン
         // =====================================================================
