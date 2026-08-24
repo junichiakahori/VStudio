@@ -13,8 +13,17 @@ const checkPort = (port) => {
 
 const killProcessOnPort = (port) => {
   return new Promise((resolve) => {
-    exec(`lsof -t -i :${port} | xargs kill -9`, () => {
-      resolve();
+    exec(`lsof -t -i :${port}`, (err, stdout) => {
+      if (!stdout || !stdout.trim()) {
+        resolve();
+        return;
+      }
+      const pids = stdout.trim().split(/\s+/).filter(Boolean);
+      if (pids.length > 0) {
+        exec(`kill -9 ${pids.join(' ')}`, () => resolve());
+      } else {
+        resolve();
+      }
     });
   });
 };
@@ -97,10 +106,13 @@ const backendManagerPlugin = () => ({
               addLog(serverName, 'SYSTEM', 'Server stopped.');
             }
 
-            if (action === 'start' || action === 'restart') {
-              // Ensure it's killed before starting
-              await killProcessOnPort(config.port);
-              serverLogs[serverName] = []; // clear logs on restart
+            if (action === 'start') {
+              const isRunning = await checkPort(config.port);
+              if (isRunning) {
+                res.end(JSON.stringify({ status: 'already_running' }));
+                return;
+              }
+              serverLogs[serverName] = [];
               addLog(serverName, 'SYSTEM', 'Starting server...');
 
               const child = spawn('python3', [config.file], {
@@ -108,17 +120,34 @@ const backendManagerPlugin = () => ({
                 stdio: 'pipe'
               });
               child.stdout.on('data', (data) => {
-                const msg = data.toString().trim();
-                console.log(`[${serverName}] ${msg}`);
-                if (msg) addLog(serverName, 'OUT', msg);
+                const lines = data.toString().split('\n').filter(Boolean);
+                lines.forEach(l => addLog(serverName, 'STDOUT', l));
               });
               child.stderr.on('data', (data) => {
-                const msg = data.toString().trim();
-                console.error(`[${serverName} ERROR] ${msg}`);
-                if (msg) addLog(serverName, 'ERR', msg);
+                const lines = data.toString().split('\n').filter(Boolean);
+                lines.forEach(l => addLog(serverName, 'STDERR', l));
               });
               child.on('close', (code) => {
-                addLog(serverName, 'SYSTEM', `Exited with code ${code}`);
+                addLog(serverName, 'SYSTEM', `Process exited with code ${code}`);
+              });
+            } else if (action === 'restart') {
+              serverLogs[serverName] = [];
+              addLog(serverName, 'SYSTEM', 'Restarting server...');
+
+              const child = spawn('python3', [config.file], {
+                cwd: process.cwd(),
+                stdio: 'pipe'
+              });
+              child.stdout.on('data', (data) => {
+                const lines = data.toString().split('\n').filter(Boolean);
+                lines.forEach(l => addLog(serverName, 'STDOUT', l));
+              });
+              child.stderr.on('data', (data) => {
+                const lines = data.toString().split('\n').filter(Boolean);
+                lines.forEach(l => addLog(serverName, 'STDERR', l));
+              });
+              child.on('close', (code) => {
+                addLog(serverName, 'SYSTEM', `Process exited with code ${code}`);
               });
             }
 
