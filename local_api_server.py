@@ -10,6 +10,7 @@ import time
 import datetime
 import shutil
 import threading
+import sqlite3
 
 PORT = 8001
 DATA_FILE = "custom_idle_phrases.json"
@@ -1319,6 +1320,34 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
 
     return corrected_items
 
+# 大規模国語辞典（master_dictionary.db: 65万語）接続管理
+_master_db_conn = None
+def get_master_db():
+    global _master_db_conn
+    if _master_db_conn is None:
+        db_path = os.path.join(os.path.dirname(__file__), 'master_dictionary.db')
+        if os.path.exists(db_path):
+            try:
+                _master_db_conn = sqlite3.connect(db_path, check_same_thread=False)
+            except Exception as e:
+                print(f"[MasterDict] DB接続エラー: {e}")
+    return _master_db_conn
+
+def lookup_master_dictionary(term):
+    """65万語の国語・現代語辞典から最頻出の正しい読み（ひらがな）を瞬時に取得"""
+    conn = get_master_db()
+    if not conn or not term or len(term) < 2:
+        return None
+    try:
+        cursor = conn.cursor()
+        cursor.execute('SELECT reading FROM dictionary WHERE surface = ? ORDER BY cost ASC LIMIT 1', (term,))
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+    except Exception as e:
+        pass
+    return None
+
 def apply_backend_pronunciation_dict(text):
     if not text:
         return text
@@ -1831,7 +1860,15 @@ def enrich_dict_from_text(text):
     added = 0
     import time
     for term in unknown_terms:
-        # Wikipedia検索
+        # Step 1: 65万語の大規模国語辞典から最優先ルックアップ（超高速・高精度）
+        master_reading = lookup_master_dictionary(term)
+        if master_reading and term not in existing:
+            existing[term] = master_reading
+            added += 1
+            print(f"[国語辞典自動登録 (65万語)] '{term}' → '{master_reading}'")
+            continue
+
+        # Step 2: 国語辞典にない固有名詞・人名・最新用語のみ Wikipedia API で検索
         target_term, reading = lookup_wikipedia_reading(term)
         time.sleep(0.05)  # APIレートリミット対策
         if target_term and reading and target_term not in existing:
@@ -1843,9 +1880,9 @@ def enrich_dict_from_text(text):
         try:
             with open(dict_path, "w", encoding="utf-8") as f:
                 json.dump(existing, f, ensure_ascii=False, indent=4)
-            print(f"[Wikipedia辞書自動登録] 計{added}件を hiragana_dict.json に追加しました")
+            print(f"[辞書自動学習] 計{added}件を hiragana_dict.json に追加しました")
         except Exception as e:
-            print(f"[Wikipedia辞書保存エラー]: {e}")
+            print(f"[辞書保存エラー]: {e}")
 
     return added
 
