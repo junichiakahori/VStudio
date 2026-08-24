@@ -109,6 +109,9 @@ def create_live_broadcast(title, description="", start_time_iso=None, privacy_st
         if "T" in start_time_iso and not (start_time_iso.endswith("Z") or "+" in start_time_iso):
             start_time_iso = f"{start_time_iso}:00+09:00"
 
+    # 新規作成時は "keep" は使えないため、安全な "unlisted"（限定公開）にフォールバック
+    valid_privacy = privacy_status if privacy_status in ["public", "unlisted", "private"] else "unlisted"
+
     broadcast_body = {
         "snippet": {
             "title": title or "【生放送】バーチャル配信",
@@ -116,7 +119,7 @@ def create_live_broadcast(title, description="", start_time_iso=None, privacy_st
             "scheduledStartTime": start_time_iso
         },
         "status": {
-            "privacyStatus": privacy_status,
+            "privacyStatus": valid_privacy,
             "selfDeclaredMadeForKids": False
         },
         "contentDetails": {
