@@ -209,24 +209,28 @@ class VStudioChatProcessor(DefaultProcessor):
 
 # YouTube API scopes
 SCOPES = ['https://www.googleapis.com/auth/youtube']
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TOKEN_PATH = os.path.join(BASE_DIR, 'token.pickle')
 youtube_api_client = None
 
 def get_authenticated_service():
     """OAuth認証を行いYouTube APIクライアントを返す（エラー時は安全にNoneを返す）"""
     creds = None
     try:
-        if os.path.exists('token.pickle'):
-            with open('token.pickle', 'rb') as token:
+        if os.path.exists(TOKEN_PATH):
+            with open(TOKEN_PATH, 'rb') as token:
                 creds = pickle.load(token)
                 
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 try:
                     creds.refresh(Request())
+                    with open(TOKEN_PATH, 'wb') as token:
+                        pickle.dump(creds, token)
                 except Exception as e:
                     logging.warning(f"OAuth Token refresh failed: {e}. Removing stale token.")
-                    if os.path.exists('token.pickle'):
-                        os.remove('token.pickle')
+                    if os.path.exists(TOKEN_PATH):
+                        os.remove(TOKEN_PATH)
                     return None
             else:
                 logging.info("有効なトークンがないため、スクレイピングモードで即時起動します。")
@@ -392,25 +396,38 @@ async def fetch_stats(video_id):
             viewers = ""
             subscribers = ""
 
-            # 1. YouTube Data API が利用可能な場合（統計情報の累計再生回数）
+            # 1. YouTube Data API が利用可能な場合（同時接続数・累計再生数・チャンネル登録者数）
             if youtube_api_client:
                 try:
                     req = youtube_api_client.videos().list(
-                        part="liveStreamingDetails,statistics",
+                        part="liveStreamingDetails,statistics,snippet",
                         id=video_id
                     )
                     res = await asyncio.to_thread(req.execute)
                     if res and "items" in res and len(res["items"]) > 0:
                         item = res["items"][0]
-                        stats = item.get("statistics", {})
-                        if "viewCount" in stats:
-                            v_num = int(stats["viewCount"])
-                            viewers = f"{v_num:,}"
+                        lsd = item.get("liveStreamingDetails", {})
+                        if "concurrentViewers" in lsd:
+                            viewers = f"{int(lsd['concurrentViewers']):,}"
+                        elif "viewCount" in item.get("statistics", {}):
+                            viewers = f"{int(item['statistics']['viewCount']):,}"
+                        
+                        channel_id = item.get("snippet", {}).get("channelId")
+                        if channel_id:
+                            ch_req = youtube_api_client.channels().list(
+                                part="statistics",
+                                id=channel_id
+                            )
+                            ch_res = await asyncio.to_thread(ch_req.execute)
+                            if ch_res and "items" in ch_res and len(ch_res["items"]) > 0:
+                                ch_stats = ch_res["items"][0].get("statistics", {})
+                                if "subscriberCount" in ch_stats:
+                                    subscribers = f"{int(ch_stats['subscriberCount']):,}"
                 except Exception as e:
                     logging.warning(f"YouTube Data API fetch stats failed: {e}")
 
-            # 2. スクレイピングによる抽出（累計再生回数を最優先でフォーマット）
-            if not viewers:
+            # 2. スクレイピングによる抽出（フォールバック）
+            if not viewers or not subscribers:
                 url = f"https://www.youtube.com/watch?v={video_id}"
                 headers = {
                     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -419,31 +436,28 @@ async def fetch_stats(video_id):
                 try:
                     html = await asyncio.to_thread(lambda: requests.get(url, headers=headers, timeout=8).text)
                     
-                    # (a) ytInitialPlayerResponse の videoDetails.viewCount（累計再生数）
-                    player_match = re.search(r'ytInitialPlayerResponse\s*=\s*(\{.*?\});(?:var|</script>)', html)
-                    if player_match:
-                        try:
-                            player = json.loads(player_match.group(1))
-                            videoDetails = player.get("videoDetails", {})
-                            raw_vc = videoDetails.get("viewCount")
-                            if raw_vc is not None and str(raw_vc).isdigit():
-                                viewers = f"{int(raw_vc):,}"
-                        except Exception:
-                            pass
-
-                    # (b) 「○○回視聴」テキストの検索
                     if not viewers:
-                        txt_match = re.search(r'"(?:simpleText|label)"\s*:\s*"([\d,]+)\s*回視聴"', html)
+                        player_match = re.search(r'ytInitialPlayerResponse\s*=\s*(\{.*?\});(?:var|</script>)', html)
+                        if player_match:
+                            try:
+                                player = json.loads(player_match.group(1))
+                                videoDetails = player.get("videoDetails", {})
+                                raw_vc = videoDetails.get("viewCount")
+                                if raw_vc is not None and str(raw_vc).isdigit():
+                                    viewers = f"{int(raw_vc):,}"
+                            except Exception:
+                                pass
+
+                    if not viewers:
+                        txt_match = re.search(r'"(?:simpleText|label)"\s*:\s*"([\d,]+)\s*(?:回視聴|人が視聴中)"', html)
                         if txt_match:
                             viewers = txt_match.group(1)
 
-                    # (c) HTML正規表現による viewCount 検索
                     if not viewers:
                         vc_match = re.search(r'"viewCount"\s*:\s*"?(\d+)"?', html)
                         if vc_match:
                             viewers = f"{int(vc_match.group(1)):,}"
 
-                    # チャンネル登録者数の抽出
                     if not subscribers:
                         sub_match1 = re.search(r'"subscriberCountText":\{"accessibility":\{"accessibilityData":\{"label":"([^"]+)"\}\}', html)
                         if sub_match1:
@@ -465,7 +479,7 @@ async def fetch_stats(video_id):
                 "subscribers": subscribers
             })
                 
-            await asyncio.sleep(15) # 15秒ごとに更新
+            await asyncio.sleep(10) # 10秒ごとに更新
     except asyncio.CancelledError:
         pass
 
