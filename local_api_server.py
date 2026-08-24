@@ -1206,6 +1206,11 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
             "人魚": "にんぎょ",
             "KO1KEYZ": "コイキーズ",
             "KO1LY": "コイリー",
+            "秋篠宮": "あきしののみや",
+            "秋篠宮家": "あきしののみやけ",
+            "常陸宮": "ひたちのみや",
+            "三笠宮": "みかさのみや",
+            "高円宮": "たかまどのみや",
             "如此": "このような"
         }
         for k, v in known_fixes.items():
