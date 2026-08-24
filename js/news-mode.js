@@ -22,6 +22,20 @@ function stripHtmlTags(htmlStr) {
   return clean.replace(/<[^>]*>/g, " ").replace(/&[a-zA-Z0-9#]+;/g, " ").replace(/\s+/g, " ").trim();
 }
 
+// ニュース見出しを読み上げ用にクリーニングする
+// 例: "[みんなのケータイ]Pixel 11は買い - ケータイ Watch" → "Pixel 11は買い"
+function cleanTitleForSpeech(title) {
+  if (!title) return "";
+  let t = String(title).trim();
+  // 先頭の [タグ] や 【タグ】 を除去
+  t = t.replace(/^[\[【][^\]】]*[\]】]\s*/, "");
+  // 末尾の " - 出典名" を除去（ハイフン後ろのソース名）
+  t = t.replace(/\s[-－]\s*[^-－]+$/, "");
+  // 全角記号・HTMLタグを除去
+  t = stripHtmlTags(t);
+  return t.trim();
+}
+
 const NEWS_CATEGORIES = {
   "cat_top": ["https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja", "https://news.yahoo.co.jp/rss/topics/top-picks.xml", "https://www.nhk.or.jp/rss/news/cat0.xml"],
   "cat_society": ["https://news.google.com/news/rss/headlines/section/topic/NATION?hl=ja&gl=JP&ceid=JP:ja", "https://news.yahoo.co.jp/rss/topics/domestic.xml", "https://www.nhk.or.jp/rss/news/cat1.xml"],
@@ -458,7 +472,7 @@ ${plainDesc}`;
       const idleFirstPerson = document.getElementById("idle-first-person");
       const fp = idleFirstPerson ? idleFirstPerson.value : "";
 
-      scriptItems.forEach((sItem) => {
+      scriptItems.forEach((sItem, sIdx) => {
         let displayTxt = sItem.display || sItem.speech;
         let speechTxt = sItem.speech || sItem.display;
 
@@ -476,6 +490,15 @@ ${plainDesc}`;
         }
 
         queueVoicevoxAudio(speechTxt, true, displayTxt).catch((e) => console.warn(e));
+
+        // 🗞️ 1文目（「次のニュースですにゃ！」）の直後に見出しを読む
+        if (sIdx === 0 && item && item.title) {
+          const headlineText = cleanTitleForSpeech(item.title);
+          if (headlineText) {
+            console.log(`[原稿] [見出し] "${headlineText}"`);
+            queueVoicevoxAudio(headlineText, true, headlineText).catch((e) => console.warn(e));
+          }
+        }
       });
 
       // 読み上げ完了を監視
@@ -1985,6 +2008,15 @@ ${creditsInstruction}
               }));
             } catch (e) {}
             await queueVoicevoxAudio(it.display, true, it.speech);
+
+            // 🗞️ 1文目（「次のニュースですにゃ！」）の直後に見出しを読む
+            if (sIdx === 0 && item.title) {
+              const headlineText = cleanTitleForSpeech(item.title);
+              if (headlineText) {
+                console.log(`[原稿] [見出し] "${headlineText}"`);
+                await queueVoicevoxAudio(headlineText, true, headlineText);
+              }
+            }
 
             // 🚀 1文目の発話キュー投入と同時に、裏側で「次の記事」の先読み生成を開始！（喋っている間に生成）
             if (sIdx === 0 && nextItem) {
