@@ -1622,7 +1622,7 @@ ${creditsInstruction}
     preloadedNewsMap.set(item.title, promise);
   }
 
-  async function readOneNewsItem(item, config, isCategoryChanged, isFirst) {
+  async function readOneNewsItem(item, config, isCategoryChanged, isFirst, nextItem = null, nextIsCatChanged = false) {
     if (!newsBroadcastState.isRunning) return false;
 
     const newsTitleEl = document.getElementById("news-article-title");
@@ -1754,12 +1754,20 @@ ${creditsInstruction}
               }));
             } catch (e) {}
             await queueVoicevoxAudio(it.display, true, it.speech);
+
+            // 🚀 1文目の発話キュー投入と同時に、裏側で「次の記事」の先読み生成を開始！（喋っている間に生成）
+            if (sIdx === 0 && nextItem) {
+              triggerNewsPrefetch(nextItem, false, nextIsCatChanged);
+            }
           }
         } else if (data.sentences) {
           for (let sIdx = 0; sIdx < data.sentences.length; sIdx++) {
             if (!newsBroadcastState.isRunning) return false;
             const s = data.sentences[sIdx];
             await queueVoicevoxAudio(s, true);
+            if (sIdx === 0 && nextItem) {
+              triggerNewsPrefetch(nextItem, false, nextIsCatChanged);
+            }
           }
         }
         // VOICEVOXの読み上げが完全に終わるまで待機
@@ -1925,12 +1933,8 @@ ${creditsInstruction}
 
       if (startIdxInput) startIdxInput.value = i + 1;
 
-      // 次の記事をバックグラウンドで先行生成（先読みプリフェッチ）開始！
-      if (i + 1 < sortedNews.length) {
-        const nextItem = sortedNews[i + 1];
-        const nextIsCatChanged = (nextItem.categoryKey || "") !== (item.categoryKey || "");
-        triggerNewsPrefetch(nextItem, false, nextIsCatChanged);
-      }
+      const nextItem = (i + 1 < sortedNews.length) ? sortedNews[i + 1] : null;
+      const nextIsCatChanged = nextItem ? ((nextItem.categoryKey || "") !== (item.categoryKey || "")) : false;
 
       // カテゴリが切り替わった時（2カテゴリ目以降の最初）にシーン切り替えSEを確実に鳴らす
       if (isCategoryChanged && config.useTransition) {
@@ -1939,7 +1943,7 @@ ${creditsInstruction}
         await new Promise(r => setTimeout(r, 600));
       }
 
-      const success = await readOneNewsItem(item, config, isCategoryChanged, isFirst);
+      const success = await readOneNewsItem(item, config, isCategoryChanged, isFirst, nextItem, nextIsCatChanged);
       if (!success && newsBroadcastState.isRunning) {
         console.warn(`[ニュース番組] 記事(#${i + 1})の読み上げが未完了のため、スキップせず同じ記事を再試行します。`);
         i--;
