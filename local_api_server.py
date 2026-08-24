@@ -1324,6 +1324,19 @@ def apply_backend_pronunciation_dict(text):
         return text
     processed = text
 
+    # ── 固有名詞・複合語の最優先読み分け（辞書分解や正規表現誤爆を防止） ──
+    EARLY_TERMS = {
+        '新千歳空港': 'しんちとせくうこう',
+        '千歳空港': 'ちとせくうこう',
+        '千歳基地': 'ちとせきち',
+        '千歳市': 'ちとせし',
+        '千歳': 'ちとせ',
+        '日本ダービー': 'にほんだーびー',
+    }
+    for k, v in EARLY_TERMS.items():
+        if k in processed:
+            processed = processed.replace(k, v)
+
     # ── 文脈に応じた「米（べい＝アメリカ／こめ）」の最優先読み分け（辞書置換による単語分解を防止） ──
     BEI_PREFIX = {
         '米国内': 'べいこくない', '米国外': 'べいこくがい',
@@ -1387,8 +1400,8 @@ def apply_backend_pronunciation_dict(text):
     processed = re.sub(r'([0-9０-９一二三四五六七八九十百千万]+人)の方', r'\1のかた', processed)
 
     # ── 文脈に応じた「歳（さい／とし）」の自動読み分け ──
-    # 1. 年齢（数字+歳）は確実に「さい」と読ませる（例: 85歳の夫妻 → 85さいの夫妻）
-    processed = re.sub(r'([0-9０-９一二三四五六七八九十百千万]+|何)歳', r'\1さい', processed)
+    # 1. 年齢（数字+歳）は確実に「さい」と読ませる（例: 85歳の夫妻 → 85さいの夫妻 / 「千歳」は除外）
+    processed = re.sub(r'(?<!千)([0-9０-９一二三四五六七八九十百千万]+|何)歳', r'\1さい', processed)
     # 2. 慣用句（歳をとる、歳の瀬など）は「とし」と読ませる
     processed = re.sub(r'歳を(と|重ね|取|かさね)', r'としを\1', processed)
     processed = re.sub(r'歳の(頃|ころ|市|瀬|せ)', r'としの\1', processed)
