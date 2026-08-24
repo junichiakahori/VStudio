@@ -1601,6 +1601,11 @@ ${creditsInstruction}
     let plainDesc = stripHtmlTags(item.description || "");
     if (plainDesc.length > 120) plainDesc = plainDesc.substring(0, 120) + "…";
 
+    if (!item.link && window.latestFetchedNews) {
+      const found = window.latestFetchedNews.find(x => x.title === item.title);
+      if (found && found.link) item.link = found.link;
+    }
+
     const payload = {
       title: item.title,
       description: plainDesc,
@@ -1670,6 +1675,11 @@ ${creditsInstruction}
     const apiKey = (apiKeyInput ? apiKeyInput.value.trim() : "") || localStorage.getItem("savedAiApiKey") || localStorage.getItem("ai_api_key") || "";
     const provider = (providerSelect ? providerSelect.value : "") || localStorage.getItem("savedAiProvider") || "gemini";
     const modelName = (modelInput ? modelInput.value.trim() : "") || localStorage.getItem("savedAiModel") || "gemini-1.5-flash";
+
+    if (!item.link && window.latestFetchedNews) {
+      const found = window.latestFetchedNews.find(x => x.title === item.title);
+      if (found && found.link) item.link = found.link;
+    }
 
     const payload = {
       title: item.title,
