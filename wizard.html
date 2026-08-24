@@ -1225,8 +1225,12 @@
                     }
                     const thumbImg = document.getElementById("wizard-yt-thumb-preview");
                     if (thumbImg) {
-                        if (info.videoId && info.videoId.length === 11) {
-                            thumbImg.src = `https://i.ytimg.com/vi/${info.videoId}/mqdefault.jpg`;
+                        const localLatestThumb = localStorage.getItem("savedThumb_latestDataUrl");
+                        if (localLatestThumb && localLatestThumb.startsWith("data:image")) {
+                            thumbImg.src = localLatestThumb;
+                            thumbImg.style.display = "block";
+                        } else if (info.videoId && info.videoId.length === 11) {
+                            thumbImg.src = `https://i.ytimg.com/vi/${info.videoId}/mqdefault.jpg?t=${Date.now()}`;
                             thumbImg.style.display = "block";
                         } else {
                             thumbImg.style.display = "none";
