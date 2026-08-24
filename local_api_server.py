@@ -750,7 +750,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 【ニュースタイトル】: {title}
 【記事内容（概要・詳細本文）】: {full_article_content}"""
 
-                print(f"[generate_item_script] タイトル: {title[:20]}..., APIキー文字数: {len(api_key)}, provider: {provider}, model: {model_name}")
+                print(f"[generate_item_script] タイトル: {title[:20]}..., URL: {article_url or 'なし'}, provider: {provider}, model: {model_name}")
                 raw_text = ""
                 if provider == 'ollama':
                     raw_text = call_ollama_backend(prompt, model_name or "qwen2.5:7b")

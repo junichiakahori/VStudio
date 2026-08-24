@@ -1596,7 +1596,7 @@ ${creditsInstruction}
 
     const promise = (async () => {
       try {
-        console.log(`[ニュース先読み] 🚀 次の記事「${item.title.substring(0, 20)}...」を先行生成中...`);
+        console.log(`[ニュース先読み] 🚀 次の記事「${item.title.substring(0, 20)}...」🔗 ${item.link || 'URLなし'} を先行生成中...`);
         const res = await fetch("/api/news/generate_item_script", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1743,7 +1743,8 @@ ${creditsInstruction}
         updateNewsSetlistProgress(item.categoryKey || "cat_top", newsBroadcastState.currentIndex, newsBroadcastState.totalCount);
 
         const count = (data.items || data.sentences || []).length;
-        console.log(`[ニュース原稿(Backend)] [${newsBroadcastState.currentIndex}/${newsBroadcastState.totalCount}件] 「${data.fullText}」 (${count}文)`);
+        const articleUrl = item.link || item.url || "";
+        console.log(`[ニュース原稿(Backend)] [${newsBroadcastState.currentIndex}/${newsBroadcastState.totalCount}件] 🔗 ${articleUrl || 'URLなし'}\n「${data.fullText}」 (${count}文)`);
         if (data.items && data.items.length > 0) {
           for (let sIdx = 0; sIdx < data.items.length; sIdx++) {
             if (!newsBroadcastState.isRunning) return false;
