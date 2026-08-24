@@ -253,17 +253,23 @@
       }
       const title = streamTitleInput ? streamTitleInput.value : "";
       const desc = streamDescInput ? streamDescInput.value : "";
-      const scheduleInput = document.getElementById("local-schedule-time");
       let scheduledStartTime = null;
       if (scheduleInput && scheduleInput.value) {
+        const now = new Date();
+        let targetDate;
         if (scheduleInput.value.includes("T")) {
-          scheduledStartTime = new Date(scheduleInput.value).toISOString();
+          targetDate = new Date(scheduleInput.value);
         } else {
-          const now = new Date();
           const [h, m] = scheduleInput.value.split(":").map(Number);
-          const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
-          scheduledStartTime = targetDate.toISOString();
+          targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+          if (targetDate.getTime() <= now.getTime() + 60000) {
+            targetDate.setDate(targetDate.getDate() + 1);
+          }
         }
+        if (isNaN(targetDate.getTime()) || targetDate.getTime() <= now.getTime() + 60000) {
+          targetDate = new Date(now.getTime() + 3 * 60000);
+        }
+        scheduledStartTime = targetDate.toISOString();
       }
 
       panelBtnUpdate.disabled = true;

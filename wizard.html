@@ -1873,14 +1873,22 @@
             
             let scheduledStartTime = null;
             if (startTimeInputVal) {
+                const now = new Date();
+                let targetDate;
                 if (startTimeInputVal.includes("T")) {
-                    scheduledStartTime = new Date(startTimeInputVal).toISOString();
+                    targetDate = new Date(startTimeInputVal);
                 } else {
-                    const now = new Date();
                     const [h, m] = startTimeInputVal.split(":").map(Number);
-                    const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
-                    scheduledStartTime = targetDate.toISOString();
+                    targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+                    if (targetDate.getTime() <= now.getTime() + 60000) {
+                        // 過去の時刻が入力されている場合は翌日に補正
+                        targetDate.setDate(targetDate.getDate() + 1);
+                    }
                 }
+                if (isNaN(targetDate.getTime()) || targetDate.getTime() <= now.getTime() + 60000) {
+                    targetDate = new Date(now.getTime() + 3 * 60000);
+                }
+                scheduledStartTime = targetDate.toISOString();
             }
 
             const btn = document.getElementById("btn-api-create-broadcast");
@@ -1956,14 +1964,21 @@
 
             let scheduledStartTime = null;
             if (startTimeInputVal) {
+                const now = new Date();
+                let targetDate;
                 if (startTimeInputVal.includes("T")) {
-                    scheduledStartTime = new Date(startTimeInputVal).toISOString();
+                    targetDate = new Date(startTimeInputVal);
                 } else {
-                    const now = new Date();
                     const [h, m] = startTimeInputVal.split(":").map(Number);
-                    const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
-                    scheduledStartTime = targetDate.toISOString();
+                    targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+                    if (targetDate.getTime() <= now.getTime() + 60000) {
+                        targetDate.setDate(targetDate.getDate() + 1);
+                    }
                 }
+                if (isNaN(targetDate.getTime()) || targetDate.getTime() <= now.getTime() + 60000) {
+                    targetDate = new Date(now.getTime() + 3 * 60000);
+                }
+                scheduledStartTime = targetDate.toISOString();
             }
 
             const btn = document.getElementById("btn-api-update-broadcast");

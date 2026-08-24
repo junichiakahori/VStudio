@@ -94,20 +94,43 @@ def start_oauth_flow():
     status = get_oauth_status()
     return status
 
+def ensure_future_start_time_iso(start_time_iso=None):
+    """
+    YouTube API要件に合わせて、配信予約時刻が必ず未来（現在+2分以降）になるよう自動検証＆補正する
+    """
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    min_future_utc = now_utc + datetime.timedelta(minutes=2)
+
+    if not start_time_iso:
+        return (now_utc + datetime.timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    iso_str = str(start_time_iso).strip()
+    if "T" in iso_str and not (iso_str.endswith("Z") or "+" in iso_str or "-" in iso_str[10:]):
+        iso_str = f"{iso_str}:00+09:00"
+
+    try:
+        dt = datetime.datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=9)))
+        dt_utc = dt.astimezone(datetime.timezone.utc)
+        if dt_utc < min_future_utc:
+            # 過去または直前時刻を検知した場合は、安全な未来時刻（現在+3分）へ自動補正
+            corrected = now_utc + datetime.timedelta(minutes=3)
+            print(f"[YouTube API] ⚠️ 過去・直前時刻 ({iso_str}) を検知 ➔ 安全な未来時刻 ({corrected.strftime('%Y-%m-%dT%H:%M:%SZ')}) に自動補正しました")
+            return corrected.strftime('%Y-%m-%dT%H:%M:%SZ')
+        return dt_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+    except Exception as e:
+        print(f"[YouTube API] 時刻パースエラー ({e}) ➔ デフォルト未来時刻 (+5分) を適用")
+        return (now_utc + datetime.timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
+
 def create_live_broadcast(title, description="", start_time_iso=None, privacy_status="unlisted"):
     """YouTube Live配信枠（予約枠）を新規作成し、ストリームにバインド"""
     service = get_authenticated_service()
     if not service:
         raise ValueError("YouTube API未認証です。Googleアカウント連携を行ってください。")
 
-    if not start_time_iso:
-        # デフォルト: 現在時刻から5分後 (ISO 8601 UTC)
-        now = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=5)
-        start_time_iso = now.strftime('%Y-%m-%dT%H:%M:%SZ')
-    else:
-        # もし日本時間などタイムゾーンなしの場合は補正
-        if "T" in start_time_iso and not (start_time_iso.endswith("Z") or "+" in start_time_iso):
-            start_time_iso = f"{start_time_iso}:00+09:00"
+    # 過去時刻エラー（invalidScheduledStartTime 400）を100%防止する安全未来時刻化
+    valid_start_time_iso = ensure_future_start_time_iso(start_time_iso)
 
     # 新規作成時は "keep" は使えないため、デフォルトの "public"（公開）にフォールバック
     valid_privacy = privacy_status if privacy_status in ["public", "unlisted", "private"] else "public"
@@ -116,7 +139,7 @@ def create_live_broadcast(title, description="", start_time_iso=None, privacy_st
         "snippet": {
             "title": title or "【生放送】バーチャル配信",
             "description": description or "",
-            "scheduledStartTime": start_time_iso
+            "scheduledStartTime": valid_start_time_iso
         },
         "status": {
             "privacyStatus": valid_privacy,
@@ -219,9 +242,7 @@ def update_live_broadcast(video_id, title=None, description=None, start_time_iso
     
     # 既に配信中 (live / complete) の場合は scheduledStartTime を変更しない（APIエラー回避）
     if start_time_iso and lifecycle not in ["live", "complete"]:
-        if "T" in start_time_iso and not (start_time_iso.endswith("Z") or "+" in start_time_iso):
-            start_time_iso = f"{start_time_iso}:00+09:00"
-        snippet["scheduledStartTime"] = start_time_iso
+        snippet["scheduledStartTime"] = ensure_future_start_time_iso(start_time_iso)
 
     if privacy_status and privacy_status != "keep":
         status["privacyStatus"] = privacy_status
