@@ -33,7 +33,25 @@ def save_data(data, file_path=DATA_FILE):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 current_hot_reload_timestamp = int(time.time() * 1000)
-ARTICLE_URL_CACHE = {}
+ARTICLE_URLS_FILE = "article_urls.json"
+
+def load_article_url_cache():
+    if os.path.exists(ARTICLE_URLS_FILE):
+        try:
+            with open(ARTICLE_URLS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+def save_article_url_cache(cache):
+    try:
+        with open(ARTICLE_URLS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(cache, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+ARTICLE_URL_CACHE = load_article_url_cache()
 LAST_PLAYING_ARTICLE_URL = ""
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -469,17 +487,22 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     # 🔗 ニュースログにURLが欠けている場合、サーバー側のURLキャッシュから自動補完して書き込み
                     if "[ニュース原稿(Backend)]" in log_message and "🔗" not in log_message:
                         matched_url = LAST_PLAYING_ARTICLE_URL or ""
-                        # ログメッセージから件数やタイトルを探索
+                        # ログメッセージからキーワードでタイトル探索
                         for t_key, u_val in ARTICLE_URL_CACHE.items():
-                            if t_key and t_key[:15] in log_message:
+                            if t_key and (t_key[:10] in log_message or t_key in log_message):
                                 matched_url = u_val
                                 break
                         if matched_url:
-                            log_message = log_message.replace("[ニュース原稿(Backend)]", f"[ニュース原稿(Backend)] 🔗 {matched_url}")
+                            # [ニュース原稿(Backend)] [220/298件] 🔗 https://... 「...」
+                            log_message = re.sub(
+                                r'(\[ニュース原稿\(Backend\)\]\s*\[[0-9]+/[0-9]+件\])',
+                                r'\1 🔗 ' + matched_url + '\n',
+                                log_message
+                            )
 
                     elif "[ニュース先読み]" in log_message and "🔗" not in log_message:
                         for t_key, u_val in ARTICLE_URL_CACHE.items():
-                            if t_key and (t_key[:12] in log_message or t_key in log_message):
+                            if t_key and (t_key[:10] in log_message or t_key in log_message):
                                 log_message = log_message.replace("を先行生成中...", f"🔗 {u_val} を先行生成中...")
                                 break
 
@@ -513,10 +536,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
                     xml_data = response.read()
                 
-                # XML内の全アイテムのタイトルとリンクを自動キャッシュ
+                # XML内の全アイテムのタイトルとリンクを自動キャッシュ＆永続化
                 try:
                     xml_str = xml_data.decode('utf-8', errors='ignore')
                     items = re.findall(r'<item>(.*?)</item>', xml_str, flags=re.DOTALL)
+                    new_cached = 0
                     for it in items:
                         t_m = re.search(r'<title>(.*?)</title>', it, flags=re.DOTALL)
                         l_m = re.search(r'<link>(.*?)</link>', it, flags=re.DOTALL) or re.search(r'<guid[^>]*>(.*?)</guid>', it, flags=re.DOTALL)
@@ -525,6 +549,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                             l_clean = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', l_m.group(1)).strip()
                             if t_clean and l_clean.startswith('http'):
                                 ARTICLE_URL_CACHE[t_clean] = l_clean
+                                new_cached += 1
+                    if new_cached > 0:
+                        save_article_url_cache(ARTICLE_URL_CACHE)
                 except Exception:
                     pass
 
@@ -1047,9 +1074,14 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
             continue
 
         # ============================================================
-        # 🚫 ワンパターンな定型感想（「期待が高まりますね」「期待が高まりますねにゃ」等）の単体文を除去
+        # 🚫 「期待が高まります」系のワンパターン定型句の徹底的完全根絶（30文字以下は無条件削除）
         # ============================================================
-        CLICHE_PATTERN = re.compile(r'^(本当に|今後の展開に|これからの活躍に|今後の動向に)?期待が(高まります|高まる|膨らみます|膨らむ)(ね|よ|な|よね)[にゃのだ！\s　。！？]*$')
+        if any(kw in display_s for kw in ["期待が高ま", "期待が膨ら", "期待が寄せら", "期待したい", "期待大", "期待されます", "期待ですね"]):
+            if len(display_s.strip()) <= 32:
+                print(f"[定型句フィルター] 🚫 「期待が高まります」系定型文を完全除去: 「{display_s}」")
+                continue
+
+        CLICHE_PATTERN = re.compile(r'^(本当に|今後の展開に|これからの活躍に|今後の動向に|今後の試合も|チームの未来に)?.*期待が(高まります|高まる|高まっている|高まっています|膨らみます|膨らむ|寄せられます|寄せられている)(ね|よ|な|よね|と思います|と感じます)?[にゃのだ！\s　。！？]*$')
         if CLICHE_PATTERN.match(display_s.strip()) or CLICHE_PATTERN.match(speech_s.strip()):
             print(f"[定型句フィルター] ワンパターンな定型文を除去: 「{display_s}」")
             continue
