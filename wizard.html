@@ -1639,10 +1639,10 @@
                     titleInput.value = suggestedTitle;
                     localStorage.setItem(`savedStreamTitle_${wizardActiveSlot}`, suggestedTitle);
                 }
-                // ユーザーが自ら編集した概要欄がある場合は、強制再生成時でも勝手に消さない
-                if (descInput && (!isUserEditedDesc || !savedDescForSlot)) {
+                if (descInput) {
                     descInput.value = suggestedDesc;
                     localStorage.setItem(`savedStreamDesc_${wizardActiveSlot}`, suggestedDesc);
+                    localStorage.setItem("savedStreamDesc", suggestedDesc);
                 }
             } else {
                 if (titleInput) {
@@ -1776,47 +1776,8 @@
 
         // 🔄 説明欄の自動再生成ボタン
         document.getElementById("btn-regen-desc")?.addEventListener("click", (e) => {
-            const isMorning = (wizardActiveSlot === "morning");
-            const today = new Date();
-            const dateStr = `${today.getMonth() + 1}/${today.getDate()}`;
-            const defaultTororoFooter = `\n忙しいあなたも、これを見れば今日のニュースがバッチリわかる！今日も楽しくおしゃべりしながら見ていってね！\n\n◆オリジナルハッシュタグ\n#とろろニュース #とろろ生放送 #今日の気になる\n\n◆X（旧Twitter）はこちら！\nhttps://x.com/drone_akahori\n\n◆クレジット表記\n・Live2Dモデル: 「とろろ」© Live2D Inc. (Live2D Creative Studio サンプルモデル)\n・VOICE：VOICEVOX ずんだもん\n・BGM：ドローン赤堀 - Nukadaki\n・配信背景：喫茶あかほり ミクスタカフェ\n\n◆配信のルール・お願い\n・話題に出ていない他の配信者さんの名前を出すのは控えてね！\n・他の配信者さんの枠でとろろの名前を出す「伝書鳩行為」もNGだよ！\n・荒らしやスパムを見かけても、反応せずにブロック＆スルーのご協力をお願いします。\nみんなで楽しく居心地の良い配信にしようね！チャンネル登録と高評価もよろしくお願いします！`;
-            const savedFooter = localStorage.getItem("savedCustomStreamDescFooter") || defaultTororoFooter;
-
-            let newDesc = "";
-            if (selectedMode === "news") {
-                const newsItems = (openerWin && openerWin.latestFetchedNews) ? openerWin.latestFetchedNews : [];
-                const greeting = isMorning
-                    ? `おはようございます！バーチャルキャスターのとろろがお送りする朝の最新ニュース生配信！\n出勤・通学前にサクッと今日の重要トピックをチェックしちゃいましょう☀️\n\n本日の注目ニュース：\n`
-                    : `こんとろ〜！バーチャルキャスターのとろろがお送りする夜の総まとめニュース生配信！\n一日の終わりに今日の重要トピックをまるごとおさらいしちゃいます🌙\n\n今回の振り返り項目：\n`;
-                newDesc = greeting;
-                if (newsItems.length > 0) {
-                    newsItems.slice(0, 15).forEach((item) => {
-                        newDesc += `・${item.title}\n`;
-                    });
-                    if (newsItems.length > 15) {
-                        newDesc += `...他 全${newsItems.length}件\n`;
-                    }
-                } else {
-                    newDesc += `・最新ニュースを随時更新・お届けします\n`;
-                }
-                newDesc += savedFooter;
-            } else if (selectedMode === "radio") {
-                newDesc = (isMorning
-                    ? `おはようございます！朝のまったりラジオ配信へようこそ！\n\n朝の支度や作業のお供にどうぞ☕️\nコメント・お便りお待ちしています！\n`
-                    : `ようこそ！まったりラジオ配信へ！\n\n作業のお供や就寝前のリラックスタイムにどうぞ☕️\nコメント・お便りお待ちしています！\n`) + savedFooter;
-            } else {
-                newDesc = (isMorning
-                    ? `おはようございます！朝の雑談配信へようこそ！\nコメントたくさん拾ってお話しします✨\n初見さんもお気軽にコメントしていってくださいね！\n`
-                    : `雑談配信へようこそ！\nコメントたくさん拾ってお話しします✨\n初見さんもお気軽にコメントしていってくださいね！\n`) + savedFooter;
-            }
-
-            const descInput = document.getElementById("wizard-suggested-desc");
-            if (descInput && newDesc) {
-                descInput.value = newDesc;
-                localStorage.setItem(`savedStreamDesc_${wizardActiveSlot}`, newDesc);
-                localStorage.setItem("savedStreamDesc", newDesc);
-                localStorage.setItem(`savedUserEditedDesc_${wizardActiveSlot}`, "true");
-            }
+            // タイトルは維持したまま、説明欄をカスタム挨拶・最新ニュース・フッターから再生成
+            updateSuggestedMetadata(true);
 
             const btn = e.target;
             const orig = btn.textContent;
