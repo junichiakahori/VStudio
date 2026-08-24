@@ -1286,10 +1286,21 @@ def apply_backend_pronunciation_dict(text):
                     processed = processed.replace(src, dst)
 
     # 人を指す「〜方（かた）」のVOICEVOX誤読（ホウ）完全・網羅的自動補正
-    # ※ 直前が平仮名（大切な方、〜の方、〜る方、〜た方、〜ない方、この方 等）は100%「かた」に補正
-    # ※ 一方、両方、前方、後方、方法等の漢字熟語（直前が漢字）は「ほう」のまま安全に維持
     processed = re.sub(r'([ぁ-ん])方([がはもにへでを、。！？\s]|$|たち|がた)', r'\1かた\2', processed)
     processed = re.sub(r'([0-9０-９一二三四五六七八九十百千万]+人)の方', r'\1のかた', processed)
+
+    # ── 数字+ストレージ容量単位の自動変換 ──
+    # 「Pixel 11256GB」のようにAIがスペースを落とした場合も含めて対応
+    # 先にモデル番号+容量の連結パターンを分離 例: ピクセル11256GB → ピクセル11 256ギガバイト
+    processed = re.sub(
+        r'(ピクセル|ギャラクシー|アイフォーン|アイフォン|エクスペリア)(\d{1,2})(\d{3})(GB|TB|MB)',
+        r'\1\2 \3\4',
+        processed
+    )
+    # 数字+単位を日本語読みに変換（\bの代わりに先読みで英字が続かないことを確認）
+    processed = re.sub(r'(\d+)\s*TB(?![a-zA-Z])', r'\1テラバイト', processed)
+    processed = re.sub(r'(\d+)\s*GB(?![a-zA-Z])', r'\1ギガバイト', processed)
+    processed = re.sub(r'(\d+)\s*MB(?![a-zA-Z])', r'\1メガバイト', processed)
 
     return processed
 
