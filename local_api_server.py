@@ -864,7 +864,7 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
 
         # 誤読頻出単語の確実な置換
         known_fixes = {
-            "方たち": "かたち",
+            "方たち": "かたたち",
             "方々": "かたがた",
             "調光": "ちょうこう",
             "世知辛い": "せちづらい",
