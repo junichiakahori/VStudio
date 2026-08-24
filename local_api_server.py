@@ -1152,6 +1152,9 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
             "今話題の": "いまわだいの",
             "今話題": "いまわだい",
             "今現在": "いまげんざい",
+            "人魚の島のひみつ": "にんぎょのしまのひみつ",
+            "人魚の島": "にんぎょのしま",
+            "人魚": "にんぎょ",
             "如此": "このような"
         }
         for k, v in known_fixes.items():
