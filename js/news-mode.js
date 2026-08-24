@@ -1699,17 +1699,9 @@ ${creditsInstruction}
         await waitForVoicevoxFinish();
       }
 
-      // 3. Local APIサーバーの自動再起動を試みる (Vite Backend Manager経由)
-      if (retryFailCount === 0) {
-        try {
-          console.log("[ニュース番組] 🚀 Local APIサーバーの自動復旧(start)コマンドを送信中...");
-          await fetch("/_api/servers/local_api_server/start", { method: "POST" });
-        } catch (smErr) {}
-      }
-
-      // 4. API無駄打ち防止バックオフ待機（初回5秒、以降は20秒間隔）
+      // 3. API無駄打ち防止バックオフ待機（初回3秒、以降は10秒間隔）
       retryFailCount++;
-      const waitTimeMs = (retryFailCount > 2) ? 20000 : 5000;
+      const waitTimeMs = (retryFailCount > 2) ? 10000 : 3000;
       await new Promise(r => setTimeout(r, waitTimeMs));
     }
 
