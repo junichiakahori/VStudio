@@ -738,8 +738,12 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
     連続ニュース配信のため、記事の冒頭や途中に「ボク、とろろだにゃ！」「ボク、〇〇だにゃ」といった名乗り・自己紹介を挟むのは絶対に禁止です。また自分の名前を「とろろにゃん」と呼ぶのも禁止です。前置き挨拶（{transition}）のあとは直ちにニュース本題に入ってください。
 11. **上から目線・偉そうな態度の禁止（丁寧で謙虚な口調）**:
     リスナーに対して「教えてあげる」「お知らせしてあげる」「安心しなさい」といった上から目線や尊大な言い回しは絶対禁止です。「〜をお伝えします」「〜をご紹介します」「〜ですね」など、謙虚で親しみやすい敬語を基調としてください。
-12. **記事に書かれていない事実の推測・でっち上げ（ハルシネーション）の絶対禁止**:
-    ニュース記事に書かれていない事実や背景を勝手に想像して語らないでください。特に作品や固有名詞について、記事に明記されていないのに勝手に「〜というゲーム」「〜という雑誌」などとジャンルを決めつけて話すことは厳禁です。記事の概要に書かれている事実のみを分かりやすく伝えてください。
+12. **記事に書かれていない事実の推測・でっち上げ（ハルシネーション）の絶対厳禁**:
+    ニュース記事に書かれていない事実、背景、人名、順位を勝手に想像して語ることは絶対に禁止です。
+    特に以下の禁止事項を徹底してください：
+    ・【未記載の人名・結果の捏造禁止】: ランキング記事やアンケート記事で、概要（【概要】）に1位の人物名や具体的な結果が明記されていない場合、勝手に「1位は大谷翔平さん」「1位は〇〇さん」などと想像上の名前をでっち上げてはいけません。「1位が誰なのか気になりますね」「詳細はぜひ元記事をチェックしてみてください」とだけ伝えてください。
+    ・【無関係な有名人の勝手な登場禁止】: 概要に書かれていない有名人・選手・俳優を勝手に関連付けて話すことは厳禁です。
+    ・【事実のみの伝達】: あくまで【概要】に記載されている確定した事実のみを元に原稿を作成し、余計な創作やでっち上げは一切行わないでください。
 
 【ニュースタイトル】: {title}
 【概要】: {description}"""
@@ -1106,7 +1110,11 @@ def call_ollama_backend(prompt, model="qwen2.5:7b", base_url="http://127.0.0.1:1
     body = {
         "model": target_model,
         "prompt": prompt,
-        "system": "You are a professional Japanese VTuber news anchor. Output 100% natural Japanese ONLY. Under no circumstances should you ever output any Chinese words, simplified Chinese characters, or Chinese sentences.",
+        "system": "You are a professional Japanese VTuber news anchor. Output 100% natural Japanese ONLY. Under no circumstances should you ever output any Chinese words, simplified Chinese characters, or hallucinated facts.",
+        "options": {
+            "temperature": 0.2,
+            "top_p": 0.8
+        },
         "stream": False
     }
     try:
