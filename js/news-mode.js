@@ -1552,6 +1552,58 @@ ${creditsInstruction}
     }
   }
 
+  const preloadedNewsMap = new Map();
+
+  function triggerNewsPrefetch(item, isFirst = false, isCategoryChanged = false) {
+    if (!item || !item.title || preloadedNewsMap.has(item.title)) return;
+    const apiKeyInput = document.getElementById("ai-api-key");
+    const providerSelect = document.getElementById("ai-provider-select");
+    const modelInput = document.getElementById("ai-model-input");
+    const apiKey = (apiKeyInput ? apiKeyInput.value.trim() : "") || localStorage.getItem("savedAiApiKey") || localStorage.getItem("ai_api_key") || "";
+    const provider = (providerSelect ? providerSelect.value : "") || localStorage.getItem("savedAiProvider") || "gemini";
+    const modelName = (modelInput ? modelInput.value.trim() : "") || localStorage.getItem("savedAiModel") || "gemini-1.5-flash";
+
+    const tmpDiv = document.createElement("div");
+    tmpDiv.innerHTML = item.description || "";
+    let plainDesc = (tmpDiv.textContent || tmpDiv.innerText || "").replace(/\s+/g, " ").trim();
+    if (plainDesc.length > 120) plainDesc = plainDesc.substring(0, 120) + "…";
+
+    const payload = {
+      title: item.title,
+      description: plainDesc,
+      categoryName: item.categoryName || "",
+      modelId: window.currentModelId || "hiyori",
+      isFirst: isFirst,
+      isCategoryChanged: isCategoryChanged,
+      apiKey: apiKey,
+      provider: provider,
+      modelName: modelName
+    };
+
+    const promise = (async () => {
+      try {
+        console.log(`[ニュース先読み] 🚀 次の記事「${item.title.substring(0, 20)}...」を先行生成中...`);
+        const res = await fetch("/api/news/generate_item_script", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        if (data && data.status === "ok") {
+          console.log(`[ニュース先読み] ✅ 先行生成完了:「${item.title.substring(0, 20)}...」`);
+          return data;
+        }
+        return null;
+      } catch (e) {
+        console.warn(`[ニュース先読み] 先行生成スキップ (${item.title}):`, e);
+        return null;
+      }
+    })();
+
+    preloadedNewsMap.set(item.title, promise);
+  }
+
   async function readOneNewsItem(item, config, isCategoryChanged, isFirst) {
     if (!newsBroadcastState.isRunning) return false;
 
@@ -1594,85 +1646,105 @@ ${creditsInstruction}
     let retryFailCount = 0;
 
     while (newsBroadcastState.isRunning) {
-      if (!apiKey && provider !== "ollama") {
-        console.warn("[ニュース番組] ⚠️ APIキーが未設定です。復旧待機画面に移行します...");
-      }
+      let data = null;
 
-      let res = null;
-      if (apiKey || provider === "ollama") {
+      // 1. 先読み（プリフェッチ）キャッシュが存在する場合は即時活用（待ち時間ゼロ！）
+      if (preloadedNewsMap.has(item.title)) {
         try {
-          res = await fetch("/api/news/generate_item_script", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
-        } catch (netErr) {
-          console.warn("[ニュース番組] 通信エラー検知 (Local API / Network):", netErr);
-        }
-      }
-
-      if (res && res.ok) {
-        try {
-          const data = await res.json();
-          if (data && data.status === "ok" && (data.items || data.sentences)) {
-            // ▼▼▼ AI生成が完全に成功した段階で初めてテロップと日付を表示！ ▼▼▼
-            if (newsTitleEl) newsTitleEl.textContent = item.title;
-            if (newsDescEl) newsDescEl.textContent = plainDesc;
-            if (newsBoardEl) newsBoardEl.classList.add("active");
-            if (catEl) catEl.textContent = item.categoryName || "";
-            if (progressBadge) {
-              progressBadge.style.display = "inline-block";
-              progressBadge.textContent = `${newsBroadcastState.currentIndex} / ${newsBroadcastState.totalCount}`;
-            }
-            if (newsDateEl) {
-              if (item.pubDate) {
-                const d = new Date(item.pubDate);
-                if (!isNaN(d.getTime())) {
-                  const y = d.getFullYear();
-                  const m = String(d.getMonth() + 1).padStart(2, "0");
-                  const day = String(d.getDate()).padStart(2, "0");
-                  const hh = String(d.getHours()).padStart(2, "0");
-                  const mm = String(d.getMinutes()).padStart(2, "0");
-                  newsDateEl.textContent = `${y}/${m}/${day} ${hh}:${mm}`;
-                } else {
-                  newsDateEl.textContent = item.pubDate;
-                }
-              } else {
-                newsDateEl.textContent = "";
-              }
-            }
-
-            // セットリストボードの進行目印を更新
-            updateNewsSetlistProgress(item.categoryKey || "cat_top", newsBroadcastState.currentIndex, newsBroadcastState.totalCount);
-
-            const count = (data.items || data.sentences || []).length;
-            console.log(`[ニュース原稿(Backend)] [${newsBroadcastState.currentIndex}/${newsBroadcastState.totalCount}件] 「${data.fullText}」 (${count}文)`);
-            if (data.items && data.items.length > 0) {
-              for (const it of data.items) {
-                if (!newsBroadcastState.isRunning) return false;
-                await queueVoicevoxAudio(it.display, true, it.speech);
-              }
-            } else if (data.sentences) {
-              for (const s of data.sentences) {
-                if (!newsBroadcastState.isRunning) return false;
-                await queueVoicevoxAudio(s, true);
-              }
-            }
-            // VOICEVOXの読み上げが完全に終わるまで待機
-            await waitForVoicevoxFinish();
-
-            // 既読マーク
-            readNewsTitles.add(item.title);
-            if (window.readNewsTitles) window.readNewsTitles.add(item.title);
-            try { localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles))); } catch (e) { }
-            if (typeof window.updateNewsListPopup === "function") {
-              window.updateNewsListPopup();
-            }
-            return true; // 正常読み上げ完了！
+          data = await preloadedNewsMap.get(item.title);
+          preloadedNewsMap.delete(item.title);
+          if (data && data.status === "ok") {
+            console.log(`[ニュース番組] ⚡ 先読みキャッシュから即時再生開始:「${item.title.substring(0, 20)}...」`);
           }
-        } catch (jsonErr) {
-          console.warn("[ニュース番組] JSONパースエラー:", jsonErr);
+        } catch (e) {
+          data = null;
         }
+      }
+
+      // 2. キャッシュにない場合は通常フェッチ
+      if (!data) {
+        if (!apiKey && provider !== "ollama") {
+          console.warn("[ニュース番組] ⚠️ APIキーが未設定です。復旧待機画面に移行します...");
+        }
+
+        let res = null;
+        if (apiKey || provider === "ollama") {
+          try {
+            res = await fetch("/api/news/generate_item_script", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            });
+          } catch (netErr) {
+            console.warn("[ニュース番組] 通信エラー検知 (Local API / Network):", netErr);
+          }
+        }
+
+        if (res && res.ok) {
+          try {
+            data = await res.json();
+          } catch (jsonErr) {
+            console.warn("[ニュース番組] JSONパースエラー:", jsonErr);
+          }
+        }
+      }
+
+      if (data && data.status === "ok" && (data.items || data.sentences)) {
+        // ▼▼▼ AI生成が完全に成功した段階で初めてテロップと日付を表示！ ▼▼▼
+        if (newsTitleEl) newsTitleEl.textContent = item.title;
+        if (newsDescEl) newsDescEl.textContent = plainDesc;
+        if (newsBoardEl) newsBoardEl.classList.add("active");
+        if (catEl) catEl.textContent = item.categoryName || "";
+        if (progressBadge) {
+          progressBadge.style.display = "inline-block";
+          progressBadge.textContent = `${newsBroadcastState.currentIndex} / ${newsBroadcastState.totalCount}`;
+        }
+        if (newsDateEl) {
+          if (item.pubDate) {
+            const d = new Date(item.pubDate);
+            if (!isNaN(d.getTime())) {
+              const y = d.getFullYear();
+              const m = String(d.getMonth() + 1).padStart(2, "0");
+              const day = String(d.getDate()).padStart(2, "0");
+              const hh = String(d.getHours()).padStart(2, "0");
+              const mm = String(d.getMinutes()).padStart(2, "0");
+              newsDateEl.textContent = `${y}/${m}/${day} ${hh}:${mm}`;
+            } else {
+              newsDateEl.textContent = item.pubDate;
+            }
+          } else {
+            newsDateEl.textContent = "";
+          }
+        }
+
+        // セットリストボードの進行目印を更新
+        updateNewsSetlistProgress(item.categoryKey || "cat_top", newsBroadcastState.currentIndex, newsBroadcastState.totalCount);
+
+        const count = (data.items || data.sentences || []).length;
+        console.log(`[ニュース原稿(Backend)] [${newsBroadcastState.currentIndex}/${newsBroadcastState.totalCount}件] 「${data.fullText}」 (${count}文)`);
+        if (data.items && data.items.length > 0) {
+          for (const it of data.items) {
+            if (!newsBroadcastState.isRunning) return false;
+            await queueVoicevoxAudio(it.display, true, it.speech);
+          }
+        } else if (data.sentences) {
+          for (const s of data.sentences) {
+            if (!newsBroadcastState.isRunning) return false;
+            await queueVoicevoxAudio(s, true);
+          }
+        }
+        // VOICEVOXの読み上げが完全に終わるまで待機
+        await waitForVoicevoxFinish();
+
+        // 既読マーク
+        readNewsTitles.add(item.title);
+        if (window.readNewsTitles) window.readNewsTitles.add(item.title);
+        try { localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles))); } catch (e) { }
+        if (typeof window.updateNewsListPopup === "function") {
+          window.updateNewsListPopup();
+        }
+        return true; // 正常読み上げ完了！
+      }
       }
 
       // ▼▼▼ 異常発生時: ニュースは絶対に読まない！「しばらくお待ちください」待機画面に切り替え ▼▼▼
@@ -1788,6 +1860,10 @@ ${creditsInstruction}
 
     const config = getNewsConfig();
 
+    preloadedNewsMap.clear();
+    if (startIndex < sortedNews.length) triggerNewsPrefetch(sortedNews[startIndex], startIndex === 0, false);
+    if (startIndex + 1 < sortedNews.length) triggerNewsPrefetch(sortedNews[startIndex + 1], false, (sortedNews[startIndex + 1].categoryKey || "") !== (sortedNews[startIndex].categoryKey || ""));
+
     // OP挨拶（途中再開でない場合のみ再生）
     if (startIndex === 0) {
       if (progressEl) progressEl.textContent = "🎬 オープニング再生中...";
@@ -1808,6 +1884,13 @@ ${creditsInstruction}
       newsBroadcastState.lastCategory = item.categoryKey || "";
 
       if (startIdxInput) startIdxInput.value = i + 1;
+
+      // 次の記事をバックグラウンドで先行生成（先読みプリフェッチ）開始！
+      if (i + 1 < sortedNews.length) {
+        const nextItem = sortedNews[i + 1];
+        const nextIsCatChanged = (nextItem.categoryKey || "") !== (item.categoryKey || "");
+        triggerNewsPrefetch(nextItem, false, nextIsCatChanged);
+      }
 
       // カテゴリが切り替わった時（2カテゴリ目以降の最初）にシーン切り替えSEを確実に鳴らす
       if (isCategoryChanged && config.useTransition) {

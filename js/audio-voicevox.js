@@ -57,8 +57,8 @@ async function playNextVoicevox() {
         body: JSON.stringify({
           text: text,
           speakerId: parseInt(speakerId, 10) || 3,
-          speedScale: 1.0,
-          pitchScale: 0.0
+          speedScale: voicevoxSpeed ? parseFloat(voicevoxSpeed.value) || 1.0 : 1.0,
+          pitchScale: voicevoxPitch ? parseFloat(voicevoxPitch.value) || 0.0 : 0.0
         })
       });
       if (synthRes.ok) {
