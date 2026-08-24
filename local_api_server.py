@@ -1099,11 +1099,11 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
                     break
             
             if has_invented:
-                display_s = "記事では今週サービス終了を迎える対象タイトルやスケジュールがまとめられています。"
+                display_s = "記事では詳細な経緯や今後の情報が詳しく紹介されています。"
                 s = display_s  # 🚀 音声(speech_s)の元データも完全に安全な文へ同期！
             elif re.search(r'([、\s]|^)(が[0-9]+日|は[0-9]+日|そしては[0-9]+日)', display_s):
                 # 万が一『』なしで主語抜け日付羅列が発生した場合の完全救済
-                display_s = "記事では今週サービス終了を迎える対象タイトルやスケジュールがまとめられています。"
+                display_s = "記事では関連する詳細なスケジュールがまとめられています。"
                 s = display_s
 
         # 音声用初期値
