@@ -1652,6 +1652,8 @@ ${creditsInstruction}
     preloadedNewsMap.set(item.title, promise);
   }
 
+  window.triggerNewsPrefetch = triggerNewsPrefetch;
+
   async function readOneNewsItem(item, config, isCategoryChanged, isFirst, nextItem = null, nextIsCatChanged = false) {
     if (!newsBroadcastState.isRunning) return false;
 
@@ -1853,7 +1855,9 @@ ${creditsInstruction}
     return false;
   }
 
-  async function startNewsBroadcast(startIndex = 0) {
+  window.readOneNewsItem = readOneNewsItem;
+
+  async function startNewsBroadcast(startIndex = 0, items = null) {
     if (newsBroadcastState.isRunning) {
       console.log(`[ニュース番組] 指定位置(#${startIndex + 1})から再開するため、現在の番組を安全に切り替えます...`);
       newsBroadcastState.isRunning = false;
@@ -1980,7 +1984,8 @@ ${creditsInstruction}
         await new Promise(r => setTimeout(r, 600));
       }
 
-      const success = await readOneNewsItem(item, config, isCategoryChanged, isFirst, nextItem, nextIsCatChanged);
+      const reader = window.readOneNewsItem || readOneNewsItem;
+      const success = await reader(item, config, isCategoryChanged, isFirst, nextItem, nextIsCatChanged);
       if (!success && newsBroadcastState.isRunning) {
         console.warn(`[ニュース番組] 記事(#${i + 1})の読み上げが未完了のため、スキップせず同じ記事を再試行します。`);
         i--;
