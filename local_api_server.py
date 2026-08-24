@@ -568,14 +568,25 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 except Exception:
                     log_message = post_data.decode('utf-8', errors='ignore')
                 if log_message:
-                    # 🔗 ニュースログにURLが欠けている（またはURLなし）場合、サーバー側のURLキャッシュから自動補完して書き込み
+                    # 🔗 ニュースログにURLが欠けている（またはURLなし）場合、サーバー側のURLキャッシュから正確に探索
                     if "[ニュース原稿(Backend)]" in log_message:
-                        matched_url = LAST_PLAYING_ARTICLE_URL or ""
-                        # ログメッセージからキーワードでタイトル探索
+                        matched_url = ""
+                        # 原稿本文やタイトルから正確な記事URLを探索
+                        best_score = 0
                         for t_key, u_val in ARTICLE_URL_CACHE.items():
-                            if t_key and (t_key[:10] in log_message or t_key in log_message):
+                            if not t_key or not u_val:
+                                continue
+                            # 記事タイトルの主要キーワード（5文字以上）がログ原稿に含まれているか照合
+                            t_clean = re.sub(r'[【】『』「」\s　・、。！？!?]+', '', t_key)
+                            if t_clean[:8] in log_message:
                                 matched_url = u_val
                                 break
+                            # 原稿の冒頭部分とタイトルの共通単語マッチング
+                            match_chars = sum(1 for c in t_clean[:12] if c in log_message)
+                            if match_chars > best_score and match_chars >= 4:
+                                best_score = match_chars
+                                matched_url = u_val
+
                         if matched_url:
                             if "🔗 URLなし" in log_message:
                                 log_message = log_message.replace("🔗 URLなし", f"🔗 {matched_url}")
