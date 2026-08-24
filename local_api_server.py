@@ -33,6 +33,8 @@ def save_data(data, file_path=DATA_FILE):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 current_hot_reload_timestamp = int(time.time() * 1000)
+ARTICLE_URL_CACHE = {}
+LAST_PLAYING_ARTICLE_URL = ""
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -219,8 +221,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
 
     def do_POST(self):
+        global current_hot_reload_timestamp, LAST_PLAYING_ARTICLE_URL
         if self.path == '/trigger_hot_reload':
-            global current_hot_reload_timestamp
             current_hot_reload_timestamp = int(time.time() * 1000)
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
@@ -464,6 +466,23 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 except Exception:
                     log_message = post_data.decode('utf-8', errors='ignore')
                 if log_message:
+                    # 🔗 ニュースログにURLが欠けている場合、サーバー側のURLキャッシュから自動補完して書き込み
+                    if "[ニュース原稿(Backend)]" in log_message and "🔗" not in log_message:
+                        matched_url = LAST_PLAYING_ARTICLE_URL or ""
+                        # ログメッセージから件数やタイトルを探索
+                        for t_key, u_val in ARTICLE_URL_CACHE.items():
+                            if t_key and t_key[:15] in log_message:
+                                matched_url = u_val
+                                break
+                        if matched_url:
+                            log_message = log_message.replace("[ニュース原稿(Backend)]", f"[ニュース原稿(Backend)] 🔗 {matched_url}")
+
+                    elif "[ニュース先読み]" in log_message and "🔗" not in log_message:
+                        for t_key, u_val in ARTICLE_URL_CACHE.items():
+                            if t_key and (t_key[:12] in log_message or t_key in log_message):
+                                log_message = log_message.replace("を先行生成中...", f"🔗 {u_val} を先行生成中...")
+                                break
+
                     with open('browser_console.log', 'a', encoding='utf-8') as f:
                         f.write(log_message + '\n')
                 self.send_response(200)
@@ -494,6 +513,21 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
                     xml_data = response.read()
                 
+                # XML内の全アイテムのタイトルとリンクを自動キャッシュ
+                try:
+                    xml_str = xml_data.decode('utf-8', errors='ignore')
+                    items = re.findall(r'<item>(.*?)</item>', xml_str, flags=re.DOTALL)
+                    for it in items:
+                        t_m = re.search(r'<title>(.*?)</title>', it, flags=re.DOTALL)
+                        l_m = re.search(r'<link>(.*?)</link>', it, flags=re.DOTALL) or re.search(r'<guid[^>]*>(.*?)</guid>', it, flags=re.DOTALL)
+                        if t_m and l_m:
+                            t_clean = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', t_m.group(1)).strip()
+                            l_clean = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', l_m.group(1)).strip()
+                            if t_clean and l_clean.startswith('http'):
+                                ARTICLE_URL_CACHE[t_clean] = l_clean
+                except Exception:
+                    pass
+
                 self.send_response(200)
                 self.send_header('Content-type', 'application/xml')
                 self.send_header('Access-Control-Allow-Origin', '*')
@@ -716,7 +750,12 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     transition = "「次のニュースなのだ！」" if is_zunda else ("「次のニュースですにゃ！」" if is_cat else "「次のニュースです！」")
 
                 article_url = (payload.get('url', '') or payload.get('link', '')).strip()
-                full_article_content = description
+                if not article_url and title in ARTICLE_URL_CACHE:
+                    article_url = ARTICLE_URL_CACHE[title]
+
+                if article_url:
+                    LAST_PLAYING_ARTICLE_URL = article_url
+                    ARTICLE_URL_CACHE[title] = article_url
 
                 # 元記事のURLが存在する場合、裏側で本文テキストを軽量自動スクレイピング
                 if article_url:
