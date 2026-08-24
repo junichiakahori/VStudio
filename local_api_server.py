@@ -1158,6 +1158,18 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
                 display_s = "記事では関連する詳細なスケジュールがまとめられています。"
                 s = display_s
 
+        # 🚫 不完全な途切れ単語・省略記号・情報不足の誤魔化し文（例: 「Ka…という銘柄」「…は別の銘柄でした」等）の検知＆自動修復
+        FRAGMENT_HALLUCINATION_PATTERN = re.compile(
+            r'([A-Za-z0-9\u4e00-\u9fff\u30a0-\u30ff]{1,10}[…\.]{2,}'
+            r'|[A-Za-z0-9\u4e00-\u9fff\u30a0-\u30ff]{1,10}…'
+            r'|別の(銘柄|会社|企業|人物|人|作品|ゲーム|商品|団体|地域)でした'
+            r'|(某|某有名|とある)(会社|企業|人物|人|作品|銘柄))'
+        )
+        if FRAGMENT_HALLUCINATION_PATTERN.search(display_s):
+            print(f"[不完全文字列・誤魔化し検知] 🚫 途切れ文字や不完全な作文を検知: '{display_s}' ➔ 安全な解説文へ置換")
+            display_s = "記事では対象となった詳細な情報や一覧が紹介されています。"
+            s = display_s
+
         # 🛡️ 記事コンテキストに基づいた「虚偽の属性・ジャンル捏造」自動検知＆自動修復エンジン
         # 元記事に記載がないのにAIが勝手に付けたジャンル修飾語（〜という雑誌、〜というゲーム等）を汎用的に検知・除去
         if article_context:
