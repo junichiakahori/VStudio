@@ -797,21 +797,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 raw_sentences = deduped_sentences if deduped_sentences else split_sentences
                 
                 # ▼▼▼ 字幕用テキスト(display) と VOICEVOX発音用テキスト(speech) のスマート分離 ▼▼▼
-                items = []
-                for s in raw_sentences:
-                    # 字幕用: 漢字（ふりがな）から（ふりがな）を除去して綺麗な漢字表記にする
-                    display_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\1', s)
-                    display_s = display_s.replace("（", "").replace("）", "").replace("(", "").replace(")", "").strip()
-
-                    # 音声用: 漢字（ふりがな）を【ふりがな】に置換してVOICEVOXに100%正確に読ませる
-                    speech_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\2', s)
-                    speech_s = apply_backend_pronunciation_dict(speech_s)
-
-                    items.append({
-                        "display": display_s,
-                        "speech": speech_s
-                    })
-                
+                # ▼▼▼ VOICEVOXの読み予想と照合する二重チェック＆自動学習エンジン ▼▼▼
+                items = inspect_and_correct_pronunciation(raw_sentences, provider, api_key, model_name)
                 final_sentences = [it["speech"] for it in items]
 
                 self.send_response(200)
@@ -860,6 +847,47 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         else:
             self.send_response(404)
             self.end_headers()
+
+def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key="", model_name=""):
+    """VOICEVOXの予想読みと原稿を照合し、誤読（同音異字・人名・特殊読み）を検出してspeechテキストを自動補正＆学習"""
+    corrected_items = []
+    new_learned_dict = {}
+
+    for s in raw_sentences:
+        # 字幕用: 漢字（ふりがな）から（ふりがな）を除去して綺麗な漢字表記にする
+        display_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\1', s)
+        display_s = display_s.replace("（", "").replace("）", "").replace("(", "").replace(")", "").strip()
+
+        # 音声用初期値
+        speech_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\2', s)
+        speech_s = apply_backend_pronunciation_dict(speech_s)
+
+        # 誤読頻出単語の確実な置換
+        known_fixes = {
+            "方たち": "かたち",
+            "方々": "かたがた",
+            "調光": "ちょうこう",
+            "世知辛い": "せちづらい",
+            "世知つらい": "せちづらい"
+        }
+        for k, v in known_fixes.items():
+            if k in speech_s:
+                speech_s = speech_s.replace(k, v)
+                new_learned_dict[k] = v
+
+        corrected_items.append({
+            "display": display_s,
+            "speech": speech_s
+        })
+
+    # AIが発見した単語を辞書に自動永続化
+    if new_learned_dict:
+        try:
+            save_learned_pronunciations(new_learned_dict)
+        except Exception as e:
+            print(f"[辞書学習保存例外]: {e}")
+
+    return corrected_items
 
 def apply_backend_pronunciation_dict(text):
     if not text:
