@@ -219,10 +219,12 @@ function initChatClient() {
           } else if (data.type === "like") {
             console.log(`[TikTok] ${data.nickname} sent likes`);
             if (typeof window.spawnReactionEffect === "function") {
+              console.log(`[Reaction] 📱 TikTok いいね from ${data.nickname || "(不明)"}`);
               window.spawnReactionEffect("❤️", data.count || 2);
             }
           } else if (data.type === "reaction") {
             if (typeof window.spawnReactionEffect === "function") {
+              console.log(`[Reaction] 📱 TikTok リアクション from ${data.nickname || "(不明)"}: ${data.emoji || "❤️"}`);
               window.spawnReactionEffect(data.emoji || "❤️", data.count || 1);
             }
           } else if (data.type === "comment") {
@@ -230,6 +232,7 @@ function initChatClient() {
             // 絵文字・リアクション検知
             const reactionMatches = (data.comment || "").match(/[❤️💖💕💓💗💘✨🌟🎉🥳👍😻🐾🔥🥰😍🙌⭐]/g);
             if (reactionMatches && typeof window.spawnReactionEffect === "function") {
+              console.log(`[Reaction] 📱 TikTok コメント絵文字 from ${data.nickname || "(不明)"}: ${reactionMatches[0]}`);
               window.spawnReactionEffect(reactionMatches[0], Math.min(reactionMatches.length, 3));
             }
             addCommentToViewer(
@@ -940,6 +943,7 @@ function initChatClient() {
           } else if (data.type === "gift") {
             console.log(`[YouTube] ${data.nickname} sent a superchat/gift`);
             if (typeof window.spawnReactionEffect === "function") {
+              console.log(`[Reaction] 📺 YouTube スーパーチャット from ${data.nickname || "(不明)"}`);
               window.spawnReactionEffect("🎁", 3);
             }
             addCommentToViewer(
@@ -976,6 +980,7 @@ function initChatClient() {
             }
           } else if (data.type === "reaction") {
             if (typeof window.spawnReactionEffect === "function") {
+              console.log(`[Reaction] 📺 YouTube リアクション from ${data.nickname || "(不明)"}: ${data.emoji || "❤️"}`);
               window.spawnReactionEffect(data.emoji || "❤️", data.count || 1);
             }
           } else if (data.type === "comment") {
@@ -983,6 +988,7 @@ function initChatClient() {
             // 絵文字・リアクション検知
             const reactionMatches = (data.comment || "").match(/[❤️💖💕💓💗💘✨🌟🎉🥳👍😻🐾🔥🥰😍🙌⭐]/g);
             if (reactionMatches && typeof window.spawnReactionEffect === "function") {
+              console.log(`[Reaction] 📺 YouTube コメント絵文字 from ${data.nickname || "(不明)"}: ${reactionMatches[0]}`);
               window.spawnReactionEffect(reactionMatches[0], Math.min(reactionMatches.length, 3));
             }
             addCommentToViewer(
