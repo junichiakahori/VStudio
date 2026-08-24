@@ -27,3 +27,11 @@
 - **local_api_server.py**: `8001` (HTTP: `/hiragana_data.json`, `/log`, `/news_script` 等)
 - **youtube_comment_server.py**: `8768` (WebSocket)
 - **tiktok_comment_server.py**: `8767` (WebSocket)
+
+## 4. 配信中のファイル編集・Vite自動監視の永続ルール（最重要）
+
+- **配信中のフロントエンドコード編集の厳格禁止**:
+  - OBS配信中・番組進行中は、画面へのエラーオーバーレイ表示や意図しない影響を防ぐため、フロントエンド（JS / HTML / CSS）ファイルの編集を絶対に行わないこと。
+- **Viteの自動監視・エラーオーバーレイの完全無効化**:
+  - `vite.config.js` では `hmr: false`、`watch: { ignored: ['**'] }` を維持し、ブラウザへの自動リロードやエラー画面のポップアップを恒久的に遮断すること。
+

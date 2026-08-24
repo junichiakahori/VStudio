@@ -167,7 +167,10 @@ export default defineConfig({
     host: 'localhost',
     port: 8443,
     strictPort: true,
-    hmr: false, // 配信中やテスト中の勝手な画面強制リロードを防止
+    hmr: false, // 配信中の勝手な画面強制リロード・エラーオーバーレイを完全防止
+    watch: {
+      ignored: ['**'] // ファイル監視を完全無効化し、配信画面へのエラーポップアップ通知を根絶
+    },
     proxy: {
       '^/(api|news_script|log|update_hiragana_data|radio_script|radio_script_yomi|radio_script_config|custom_idle_phrases|hiragana_data|se_list|add_idle_phrase|convert_remaining_kanji|fetch_rss|get_youtube_video_info)': {
         target: 'http://localhost:8001',
