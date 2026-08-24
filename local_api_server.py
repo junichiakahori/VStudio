@@ -1320,33 +1320,30 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
 
     return corrected_items
 
-# 大規模国語辞典（master_dictionary.db: 65万語）接続管理
-_master_db_conn = None
-def get_master_db():
-    global _master_db_conn
-    if _master_db_conn is None:
-        db_path = os.path.join(os.path.dirname(__file__), 'master_dictionary.db')
-        if os.path.exists(db_path):
+# 大規模国語辞典（master_dictionary.json: 65万語）メモリキャッシュ管理
+_master_dict_data = None
+def get_master_dict():
+    global _master_dict_data
+    if _master_dict_data is None:
+        json_path = os.path.join(os.path.dirname(__file__), 'master_dictionary.json')
+        if os.path.exists(json_path):
             try:
-                _master_db_conn = sqlite3.connect(db_path, check_same_thread=False)
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    _master_dict_data = json.load(f)
+                print(f"[MasterDict] 大規模国語辞典（master_dictionary.json: {len(_master_dict_data):,}語）をメモリにロード完了")
             except Exception as e:
-                print(f"[MasterDict] DB接続エラー: {e}")
-    return _master_db_conn
+                print(f"[MasterDict] JSON読み込みエラー: {e}")
+                _master_dict_data = {}
+        else:
+            _master_dict_data = {}
+    return _master_dict_data
 
 def lookup_master_dictionary(term):
-    """65万語の国語・現代語辞典から最頻出の正しい読み（ひらがな）を瞬時に取得"""
-    conn = get_master_db()
-    if not conn or not term or len(term) < 2:
+    """65万語の国語・現代語辞典（JSON）から最頻出の正しい読み（ひらがな）を瞬時に取得"""
+    d = get_master_dict()
+    if not d or not term or len(term) < 2:
         return None
-    try:
-        cursor = conn.cursor()
-        cursor.execute('SELECT reading FROM dictionary WHERE surface = ? ORDER BY cost ASC LIMIT 1', (term,))
-        row = cursor.fetchone()
-        if row:
-            return row[0]
-    except Exception as e:
-        pass
-    return None
+    return d.get(term, None)
 
 def apply_backend_pronunciation_dict(text):
     if not text:
