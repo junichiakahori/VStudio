@@ -857,9 +857,11 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
     new_learned_dict = {}
 
     for s in raw_sentences:
-        # 字幕用: 漢字（ふりがな）から（ふりがな）を除去して綺麗な漢字表記にする
+        # 字幕用: 漢字（ふりがな）から（ふりがな）を除去して綺麗な漢字表記にし、「のかた」等を「の方」に美しく整える
         display_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\1', s)
         display_s = display_s.replace("（", "").replace("）", "").replace("(", "").replace(")", "").strip()
+        display_s = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)のかた([たち|がた|も|は|が|に|へ|で|を|、|。|！|？\s]|$)', r'\1の方\2', display_s)
+        display_s = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)なかた([たち|がた|も|は|が|に|へ|で|を|、|。|！|？\s]|$)', r'\1な方\2', display_s)
 
         # 音声用初期値
         speech_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\2', s)
