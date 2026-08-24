@@ -52,8 +52,17 @@ async function playNextVoicevox() {
   const speedScaleVal = speedEl ? parseFloat(speedEl.value) || 1.0 : 1.0;
   const pitchScaleVal = pitchEl ? parseFloat(pitchEl.value) || 0.0 : 0.0;
 
-  try {
-    let arrayBuffer;
+// VOICEVOX音声合成バッファの先行キャッシュ（先読み時に事前に音声化してラグ0.0秒化）
+const voicevoxAudioBufferCache = new Map();
+
+async function fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal) {
+  if (!text || !text.trim()) return null;
+  const cacheKey = `${speakerId}_${speedScaleVal}_${pitchScaleVal}_${text.trim()}`;
+  if (voicevoxAudioBufferCache.has(cacheKey)) {
+    return await voicevoxAudioBufferCache.get(cacheKey);
+  }
+
+  const promise = (async () => {
     try {
       // 1. Python バックエンド経由で辞書適用＆音声合成
       const synthRes = await fetch("/api/voicevox/synthesize", {
@@ -67,12 +76,10 @@ async function playNextVoicevox() {
         })
       });
       if (synthRes.ok) {
-        arrayBuffer = await synthRes.arrayBuffer();
-      } else {
-        throw new Error("Backend synthesis failed: " + synthRes.statusText);
+        return await synthRes.arrayBuffer();
       }
+      throw new Error("Backend synthesis failed: " + synthRes.statusText);
     } catch (backendErr) {
-      console.warn("[VOICEVOX] Backend synthesis fallback to direct call:", backendErr);
       // Fallback: 直接 VOICEVOX (:50021) 呼び出し
       const queryRes = await fetch(
         `http://localhost:50021/audio_query?text=${encodeURIComponent(text)}&speaker=${speakerId}`,
@@ -89,8 +96,31 @@ async function playNextVoicevox() {
         }
       );
       if (!directSynthRes.ok) throw new Error("Direct synthesis failed");
-      arrayBuffer = await directSynthRes.arrayBuffer();
+      return await directSynthRes.arrayBuffer();
     }
+  })();
+
+  voicevoxAudioBufferCache.set(cacheKey, promise);
+  if (voicevoxAudioBufferCache.size > 80) {
+    const firstKey = voicevoxAudioBufferCache.keys().next().value;
+    voicevoxAudioBufferCache.delete(firstKey);
+  }
+  return await promise;
+}
+
+window.preloadVoicevoxSentenceAudio = function(text, speakerId, speed, pitch) {
+  const speakerIdEl = document.getElementById("voicevox-speaker-id");
+  const speedEl = document.getElementById("voicevox-speed");
+  const pitchEl = document.getElementById("voicevox-pitch");
+  const spk = speakerId || (speakerIdEl ? speakerIdEl.value : (window.voicevoxSpeakerId ? window.voicevoxSpeakerId.value : "3"));
+  const spd = speed !== undefined ? speed : (speedEl ? parseFloat(speedEl.value) || 1.0 : 1.0);
+  const ptc = pitch !== undefined ? pitch : (pitchEl ? parseFloat(pitchEl.value) || 0.0 : 0.0);
+  return fetchVoicevoxBuffer(text, spk, spd, ptc);
+};
+
+  try {
+    let arrayBuffer = await fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal);
+    if (!arrayBuffer) throw new Error("Empty audio buffer");
 
     // 3. Play Audio
     if (!voicevoxAudioContext) {

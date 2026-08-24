@@ -1601,6 +1601,15 @@ ${creditsInstruction}
         const data = await res.json();
         if (data && data.status === "ok") {
           console.log(`[ニュース先読み] ✅ 先行生成完了:「${item.title.substring(0, 20)}...」`);
+          // 🚀 最初の文の音声もバックグラウンドで事前合成（記事切り替えラグを0.0秒化）
+          try {
+            const firstSentence = (data.items && data.items[0])
+              ? (data.items[0].speech || data.items[0].display)
+              : ((data.sentences && data.sentences[0]) || null);
+            if (firstSentence && typeof window.preloadVoicevoxSentenceAudio === "function") {
+              window.preloadVoicevoxSentenceAudio(firstSentence);
+            }
+          } catch (audioPreloadErr) {}
           return data;
         }
         return null;
