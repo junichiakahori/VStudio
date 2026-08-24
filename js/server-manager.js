@@ -11,7 +11,7 @@ export async function checkServerStatus() {
     
     updateUI(status);
   } catch (err) {
-    console.error("Failed to fetch server status", err);
+    // 画面リロード時やバックエンド起動中の通信エラーは静かに無視
   }
 }
 

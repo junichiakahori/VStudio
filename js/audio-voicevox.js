@@ -45,7 +45,12 @@ async function playNextVoicevox() {
       text = item.original;
     }
   }
-  const speakerId = voicevoxSpeakerId ? voicevoxSpeakerId.value : "3";
+  const speakerIdEl = document.getElementById("voicevox-speaker-id");
+  const speedEl = document.getElementById("voicevox-speed");
+  const pitchEl = document.getElementById("voicevox-pitch");
+  const speakerId = speakerIdEl ? speakerIdEl.value : (window.voicevoxSpeakerId ? window.voicevoxSpeakerId.value : "3");
+  const speedScaleVal = speedEl ? parseFloat(speedEl.value) || 1.0 : 1.0;
+  const pitchScaleVal = pitchEl ? parseFloat(pitchEl.value) || 0.0 : 0.0;
 
   try {
     let arrayBuffer;
@@ -57,8 +62,8 @@ async function playNextVoicevox() {
         body: JSON.stringify({
           text: text,
           speakerId: parseInt(speakerId, 10) || 3,
-          speedScale: voicevoxSpeed ? parseFloat(voicevoxSpeed.value) || 1.0 : 1.0,
-          pitchScale: voicevoxPitch ? parseFloat(voicevoxPitch.value) || 0.0 : 0.0
+          speedScale: speedScaleVal,
+          pitchScale: pitchScaleVal
         })
       });
       if (synthRes.ok) {
