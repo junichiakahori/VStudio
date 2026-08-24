@@ -1723,13 +1723,26 @@ ${creditsInstruction}
         const count = (data.items || data.sentences || []).length;
         console.log(`[ニュース原稿(Backend)] [${newsBroadcastState.currentIndex}/${newsBroadcastState.totalCount}件] 「${data.fullText}」 (${count}文)`);
         if (data.items && data.items.length > 0) {
-          for (const it of data.items) {
+          for (let sIdx = 0; sIdx < data.items.length; sIdx++) {
             if (!newsBroadcastState.isRunning) return false;
+            const it = data.items[sIdx];
+            try {
+              localStorage.setItem("newsActiveState", JSON.stringify({
+                isRunning: true,
+                articleIndex: newsBroadcastState.currentIndex - 1,
+                totalArticles: newsBroadcastState.totalCount,
+                item: item,
+                scriptData: data,
+                sentenceIndex: sIdx,
+                timestamp: Date.now()
+              }));
+            } catch (e) {}
             await queueVoicevoxAudio(it.display, true, it.speech);
           }
         } else if (data.sentences) {
-          for (const s of data.sentences) {
+          for (let sIdx = 0; sIdx < data.sentences.length; sIdx++) {
             if (!newsBroadcastState.isRunning) return false;
+            const s = data.sentences[sIdx];
             await queueVoicevoxAudio(s, true);
           }
         }
@@ -2707,4 +2720,139 @@ ${creditsInstruction}
       });
     }
   }
+
+  // =========================================================================
+  // 🚨 ワンクリック配信中断・リロード復帰システム（ピンポイント感想復帰）
+  // =========================================================================
+  window.initNewsResumeSystem = function () {
+    try {
+      const raw = localStorage.getItem("newsActiveState");
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      // 30分以内の有効な中断データが存在する場合のみバナーを表示
+      if (!saved || !saved.isRunning || !saved.item || !saved.scriptData) return;
+      if (Date.now() - (saved.timestamp || 0) > 30 * 60 * 1000) {
+        localStorage.removeItem("newsActiveState");
+        return;
+      }
+
+      const existing = document.getElementById("news-resume-banner");
+      if (existing) existing.remove();
+
+      const banner = document.createElement("div");
+      banner.id = "news-resume-banner";
+      banner.className = "news-resume-banner";
+      const totalS = (saved.scriptData.items || []).length;
+      const currentS = (saved.sentenceIndex || 0) + 1;
+      const artNum = (saved.articleIndex || 0) + 1;
+      const titleShort = saved.item.title.length > 20 ? saved.item.title.substring(0, 20) + "…" : saved.item.title;
+
+      banner.innerHTML = `
+        <div class="resume-info">
+          <span class="resume-badge">⚠️ 配信中断を検知</span>
+          <span class="resume-text">第${artNum}件「${titleShort}」の途中 (${currentS}/${totalS}文目) から1クリックで即座に復帰できます</span>
+        </div>
+        <div class="resume-actions">
+          <button id="news-quick-resume-btn" class="resume-btn resume-btn-primary">⚡ 感想の途中から再開</button>
+          <button id="news-discard-resume-btn" class="resume-btn resume-btn-secondary">✕ 破棄</button>
+        </div>
+      `;
+      document.body.appendChild(banner);
+
+      document.getElementById("news-quick-resume-btn").onclick = async () => {
+        banner.remove();
+        await window.quickResumeNewsBroadcast(saved);
+      };
+
+      document.getElementById("news-discard-resume-btn").onclick = () => {
+        banner.remove();
+        localStorage.removeItem("newsActiveState");
+      };
+    } catch (e) {
+      console.warn("[ニュース復帰システム] 初期化エラー:", e);
+    }
+  };
+
+  window.quickResumeNewsBroadcast = async function (saved) {
+    if (!saved || !saved.item || !saved.scriptData) return;
+    console.log(`[ニュース復帰] ⚡ 第${saved.articleIndex + 1}件の第${(saved.sentenceIndex || 0) + 1}文目から即座に配信を再開します...`);
+
+    // 1. AudioContextアンミュート
+    if (window.voicevoxAudioContext && window.voicevoxAudioContext.state === "suspended") {
+      await window.voicevoxAudioContext.resume().catch(() => {});
+    }
+
+    // 2. YouTube WebSocket再接続
+    if (typeof window.startYoutubeConnection === "function") {
+      const savedYt = localStorage.getItem("savedYoutubeId") || "@drone.akahori";
+      window.startYoutubeConnection(savedYt);
+    }
+
+    // 3. ニュース状態復元
+    const allItems = saved.scriptData.items || [];
+    const startIndex = saved.sentenceIndex || 0;
+
+    newsBroadcastState = {
+      isRunning: true,
+      currentIndex: (saved.articleIndex || 0) + 1,
+      totalCount: saved.totalArticles || 298,
+      lastCategory: saved.item.categoryKey || ""
+    };
+    window.newsBroadcastState = newsBroadcastState;
+
+    const startBtn = document.getElementById("news-broadcast-start-btn");
+    const stopBtn = document.getElementById("news-broadcast-stop-btn");
+    const progressEl = document.getElementById("news-broadcast-progress");
+    if (startBtn) startBtn.style.display = "none";
+    if (stopBtn) stopBtn.style.display = "block";
+    if (progressEl) progressEl.textContent = `📰 進行中: ${newsBroadcastState.currentIndex} / ${newsBroadcastState.totalCount}件`;
+
+    const newsTitleEl = document.getElementById("news-article-title");
+    const newsDescEl = document.getElementById("news-article-desc");
+    const newsBoardEl = document.getElementById("news-board");
+    const catEl = document.getElementById("news-board-category");
+    const progressBadge = document.getElementById("news-board-progress");
+
+    if (newsTitleEl) newsTitleEl.textContent = saved.item.title;
+    if (newsDescEl) newsDescEl.textContent = saved.item.description || "";
+    if (newsBoardEl) newsBoardEl.classList.add("active");
+    if (catEl) catEl.textContent = saved.item.categoryName || "";
+    if (progressBadge) {
+      progressBadge.style.display = "inline-block";
+      progressBadge.textContent = `${newsBroadcastState.currentIndex} / ${newsBroadcastState.totalCount}`;
+    }
+
+    updateNewsSetlistProgress(saved.item.categoryKey || "cat_top", newsBroadcastState.currentIndex, newsBroadcastState.totalCount);
+
+    // 4. 残りの文（感想の途中〜）を順番に再生
+    for (let sIdx = startIndex; sIdx < allItems.length; sIdx++) {
+      if (!newsBroadcastState.isRunning) return;
+      const it = allItems[sIdx];
+      try {
+        localStorage.setItem("newsActiveState", JSON.stringify({
+          ...saved,
+          sentenceIndex: sIdx,
+          timestamp: Date.now()
+        }));
+      } catch (e) {}
+      await queueVoicevoxAudio(it.display, true, it.speech);
+    }
+    await waitForVoicevoxFinish();
+
+    // 5. 既読にして次の記事の通常ループへ突入
+    readNewsTitles.add(saved.item.title);
+    if (window.readNewsTitles) window.readNewsTitles.add(saved.item.title);
+    try { localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles))); } catch (e) {}
+
+    if (newsBroadcastState.isRunning) {
+      startNewsBroadcast((saved.articleIndex || 0) + 1);
+    }
+  };
+
+  // ページ読み込み時に中断状態をチェック
+  setTimeout(() => {
+    if (typeof window.initNewsResumeSystem === "function") {
+      window.initNewsResumeSystem();
+    }
+  }, 1200);
 });
