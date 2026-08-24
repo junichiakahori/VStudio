@@ -737,7 +737,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
    ・「期待が高まりますね」などのワンパターンの定型句ではなく、ニュースの内容（驚き、感動、応援、共感など）にしっかり合わせた温かい感想を述べてください。
 
 【話し方・トーンの重要ルール】:
-0. **【完全日本語厳守・中国語絶対禁止】必ず100%標準語の自然な日本語のみで出力してください。中国語文字（听、这、那、很、吃惊、吗、的、了等）は1文字も混入させないこと。**
+0. **【完全日本語厳守・中国語絶対禁止】必ず100%標準語の自然な日本語のみで出力してください。中国語文字（听、这、那、很、吃惊、吗、的、了等）や中国語の言い回し（「如此」「巴弟」「开心」など）は1文字も混入させないこと。必ず「このような」「バディ」「嬉しい」などの自然な日本語を使ってください。**
 1. **テンポの良い短文構成**: 1文は20〜35文字程度で句点「。」で区切り、聞き取りやすくリズミカルに話してください。
 2. **語尾の使いすぎ禁止**: 毎文無理にキャラクター語尾をつけず、通常の丁寧語（〜です、〜ですね、〜とのことです）を基本にし、要所にのみ自然に添えてください。
 3. **前置き挨拶の重複・末尾配置・末尾名乗りの絶対禁止**:
@@ -898,6 +898,29 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
         speech_s = speech_s.replace("とろろにゃん", "とろろ").replace("お知らせしてあげる", "お知らせします").replace("教えてあげる", "ご紹介します").replace("安心しなさい", "ご安心ください")
         speech_s = apply_backend_pronunciation_dict(speech_s)
 
+        # 🇨🇳 中国語固有語彙 ➔ 🇯🇵 自然な日本語への自動置換
+        CHINESE_TO_JAPANESE = {
+            "如此": "このような",
+            "巴弟": "バディ",
+            "巴娣": "バディ",
+            "那么": "それでは",
+            "这里": "ここ",
+            "那里": "そこ",
+            "开心": "嬉しく",
+            "厉害": "すごい",
+            "选手": "選手",
+            "首发": "スタメン",
+            "登场": "登場",
+            "进球": "ゴール",
+            "比赛": "試合",
+            "粉丝": "ファン"
+        }
+        for c_word, j_word in CHINESE_TO_JAPANESE.items():
+            if c_word in display_s:
+                display_s = display_s.replace(c_word, j_word)
+            if c_word in speech_s:
+                speech_s = speech_s.replace(c_word, j_word)
+
         # 誤読頻出単語の確実な置換
         known_fixes = {
             "孫正義氏": "そんまさよしし",
@@ -915,7 +938,8 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
             "世知つらい": "せちづらい",
             "今話題の": "いまわだいの",
             "今話題": "いまわだい",
-            "今現在": "いまげんざい"
+            "今現在": "いまげんざい",
+            "如此": "このような"
         }
         for k, v in known_fixes.items():
             if k in speech_s:
