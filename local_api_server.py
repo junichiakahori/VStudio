@@ -1106,9 +1106,9 @@ def synthesize_voicevox_backend(text, speaker_id=1, speed=1.0, pitch=0.0):
     return wav_bytes
 
 def run():
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("", PORT), RequestHandler) as httpd:
-        print(f"API Server running at port {PORT}")
+    socketserver.ThreadingTCPServer.allow_reuse_address = True
+    with socketserver.ThreadingTCPServer(("", PORT), RequestHandler) as httpd:
+        print(f"API Server running at port {PORT} (Multi-threaded)")
         httpd.serve_forever()
 
 if __name__ == '__main__':
