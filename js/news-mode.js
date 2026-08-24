@@ -831,85 +831,149 @@ window.playNextContinuousNews = playNextContinuousNews;
     });
   }
 
+  // 📰 記事一覧ポップアップを開く共通関数
+  window.openNewsListPopup = function () {
+    if (window.newsListPopup && !window.newsListPopup.closed) {
+      window.updateNewsListPopup();
+      window.newsListPopup.focus();
+      return;
+    }
+
+    window.newsListPopup = window.open("", "NewsList", "width=680,height=720,menubar=no,toolbar=no,location=no,status=no");
+    if (!window.newsListPopup) {
+      alert("ポップアップがブロックされました。ブラウザの設定で許可してください。");
+      return;
+    }
+
+    const doc = window.newsListPopup.document;
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html lang="ja">
+      <head>
+        <meta charset="UTF-8">
+        <title>📰 取得済みのニュース一覧</title>
+        <style>
+          * { box-sizing: border-box; }
+          body {
+            background: #0f121d;
+            color: #f1f2f6;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", Meiryo, sans-serif;
+            margin: 0;
+            padding: 16px 20px;
+          }
+          header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          }
+          h3 {
+            margin: 0;
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #fff;
+          }
+          #news-list-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }
+          ::-webkit-scrollbar { width: 6px; }
+          ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+          ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+          ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.35); }
+        </style>
+      </head>
+      <body>
+        <header>
+          <h3>📰 取得済みのニュース一覧</h3>
+        </header>
+        <div id="news-list-container"></div>
+        <script>
+          setInterval(() => {
+            if (window.opener && typeof window.opener.updateNewsListPopup === 'function') {
+              window.opener.updateNewsListPopup();
+            }
+          }, 3000);
+        </script>
+      </body>
+      </html>
+    `);
+    doc.close();
+
+    setTimeout(() => {
+      window.updateNewsListPopup();
+    }, 100);
+  };
+
   const newsListBtn = document.getElementById("news-list-btn") || document.getElementById("news-list-popup-btn");
   if (newsListBtn) {
     newsListBtn.addEventListener("click", () => {
-      if (window.newsListPopup && !window.newsListPopup.closed) {
-        window.updateNewsListPopup();
-        window.newsListPopup.focus();
-        return;
-      }
-
-      window.newsListPopup = window.open("", "NewsList", "width=640,height=700,menubar=no,toolbar=no,location=no,status=no");
-      if (!window.newsListPopup) {
-        alert("ポップアップがブロックされました。ブラウザの設定で許可してください。");
-        return;
-      }
-
-      const doc = window.newsListPopup.document;
-      doc.open();
-      doc.write(`
-        <!DOCTYPE html>
-        <html lang="ja">
-        <head>
-          <meta charset="UTF-8">
-          <title>📰 取得済みのニュース一覧</title>
-          <style>
-            * { box-sizing: border-box; }
-            body {
-              background: #0f121d;
-              color: #f1f2f6;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", Meiryo, sans-serif;
-              margin: 0;
-              padding: 16px 20px;
-            }
-            header {
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              margin-bottom: 14px;
-              padding-bottom: 10px;
-              border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            }
-            h3 {
-              margin: 0;
-              font-size: 1.05rem;
-              font-weight: 700;
-              color: #fff;
-            }
-            #news-list-container {
-              display: flex;
-              flex-direction: column;
-              gap: 8px;
-            }
-            ::-webkit-scrollbar { width: 6px; }
-            ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-            ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
-            ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.35); }
-          </style>
-        </head>
-        <body>
-          <header>
-            <h3>📰 取得済みのニュース一覧</h3>
-          </header>
-          <div id="news-list-container"></div>
-          <script>
-            setInterval(() => {
-              if (window.opener && typeof window.opener.updateNewsListPopup === 'function') {
-                window.opener.updateNewsListPopup();
-              }
-            }, 3000);
-          </script>
-        </body>
-        </html>
-      `);
-      doc.close();
-
-      setTimeout(() => {
-        window.updateNewsListPopup();
-      }, 100);
+      window.openNewsListPopup();
     });
   }
+
+  // 🚀 画面右下に常時配置されるスマートな「📰 記事一覧」クイックランチャーボタンを生成
+  function injectNewsListQuickButton() {
+    if (document.getElementById("news-quick-floating-btn")) return;
+    const qBtn = document.createElement("button");
+    qBtn.id = "news-quick-floating-btn";
+    qBtn.title = "記事一覧を開く (ショートカット: Nキー / Alt+N)";
+    qBtn.innerHTML = `📰 記事一覧 <span style="font-size:0.65rem; opacity:0.75; background:rgba(255,255,255,0.18); padding:1px 5px; border-radius:6px; margin-left:4px;">N</span>`;
+    qBtn.style.position = "fixed";
+    qBtn.style.bottom = "20px";
+    qBtn.style.right = "20px";
+    qBtn.style.zIndex = "99999";
+    qBtn.style.background = "linear-gradient(135deg, rgba(30, 39, 46, 0.92), rgba(15, 20, 30, 0.96))";
+    qBtn.style.color = "#81ecec";
+    qBtn.style.border = "1px solid rgba(129, 236, 236, 0.4)";
+    qBtn.style.borderRadius = "20px";
+    qBtn.style.padding = "8px 16px";
+    qBtn.style.fontSize = "0.82rem";
+    qBtn.style.fontWeight = "bold";
+    qBtn.style.cursor = "pointer";
+    qBtn.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.4)";
+    qBtn.style.backdropFilter = "blur(8px)";
+    qBtn.style.transition = "all 0.2s ease";
+    qBtn.style.display = "flex";
+    qBtn.style.alignItems = "center";
+    qBtn.style.gap = "4px";
+
+    qBtn.onmouseenter = () => {
+      qBtn.style.transform = "translateY(-2px) scale(1.05)";
+      qBtn.style.borderColor = "#81ecec";
+      qBtn.style.boxShadow = "0 6px 20px rgba(129, 236, 236, 0.35)";
+    };
+    qBtn.onmouseleave = () => {
+      qBtn.style.transform = "translateY(0) scale(1.0)";
+      qBtn.style.borderColor = "rgba(129, 236, 236, 0.4)";
+      qBtn.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.4)";
+    };
+    qBtn.onclick = () => {
+      window.openNewsListPopup();
+    };
+    document.body.appendChild(qBtn);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", injectNewsListQuickButton);
+  } else {
+    injectNewsListQuickButton();
+  }
+
+  // ⌨️ キーボードショートカット: 'N' キー または 'Alt+N' で即座に記事一覧を開く
+  window.addEventListener("keydown", (e) => {
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
+    if (tag === "input" || tag === "textarea" || (e.target && e.target.isContentEditable)) return;
+
+    if (e.key === "n" || e.key === "N" || (e.altKey && (e.key === "n" || e.key === "N"))) {
+      e.preventDefault();
+      window.openNewsListPopup();
+    }
+  });
 
   // デフォルトの日付設定（1日前〜今日）
   const dateStartInput = document.getElementById("news-date-start");
