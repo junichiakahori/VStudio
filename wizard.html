@@ -402,10 +402,10 @@
                     <div style="display:flex; gap:6px; margin-bottom: 8px; align-items:center;">
                         <label style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap;">公開設定:</label>
                         <select id="wizard-privacy-status" style="flex:1; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.2); border-radius:4px; padding:4px 8px; color:#fff; font-size:0.75rem; outline:none;">
-                            <option value="keep" selected>維持（既存枠の公開設定を変更しない）</option>
-                            <option value="public">🌐 公開 (一般リスナー向け)</option>
-                            <option value="unlisted">🔒 限定公開 (推奨・テスト用)</option>
+                            <option value="public" selected>🌐 公開 (一般リスナー向け)</option>
+                            <option value="unlisted">🔒 限定公開 (テスト用)</option>
                             <option value="private">👁️ 非公開 (自分のみ)</option>
+                            <option value="keep">維持（既存枠の公開設定を変更しない）</option>
                         </select>
                     </div>
 
@@ -1753,9 +1753,9 @@
         // 🔴 YouTube枠の新規作成
         document.getElementById("btn-api-create-broadcast")?.addEventListener("click", async () => {
             const titleVal = document.getElementById("wizard-suggested-title")?.value || "";
-            let privacyStatus = document.getElementById("wizard-privacy-status")?.value || "unlisted";
+            let privacyStatus = document.getElementById("wizard-privacy-status")?.value || "public";
             if (privacyStatus === "keep") {
-                privacyStatus = "unlisted"; // 新規枠作成時はデフォルトで限定公開として安全作成
+                privacyStatus = "public"; // 新規枠作成時はデフォルトで公開として作成
             }
             const startTimeInputVal = document.getElementById("wizard-start-time")?.value;
             

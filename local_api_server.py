@@ -825,9 +825,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 payload = json.loads(post_data.decode('utf-8')) if post_data else {}
                 title = payload.get('title', '')
                 description = payload.get('description', '')
-                privacy_status = payload.get('privacyStatus', 'unlisted')
+                privacy_status = payload.get('privacyStatus', 'public')
                 if privacy_status not in ['public', 'unlisted', 'private']:
-                    privacy_status = 'unlisted'
+                    privacy_status = 'public'
                 res = youtube_api_helper.create_live_broadcast(title, description, start_time_iso, privacy_status)
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
@@ -835,6 +835,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({"success": True, **res}, ensure_ascii=False).encode('utf-8'))
             except Exception as e:
+                import traceback
+                print(f"[create_broadcast エラー]: {e}")
+                traceback.print_exc()
                 self.send_response(500)
                 self.send_header('Content-type', 'application/json')
                 self.send_header('Access-Control-Allow-Origin', '*')
