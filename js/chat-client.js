@@ -626,6 +626,31 @@ function initChatClient() {
   }
 
   if (youtubeConnectBtn) {
+
+  // ヘッダーバッジも同時に更新するステータスヘルパー
+  function setYoutubeStatus(text, state) {
+    // state: "connected" | "connecting" | "error" | "disconnected"
+    if (youtubeStatus) youtubeStatus.textContent = text;
+    const dot = document.getElementById("yt-header-dot");
+    const label = document.getElementById("yt-header-label");
+    const badge = document.getElementById("yt-header-status");
+    if (!dot || !label) return;
+    const colors = {
+      connected: { dot: "#00e676", border: "rgba(0,230,118,0.35)", bg: "rgba(0,230,118,0.08)" },
+      connecting: { dot: "#ffa726", border: "rgba(255,167,38,0.35)", bg: "rgba(255,167,38,0.08)" },
+      error: { dot: "#ff5252", border: "rgba(255,82,82,0.35)", bg: "rgba(255,82,82,0.08)" },
+      disconnected: { dot: "#555", border: "rgba(255,255,255,0.12)", bg: "rgba(255,255,255,0.05)" }
+    };
+    const c = colors[state] || colors.disconnected;
+    dot.style.background = c.dot;
+    if (badge) {
+      badge.style.borderColor = c.border;
+      badge.style.background = c.bg;
+    }
+    label.textContent = text;
+    label.style.color = state === "connected" ? "#00e676" : state === "connecting" ? "#ffa726" : state === "error" ? "#ff5252" : "var(--text-muted)";
+  }
+
   function stopYoutubeConnection() {
     window.isYoutubeIntendedConnect = false;
     clearTimeout(youtubeReconnectTimer);
@@ -642,7 +667,7 @@ function initChatClient() {
       youtubeConnectBtn.textContent = "接続";
       youtubeConnectBtn.style.background = "#ff0000";
     }
-    if (youtubeStatus) youtubeStatus.textContent = "未接続";
+    setYoutubeStatus("YouTube: 未接続", "disconnected");
     const scheduleContainer = document.getElementById("youtube-schedule-container");
     if (scheduleContainer) scheduleContainer.style.display = "none";
     if (window.youtubeScheduleTimer) clearInterval(window.youtubeScheduleTimer);
@@ -651,7 +676,7 @@ function initChatClient() {
   async function startYoutubeConnection(videoId) {
     if (!videoId) return;
     window.isYoutubeIntendedConnect = true;
-    if (youtubeStatus) youtubeStatus.textContent = "接続中...";
+    setYoutubeStatus("YouTube: 接続中...", "connecting");
 
     if (youtubeWs) {
       try { youtubeWs.close(); } catch (e) {}
@@ -686,7 +711,8 @@ function initChatClient() {
         try {
           const data = JSON.parse(event.data);
           if (data.type === "status") {
-            youtubeStatus.textContent = data.message;
+            const statusState = data.status === "connected" ? "connected" : (data.status === "error" || data.status === "disconnected") ? "error" : "connecting";
+            setYoutubeStatus(data.message, statusState);
             if (data.status === "connected" && !isYoutubeConnectedLogged) {
               isYoutubeConnectedLogged = true;
               console.log("[YouTube] コメント読み上げの準備が完了しました！");
@@ -707,11 +733,7 @@ function initChatClient() {
                 clearInterval(window.youtubeScheduleTimer);
             }
           } else if (data.type === "stream_started") {
-            youtubeStatus.textContent = data.message;
-            youtubeStatus.style.color = "#0f0";
-            setTimeout(() => {
-              youtubeStatus.style.color = "";
-            }, 3000);
+            setYoutubeStatus(data.message, "connected");
             const scheduleContainer = document.getElementById(
               "youtube-schedule-container",
             );
@@ -1113,7 +1135,7 @@ function initChatClient() {
 
       youtubeWs.onclose = () => {
         if (window.isYoutubeIntendedConnect) {
-          if (youtubeStatus) youtubeStatus.textContent = "再接続中...";
+          setYoutubeStatus("YouTube: 再接続中...", "connecting");
           if (youtubeConnectBtn) {
             youtubeConnectBtn.textContent = "再接続中";
             youtubeConnectBtn.style.background = "#ff8800";
@@ -1125,7 +1147,7 @@ function initChatClient() {
             }
           }, 3500);
         } else {
-          if (youtubeStatus) youtubeStatus.textContent = "未接続";
+          setYoutubeStatus("YouTube: 未接続", "disconnected");
           if (youtubeConnectBtn) {
             youtubeConnectBtn.textContent = "接続";
             youtubeConnectBtn.style.background = "#ff0000";
@@ -1135,7 +1157,7 @@ function initChatClient() {
 
       youtubeWs.onerror = (err) => {
         console.error("YouTube WS error", err);
-        if (youtubeStatus) youtubeStatus.textContent = "接続エラー (自動再試行中)";
+        setYoutubeStatus("YouTube: 接続エラー", "error");
         if (typeof clearIdleTimer === "function") clearIdleTimer();
       };
     }

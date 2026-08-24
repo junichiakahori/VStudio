@@ -26,6 +26,11 @@
                     <button class="tab-btn" data-target="tab-audio">🎙️ 音声/AI</button>
                     <button class="tab-btn" data-target="tab-stream">📺 配信/OBS</button>
                 </div>
+                <!-- YouTube 接続ステータス（常時表示バッジ） -->
+                <div id="yt-header-status" style="display:flex;align-items:center;gap:0.4rem;padding:0.25rem 0.6rem;border-radius:20px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);font-size:0.72rem;margin:0 0 6px 0;cursor:pointer;" title="配信/OBSタブを開く" onclick="document.querySelector('[data-target=tab-stream]')?.click()">
+                    <span id="yt-header-dot" style="width:7px;height:7px;border-radius:50%;background:#555;display:inline-block;flex-shrink:0;transition:background 0.3s;"></span>
+                    <span id="yt-header-label" style="color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;">YouTube: 未接続</span>
+                </div>
             </div>
 
             <!-- タブの下から独立してスクロールするコンテンツエリア -->
