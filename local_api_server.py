@@ -875,6 +875,13 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
                 speech_s = speech_s.replace(k, v)
                 new_learned_dict[k] = v
 
+        # AIが生成したルビ（例: KEY TO LIT（キートゥーリット）、角田裕毅（つのだ ゆうき））を自動抽出して学習辞書に即時登録
+        for m in re.finditer(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・\s]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', s):
+            orig_word = m.group(1).strip()
+            reading_word = m.group(2).strip()
+            if orig_word and reading_word and len(orig_word) >= 2:
+                new_learned_dict[orig_word] = reading_word
+
         corrected_items.append({
             "display": display_s,
             "speech": speech_s
