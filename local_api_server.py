@@ -113,6 +113,31 @@ def init_preload_all_rss_urls():
 
 init_preload_all_rss_urls()
 
+def search_news_url_by_title(title):
+    """タイトルからGoogle News RSSを瞬時に検索して元記事の正規URLを特定"""
+    if not title:
+        return ""
+    try:
+        clean_title = re.sub(r'[\s\-_].*$', '', title).strip()
+        if len(clean_title) < 5:
+            clean_title = title[:25]
+        q = urllib.parse.quote(clean_title)
+        url = f"https://news.google.com/rss/search?q={q}&hl=ja&gl=JP&ceid=JP:ja"
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, context=ctx, timeout=3.5) as res:
+            xml_str = res.read().decode('utf-8', errors='ignore')
+            m = re.search(r'<item>.*?<link>(.*?)</link>', xml_str, flags=re.DOTALL)
+            if m:
+                link = m.group(1).strip()
+                if link.startswith('http'):
+                    return link
+    except Exception:
+        pass
+    return ""
+
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
@@ -843,13 +868,19 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                             article_url = u_v
                             break
 
+                # キャッシュにもない場合はGoogle News検索で正規URLを即時特定
+                if not article_url:
+                    article_url = search_news_url_by_title(title)
+
                 if article_url:
                     LAST_PLAYING_ARTICLE_URL = article_url
                     ARTICLE_URL_CACHE[title] = article_url
+                    save_article_url_cache(ARTICLE_URL_CACHE)
                     # 🔗 browser_console.log に記事URLを直接記録
                     now_iso = time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime())
                     with open('browser_console.log', 'a', encoding='utf-8') as f:
                         f.write(f"[{now_iso}] [LOG] [ニュース記事URL] 🔗 {article_url} | 記事: 「{title}」\n")
+                    print(f"[記事URL特定成功] 🔗 {article_url} ({title[:20]}...)")
 
                 full_article_content = description
 
