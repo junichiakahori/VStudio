@@ -319,7 +319,9 @@ window.triggerIdleSpeech = async function () {
           clearInterval(checkQueueInterval);
           return;
         }
-        if (voicevoxAudioQueue.length === 0 && !isVoicevoxPlaying) {
+        const isQueueEmpty = typeof voicevoxAudioQueue !== "undefined" ? voicevoxAudioQueue.length === 0 : (window.voicevoxAudioQueue ? window.voicevoxAudioQueue.length === 0 : true);
+        const isPlaying = typeof isVoicevoxPlaying !== "undefined" ? isVoicevoxPlaying : !!window.isVoicevoxPlaying;
+        if (isQueueEmpty && !isPlaying) {
           clearInterval(checkQueueInterval);
           console.log(
             "[ラジオモード] コメント読み上げキューが空になったため、間もなく自動再生を再開します。",
@@ -556,7 +558,10 @@ window.resetIdleTimer = function () {
     return;
   }
 
-  if (isVoicevoxEnabled && isIdleSpeechEnabled) {
+  const isVoicevoxOn = typeof isVoicevoxEnabled !== "undefined" ? isVoicevoxEnabled : !!window.isVoicevoxEnabled;
+  const isIdleSpeechOn = typeof isIdleSpeechEnabled !== "undefined" ? isIdleSpeechEnabled : !!window.isIdleSpeechEnabled;
+
+  if (isVoicevoxOn && isIdleSpeechOn) {
     // UI上の設定(5秒)に合わせる (5秒〜10秒のランダム)
     const delay = 5000 + Math.random() * 5000;
     idleSpeechTimer = setTimeout(triggerIdleSpeech, delay);
