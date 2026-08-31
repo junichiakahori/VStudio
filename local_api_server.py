@@ -1637,8 +1637,20 @@ def apply_backend_pronunciation_dict(text):
     processed = re.sub(r'(\d+)\s*GB(?![a-zA-Z])', r'\1ギガバイト', processed)
     processed = re.sub(r'(\d+)\s*MB(?![a-zA-Z])', r'\1メガバイト', processed)
 
-    # ── 英語グループ名・アーティスト固有名詞のカタカナ自動変換 ──
+    # ── 英語グループ名・アーティスト・配信用語のカタカナ自動変換 ──
     ENGLISH_NAME_TO_KANA = {
+        # 配信・VTuber用語
+        "AITuber": "あいちゅーばー",
+        "AITUBER": "あいちゅーばー",
+        "aituber": "あいちゅーばー",
+        "VTuber": "ぶいちゅーばー",
+        "VTUBER": "ぶいちゅーばー",
+        "vtuber": "ぶいちゅーばー",
+        "YouTuber": "ゆーちゅーばー",
+        "YOUTUBER": "ゆーちゅーばー",
+        "youtuber": "ゆーちゅーばー",
+        "AZKi": "あずき",
+        "HIMEHINA": "ひめひな",
         # K-POP グループ
         "SUPER JUNIOR": "スーパージュニア",
         "BTS": "ビーティーエス",
