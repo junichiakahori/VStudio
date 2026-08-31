@@ -195,23 +195,19 @@ export async function convertToHiraganaWithAI(text) {
     }
 
     try {
-        const prompt = `あなたは日本語の音声合成（VOICEVOX）用の文脈校正アシスタントです。
-与えられた日本語の文章の中で、「文脈によって読み方が変わる漢字（中央市場、株式市場、私立、1日など）」や「誤読されやすい固有名詞」だけを、正しいひらがなでピンポイントに補正してください。
-通常の漢字、一般的な熟語はそのまま漢字で維持してください。
-
-テキスト: ${text}
-校正後:`;
-
         let result = null;
         if (provider === 'ollama') {
             const aiModelInput = document.getElementById('ai-model-input');
             const targetModel = (aiModelInput && aiModelInput.value.trim()) || 'qwen2.5:7b';
-            const systemPrompt = `あなたは日本語音声合成(TTS)専用のルビ・発音校正エンジンです。
-【絶対厳守ルール】
-1. 単語の追加・削除・言い換えは一切禁止です（「テストさん」「こんにちは」などを勝手に追加してはいけません）。
-2. 通常の日本語漢字（日常、天気、野球など）はそのまま漢字で維持してください。
-3. VTuber・活動者・クリエイター名やアルファベット表記（例: 天羽しろっぷ → あまうしろっぷ, 滝夜ノアル → たきやのある, 趙味りく → ちょうみりく, AZKi → あずき, Suisei → すいせい, HIMEHINA → ひめひな等）や、文脈で読みが変わる漢字（市場、1日、私立等）は、VOICEVOXが自然に発音できるように正しいひらがなに置き換えてください（※「天羽」を「あまば」と読まないこと）。
-4. 解説や前置き・後書きは一切出力せず、校正後の文章のみを1行で出力してください。`;
+            
+            // 外部プロンプトファイル（/prompts/phonetic_proofread.txt）から動的ロード
+            let systemPrompt = "";
+            if (typeof window.PromptLoader !== "undefined" && typeof window.PromptLoader.loadPromptTemplate === "function") {
+                systemPrompt = await window.PromptLoader.loadPromptTemplate("phonetic_proofread");
+            }
+            if (!systemPrompt) {
+                systemPrompt = `あなたは日本語音声合成(TTS)専用のルビ・発音校正エンジンです。\n単語の追加・削除・言い換えは一切禁止です。VOICEVOXが自然に発音できるよう校正したテキストのみを1行で出力してください。`;
+            }
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 6000);
@@ -238,6 +234,13 @@ export async function convertToHiraganaWithAI(text) {
                 result = json.message.content.trim();
             }
         } else {
+            let prompt = "";
+            if (typeof window.PromptLoader !== "undefined" && typeof window.PromptLoader.getFormattedPrompt === "function") {
+                prompt = await window.PromptLoader.getFormattedPrompt("ai_hiragana_gemini", { text });
+            }
+            if (!prompt) {
+                prompt = `テキスト: ${text}\n校正後:`;
+            }
             result = await callAI(prompt, apiKey, provider, false, 200);
         }
 
