@@ -1637,64 +1637,8 @@ def apply_backend_pronunciation_dict(text):
     processed = re.sub(r'(\d+)\s*GB(?![a-zA-Z])', r'\1ギガバイト', processed)
     processed = re.sub(r'(\d+)\s*MB(?![a-zA-Z])', r'\1メガバイト', processed)
 
-    # ── 英語グループ名・アーティスト・配信用語のカタカナ自動変換 ──
-    ENGLISH_NAME_TO_KANA = {
-        # 配信・VTuber用語
-        "AITuber": "あいちゅーばー",
-        "AITUBER": "あいちゅーばー",
-        "aituber": "あいちゅーばー",
-        "VTuber": "ぶいちゅーばー",
-        "VTUBER": "ぶいちゅーばー",
-        "vtuber": "ぶいちゅーばー",
-        "YouTuber": "ゆーちゅーばー",
-        "YOUTUBER": "ゆーちゅーばー",
-        "youtuber": "ゆーちゅーばー",
-        "AZKi": "あずき",
-        "HIMEHINA": "ひめひな",
-        # K-POP グループ
-        "SUPER JUNIOR": "スーパージュニア",
-        "BTS": "ビーティーエス",
-        "BLACKPINK": "ブラックピンク",
-        "TWICE": "トゥワイス",
-        "EXO": "エクソ",
-        "NCT": "エヌシーティー",
-        "SEVENTEEN": "セブンティーン",
-        "STRAY KIDS": "ストレイキッズ",
-        "aespa": "エスパ",
-        "NewJeans": "ニュージーンズ",
-        "IVE": "アイブ",
-        "LE SSERAFIM": "ルセラフィム",
-        "ILLIT": "イリット",
-        "RIIZE": "ライズ",
-        "BTOB": "ビートゥービー",
-        "MONSTA X": "モンスタエックス",
-        "GOT7": "ガットセブン",
-        "DAY6": "デイシックス",
-        "2PM": "ツーピーエム",
-        "2NE1": "トゥエニーワン",
-        "WINNER": "ウィナー",
-        "iKON": "アイコン",
-        "BIGBANG": "ビッグバン",
-        "SHINee": "シャイニー",
-        "f(x)": "エフエックス",
-        "INFINITE": "インフィニット",
-        "VIXX": "ヴィックス",
-        "ASTRO": "アストロ",
-        "THE BOYZ": "ザボーイズ",
-        "ATEEZ": "エイティーズ",
-        "TXT": "トゥモローバイトゥゲザー",
-        "ENHYPEN": "エンハイプン",
-        # J-POP・国際グループ
-        "BIG BANG": "ビッグバン",
-        "ONE DIRECTION": "ワンダイレクション",
-        "COLDPLAY": "コールドプレイ",
-    }
-    for en_name, kana in ENGLISH_NAME_TO_KANA.items():
-        # 前後が単語境界（スペース、句読点、文頭文末）の場合のみ置換
-        processed = re.sub(r'(?<![a-zA-Z\u30a0-\u30ff\u3040-\u309f])' + re.escape(en_name) + r'(?![a-zA-Z])', kana, processed)
-
-    # ── wiki_dict / master_dictionary フォールバック（漢字が残っている箇所のみ最長一致スキャン） ──
-    # 優先度: hiragana_dict > wiki_dict（Wikipedia固有名詞）> master_dictionary（一般語彙）
+    # ── wiki_dict / master_dictionary フォールバック（未置換の単語を最長一致スキャン） ──
+    # 優先度: wiki_dict（Wikipedia固有名詞）> master_dictionary（一般語彙・英語固有名詞）
 
     # --- Step1: wiki_dict を全文置換（カタカナ始まり複合語も確実にカバー）---
     wiki = get_wiki_dict()
