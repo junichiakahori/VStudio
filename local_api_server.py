@@ -604,27 +604,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
         elif self.path == '/update_hiragana_dict':
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            
-            try:
-                new_entries = json.loads(post_data.decode('utf-8'))
-                current_dict = load_data(DICT_FILE)
-                # マージ
-                current_dict.update(new_entries)
-                save_data(current_dict, DICT_FILE)
-                
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "ok", "total_entries": len(current_dict)}).encode('utf-8'))
-            except Exception as e:
-                self.send_response(500)
-                self.send_header('Content-type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "disabled"}).encode('utf-8'))
         elif self.path == '/radio_script':
             # ラジオ台本ファイルの保存
             content_length = int(self.headers.get('Content-Length', 0))
