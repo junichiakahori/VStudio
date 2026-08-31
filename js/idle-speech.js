@@ -385,7 +385,8 @@ window.triggerIdleSpeech = async function () {
         ? availablePhrases[Math.floor(Math.random() * availablePhrases.length)]
         : null;
 
-      // 外部プロンプトファイル（/prompts/idle_speech.txt）からロード＆展開
+    if (shouldRemake) {
+      // 外部プロンプト（prompts.json）からロード＆展開
       let prompt = "";
       if (typeof window.PromptLoader !== "undefined" && typeof window.PromptLoader.getFormattedPrompt === "function") {
         prompt = await window.PromptLoader.getFormattedPrompt("idle_speech", {
