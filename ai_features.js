@@ -166,28 +166,8 @@ export async function callAI(prompt, apiKey, provider, pureText=false, maxTokens
 }
 
 export function applyCustomHiraganaDict(text) {
-    let processedText = text;
-
-    // ユーザーが画面上で明示的に登録したカスタム辞書（例: VTuber, ぶいちゅーばー 等）のみを素直に適用
-    const aiHiraganaDict = document.getElementById('ai-hiragana-dict');
-    if (!aiHiraganaDict || !aiHiraganaDict.value.trim()) return processedText;
-    const lines = aiHiraganaDict.value.split('\n');
-    for (const line of lines) {
-        const parts = line.split(',');
-        if (parts.length >= 2) {
-            const target = parts[0].trim();
-            const replacement = parts[1].trim();
-            if (target && replacement) {
-                try {
-                    const regex = new RegExp(target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-                    processedText = processedText.replace(regex, replacement);
-                } catch (e) {
-                    processedText = processedText.split(target).join(replacement);
-                }
-            }
-        }
-    }
-    return processedText;
+    // 辞書による誤変換や干渉を防止するため、辞書置換は行わず原文をそのまま返す
+    return text;
 }
 
 export async function convertToHiraganaWithAI(text) {
@@ -199,10 +179,9 @@ export async function convertToHiraganaWithAI(text) {
         return window.aiHiraganaCache[cacheKey];
     }
 
-    // 2. カスタム辞書（手動登録）を適用
-    let dictApplied = applyCustomHiraganaDict(text);
+    const dictApplied = text;
 
-    // 3. AI設定の取得
+    // 2. AI設定の取得
     const aiHiraganaToggle = document.getElementById('ai-hiragana-toggle');
     const isAiHiraganaEnabled = aiHiraganaToggle ? aiHiraganaToggle.checked : true;
     const aiApiKeyInput = document.getElementById('ai-api-key');
@@ -210,29 +189,29 @@ export async function convertToHiraganaWithAI(text) {
     const providerSelect = document.getElementById('ai-provider-select');
     const provider = (providerSelect ? providerSelect.value : '') || localStorage.getItem('savedAiProvider') || 'ollama';
 
-    // AIが利用できない場合は辞書適用結果をそのまま返却
+    // AIが利用できない場合は原文をそのまま返却
     if (!isAiHiraganaEnabled || (!apiKey && provider !== 'ollama')) {
-        return dictApplied;
+        return text;
     }
 
     try {
         const prompt = `あなたは日本語の音声合成（VOICEVOX）用の文脈校正アシスタントです。
-与えられた日本語の文章の中で、「文脈によって読み方が変わる漢字（中央市場、株式市場、私立、1日など）」や「誤読されやすい城名などの固有名詞（丸岡城→丸岡じょう等）」だけを、正しいひらがなでピンポイントに補正してください。
-通常の漢字、人名（下地幹郎など）、一般的な熟語（速報、知事選、立候補、表明など）はそのまま漢字で維持してください。
+与えられた日本語の文章の中で、「文脈によって読み方が変わる漢字（中央市場、株式市場、私立、1日など）」や「誤読されやすい固有名詞」だけを、正しいひらがなでピンポイントに補正してください。
+通常の漢字、一般的な熟語はそのまま漢字で維持してください。
 
-テキスト: ${dictApplied}
+テキスト: ${text}
 校正後:`;
 
         let result = null;
         if (provider === 'ollama') {
             const aiModelInput = document.getElementById('ai-model-input');
             const targetModel = (aiModelInput && aiModelInput.value.trim()) || 'qwen2.5:7b';
-            const systemPrompt = `You are a professional Japanese phonetic proofreader for speech synthesis (TTS).
-Your task is to fix mispronounced Japanese words, rare names/usernames, and ambiguous context-dependent kanji so VOICEVOX pronounces them naturally:
-1. Replace rare or unusual names, usernames, and handles before honorifics (e.g. 魂児さん/魂児くん → こんじさん/こんじくん) with their natural phonetic reading in Hiragana.
-2. Replace context-dependent kanji with phonetic hiragana (e.g. 丸岡城 → 丸岡じょう, 中央市場 → 中央いちば, 私立 → しりつ, 1日 → ついたち/いちにち).
-3. Keep common standard dictionary Kanji and well-known proper nouns intact (e.g. 速報, 下地幹郎, 沖縄知事選).
-4. Do NOT translate, summarize, or comment. Output the corrected Japanese text only.`;
+            const systemPrompt = `あなたは日本語音声合成(TTS)専用のルビ・発音校正エンジンです。
+【絶対厳守ルール】
+1. 単語の追加・削除・言い換えは一切禁止です（「テストさん」「こんにちは」などを勝手に追加してはいけません）。
+2. 通常の漢字（趣味、日常、天気、野球など）はそのまま漢字で維持してください。普通に読める漢字を勝手にひらがなに崩さないでください。
+3. 文脈で読みが変わる漢字（市場、1日、私立等）や、VOICEVOXが読み間違える特殊な固有名詞・人名・VTuber名のみ、正しい読み（ひらがな）に置き換えてください。
+4. 解説や前置き・後書きは一切出力せず、校正後の文章のみを1行で出力してください。`;
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 6000);
@@ -245,7 +224,7 @@ Your task is to fix mispronounced Japanese words, rare names/usernames, and ambi
                     model: targetModel,
                     messages: [
                         { role: 'system', content: systemPrompt },
-                        { role: 'user', content: dictApplied }
+                        { role: 'user', content: `以下のテキストの発音校正を行ってください:\n${text}` }
                     ],
                     stream: false,
                     options: {
@@ -264,7 +243,15 @@ Your task is to fix mispronounced Japanese words, rare names/usernames, and ambi
 
         if (result && typeof result === 'string') {
             result = result.replace(/^校正後[:：\s]*/i, '').trim();
+            result = result.replace(/^以下のテキスト[^\n]*\n?/i, '').trim();
             result = result.replace(/[\r\n]+/g, ' ').trim();
+            
+            // 🛡️ ハルシネーション（勝手な単語追加・捏造）防止ガード
+            if (result.includes("テスト") && !text.includes("テスト")) {
+                console.warn(`[AI文脈校正] ⚠️ ハルシネーション(単語捏造)を検知したため破棄: "${result}" ➔ 原文を使用`);
+                result = text;
+            }
+
             console.log(`[AI文脈校正] 🤖 AIの校正結果: "${result}"`);
             if (result && result.length > 0) {
                 if (!window.aiHiraganaCache) window.aiHiraganaCache = {};
@@ -281,7 +268,7 @@ Your task is to fix mispronounced Japanese words, rare names/usernames, and ambi
         }
     }
 
-    return dictApplied;
+    return text;
 }
 
 export function restorePunctuation(original, hiragana) {

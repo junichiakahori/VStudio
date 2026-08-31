@@ -1609,23 +1609,6 @@ def apply_backend_pronunciation_dict(text):
     # 4. 見出し・文頭・読点直後の単独「米」（例: 「米、対イラン」→「べい、対イラン」「米が軍事面」→「べいが軍事面」「米は」→「べいは」）
     processed = re.sub(r'(^|[、。！？「\s])米([、がはと])', r'\1べい\2', processed)
 
-    dict_data = load_data(DICT_FILE)
-    if isinstance(dict_data, dict):
-        # 最長一致（長いフレーズから優先して置換し誤爆を防止）
-        sorted_dict = sorted(dict_data.items(), key=lambda item: len(item[0]), reverse=True)
-        for k, v in sorted_dict:
-            if k in processed:
-                processed = processed.replace(k, v)
-    h_data = load_data(HIRAGANA_FILE)
-    custom_lines = h_data.get("dictionary", "")
-    if custom_lines:
-        for line in custom_lines.split("\n"):
-            parts = line.split(",")
-            if len(parts) >= 2:
-                src, dst = parts[0].strip(), parts[1].strip()
-                if src and dst and src in processed:
-                    processed = processed.replace(src, dst)
-
     # 人を指す「〜方（かた）」のVOICEVOX誤読（ホウ）完全・網羅的自動補正
     processed = re.sub(r'([ぁ-ん])方([がはもにへでを、。！？\s]|$|たち|がた)', r'\1かた\2', processed)
     processed = re.sub(r'([0-9０-９一二三四五六七八九十百千万]+人)の方', r'\1のかた', processed)
@@ -1854,31 +1837,8 @@ def get_voicevox_kana(text, speaker_id=1):
         return ""
 
 def save_learned_pronunciations(new_words):
-    """AIが検知した誤読単語（漢字 -> 正しいひらがな）を hiragana_dict.json に自動保存"""
-    dict_path = os.path.join(os.path.dirname(__file__), 'dict', 'hiragana_dict.json')
-    try:
-        existing = {}
-        if os.path.exists(dict_path):
-            with open(dict_path, 'r', encoding='utf-8') as f:
-                existing = json.load(f)
-        updated = False
-        for k, v in new_words.items():
-            k_s = (k or "").strip()
-            v_s = (v or "").strip()
-            # 1文字単語や助詞・活用語尾（って、は、を、お等）は文破壊の原因になるため登録禁止
-            if len(k_s) < 2 or not re.search(r'[\u4e00-\u9fafA-Za-z0-9]', k_s):
-                continue
-            if k_s in ["って", "て", "は", "わ", "を", "お", "でお", "のを"]:
-                continue
-            if k_s and v_s and k_s not in existing:
-                existing[k_s] = v_s
-                updated = True
-                print(f"[AI自動学習] 読み補正を辞書に新規登録: '{k_s}' -> '{v_s}'")
-        if updated:
-            with open(dict_path, 'w', encoding='utf-8') as f:
-                json.dump(existing, f, ensure_ascii=False, indent=4)
-    except Exception as e:
-        print(f"[辞書自動保存エラー]: {e}")
+    """辞書への自動書き込みを無効化"""
+    pass
 
 # pykakasi インスタンス（起動時に一度だけ初期化してキャッシュ）
 _kakasi_instance = None
@@ -2058,54 +2018,8 @@ def extract_kanji_terms(text):
     return sorted(list(set(t for t in terms if len(t) >= 2)), key=lambda x: len(x), reverse=True)
 
 def enrich_dict_from_text(text):
-    """
-    テキスト中の漢字語句をWikipedia APIで読み検索し、
-    未登録のものを hiragana_dict.json に自動追加する。
-    返り値: 新規追加件数
-    """
-    dict_path = os.path.join(os.path.dirname(__file__), 'dict', 'hiragana_dict.json')
-    try:
-        existing = {}
-        if os.path.exists(dict_path):
-            with open(dict_path, "r", encoding="utf-8") as f:
-                existing = json.load(f)
-    except Exception:
-        existing = {}
-
-    terms = extract_kanji_terms(text)
-    # 既に辞書登録済みはスキップ
-    unknown_terms = [t for t in terms if t not in existing]
-    if not unknown_terms:
-        return 0
-
-    added = 0
-    import time
-    for term in unknown_terms:
-        # Step 1: 65万語の大規模国語辞典から最優先ルックアップ（超高速・高精度）
-        master_reading = lookup_master_dictionary(term)
-        if master_reading and term not in existing:
-            existing[term] = master_reading
-            added += 1
-            print(f"[国語辞典自動登録 (65万語)] '{term}' → '{master_reading}'")
-            continue
-
-        # Step 2: 国語辞典にない固有名詞・人名・最新用語のみ Wikipedia API で検索
-        target_term, reading = lookup_wikipedia_reading(term)
-        time.sleep(0.05)  # APIレートリミット対策
-        if target_term and reading and target_term not in existing:
-            existing[target_term] = reading
-            added += 1
-            print(f"[Wikipedia辞書自動登録] '{target_term}' → '{reading}'")
-
-    if added > 0:
-        try:
-            with open(dict_path, "w", encoding="utf-8") as f:
-                json.dump(existing, f, ensure_ascii=False, indent=4)
-            print(f"[辞書自動学習] 計{added}件を hiragana_dict.json に追加しました")
-        except Exception as e:
-            print(f"[辞書保存エラー]: {e}")
-
-    return added
+    """辞書への自動学習・追加を無効化"""
+    return 0
 
 def clean_kana_for_display(kana_str):
     """VOICEVOX内部のアクセント記号（'や_や/）を除去して、人間が読める読みやすいカナ文字列に整形"""
