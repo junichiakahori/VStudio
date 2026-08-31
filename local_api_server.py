@@ -1927,8 +1927,10 @@ def lookup_wikipedia_reading(term):
                 # パターン2: （あまう しろっぷ、英語名...）のようにカンマや区切りがある場合
                 m = re.search(r'[（(]([ぁ-んァ-ヶー\s　っッ]+?)(?:[、,\s　]|あるいは|または|[）)])', intro_text)
             if m:
-                reading = re.sub(r"[\s　]", "", m.group(1))
-                if re.fullmatch(r"[ぁ-んァ-ヶーっッ]+", reading) and 2 <= len(reading) <= 20:
+                reading = m.group(1).strip()
+                # 複数の連続スペースは1つの半角スペースに正規化
+                reading = re.sub(r'[\s　]+', ' ', reading)
+                if re.fullmatch(r"[ぁ-んァ-ヶーっッ\s]+", reading) and 2 <= len(reading) <= 25:
                     reading = reading.translate(str.maketrans(
                         "ァィゥェォァイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンッー",
                         "ぁぃぅぇぉあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんっー"
