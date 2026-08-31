@@ -1426,13 +1426,8 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
                             display_s = display_s.replace(target_full, target_name)
             s = display_s
 
-        # 🚫 数字+年（とし）などのAIによる誤ったルビ振りを無効化し漢字に戻す（例: 6年(とし)前 ➔ 6年前）
-        s = re.sub(r'([0-9０-９一二三四五六七八九十百千万]+)年[（\(]とし[）\)]', r'\1年', s)
-        s = re.sub(r'([0-9０-９一二三四五六七八九十百千万]+)としまえ', r'\1ねんまえ', s)
-
         # 音声用初期値（ルビ付き表記からの読み抽出 ＆ 外部辞書 custom_dict.json の最長一致適用）
         speech_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\2', s)
-        speech_s = re.sub(r'([0-9０-９一二三四五六七八九十百千万]+)としまえ', r'\1ねんまえ', speech_s)
         speech_s = apply_backend_pronunciation_dict(speech_s)
 
         # ============================================================
