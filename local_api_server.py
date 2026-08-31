@@ -16,6 +16,7 @@ PORT = 8001
 DATA_FILE = "custom_idle_phrases.json"
 HIRAGANA_FILE = "hiragana_data.json"
 DICT_FILE = os.path.join("dict", "hiragana_dict.json")
+CUSTOM_DICT_FILE = os.path.join("dict", "custom_dict.json")
 RADIO_SCRIPT_FILE = "radio_script.txt"
 RADIO_SCRIPT_YOMI_FILE = "radio_script_yomi.txt"
 RADIO_SCRIPT_CONFIG_FILE = "radio_script_config.json"
@@ -1540,6 +1541,14 @@ def apply_backend_pronunciation_dict(text):
     if not text:
         return text
     processed = text
+
+    # ── 0. ユーザー手動カスタム辞書（dict/custom_dict.json）【最優先・手動登録専用】 ──
+    custom_dict = load_data(CUSTOM_DICT_FILE)
+    if custom_dict and isinstance(custom_dict, dict):
+        for k, v in sorted(custom_dict.items(), key=lambda x: -len(x[0])):
+            if k in processed:
+                processed = processed.replace(k, v)
+
     # ── 固有名詞・複合語の最優先読み分け（辞書分解や正規表現誤爆を防止） ──
     EARLY_TERMS = {
         '新千歳空港': 'しんちとせくうこう',
