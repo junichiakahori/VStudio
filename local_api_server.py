@@ -1519,24 +1519,6 @@ def lookup_master_dictionary(term):
         return None
     return d.get(term, None)
 
-# Wikipedia辞書（wiki_dict.json）メモリキャッシュ管理
-_wiki_dict_data = None
-def get_wiki_dict():
-    global _wiki_dict_data
-    if _wiki_dict_data is None:
-        json_path = os.path.join(os.path.dirname(__file__), 'dict', 'wiki_dict.json')
-        if os.path.exists(json_path):
-            try:
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    _wiki_dict_data = json.load(f)
-                print(f"[WikiDict] Wikipedia固有名詞辞書（wiki_dict.json: {len(_wiki_dict_data):,}語）をメモリにロード完了")
-            except Exception as e:
-                print(f"[WikiDict] JSON読み込みエラー: {e}")
-                _wiki_dict_data = {}
-        else:
-            _wiki_dict_data = {}
-    return _wiki_dict_data
-
 def apply_backend_pronunciation_dict(text):
     if not text:
         return text
@@ -1645,17 +1627,6 @@ def apply_backend_pronunciation_dict(text):
     processed = re.sub(r'(\d+)\s*TB(?![a-zA-Z])', r'\1テラバイト', processed)
     processed = re.sub(r'(\d+)\s*GB(?![a-zA-Z])', r'\1ギガバイト', processed)
     processed = re.sub(r'(\d+)\s*MB(?![a-zA-Z])', r'\1メガバイト', processed)
-
-    # ── wiki_dict / master_dictionary フォールバック（未置換の単語を最長一致スキャン） ──
-    # 優先度: wiki_dict（Wikipedia固有名詞）> master_dictionary（一般語彙・英語固有名詞）
-
-    # --- Step1: wiki_dict を全文置換（カタカナ始まり複合語も確実にカバー）---
-    wiki = get_wiki_dict()
-    if wiki:
-        hiragana_dict_keys = set(load_data(DICT_FILE).keys()) if isinstance(load_data(DICT_FILE), dict) else set()
-        for k, v in sorted(wiki.items(), key=lambda x: -len(x[0])):
-            if k not in hiragana_dict_keys and k in processed:
-                processed = processed.replace(k, v)
 
     return processed
 
