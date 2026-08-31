@@ -1928,14 +1928,18 @@ def lookup_wikipedia_reading(term):
                 # パターン2: （あまう しろっぷ、英語名...）のようにカンマや区切りがある場合
                 m = re.search(r'[（(]([ぁ-んァ-ヶー\s　っッ]+?)(?:[、,\s　]|あるいは|または|[）)])', intro_text)
             if m:
-                reading = m.group(1).strip()
-                # 複数の連続スペースは1つの半角スペースに正規化
-                reading = re.sub(r'[\s　]+', ' ', reading)
-                if re.fullmatch(r"[ぁ-んァ-ヶーっッ\s]+", reading) and 2 <= len(reading) <= 25:
-                    reading = reading.translate(str.maketrans(
-                        "ァィゥェォァイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンッー",
-                        "ぁぃぅぇぉあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんっー"
-                    ))
+                raw_reading = m.group(1).strip()
+                # スペース区切りの複合名（例: あまう しろっぷ）の場合、スペースを残すとVOICEVOXが読点（ポーズ）を入れてしまうため
+                # 姓をひらがな、名をカタカナに変換して結合（例: あまうシロップ）することで、息継ぎなしの一息で自然なアクセントを実現
+                parts = [p.strip() for p in re.split(r'[\s　]+', raw_reading) if p.strip()]
+                if len(parts) >= 2:
+                    hira_part = ''.join(chr(ord(c) - 0x60) if 0x30a1 <= ord(c) <= 0x30f6 else c for c in parts[0])
+                    kata_part = ''.join(chr(ord(c) + 0x60) if 0x3041 <= ord(c) <= 0x3096 else c for c in "".join(parts[1:]))
+                    reading = hira_part + kata_part
+                else:
+                    reading = ''.join(chr(ord(c) - 0x60) if 0x30a1 <= ord(c) <= 0x30f6 else c for c in re.sub(r'[\s　]', '', raw_reading))
+
+                if re.fullmatch(r"[ぁ-んァ-ヶーっッ]+", reading) and 2 <= len(reading) <= 25:
                     # ノイズ単語チェック
                     if reading in INVALID_READINGS:
                         continue
