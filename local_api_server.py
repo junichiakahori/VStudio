@@ -1196,6 +1196,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     return
 
                 # 🗞️ AIが生成した見出しルビ（[HEADLINE: ...] または 【見出し】: ...）の抽出
+                clean_text = raw_text
                 ai_headline_raw = None
                 headline_match = re.search(r'(?:\[HEADLINE:\s*|【見出し】:\s*)(.*?)(?:\]|\n|$)', raw_text)
                 if headline_match:
