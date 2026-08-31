@@ -158,7 +158,13 @@ async function playNextContinuousNews(isOneOff = false, isFetchOnly = false) {
       const zundaPrompt = isZunda
         ? "語尾に「のだ」「なのだ」をつけてずんだもんになりきってください。"
         : "";
-      const prompt = `あなたはVTuberの配信者です。配信の終了時間が1分後に迫っています。これまで読んでいたニュースコーナーを締めくくり、リスナーに向けて「本日のニュースは以上になります。それでは、配信終了のお時間までごゆっくりお過ごしください！」といった内容の挨拶を1〜2文で述べてください。余計な説明や括弧書きは不要です。${zundaPrompt}`;
+      let prompt = "";
+      if (typeof window.PromptLoader !== "undefined" && typeof window.PromptLoader.getFormattedPrompt === "function") {
+        prompt = await window.PromptLoader.getFormattedPrompt("news_ending_soon", { zundaPrompt });
+      }
+      if (!prompt) {
+        prompt = `あなたはVTuberの配信者です。配信の終了時間が1分後に迫っています。リスナーに向けて締めの挨拶を1〜2文で述べてください。余計な説明は不要です。${zundaPrompt}`;
+      }
 
       const apiKeyInput = document.getElementById("ai-api-key");
       const providerSelect = document.getElementById("ai-provider-select");
@@ -336,7 +342,13 @@ async function playNextContinuousNews(isOneOff = false, isFetchOnly = false) {
         const provider = providerSelect ? providerSelect.value : "gemini";
         const isZunda = currentModelId === "zundamon" || currentModelId === "zundamon_human";
         const zundaPrompt = isZunda ? "語尾に「のだ」「なのだ」をつけてずんだもんになりきってください。" : "";
-        const prompt = `あなたはVTuberの配信者です。先ほどまでニュースを読んでいましたが、現在の最新ニュースをすべて読み終えました。リスナーに向けて「現在の最新ニュースは以上になります！また新しいニュースが入ったらお伝えしますね！」といった内容の締めの挨拶を1文で述べてください。余計な説明は不要です。${zundaPrompt}`;
+        let prompt = "";
+        if (typeof window.PromptLoader !== "undefined" && typeof window.PromptLoader.getFormattedPrompt === "function") {
+          prompt = await window.PromptLoader.getFormattedPrompt("news_closing", { zundaPrompt });
+        }
+        if (!prompt) {
+          prompt = `あなたはVTuberの配信者です。最新ニュースをすべて読み終えたので、リスナーに向けて締めの挨拶を1文で述べてください。${zundaPrompt}`;
+        }
 
         const text = await aiFeatures.callAI(prompt, apiKey, provider, true);
         if (text) {
@@ -433,13 +445,18 @@ async function playNextContinuousNews(isOneOff = false, isFetchOnly = false) {
       ? "まずリスナーに向けて1文で要約して紹介し"
       : "「次のニュースです」などと一言添えてからリスナーに向けて1文で要約し";
 
-    const prompt = `あなたはVTuberの配信者です。以下のニュース記事について、${introInstruction}、続けてあなた自身の率直な感想やリアクションを1〜2文で述べてください。余計な説明や括弧書きは不要です。${zundaPrompt}
-        
-【ニュースタイトル】
-${item.title}
-
-【概要】
-${plainDesc}`;
+    let prompt = "";
+    if (typeof window.PromptLoader !== "undefined" && typeof window.PromptLoader.getFormattedPrompt === "function") {
+      prompt = await window.PromptLoader.getFormattedPrompt("news_reaction", {
+        introInstruction,
+        zundaPrompt,
+        title: item.title,
+        content: plainDesc
+      });
+    }
+    if (!prompt) {
+      prompt = `以下のニュースについて要約と感想を述べてください。\n【タイトル】${item.title}\n【本文】${plainDesc}`;
+    }
 
     const categorySpanForLog = document.getElementById("news-board-category");
     const catName = item.categoryName || (categorySpanForLog ? categorySpanForLog.textContent : "ニュース");
@@ -1639,10 +1656,17 @@ ${creditsInstruction}
           ? "明るく元気なずんだ妖精のニュースキャスター「ずんだもん」です。語尾は「〜のだ」「〜なのだ」です。"
           : (isCat ? "愛嬌のある白猫のニュースキャスター「とろろ」です。語尾は自然に「〜にゃ」を使います。" : "明るく丁寧なニュースキャスターです。");
 
-        const prompt = `あなたはニュース番組のキャスターです。${charDesc}
-リスナーの「${item.nickname}」さんから『${item.comment}』というコメントをいただきました。
-ニュースキャスターとして、このコメントに対して1〜2文で親しみやすく自然に応答・返信してください（20〜40文字程度）。
-※「次のニュース」などの繋ぎフレーズや自己紹介・名前の署名は絶対に含めず、コメントに対する返答セリフのみを出力してください。`;
+        let prompt = "";
+        if (typeof window.PromptLoader !== "undefined" && typeof window.PromptLoader.getFormattedPrompt === "function") {
+          prompt = await window.PromptLoader.getFormattedPrompt("news_comment_reply", {
+            charDesc,
+            nickname: item.nickname,
+            comment: item.comment
+          });
+        }
+        if (!prompt) {
+          prompt = `${item.nickname}さんのコメント「${item.comment}」に対して1〜2文で返信してください。`;
+        }
 
         let reply = "";
         const res = await fetch("/api/news/generate_item_script", {

@@ -1036,27 +1036,17 @@
       const shortDesc = streamDescInput ? streamDescInput.value.trim() : "";
       const theme = aiStreamThemeInput ? aiStreamThemeInput.value.trim() : "";
 
-      const prompt = `あなたはプロのVTuber配信マネージャーです。
-以下の配信情報をもとに、YouTubeの概要欄（説明欄）に書く長文テキストを1本だけ作成してください。
-
-${slotDescContext}
-配信タイトル: ${title || "（未設定）"}
-配信テーマ: ${theme || shortDesc || "（未設定）"}
-
-【概要欄の構成】
-1. 元気な挨拶と配信の見どころ（2〜3文）
-2. 配信のルール・お願い
-   - 話題に出ていない他の配信者の名前を出さないでください
-   - 伝書鳩NG
-   - 荒らし・アンチはブロック＆スルー
-   - 不快なコメントは非表示・ブロックします
-3. SNSリンク（Twitterなど、ダミーURL可）
-4. 関連するハッシュタグ（5〜8個）
-5. 素材・モデルのクレジット表記（以下の内容を必ず含めてください）
-   - Live2Dモデル: 「とろろ」© Live2D Inc. (Live2D Creative Studio サンプルモデル)
-   - BGMやその他素材（ダミーで構いません）
-
-マークダウンやJSONは不要です。そのままYouTubeに貼れる形式のプレーンテキストだけを返してください。`;
+      let prompt = "";
+      if (typeof window.PromptLoader !== "undefined" && typeof window.PromptLoader.getFormattedPrompt === "function") {
+        prompt = await window.PromptLoader.getFormattedPrompt("stream_yt_desc", {
+          slotDescContext,
+          title: title || "（未設定）",
+          theme: theme || shortDesc || "（未設定）"
+        });
+      }
+      if (!prompt) {
+        prompt = `配信タイトル「${title}」、テーマ「${theme}」のYouTube概要欄を作成してください。`;
+      }
 
       aiGenerateYtDescBtn.textContent = "⏳ 生成中...";
       aiGenerateYtDescBtn.disabled = true;

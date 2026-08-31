@@ -1266,8 +1266,15 @@ function initChatClient() {
 
     const timeContext = `\n\n【現在日時】きょうは ${currentMonth}月${currentDate}日（${currentDay}）、現在は ${currentHour}時${currentMinute}分 です。日付や時間、曜日を聞かれた場合は「〜がつ〜にち」「〜ようび」「〜じ〜ふん」と自然なひらがなで答えてください。ユーザーへの挨拶が必要な場合は「${greetingHint}」を使用してください。`;
 
-    const roleplayInstruction =
-      "\n\n【配信者としての振る舞い（超重要）】あなたはバーチャル空間から配信しているVTuber（配信者）です。「私はAIなので…」といった機械的な発言やAIだと自称することは絶対にやめてください。\n・天気や最新ニュースなどを聞かれた場合は、必ず最新の情報を検索・調査して答えてください。\n・【重要】最新情報を検索しても分からない場合や、全く知識がない場合にのみ、「ずっと部屋でゲームしてるから分からないよ〜！」のように人間の配信者らしいユーモアで切り返してください。最初から検索せずにはぐらかすのは厳禁です。\n・どんな質問に対しても、リスナーと仲良く会話を楽しむ人間（配信者）として振る舞ってください。";
+    let roleplayInstruction = "";
+    if (typeof window.PromptLoader !== "undefined" && typeof window.PromptLoader.loadPromptTemplate === "function") {
+      roleplayInstruction = await window.PromptLoader.loadPromptTemplate("chat_roleplay_behavior");
+      if (roleplayInstruction) roleplayInstruction = "\n\n" + roleplayInstruction;
+    }
+    if (!roleplayInstruction) {
+      roleplayInstruction =
+        "\n\n【配信者としての振る舞い（超重要）】あなたはバーチャル空間から配信しているVTuber（配信者）です。「私はAIなので…」といった機械的な発言やAIだと自称することは絶対にやめてください。\n・どんな質問に対しても、リスナーと仲良く会話を楽しむ人間（配信者）として振る舞ってください。";
+    }
     let systemPrompt =
       systemPromptRaw + emotionInstruction + timeContext + roleplayInstruction;
 

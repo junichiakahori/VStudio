@@ -383,9 +383,19 @@ window.triggerIdleSpeech = async function () {
         ? availablePhrases[Math.floor(Math.random() * availablePhrases.length)]
         : null;
 
-    if (shouldRemake) {
-      // AI機能ONの場合は完全新規生成
-      let prompt = `あなたは配信者です。今の季節は「${seasonCategory}」、時間帯は「${timeCategory}」です。${themeContext}季節感や時間帯、日常のちょっとした出来事、またはリスナーへの気軽な問いかけなど、配信中の自然で【全く新しい】独り言を1〜2文で生成してください。過去の使い回しにならないよう、毎回新鮮な話題を提供してください。${isZunda ? "語尾に「のだ」「なのだ」をつけてずんだもんになりきってください。" : ""}`;
+      // 外部プロンプトファイル（/prompts/idle_speech.txt）からロード＆展開
+      let prompt = "";
+      if (typeof window.PromptLoader !== "undefined" && typeof window.PromptLoader.getFormattedPrompt === "function") {
+        prompt = await window.PromptLoader.getFormattedPrompt("idle_speech", {
+          seasonCategory,
+          timeCategory,
+          themeContext,
+          zundaPrompt: isZunda ? "語尾に「のだ」「なのだ」をつけてずんだもんになりきってください。" : ""
+        });
+      }
+      if (!prompt) {
+        prompt = `あなたは配信者です。今の季節は「${seasonCategory}」、時間帯は「${timeCategory}」です。${themeContext}配信中の自然な独り言を1〜2文で生成してください。${isZunda ? "語尾に「のだ」「なのだ」をつけてずんだもんになりきってください。" : ""}`;
+      }
 
       const generatedPhrase = await aiFeatures.callAI(
         prompt,

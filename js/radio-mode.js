@@ -616,39 +616,30 @@
           ? `台本の最終行は必ず次の挨拶で締めてください（変更不可）:\n「${configClosing}」`
           : "";
 
-        // プロンプトの構築
-        const prompt = `${personalityDesc}「${programTitle}」という番組の、「${programTheme}」というテーマで、約${duration}分間の番組台本を生成してください。
-以下のルールに必ず従ってください。
-${timeContextStr}
-【文字数・行数の目安】
-- 読み上げ速度は1分あたり約${charsPerMinute}文字です
-- ${duration}分の番組なので、台本全体の総文字数は約${totalChars}文字が目安です
-- 1行（1セリフ）は80〜120文字程度にしてください
-- したがって全体で約${targetLines}行の台本を生成してください（±3行程度は許容）
-${openingInstruction ? "\n【オープニング（最初の行）の指定】\n" + openingInstruction : ""}
-${closingInstruction ? "\n【エンディング（最終行）の指定】\n" + closingInstruction : ""}
+        // 外部プロンプトファイル（/prompts/radio_script_generate.txt）からロード＆展開
+        const promptVars = {
+          personalityDesc,
+          programTitle,
+          programTheme,
+          duration,
+          timeContextStr,
+          charsPerMinute,
+          totalChars,
+          targetLines,
+          openingInstruction: openingInstruction ? "\n【オープニング（最初の行）の指定】\n" + openingInstruction : "",
+          closingInstruction: closingInstruction ? "\n【エンディング（最終行）の指定】\n" + closingInstruction : "",
+          seListStr,
+          exampleOpening: configOpening || "皆さんこんにちは！今夜もまったりやっていきましょう。",
+          exampleClosing: configClosing || "今夜もたくさん聴いてくれてありがとう。また次回もよろしくね！"
+        };
 
-【フォーマットのルール】
-1. 1セリフにつき1行で出力してください。セリフの中に改行を含めないでください。
-2. 構成は「オープニング（2〜3行）」→「メイントーク（パーソナリティの独り語り）」→「[ラジオ一時停止: コメント返し]」→「エンディング（2〜3行）」のように自然な流れにしてください。
-3. SE（効果音）を鳴らしたいタイミングで、独立した1行として \`[SE: 効果音の名前]\` と記述してください。セリフと同じ行には書かないでください。SEは場面転換や盛り上がりのタイミングで数回使用してください。
-4. 【重要・禁止事項】「リスナーからのお便り、メール、コメントの紹介」は【完全に禁止】です。架空のリスナー名や架空のコメント（例：「〜さんからのお便りです」「〜というコメントが来ていますね」等）は【絶対に捏造・出力しないでください】。番組は終始「パーソナリティの独り語り」のみで進行してください。
-5. 【重要】エンディングの直前に、独立した1行として \`[ラジオ一時停止: コメント返し]\` というタグだけを1回出力してください。このタグの前後で、コメントを読み上げるようなセリフは一切不要です。
-${seListStr}
-
-【出力形式の例】
-${configOpening || "皆さんこんにちは！今夜もまったりやっていきましょう。"}
-[SE: 大勢で拍手]
-今回のテーマはですね、${programTheme}についていろいろ話していきたいと思います。
-実はわたし最近ちょっとした発見がありまして、みなさんにもシェアしたいんですよ。
-（…このように${targetLines}行程度まで「パーソナリティ自身の体験談や考え（独り語り）」を続ける…）
-（…絶対に架空のリスナーのお便りやコメントを捏造しないでください…）
-[ラジオ一時停止: コメント返し]
-さて、そろそろお別れの時間ですね。
-${configClosing || "今夜もたくさん聴いてくれてありがとう。また次回もよろしくね！"}
-[SE: 放送終了チャイム]
-
-上記の形式で、台本のセリフのみを出力してください（説明書きや前置き・セクション見出しは不要です）。`;
+        let prompt = "";
+        if (typeof window.PromptLoader !== "undefined" && typeof window.PromptLoader.getFormattedPrompt === "function") {
+          prompt = await window.PromptLoader.getFormattedPrompt("radio_script_generate", promptVars);
+        }
+        if (!prompt) {
+          prompt = `${personalityDesc}「${programTitle}」の「${programTheme}」について約${duration}分の台本を1行1セリフで生成してください。`;
+        }
 
         // aiFeaturesを使って生成 (AIモデルはシステムプロンプト欄のロジックを流用)
         const generatedScript = await aiFeatures.callAI(
