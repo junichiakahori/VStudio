@@ -1593,6 +1593,24 @@ def apply_backend_pronunciation_dict(text):
     # 4. 見出し・文頭・読点直後の単独「米」（例: 「米、対イラン」→「べい、対イラン」「米が軍事面」→「べいが軍事面」「米は」→「べいは」）
     processed = re.sub(r'(^|[、。！？「\s])米([、がはと])', r'\1べい\2', processed)
 
+    # ── 固有名詞・VTuber・人名・タレント名の完全自動リアルタイム読み解決（インメモリ） ──
+    try:
+        candidate_terms = extract_kanji_terms(processed)
+        for term in candidate_terms:
+            if not term or len(term) < 2:
+                continue
+            # Step 1: 国語辞典ルックアップ
+            m_reading = lookup_master_dictionary(term)
+            if m_reading and len(m_reading) >= 2:
+                processed = processed.replace(term, m_reading)
+                continue
+            # Step 2: Wikipedia API リアルタイム読み取得（インメモリキャッシュ対応）
+            w_term, w_reading = lookup_wikipedia_reading(term)
+            if w_term and w_reading and w_term in processed:
+                processed = processed.replace(w_term, w_reading)
+    except Exception as e:
+        print(f"[固有名詞自動解決エラー]: {e}")
+
     # 人を指す「〜方（かた）」のVOICEVOX誤読（ホウ）完全・網羅的自動補正
     processed = re.sub(r'([ぁ-ん])方([がはもにへでを、。！？\s]|$|たち|がた)', r'\1かた\2', processed)
     processed = re.sub(r'([0-9０-９一二三四五六七八九十百千万]+人)の方', r'\1のかた', processed)
@@ -1901,12 +1919,13 @@ def lookup_wikipedia_reading(term):
             extract = page.get("extract", "")
             page_title = page.get("title", term)
 
-            # 冒頭80文字以内の最初の括弧から読みを取得（後方の別名や外国語読みを拾わない）
-            intro_text = extract[:100]
-            m = re.search(
-                r'[（(]([ぁ-んァ-ヶー\s　っッ]+?)(?:[、,\s　]|あるいは|または|[）)])',
-                intro_text
-            )
+            # 冒頭120文字以内の最初の括弧から読みを取得（スペース区切りやフルネームにも対応）
+            intro_text = extract[:120]
+            # パターン1: （あまう しろっぷ）のように全体がひらがな・カタカナの括弧
+            m = re.search(r'[（(]([ぁ-んァ-ヶー\s　っッ]+?)[）)]', intro_text)
+            if not m:
+                # パターン2: （あまう しろっぷ、英語名...）のようにカンマや区切りがある場合
+                m = re.search(r'[（(]([ぁ-んァ-ヶー\s　っッ]+?)(?:[、,\s　]|あるいは|または|[）)])', intro_text)
             if m:
                 reading = re.sub(r"[\s　]", "", m.group(1))
                 if re.fullmatch(r"[ぁ-んァ-ヶーっッ]+", reading) and 2 <= len(reading) <= 20:
