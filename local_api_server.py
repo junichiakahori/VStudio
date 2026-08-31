@@ -164,20 +164,26 @@ def save_data(data, file_path=DATA_FILE):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 def build_news_prompt(char_desc, transition, title, full_article_content):
-    """外部プロンプトファイル news_prompt_template.txt からテンプレートを動的読み込みしてプロンプトを構築"""
-    if os.path.exists(PROMPT_TEMPLATE_FILE):
+    """prompts.json の news_script からプロンプトを構築"""
+    prompts_file = os.path.join(BASE_DIR, "prompts.json")
+    if os.path.exists(prompts_file):
         try:
-            with open(PROMPT_TEMPLATE_FILE, 'r', encoding='utf-8') as f:
-                template = f.read()
-                return template.format(
-                    char_desc=char_desc,
-                    transition=transition,
-                    title=title,
-                    full_article_content=full_article_content
-                )
+            with open(prompts_file, 'r', encoding='utf-8') as f:
+                p_data = json.load(f)
+                news_p = p_data.get("news_script", {}).get("prompt", [])
+                if isinstance(news_p, list):
+                    template = "\n".join(news_p)
+                else:
+                    template = str(news_p)
+                if template:
+                    return template.format(
+                        char_desc=char_desc,
+                        transition=transition,
+                        title=title,
+                        full_article_content=full_article_content
+                    )
         except Exception as e:
-            print(f"[プロンプトファイル読み込みエラー]: {e}")
-    # 万が一ファイルが無い場合の安全なフォールバック
+            print(f"[prompts.json 読み込みエラー]: {e}")
     return f"あなたは人気配信者である{char_desc}\n冒頭: {transition}\n【タイトル】: {title}\n【内容】: {full_article_content}"
 
 def load_article_url_cache():
