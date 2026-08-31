@@ -1510,31 +1510,6 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
 
     return corrected_items
 
-# 大規模国語辞典（master_dict.json: 65万語）メモリキャッシュ管理
-_master_dict_data = None
-def get_master_dict():
-    global _master_dict_data
-    if _master_dict_data is None:
-        json_path = os.path.join(os.path.dirname(__file__), 'dict', 'master_dict.json')
-        if os.path.exists(json_path):
-            try:
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    _master_dict_data = json.load(f)
-                print(f"[MasterDict] 大規模国語辞典（master_dict.json: {len(_master_dict_data):,}語）をメモリにロード完了")
-            except Exception as e:
-                print(f"[MasterDict] JSON読み込みエラー: {e}")
-                _master_dict_data = {}
-        else:
-            _master_dict_data = {}
-    return _master_dict_data
-
-def lookup_master_dictionary(term):
-    """65万語の国語・現代語辞典（JSON）から最頻出の正しい読み（ひらがな）を瞬時に取得"""
-    d = get_master_dict()
-    if not d or not term or len(term) < 2:
-        return None
-    return d.get(term, None)
-
 def apply_backend_pronunciation_dict(text):
     if not text:
         return text
@@ -1607,16 +1582,10 @@ def apply_backend_pronunciation_dict(text):
         for term in candidate_terms:
             if not term or len(term) < 2:
                 continue
-            # Step 1: 特殊な固有名詞・VTuber・アルファベット名のWikipedia API リアルタイム読み取得（最優先）
+            # 特殊な固有名詞・VTuber・アルファベット名のWikipedia API リアルタイム読み取得
             w_term, w_reading = lookup_wikipedia_reading(term)
             if w_term and w_reading and w_term in processed:
                 processed = processed.replace(w_term, w_reading)
-                continue
-
-            # Step 2: 固有名詞・人名辞書から補正
-            m_reading = lookup_master_dictionary(term)
-            if m_reading and len(m_reading) >= 2:
-                processed = processed.replace(term, m_reading)
     except Exception as e:
         print(f"[固有名詞自動解決エラー]: {e}")
 
