@@ -2043,7 +2043,7 @@ def synthesize_voicevox_backend(text, speaker_id=1, speed=1.0, pitch=0.0):
     import urllib.parse
     processed_text = apply_backend_pronunciation_dict(text)
     final_text = processed_text
-    corrected = False
+    corrected = (processed_text != text)
 
     def _audio_query(t):
         enc = urllib.parse.quote(t)

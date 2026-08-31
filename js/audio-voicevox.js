@@ -111,8 +111,8 @@ async function fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal
           try { finalText = decodeURIComponent(finalTextHeader); } catch (e) { }
         }
 
-        if (corrected === "1") {
-          console.warn(`[VOICEVOX誤読補正] ⚠️ 補正適用: "${text.trim()}" ➔ 補正後: "${finalText}" ➔ 実際の読み: 🗣️ "${cleanKana || rawKana}"`);
+        if (corrected === "1" || (finalText && finalText !== text.trim())) {
+          console.log(`[VOICEVOX発音確認] 🗣️ 「${text.trim()}」 ➔ 変換後: 「${finalText}」 (読み: "${cleanKana || rawKana}")`);
         } else {
           console.log(`[VOICEVOX発音確認] 🗣️ 読み: "${cleanKana || rawKana}"`);
         }
@@ -205,8 +205,8 @@ async function playNextVoicevox() {
     if (displayString) {
       console.log(`[原稿] "${displayString}"`);
     }
-    // 🗣️ VOICEVOXの音声合成と再生ログには「音声用の speakString」を使う
-    console.log(`[VOICEVOX] Playing: "${speakString}" (Speaker ID: ${speakerId})`);
+    // 🗣️ VOICEVOXの音声合成と再生ログ
+    console.log(`[VOICEVOX] 音声リクエスト送信: "${speakString}" (Speaker ID: ${speakerId})`);
 
     currentPlayingDisplayText = displayString;
     showSubtitles(displayString); // 画面の字幕には漢字混じりの綺麗な原稿を表示
