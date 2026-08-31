@@ -1599,15 +1599,16 @@ def apply_backend_pronunciation_dict(text):
         for term in candidate_terms:
             if not term or len(term) < 2:
                 continue
-            # Step 1: 国語辞典ルックアップ
-            m_reading = lookup_master_dictionary(term)
-            if m_reading and len(m_reading) >= 2:
-                processed = processed.replace(term, m_reading)
-                continue
-            # Step 2: Wikipedia API リアルタイム読み取得（インメモリキャッシュ対応）
+            # Step 1: 特殊な固有名詞・VTuber・アルファベット名のWikipedia API リアルタイム読み取得（最優先）
             w_term, w_reading = lookup_wikipedia_reading(term)
             if w_term and w_reading and w_term in processed:
                 processed = processed.replace(w_term, w_reading)
+                continue
+
+            # Step 2: 固有名詞・人名辞書から補正
+            m_reading = lookup_master_dictionary(term)
+            if m_reading and len(m_reading) >= 2:
+                processed = processed.replace(term, m_reading)
     except Exception as e:
         print(f"[固有名詞自動解決エラー]: {e}")
 
