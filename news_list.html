@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📰 取得済みのニュース一覧</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0f121d;
+            --bg-card: #181d2c;
+            --bg-card-hover: #22293d;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(0, 210, 211, 0.4);
+            --text-main: #f1f2f6;
+            --text-muted: #8b949e;
+            --accent-green: #00e676;
+            --accent-blue: #00d2d3;
+            --accent-orange: #ff9f43;
+            --accent-pink: #ff6b81;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 16px 20px;
+            overflow-y: auto;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            background: rgba(15, 18, 29, 0.96);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stats-badge {
+            background: rgba(0, 210, 211, 0.15);
+            color: #81ecec;
+            border: 1px solid rgba(0, 210, 211, 0.35);
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .action-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-color);
+            color: #e2e8f0;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 0.16);
+            border-color: rgba(255, 255, 255, 0.25);
+            color: #ffffff;
+        }
+
+        .action-btn.jump-btn {
+            background: linear-gradient(135deg, #00e676, #00b894);
+            color: #051a10;
+            border: none;
+            box-shadow: 0 2px 10px rgba(0, 230, 118, 0.35);
+        }
+
+        .action-btn.jump-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(0, 230, 118, 0.6);
+        }
+
+        #news-list-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-bottom: 20px;
+        }
+
+        .news-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px 16px;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .news-card:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-hover);
+            transform: translateY(-1px);
+        }
+
+        .news-card.is-playing {
+            border-color: var(--accent-green);
+            background: linear-gradient(135deg, rgba(0, 230, 118, 0.12) 0%, rgba(24, 29, 44, 0.95) 100%);
+            box-shadow: 0 0 16px rgba(0, 230, 118, 0.3);
+        }
+
+        .news-card.is-read {
+            opacity: 0.65;
+        }
+
+        .news-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .card-tags {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .cat-badge {
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 5px;
+            color: #fff;
+            background: #485460;
+        }
+
+        .cat-cat_top { background: linear-gradient(135deg, #e84118, #c23616); }
+        .cat-cat_society { background: linear-gradient(135deg, #0097e6, #00a8ff); }
+        .cat-cat_world { background: linear-gradient(135deg, #8c7ae6, #9c88ff); }
+        .cat-cat_business { background: linear-gradient(135deg, #44bd32, #4cd137); }
+        .cat-cat_politics { background: linear-gradient(135deg, #e1b12c, #fbc531); color: #000; }
+        .cat-cat_entertainment { background: linear-gradient(135deg, #e84393, #fd79a8); }
+        .cat-cat_sports { background: linear-gradient(135deg, #e67e22, #f39c12); }
+        .cat-cat_tech { background: linear-gradient(135deg, #00cec9, #81ecec); color: #000; }
+        .cat-cat_science { background: linear-gradient(135deg, #16a085, #1abc9c); }
+        .cat-cat_local { background: linear-gradient(135deg, #7f8c8d, #95a5a6); }
+
+        .playing-badge {
+            background: #00e676;
+            color: #000;
+            font-size: 0.7rem;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 4px;
+            animation: blink 1.2s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .read-status {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
+
+        .start-here-btn {
+            background: linear-gradient(135deg, rgba(0, 210, 211, 0.15), rgba(0, 168, 255, 0.15));
+            border: 1px solid rgba(0, 210, 211, 0.4);
+            color: #81ecec;
+            border-radius: 6px;
+            padding: 3px 9px;
+            font-size: 0.73rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: inherit;
+        }
+
+        .start-here-btn:hover {
+            background: linear-gradient(135deg, #00d2d3, #00b894);
+            color: #051a10;
+            border-color: #00d2d3;
+            box-shadow: 0 2px 10px rgba(0, 210, 211, 0.45);
+            transform: translateY(-1px);
+        }
+
+        .start-here-btn:active {
+            transform: translateY(0);
+        }
+
+        .news-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #ffffff;
+            line-height: 1.45;
+            margin-bottom: 6px;
+        }
+
+        .news-desc {
+            font-size: 0.82rem;
+            color: #94a3b8;
+            line-height: 1.5;
+            margin-bottom: 8px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .news-card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            padding-top: 6px;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .news-link {
+            color: #00d2d3;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: color 0.15s;
+        }
+
+        .news-link:hover {
+            color: #81ecec;
+            text-decoration: underline;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.6;
+        }
+
+        .empty-title {
+            font-size: 1.1rem;
+            color: #e2e8f0;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .empty-desc {
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+
+        @keyframes focusPulse {
+            0% { transform: scale(1); box-shadow: 0 0 16px rgba(0, 230, 118, 0.4); }
+            50% { transform: scale(1.02); box-shadow: 0 0 24px rgba(0, 230, 118, 0.8); }
+            100% { transform: scale(1); box-shadow: 0 0 16px rgba(0, 230, 118, 0.4); }
+        }
+
+        .pulse-active {
+            animation: focusPulse 0.8s ease;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
+        ::-webkit-scrollbar-thumb { background: #2a3144; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3c4660; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <h3>📰 取得済みのニュース一覧</h3>
+            <span class="stats-badge" id="news-count-badge">0 件</span>
+        </div>
+        <div class="header-actions">
+            <button class="action-btn jump-btn" id="jump-to-current-btn" onclick="scrollToPlayingNews(true)">
+                🎯 放送中へジャンプ
+            </button>
+            <button class="action-btn" id="refresh-btn" onclick="renderNewsList()">
+                🔄 更新
+            </button>
+        </div>
+    </header>
+
+    <div id="news-list-container">
+        <div class="empty-state">
+            <div class="empty-icon">⏳</div>
+            <div class="empty-title">ニュースを読み込んでいます...</div>
+        </div>
+    </div>
+
+    <script>
+        const CATEGORY_NAMES = {
+            cat_top: "主要",
+            cat_society: "社会",
+            cat_world: "国際",
+            cat_business: "経済",
+            cat_politics: "政治",
+            cat_entertainment: "エンタメ",
+            cat_sports: "スポーツ",
+            cat_tech: "IT・技術",
+            cat_science: "科学",
+            cat_local: "地域"
+        };
+
+        const CATEGORY_ORDER = ["cat_top", "cat_society", "cat_world", "cat_business", "cat_politics", "cat_entertainment", "cat_sports", "cat_tech", "cat_science", "cat_local"];
+
+        function escapeHtml(str) {
+            if (!str) return "";
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+
+        function getFetchedNews() {
+            try {
+                const saved = localStorage.getItem("latestFetchedNews");
+                if (saved) return JSON.parse(saved);
+            } catch (e) {}
+            return [];
+        }
+
+        function getReadTitles() {
+            try {
+                return new Set(JSON.parse(localStorage.getItem("newsReadTitles") || "[]"));
+            } catch (e) {
+                return new Set();
+            }
+        }
+
+        function getSortedNews() {
+            const newsList = getFetchedNews();
+            if (!newsList || newsList.length === 0) return [];
+            return [...newsList].sort((a, b) => {
+                const ai = CATEGORY_ORDER.indexOf(a.categoryKey || "cat_top");
+                const bi = CATEGORY_ORDER.indexOf(b.categoryKey || "cat_top");
+                const catDiff = (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+                if (catDiff !== 0) return catDiff;
+                const dateA = new Date(a.pubDate || 0).getTime();
+                const dateB = new Date(b.pubDate || 0).getTime();
+                return dateA - dateB;
+            });
+        }
+
+        function renderNewsList() {
+            const container = document.getElementById("news-list-container");
+            const badge = document.getElementById("news-count-badge");
+            const sortedNews = getSortedNews();
+            const readTitles = getReadTitles();
+
+            if (!sortedNews || sortedNews.length === 0) {
+                badge.textContent = "0 件";
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📰</div>
+                        <div class="empty-title">まだニュースが取得されていません</div>
+                        <div class="empty-desc">メイン画面の「⬇️ ニュースを取得」ボタンを押してニュースを取得してください。</div>
+                    </div>
+                `;
+                return;
+            }
+
+            const unreadCount = sortedNews.filter(n => !readTitles.has(n.title)).length;
+            const readCount = sortedNews.length - unreadCount;
+            badge.textContent = `全 ${sortedNews.length} 件 (未読: ${unreadCount} / 既読: ${readCount})`;
+
+            // 現在放送中のタイトル
+            const currentPlayingTitle = localStorage.getItem("currentPlayingNewsTitle") || "";
+
+            let html = "";
+            let isFirstUnreadMarked = false;
+
+            sortedNews.forEach((item, idx) => {
+                const isRead = readTitles.has(item.title);
+                const isPlaying = currentPlayingTitle && item.title.includes(currentPlayingTitle);
+                const catKey = item.categoryKey || "cat_top";
+                const catName = CATEGORY_NAMES[catKey] || item.category || "ニュース";
+                const linkUrl = item.link || item.url || "";
+
+                let idAttr = "";
+                let firstUnreadClass = "";
+                if (isPlaying) {
+                    idAttr = 'id="current-playing-news-card"';
+                } else if (!isRead && !isFirstUnreadMarked) {
+                    firstUnreadClass = "is-unread-first";
+                    isFirstUnreadMarked = true;
+                }
+
+                html += `
+                    <div class="news-card ${isPlaying ? 'is-playing' : ''} ${isRead ? 'is-read' : ''} ${firstUnreadClass}" ${idAttr}>
+                        <div class="news-card-header">
+                            <div class="card-tags">
+                                <span class="cat-badge cat-${catKey}">${escapeHtml(catName)}</span>
+                                ${isPlaying ? '<span class="playing-badge">🎙️ 放送中</span>' : ''}
+                                <span style="font-size:0.75rem; color:#64748b; font-family:\'Fira Code\',monospace;">#${idx + 1}</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <button class="start-here-btn" onclick="startNewsFromCard(${idx}, event)" title="このニュースから読み上げを開始します">▶ ここから始める</button>
+                                <span class="read-status">${isRead ? '✅ 既読' : '🆕 未読'}</span>
+                            </div>
+                        </div>
+                        <div class="news-title">${escapeHtml(item.title)}</div>
+                        ${item.description ? `<div class="news-desc">${escapeHtml(item.description)}</div>` : ''}
+                        <div class="news-card-footer">
+                            <span>📅 ${escapeHtml(item.pubDate || '日時不明')}</span>
+                            ${linkUrl ? `<a href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener noreferrer" class="news-link">🔗 元記事を開く ↗</a>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        window.startNewsFromCard = function(index, event) {
+            if (event) event.stopPropagation();
+            const sortedNews = getSortedNews();
+            if (!sortedNews || !sortedNews[index]) return;
+            const targetItem = sortedNews[index];
+            const targetTitle = targetItem.title;
+
+            // 1. 親ウィンドウのAPIを直接実行
+            let sent = false;
+            try {
+                const hostWin = (window.opener && !window.opener.closed) ? window.opener : (window.parent !== window ? window.parent : window);
+                if (hostWin && typeof hostWin.startNewsFromTitle === "function") {
+                    hostWin.startNewsFromTitle(targetTitle);
+                    sent = true;
+                }
+            } catch (e) {}
+
+            // 2. 直接実行できなかった場合のみ localStorageイベントでフォールバック
+            if (!sent) {
+                localStorage.setItem("startNewsRequest", JSON.stringify({
+                    title: targetTitle,
+                    timestamp: Date.now()
+                }));
+            }
+
+            // UIフィードバック
+            const btn = event ? event.currentTarget : null;
+            if (btn) {
+                btn.innerHTML = "✨ 開始しました！";
+                btn.style.background = "#00e676";
+                btn.style.color = "#051a10";
+                btn.style.borderColor = "#00e676";
+                setTimeout(() => {
+                    renderNewsList();
+                }, 1000);
+            }
+        };
+
+        window.scrollToPlayingNews = function(smooth = true) {
+            const target = document.getElementById("current-playing-news-card") || document.querySelector(".is-unread-first");
+            if (target) {
+                target.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "center" });
+                target.classList.remove("pulse-active");
+                void target.offsetWidth;
+                target.classList.add("pulse-active");
+            } else {
+                window.scrollTo({ top: 0, behavior: smooth ? "smooth" : "auto" });
+            }
+        };
+
+        // 初期化 & 定期更新（別ウィンドウの変更を自動同期）
+        renderNewsList();
+        setInterval(renderNewsList, 2500);
+    </script>
+</body>
+</html>

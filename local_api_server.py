@@ -15,7 +15,7 @@ import sqlite3
 PORT = 8001
 DATA_FILE = "custom_idle_phrases.json"
 HIRAGANA_FILE = "hiragana_data.json"
-DICT_FILE = "hiragana_dict.json"
+DICT_FILE = os.path.join("dict", "hiragana_dict.json")
 RADIO_SCRIPT_FILE = "radio_script.txt"
 RADIO_SCRIPT_YOMI_FILE = "radio_script_yomi.txt"
 RADIO_SCRIPT_CONFIG_FILE = "radio_script_config.json"
@@ -27,38 +27,121 @@ current_hot_reload_timestamp = int(time.time() * 1000)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ARTICLE_URLS_FILE = os.path.join(BASE_DIR, "article_urls.json")
 PROMPT_TEMPLATE_FILE = os.path.join(BASE_DIR, "news_prompt_template.txt")
-LOG_FILE = os.path.join(BASE_DIR, "browser_console.log")
+LOG_FILE = os.path.join(BASE_DIR, "logs", "browser_console.log")
 LOG_BACKUP_DIR = os.path.join(BASE_DIR, "logs_backup")
 
 _log_lock = threading.Lock()
 _current_log_date = datetime.date.today().strftime('%Y-%m-%d')
 
-def check_and_rotate_browser_log():
-    """日付が変わった際に browser_console.log を logs_backup/ にバックアップし、1行目からリセット"""
+ALL_MANAGED_LOGS = [
+    ('browser_console', os.path.join(BASE_DIR, "logs", "browser_console.log")),
+]
+MAX_LOG_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
+RETENTION_DAYS = 7
+
+def clean_old_log_backups(retention_days=RETENTION_DAYS):
+    """logs_backup/ 内の指定日数（デフォルト7日）以上前のバックアップを自動クリーンアップ"""
+    try:
+        if not os.path.exists(LOG_BACKUP_DIR):
+            return
+        cutoff_time = time.time() - (retention_days * 86400)
+        for fname in os.listdir(LOG_BACKUP_DIR):
+            if not fname.endswith(".log"):
+                continue
+            file_path = os.path.join(LOG_BACKUP_DIR, fname)
+            try:
+                if os.path.isfile(file_path) and os.path.getmtime(file_path) < cutoff_time:
+                    os.remove(file_path)
+                    print(f"[LogCleanup] 🧹 7日以上前の古いログバックアップを削除しました: {fname}")
+            except Exception as fe:
+                print(f"[LogCleanupエラー]: {fe}")
+    except Exception as e:
+        print(f"[LogCleanup全体エラー]: {e}")
+
+def _rotate_single_log(log_key, file_path, reason_label):
+    """単一ログファイルのローテーション実行"""
+    if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
+        return
+    if not os.path.exists(LOG_BACKUP_DIR):
+        os.makedirs(LOG_BACKUP_DIR, exist_ok=True)
+        
+    date_str = datetime.date.today().strftime('%Y-%m-%d')
+    base_backup_name = f"{log_key}_{date_str}.log"
+    backup_path = os.path.join(LOG_BACKUP_DIR, base_backup_name)
+    
+    # 既に同名バックアップが存在する場合はタイムスタンプ付き
+    if os.path.exists(backup_path):
+        ts_str = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_path = os.path.join(LOG_BACKUP_DIR, f"{log_key}_{ts_str}.log")
+        
+    try:
+        shutil.copy2(file_path, backup_path)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            now_str = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S.000Z')
+            f.write(f"[{now_str}] [SYSTEM] === Log rotated ({reason_label}: {os.path.basename(backup_path)}) ===\n")
+        print(f"[LogRotation] 📦 {log_key} をローテーションしました ({reason_label}) -> {os.path.basename(backup_path)}")
+    except Exception as e:
+        print(f"[LogRotationエラー {log_key}]: {e}")
+
+def check_and_rotate_logs():
+    """日付変更またはサイズ上限(10MB)超過時に全ログをローテーション"""
     global _current_log_date
     today_str = datetime.date.today().strftime('%Y-%m-%d')
+    
     with _log_lock:
-        if today_str != _current_log_date:
+        is_date_changed = (today_str != _current_log_date)
+        
+        # 1. 日付変更による全ログローテーション
+        if is_date_changed:
+            prev_date = _current_log_date
+            print(f"[LogRotation] 📅 日付変更を検知 ({prev_date} -> {today_str})。全ログをバックアップ退避します。")
+            for log_key, file_path in ALL_MANAGED_LOGS:
+                _rotate_single_log(log_key, file_path, f"Date changed from {prev_date}")
+            _current_log_date = today_str
+            clean_old_log_backups(RETENTION_DAYS)
+        else:
+            # 2. サイズ超過チェック（10MB超過）
+            for log_key, file_path in ALL_MANAGED_LOGS:
+                if os.path.exists(file_path):
+                    try:
+                        if os.path.getsize(file_path) >= MAX_LOG_SIZE_BYTES:
+                            _rotate_single_log(log_key, file_path, "Size > 10MB")
+                    except Exception:
+                        pass
+
+def check_and_rotate_browser_log():
+    """後方互換用ラッパー"""
+    check_and_rotate_logs()
+
+def _start_log_rotation_scheduler():
+    """定期的にログローテーションとクリーンアップをチェックするバックグラウンドスレッド"""
+    def _loop():
+        time.sleep(2)
+        check_and_rotate_logs()
+        clean_old_log_backups(RETENTION_DAYS)
+        while True:
+            time.sleep(300)  # 5分毎にサイズ・日付変更を巡回チェック
             try:
-                if not os.path.exists(LOG_BACKUP_DIR):
-                    os.makedirs(LOG_BACKUP_DIR, exist_ok=True)
-                if os.path.exists(LOG_FILE) and os.path.getsize(LOG_FILE) > 0:
-                    backup_filename = f"browser_console_{_current_log_date}.log"
-                    backup_path = os.path.join(LOG_BACKUP_DIR, backup_filename)
-                    shutil.copy2(LOG_FILE, backup_path)
-                    # 1行目からスタート
-                    with open(LOG_FILE, 'w', encoding='utf-8') as f:
-                        now_str = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S.000Z')
-                        f.write(f"[{now_str}] [SYSTEM] === Log rotated for {today_str} (Previous: {backup_filename}) ===\n")
-                    print(f"[LogRotation] 📅 日付変更を検知: {backup_filename} にバックアップし、browser_console.log を1行目から再スタートしました")
-            except Exception as e:
-                print(f"[LogRotationエラー]: {e}")
-            finally:
-                _current_log_date = today_str
+                check_and_rotate_logs()
+            except Exception:
+                pass
+    t = threading.Thread(target=_loop, daemon=True)
+    t.start()
+
+def log_to_api_file(message):
+    try:
+        check_and_rotate_logs()
+        log_path = os.path.join(BASE_DIR, "logs", "api_server.log")
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        with open(log_path, 'a', encoding='utf-8') as f:
+            timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            f.write(f"[{timestamp}] {message}\n")
+    except Exception:
+        pass
 
 def write_browser_console_log(log_message):
     """日次ローテーション管理付きの安全なログ書き込み"""
-    check_and_rotate_browser_log()
+    check_and_rotate_logs()
     with _log_lock:
         try:
             with open(LOG_FILE, 'a', encoding='utf-8') as f:
@@ -197,7 +280,32 @@ def search_news_url_by_title(title):
         pass
     return ""
 
+LOG_FILES_MAP = {
+    'launcher': 'logs/launcher.log',
+    'api_server': 'logs/api_server.log',
+    'vite': 'logs/vite.log',
+    'youtube_server': 'logs/youtube_server.log',
+    'tiktok_server': 'logs/tiktok_server.log',
+    'browser_console': 'logs/browser_console.log'
+}
+
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, format, *args):
+        # 頻繁なポーリングや /log 正常アクセスの出力を抑制し、api_server.log の肥大化を防ぐ
+        if len(args) >= 2 and str(args[1]) in ("200", "304"):
+            req_first_line = str(args[0])
+            if any(endpoint in req_first_line for endpoint in [
+                "POST /log",
+                "GET /api/log",
+                "GET /custom_idle_phrases.json",
+                "GET /hiragana_data.json",
+                "GET /news_script",
+                "GET /radio_script",
+                "GET /api/youtube/oauth_status"
+            ]):
+                return
+        super().log_message(format, *args)
+
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -206,7 +314,42 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path == '/hot_reload_signal':
+        if self.path.startswith('/api/log'):
+            parsed = urllib.parse.urlparse(self.path)
+            qs = urllib.parse.parse_qs(parsed.query)
+            tab = qs.get('tab', ['launcher'])[0]
+            rel_path = LOG_FILES_MAP.get(tab, 'logs/launcher.log')
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            full_path = os.path.join(base_dir, rel_path)
+            
+            content = ""
+            line_count = 0
+            mtime_str = ""
+            if os.path.exists(full_path):
+                try:
+                    with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+                    line_count = len(content.splitlines())
+                    mtime = os.path.getmtime(full_path)
+                    mtime_str = datetime.datetime.fromtimestamp(mtime).strftime('%H:%M:%S')
+                except Exception as e:
+                    content = f"(ログ読み込みエラー: {e})"
+            else:
+                content = "(ログファイルが空か、まだ生成されていません)"
+                
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json; charset=utf-8')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            resp_data = {
+                'tab': tab,
+                'filename': rel_path,
+                'content': content,
+                'lineCount': line_count,
+                'modifiedTime': mtime_str
+            }
+            self.wfile.write(json.dumps(resp_data, ensure_ascii=False).encode('utf-8'))
+        elif self.path == '/hot_reload_signal':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
@@ -634,6 +777,29 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
+        elif self.path.startswith('/api/log_clear'):
+            parsed = urllib.parse.urlparse(self.path)
+            qs = urllib.parse.parse_qs(parsed.query)
+            tab = qs.get('tab', ['launcher'])[0]
+            rel_path = LOG_FILES_MAP.get(tab, 'logs/launcher.log')
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            full_path = os.path.join(base_dir, rel_path)
+            
+            success = False
+            error_msg = ""
+            try:
+                os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                with open(full_path, 'w', encoding='utf-8') as f:
+                    f.write("")
+                success = True
+            except Exception as e:
+                error_msg = str(e)
+                
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json; charset=utf-8')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({'success': success, 'error': error_msg, 'filename': rel_path}, ensure_ascii=False).encode('utf-8'))
         elif self.path == '/log':
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
@@ -1001,10 +1167,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 if article_url:
                     LAST_PLAYING_ARTICLE_URL = article_url
                     ARTICLE_URL_CACHE[title] = article_url
-                    save_article_url_cache(ARTICLE_URL_CACHE)
-                    # 🔗 browser_console.log に記事URLを直接記録
-                    now_iso = time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime())
-                    write_browser_console_log(f"[{now_iso}] [LOG] [ニュース記事URL] 🔗 {article_url} | 記事: 「{title}」")
+                    # 🔗 browser_console.log に記事URLを直接記録 (JST表記)
+                    now_jst = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).strftime('%Y-%m-%d %H:%M:%S.000')
+                    write_browser_console_log(f"[{now_jst}] [LOG] [ニュース記事URL] 🔗 {article_url} | 記事: 「{title}」")
                     print(f"[記事URL特定成功] 🔗 {article_url} ({title[:20]}...)")
 
                 full_article_content = description
@@ -1046,8 +1211,16 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps({"error": "AI generation failed. Switching to standby waiting mode."}).encode('utf-8'))
                     return
 
+                # 🗞️ AIが生成した見出しルビ（[HEADLINE: ...] または 【見出し】: ...）の抽出
+                ai_headline_raw = None
+                headline_match = re.search(r'(?:\[HEADLINE:\s*|【見出し】:\s*)(.*?)(?:\]|\n|$)', raw_text)
+                if headline_match:
+                    ai_headline_raw = headline_match.group(1).strip()
+                    # 本文処理対象から [HEADLINE: ...] 行を除去
+                    clean_text = re.sub(r'(?:\[HEADLINE:\s*|【見出し】:\s*).*?(?:\]|\n|$)', '', clean_text).strip()
+
                 # クリーンアップ（カギ括弧除去 ＆ 不自然な語尾重複の自動補正）
-                clean_text = raw_text.replace("「", "").replace("」", "").strip()
+                clean_text = clean_text.replace("「", "").replace("」", "").strip()
                 clean_text = re.sub(r'にゃ{2,}', 'にゃ', clean_text)
                 clean_text = re.sub(r'にゃ[か？\?]+にゃ', 'かにゃ', clean_text)
                 clean_text = re.sub(r'のだ{2,}', 'のだ', clean_text)
@@ -1110,7 +1283,15 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     items = [{"display": fallback_display, "speech": fallback_speech}]
                     print(f"[フォールバック生成] 中国語除去のためクリーンな日本語原稿を安全自動生成しました: 「{title}」")
 
-                final_sentences = [it["speech"] for it in items]
+                # 見出し（タイトル）の表示・読みをAI生成結果から優先分離
+                if ai_headline_raw:
+                    headline_display = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\1', ai_headline_raw)
+                    headline_display = headline_display.replace("（", "").replace("）", "").replace("(", "").replace(")", "").strip()
+                    headline_speech = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\2', ai_headline_raw)
+                    headline_speech = apply_backend_pronunciation_dict(headline_speech)
+                else:
+                    headline_display = title.replace("「", "").replace("」", "").strip()
+                    headline_speech = apply_backend_pronunciation_dict(headline_display)
 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json; charset=utf-8')
@@ -1119,8 +1300,13 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({
                     "status": "ok",
                     "url": article_url or "",
+                    "headline": {
+                        "display": headline_display,
+                        "speech": headline_speech
+                    },
+                    "headline_speech": headline_speech,
                     "items": items,
-                    "sentences": final_sentences,
+                    "sentences": [it["display"] for it in items],
                     "fullText": "\n".join([it["display"] for it in items])
                 }, ensure_ascii=False).encode('utf-8'))
             except Exception as e:
@@ -1310,6 +1496,8 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
             "display": display_s,
             "speech": speech_s
         })
+        # 🔍 【追加】最終的にペアとして確定したものを記録
+        log_to_api_file(f"[ペア確定] display: '{display_s}' ➔ speech: '{speech_s}'")
 
     # AIが発見した単語を辞書に自動永続化
     if new_learned_dict:
@@ -1320,17 +1508,17 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
 
     return corrected_items
 
-# 大規模国語辞典（master_dictionary.json: 65万語）メモリキャッシュ管理
+# 大規模国語辞典（master_dict.json: 65万語）メモリキャッシュ管理
 _master_dict_data = None
 def get_master_dict():
     global _master_dict_data
     if _master_dict_data is None:
-        json_path = os.path.join(os.path.dirname(__file__), 'master_dictionary.json')
+        json_path = os.path.join(os.path.dirname(__file__), 'dict', 'master_dict.json')
         if os.path.exists(json_path):
             try:
                 with open(json_path, 'r', encoding='utf-8') as f:
                     _master_dict_data = json.load(f)
-                print(f"[MasterDict] 大規模国語辞典（master_dictionary.json: {len(_master_dict_data):,}語）をメモリにロード完了")
+                print(f"[MasterDict] 大規模国語辞典（master_dict.json: {len(_master_dict_data):,}語）をメモリにロード完了")
             except Exception as e:
                 print(f"[MasterDict] JSON読み込みエラー: {e}")
                 _master_dict_data = {}
@@ -1345,11 +1533,28 @@ def lookup_master_dictionary(term):
         return None
     return d.get(term, None)
 
+# Wikipedia辞書（wiki_dict.json）メモリキャッシュ管理
+_wiki_dict_data = None
+def get_wiki_dict():
+    global _wiki_dict_data
+    if _wiki_dict_data is None:
+        json_path = os.path.join(os.path.dirname(__file__), 'dict', 'wiki_dict.json')
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    _wiki_dict_data = json.load(f)
+                print(f"[WikiDict] Wikipedia固有名詞辞書（wiki_dict.json: {len(_wiki_dict_data):,}語）をメモリにロード完了")
+            except Exception as e:
+                print(f"[WikiDict] JSON読み込みエラー: {e}")
+                _wiki_dict_data = {}
+        else:
+            _wiki_dict_data = {}
+    return _wiki_dict_data
+
 def apply_backend_pronunciation_dict(text):
     if not text:
         return text
     processed = text
-
     # ── 固有名詞・複合語の最優先読み分け（辞書分解や正規表現誤爆を防止） ──
     EARLY_TERMS = {
         '新千歳空港': 'しんちとせくうこう',
@@ -1488,6 +1693,17 @@ def apply_backend_pronunciation_dict(text):
     for en_name, kana in ENGLISH_NAME_TO_KANA.items():
         # 前後が単語境界（スペース、句読点、文頭文末）の場合のみ置換
         processed = re.sub(r'(?<![a-zA-Z\u30a0-\u30ff\u3040-\u309f])' + re.escape(en_name) + r'(?![a-zA-Z])', kana, processed)
+
+    # ── wiki_dict / master_dictionary フォールバック（漢字が残っている箇所のみ最長一致スキャン） ──
+    # 優先度: hiragana_dict > wiki_dict（Wikipedia固有名詞）> master_dictionary（一般語彙）
+
+    # --- Step1: wiki_dict を全文置換（カタカナ始まり複合語も確実にカバー）---
+    wiki = get_wiki_dict()
+    if wiki:
+        hiragana_dict_keys = set(load_data(DICT_FILE).keys()) if isinstance(load_data(DICT_FILE), dict) else set()
+        for k, v in sorted(wiki.items(), key=lambda x: -len(x[0])):
+            if k not in hiragana_dict_keys and k in processed:
+                processed = processed.replace(k, v)
 
     return processed
 
@@ -1639,7 +1855,7 @@ def get_voicevox_kana(text, speaker_id=1):
 
 def save_learned_pronunciations(new_words):
     """AIが検知した誤読単語（漢字 -> 正しいひらがな）を hiragana_dict.json に自動保存"""
-    dict_path = os.path.join(os.path.dirname(__file__), 'hiragana_dict.json')
+    dict_path = os.path.join(os.path.dirname(__file__), 'dict', 'hiragana_dict.json')
     try:
         existing = {}
         if os.path.exists(dict_path):
@@ -1690,11 +1906,11 @@ def convert_to_hiragana_yomi(text):
 
 def needs_misread_correction(processed_text, kana_str):
     """
-    辞書変換後のテキストに漢字が残っていれば誤読リスクあり → 再合成が必要と判定。
-    ひらがな・カタカナ・英数字・記号のみなら誤読の余地なし。
+    辞書変換後のテキストに未置換の英語固有名詞（例: SUPER JUNIOR, BTS等）が残っていれば辞書学習・補正対象と判定。
+    ※ 漢字はVOICEVOXの文脈解析およびAIルビ付与で高精度に処理するため、機械的な全文ひらがな化は行わない。
     """
-    # 漢字（CJK統合漢字）が1文字でも残っていれば補正対象
-    if re.search(r'[\u4e00-\u9fff\u3400-\u4dbf]', processed_text):
+    # 2文字以上の未変換英単語（例: SUPER JUNIOR, BTS）があれば誤読リスク対象
+    if re.search(r'[A-Za-z]{2,}', processed_text):
         return True
     return False
 
@@ -1830,6 +2046,14 @@ def extract_kanji_terms(text):
                 if base not in COMMON_BASIC_WORDS:
                     terms.add(base)
 
+    # 5. 英語・アルファベット固有名詞・グループ名（例: SUPER JUNIOR, BTS, NewJeans, Snow Man 等）
+    english_terms = re.findall(r'[A-Za-z0-9&・\s]{2,}', text)
+    for et in english_terms:
+        et_clean = et.strip()
+        if len(et_clean) >= 3 and not et_clean.isdigit():
+            if et_clean.upper() not in {"THE", "AND", "FOR", "WITH", "FROM", "NEWS", "TODAY", "TOPICS", "LIVE", "SYSTEM", "LOG", "WARN", "ERROR"}:
+                terms.add(et_clean)
+
     # 長い固有名詞優先（三浦大知 > 三浦 など）でソート
     return sorted(list(set(t for t in terms if len(t) >= 2)), key=lambda x: len(x), reverse=True)
 
@@ -1839,7 +2063,7 @@ def enrich_dict_from_text(text):
     未登録のものを hiragana_dict.json に自動追加する。
     返り値: 新規追加件数
     """
-    dict_path = os.path.join(os.path.dirname(__file__), "hiragana_dict.json")
+    dict_path = os.path.join(os.path.dirname(__file__), 'dict', 'hiragana_dict.json')
     try:
         existing = {}
         if os.path.exists(dict_path):
@@ -1909,31 +2133,19 @@ def synthesize_voicevox_backend(text, speaker_id=1, speed=1.0, pitch=0.0):
     if kana_str:
         print(f"[VOICEVOX発音カナ] {kana_str}")
 
-    # ── 誤読チェック＆自動リトライ ──
+    # ── 未登録固有名詞等の自動学習＆再クエリ ──
     if needs_misread_correction(processed_text, kana_str):
-        # Step1: Wikipedia で漢字語の読みを取得 → 辞書に自動登録
         wiki_added = enrich_dict_from_text(processed_text)
         if wiki_added > 0:
             # 辞書更新後に再適用
             processed_text = apply_backend_pronunciation_dict(text)
             final_text = processed_text
-            print(f"[誤読補正] Wikipedia登録後 再変換: {processed_text!r}")
-
-        # Step2: まだ漢字が残るなら pykakasi で完全ひらがな化
-        if needs_misread_correction(processed_text, None):
-            yomi_text = convert_to_hiragana_yomi(processed_text)
-            final_text = yomi_text
-            print(f"[誤読補正] pykakasi適用: {yomi_text!r}")
-            query_json = _audio_query(yomi_text)
-        else:
-            # Wikipedia だけで解決した場合はそのまま再合成
-            final_text = processed_text
+            print(f"[固有名詞自動学習後 再変換] {processed_text!r}")
             query_json = _audio_query(processed_text)
-
-        kana_str = query_json.get("kana", kana_str)
-        corrected = True
-        if kana_str:
-            print(f"[VOICEVOX発音カナ(補正後)] {kana_str}")
+            kana_str = query_json.get("kana", kana_str)
+            corrected = True
+            if kana_str:
+                print(f"[VOICEVOX発音カナ(補正後)] {kana_str}")
 
 
     if speed != 1.0:
@@ -1953,6 +2165,7 @@ def synthesize_voicevox_backend(text, speaker_id=1, speed=1.0, pitch=0.0):
     return wav_bytes, kana_str, corrected, final_text
 
 def run():
+    _start_log_rotation_scheduler()
     socketserver.ThreadingTCPServer.allow_reuse_address = True
     with socketserver.ThreadingTCPServer(("", PORT), RequestHandler) as httpd:
         print(f"API Server running at port {PORT} (Multi-threaded)")

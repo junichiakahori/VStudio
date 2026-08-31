@@ -4,11 +4,10 @@ import {
   NORMAL_LONG_STORIES,
   ZUNDA_LONG_STORIES,
 } from "./idle_phrases.js";
-import * as aiFeaturesModule from "./ai_features.js";
-import "./ui_features.js"; // HMR tracking: UI event rebinding without full reload
-import "./js/server-manager.js"; // Backend Server Manager
-import "./js/settings-backup.js"; // Settings export/import
-import uiHtml from "./ui_panel.html?raw"; // Separated UI HTML
+import * as aiFeaturesModule from "./ai_features.js?v=6.6";
+import "./ui_features.js?v=6.6"; // HMR tracking: UI event rebinding without full reload
+import "./js/server-manager.js?v=6.6"; // Backend Server Manager
+import "./js/settings-backup.js?v=6.6"; // Settings export/import
 
 window.aiFeatures = aiFeaturesModule;
 window.NORMAL_PHRASES = NORMAL_PHRASES;
@@ -20,39 +19,21 @@ window.ZUNDA_LONG_STORIES = ZUNDA_LONG_STORIES;
 window.obsWsClient = null;
 window.isObsWsConnected = false;
 
-if (import.meta.hot) {
-  import.meta.hot.accept("./ai_features.js", (newModule) => {
-    if (newModule) {
-      aiFeatures = newModule;
-      console.log("[HMR] ai_features.js updated successfully!");
-    }
-  });
-  // ui_features.js が変更されたときUIリスナーだけ再バインドする
-  import.meta.hot.accept("./ui_features.js", () => {
-    console.log("[HMR] ui_features.js updated - rebinding UI events...");
-    if (window.__rebindUI) window.__rebindUI();
-  });
-  // ui_panel.html が変更されたとき（配信中は絶対リロード禁止）
-  import.meta.hot.accept("./ui_panel.html?raw", (newHtmlModule) => {
-    console.log("[HMR] ui_panel.html updated (配信中断防止のため自動リロードは行いません)");
-  });
-}
-
 // Live2D Avatar Studio - Main Controller
 // Uses PixiJS v6 + pixi-live2d-display v0.4 (Cubism4 bundle) + MediaPipe
 
-document.addEventListener("DOMContentLoaded", () => {
-  console.log("[DEBUG] uiHtml type:", typeof uiHtml);
-  console.log(
-    "[DEBUG] uiHtml length:",
-    uiHtml ? uiHtml.length : "null/undefined",
-  );
-  if (typeof uiHtml === "string") {
-    document
-      .querySelector(".app-container")
-      .insertAdjacentHTML("beforeend", uiHtml);
-  } else {
-    console.error("[ERROR] uiHtml is not a string:", uiHtml);
+document.addEventListener("DOMContentLoaded", async () => {
+  // ui_panel.html を静的fetchで動的取得（Viteのバンドルキャッシュを完全バイパスし、手動リロードで常に最新を即座に反映）
+  try {
+    const res = await fetch(`/ui_panel.html?t=${Date.now()}`);
+    if (res.ok) {
+      const htmlText = await res.text();
+      document.querySelector(".app-container").insertAdjacentHTML("beforeend", htmlText);
+    } else {
+      console.error("[ERROR] Failed to fetch ui_panel.html:", res.status);
+    }
+  } catch (e) {
+    console.error("[ERROR] ui_panel.html fetch error:", e);
   }
 
   // =====================================================================

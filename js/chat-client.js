@@ -31,10 +31,20 @@ function initChatClient() {
     if (commentHistory.length > 100) {
       commentHistory.shift();
     }
-    localStorage.setItem("savedCommentHistory", JSON.stringify(commentHistory));
+    try {
+      localStorage.setItem("savedCommentHistory", JSON.stringify(commentHistory));
+    } catch (e) {
+      // localStorage容量超過時は古いデータを削減して安全に退避
+      try {
+        commentHistory = commentHistory.slice(-20);
+        localStorage.setItem("savedCommentHistory", JSON.stringify(commentHistory));
+      } catch (e2) {}
+    }
 
     totalCommentsCount++;
-    localStorage.setItem("savedTotalCommentsCount", totalCommentsCount);
+    try {
+      localStorage.setItem("savedTotalCommentsCount", totalCommentsCount);
+    } catch (e) {}
     const statCommentsEl = document.getElementById("stat-comments");
     if (statCommentsEl) statCommentsEl.textContent = totalCommentsCount;
 
@@ -326,42 +336,7 @@ function initChatClient() {
                     `[TikTok Skip] 待機列過多のためスキップ: ${cleanComment}`,
                   );
                 } else {
-                  // 1. コメントを読み上げる
-                  queueCommentAudio(`${cleanNickname}さん、${cleanComment}`);
-
-                  if (
-                    isAiReplyEnabled &&
-                    aiApiKeyInput &&
-                    aiApiKeyInput.value.trim().length > 0
-                  ) {
-                    // 2A. AIによる自動返信
-                    generateAIResponse(cleanNickname, cleanComment);
-                  } else {
-                    // 2B. キーワードによる自動返信
-                    if (matchedRule) {
-                      const adjustedReply = aiFeatures.adjustIdlePhraseForModel(
-                        matchedRule.response,
-                        currentModelId,
-                      );
-                      queueCommentAudio(adjustedReply);
-                    } else if (Math.random() < 0.2) {
-                      // 3. キーワードに一致しなかった場合、たまに相槌を打つ（20%の確率）
-                      const genericReplies = [
-                        "なるほどなるほどー",
-                        "たしかにー！",
-                        "へぇー！",
-                        "そうんだね！",
-                        "わかるわかるー",
-                      ];
-                      const adjustedReply = aiFeatures.adjustIdlePhraseForModel(
-                        genericReplies[
-                          Math.floor(Math.random() * genericReplies.length)
-                        ],
-                        currentModelId,
-                      );
-                      queueCommentAudio(adjustedReply);
-                    }
-                  }
+                  handleIncomingComment(cleanNickname, cleanComment, matchedRule);
                 }
               }
             }
@@ -498,114 +473,10 @@ function initChatClient() {
     youtubeDetectBtn.addEventListener("click", () => detectYoutubeVideo(false));
   }
 
-  // メイン画面用 配信枠一覧モーダル
-  const mainModalPicker = document.getElementById("main-modal-broadcast-picker");
-  const mainBtnClosePicker = document.getElementById("main-btn-close-broadcast-picker");
+  // メイン画面用 配信枠一覧（配信画面を遮らない独立サブウィンドウで起動）
   const mainBtnOpenPicker = document.getElementById("youtube-select-modal-btn");
-  const mainListContainer = document.getElementById("main-broadcast-picker-list");
-  let mainCachedBroadcasts = [];
-  let mainActiveFilter = "all";
-
-  async function mainLoadBroadcasts() {
-    if (!mainListContainer) return;
-    mainListContainer.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:20px;">⏳ 配信枠一覧を取得中...</div>';
-    try {
-      const res = await fetch("http://localhost:8001/api/youtube/list_broadcasts", { cache: "no-store" });
-      const data = await res.json();
-      if (data.success && Array.isArray(data.items)) {
-        mainCachedBroadcasts = data.items;
-        mainRenderBroadcasts();
-      } else {
-        mainListContainer.innerHTML = `<div style="color:#ff7675; font-size:0.8rem; text-align:center; padding:20px;">⚠️ 取得エラー: ${data.error || "未認証です"}</div>`;
-      }
-    } catch (err) {
-      mainListContainer.innerHTML = `<div style="color:#ff7675; font-size:0.8rem; text-align:center; padding:20px;">❌ 通信エラー: ${err.message}</div>`;
-    }
-  }
-
-  function mainRenderBroadcasts() {
-    if (!mainListContainer) return;
-    mainListContainer.innerHTML = "";
-    let filtered = mainCachedBroadcasts;
-    if (mainActiveFilter === "upcoming") {
-      filtered = mainCachedBroadcasts.filter(b => b.lifeCycleStatus === "ready" || b.lifeCycleStatus === "created" || b.lifeCycleStatus === "upcoming");
-    }
-    if (filtered.length === 0) {
-      mainListContainer.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:20px;">該当する配信枠が見つかりませんでした。</div>';
-      return;
-    }
-    filtered.forEach(item => {
-      const card = document.createElement("div");
-      card.style.cssText = "background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; cursor: pointer; transition: all 0.2s; display: flex; gap: 12px; align-items: center;";
-      card.onmouseenter = () => { card.style.background = "rgba(0, 210, 211, 0.12)"; card.style.borderColor = "#00d2d3"; };
-      card.onmouseleave = () => { card.style.background = "rgba(255,255,255,0.05)"; card.style.borderColor = "rgba(255,255,255,0.1)"; };
-
-      let statusBadge = "⚪️ 待機中";
-      let statusColor = "#aaa";
-      if (item.lifeCycleStatus === "live") { statusBadge = "🟢 配信中 (Live)"; statusColor = "#00e676"; }
-      else if (item.lifeCycleStatus === "ready" || item.lifeCycleStatus === "upcoming") { statusBadge = "🟡 予約・待機中"; statusColor = "#ffb400"; }
-      else if (item.lifeCycleStatus === "complete") { statusBadge = "⚪️ 終了済"; statusColor = "#777"; }
-
-      let timeStr = "指定なし";
-      if (item.scheduledStartTime) {
-        try {
-          const d = new Date(item.scheduledStartTime);
-          timeStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-        } catch (e) {}
-      }
-
-      let privacyBadge = item.privacyStatus === "public" ? "🌐 公開" : (item.privacyStatus === "unlisted" ? "🔒 限定公開" : "👁️ 非公開");
-      const thumbUrl = item.thumbnail || `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`;
-
-      card.innerHTML = `
-        <img src="${thumbUrl}" alt="Thumbnail" style="width: 110px; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; background: #000; border: 1px solid rgba(255,255,255,0.15); flex-shrink: 0;" onerror="this.src='https://i.ytimg.com/vi/${item.id}/hqdefault.jpg'">
-        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:0.72rem; font-weight:bold; color:${statusColor};">${statusBadge}</span>
-            <span style="font-size:0.7rem; color:var(--text-muted); background:rgba(0,0,0,0.3); padding:2px 6px; border-radius:4px;">${privacyBadge}</span>
-          </div>
-          <div style="font-size:0.85rem; font-weight:bold; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-            ${item.title || "無題の配信"}
-          </div>
-          <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:var(--text-muted); margin-top:2px;">
-            <span>⏰ 予定: ${timeStr}</span>
-            <span style="font-family:monospace; color:#00d2d3;">ID: ${item.id}</span>
-          </div>
-        </div>
-      `;
-
-      card.addEventListener("click", () => {
-        if (youtubeUserInput) {
-          youtubeUserInput.value = item.id;
-          localStorage.setItem("savedYoutubeVideoId", item.id);
-        }
-        if (mainModalPicker) mainModalPicker.style.display = "none";
-      });
-
-      mainListContainer.appendChild(card);
-    });
-  }
-
   mainBtnOpenPicker?.addEventListener("click", () => {
-    if (mainModalPicker) mainModalPicker.style.display = "flex";
-    mainLoadBroadcasts();
-  });
-  mainBtnClosePicker?.addEventListener("click", () => {
-    if (mainModalPicker) mainModalPicker.style.display = "none";
-  });
-  mainModalPicker?.addEventListener("click", (e) => {
-    if (e.target === mainModalPicker) mainModalPicker.style.display = "none";
-  });
-  document.getElementById("main-filter-all-broadcasts")?.addEventListener("click", (e) => {
-    mainActiveFilter = "all";
-    mainRenderBroadcasts();
-  });
-  document.getElementById("main-filter-upcoming-broadcasts")?.addEventListener("click", (e) => {
-    mainActiveFilter = "upcoming";
-    mainRenderBroadcasts();
-  });
-  document.getElementById("main-btn-refresh-broadcasts")?.addEventListener("click", () => {
-    mainLoadBroadcasts();
+    window.open("/broadcast_picker.html", "BroadcastPicker", "width=580,height=750,menubar=no,toolbar=no,location=no,status=no");
   });
 
   if (youtubeUserInput) {
@@ -930,14 +801,19 @@ function initChatClient() {
               subDisplay = numOnly ? numOnly[0] : data.subscribers;
               statSubscribers.textContent = subDisplay;
             }
+            const statLikes = document.getElementById("stat-likes");
+            if (statLikes && data.likes !== undefined) {
+              statLikes.textContent = (data.likes === "" || data.likes === null) ? "-" : data.likes;
+            }
             const currentCommentsCount = window.totalCommentsCount || 0;
             const inputVal = document.getElementById("youtube-video-input")?.value || "";
             const currentVid = data.videoId || "-";
-            const statsSig = `${inputVal}|${currentVid}|${subDisplay}|${data.viewers}|${currentCommentsCount}`;
+            const likesVal = data.likes || "-";
+            const statsSig = `${inputVal}|${currentVid}|${subDisplay}|${data.viewers}|${likesVal}|${currentCommentsCount}`;
             if (window._lastLoggedStatsSig !== statsSig) {
               window._lastLoggedStatsSig = statsSig;
               console.log(
-                `[YouTube Live 統計] 📺 接続先: ${inputVal || currentVid} (動画ID: ${currentVid}) | 👤 登録者数: ${subDisplay}人 | 👁️ 視聴者数/再生数: ${data.viewers || '-'} | 💬 コメント総数: ${currentCommentsCount}件`
+                `[YouTube Live 統計] 📺 接続先: ${inputVal || currentVid} (動画ID: ${currentVid}) | 👤 登録者数: ${subDisplay}人 | 👁️ 視聴者数/再生数: ${data.viewers || '-'} | 👍 高評価: ${likesVal} | 💬 コメント総数: ${currentCommentsCount}件`
               );
             }
           } else if (data.type === "gift") {
@@ -1089,38 +965,7 @@ function initChatClient() {
                     `[YouTube Skip] 待機列過多のためスキップ: ${cleanComment}`,
                   );
                 } else {
-                  queueCommentAudio(`${cleanNickname}さん、${cleanComment}`);
-
-                  if (
-                    isAiReplyEnabled &&
-                    aiApiKeyInput &&
-                    aiApiKeyInput.value.trim().length > 0
-                  ) {
-                    generateAIResponse(cleanNickname, cleanComment);
-                  } else {
-                    if (matchedRule) {
-                      const adjustedReply = aiFeatures.adjustIdlePhraseForModel(
-                        matchedRule.response,
-                        currentModelId,
-                      );
-                      queueCommentAudio(adjustedReply);
-                    } else if (Math.random() < 0.2) {
-                      const genericReplies = [
-                        "なるほどなるほどー",
-                        "たしかにー！",
-                        "へぇー！",
-                        "そうんだね！",
-                        "わかるわかるー",
-                      ];
-                      const adjustedReply = aiFeatures.adjustIdlePhraseForModel(
-                        genericReplies[
-                          Math.floor(Math.random() * genericReplies.length)
-                        ],
-                        currentModelId,
-                      );
-                      queueCommentAudio(adjustedReply);
-                    }
-                  }
+                  handleIncomingComment(cleanNickname, cleanComment, matchedRule);
                 }
               }
             }
@@ -1621,18 +1466,109 @@ function initChatClient() {
 
   window.addCommentToViewer = addCommentToViewer;
   window.generateAIResponse = generateAIResponse;
-  function queueCommentAudio(text) {
+  async function queueCommentAudio(text) {
     const radioModeToggle = document.getElementById("ai-radio-mode-toggle");
     const isRadioMode = radioModeToggle && radioModeToggle.checked;
     if (isRadioMode && radioModeState.currentPhase !== "waiting_for_comments") {
       radioCommentQueue.push(text);
       console.log(`[ラジオモード] コメントをプールに保存しました: ${text}`);
     } else {
-      queueVoicevoxAudio(text).catch((e) => console.warn(e));
+      let yomi = null;
+      if (typeof aiFeatures !== "undefined" && typeof aiFeatures.convertToHiraganaWithAI === "function") {
+        try {
+          yomi = await aiFeatures.convertToHiraganaWithAI(text);
+        } catch (e) {
+          console.warn("[コメント読み上げ] AIひらがな変換スキップ:", e);
+        }
+      }
+      queueVoicevoxAudio(text, false, yomi).catch((e) => console.warn(e));
     }
   }
 
+  window.newsCommentQueue = window.newsCommentQueue || [];
+
+  function handleIncomingComment(cleanNickname, cleanComment, matchedRule = null) {
+    const isAiReplyEnabled = document.getElementById("ai-reply-toggle")?.checked;
+    const aiApiKeyInput = document.getElementById("ai-api-key");
+    const radioModeToggle = document.getElementById("ai-radio-mode-toggle");
+    const isRadioMode = radioModeToggle && radioModeToggle.checked;
+    const isNewsPlaying = !!(window.isReadingNews || (window.newsBroadcastState && window.newsBroadcastState.isRunning));
+
+    // 1. ニュース番組モード進行中の場合: 即時発声を控え、ニュース合間キューへキープ！
+    if (isNewsPlaying) {
+      window.newsCommentQueue = window.newsCommentQueue || [];
+      window.newsCommentQueue.push({
+        nickname: cleanNickname,
+        comment: cleanComment,
+        timestamp: Date.now()
+      });
+      console.log(`[ニュース番組] 🎙️ コメントをニュース合間返信用キューに保存しました: ${cleanNickname}さん「${cleanComment}」 (待機: ${window.newsCommentQueue.length}件)`);
+      return;
+    }
+
+    // 2. ラジオ番組モード（進行中）の場合: ラジオプールへ保存
+    if (isRadioMode && radioModeState.currentPhase !== "waiting_for_comments") {
+      radioCommentQueue.push(`${cleanNickname}さん、${cleanComment}`);
+      console.log(`[ラジオモード] コメントをプールに保存しました: ${cleanNickname}さん、${cleanComment}`);
+      return;
+    }
+
+    // 3. 通常時: コメントを即時読み上げ ＆ AI/定型返信
+    queueCommentAudio(`${cleanNickname}さん、${cleanComment}`);
+
+    if (
+      isAiReplyEnabled &&
+      aiApiKeyInput &&
+      aiApiKeyInput.value.trim().length > 0
+    ) {
+      generateAIResponse(cleanNickname, cleanComment);
+    } else {
+      if (matchedRule) {
+        const adjustedReply = aiFeatures.adjustIdlePhraseForModel(
+          matchedRule.response,
+          currentModelId,
+        );
+        queueCommentAudio(adjustedReply);
+      } else if (Math.random() < 0.2) {
+        const genericReplies = [
+          "なるほどなるほどー",
+          "たしかにー！",
+          "へぇー！",
+          "そうんだね！",
+          "わかるわかるー",
+        ];
+        const adjustedReply = aiFeatures.adjustIdlePhraseForModel(
+          genericReplies[
+            Math.floor(Math.random() * genericReplies.length)
+          ],
+          currentModelId,
+        );
+        queueCommentAudio(adjustedReply);
+      }
+    }
+  }
+
+  window.handleIncomingComment = handleIncomingComment;
   window.queueCommentAudio = queueCommentAudio;
+
+  // 💬 常設テストコメント送信関数（HTML側から直接呼び出し）
+  let isSendingManual = false;
+  window.sendManualTestComment = function() {
+    if (isSendingManual) return;
+    const manualInput = document.getElementById("manual-comment-input");
+    if (!manualInput) return;
+    const txt = manualInput.value.trim();
+    if (!txt) return;
+
+    isSendingManual = true;
+    setTimeout(() => { isSendingManual = false; }, 300);
+
+    console.log(`[テストコメント送信] 💬 テストコメントを送信: 「${txt}」`);
+    if (typeof addCommentToViewer === "function") {
+      addCommentToViewer("テスト", txt, "youtube", false, "");
+    }
+    handleIncomingComment("テスト", txt);
+  };
 }
 
 window.initChatClient = initChatClient;

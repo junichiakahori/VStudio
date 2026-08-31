@@ -16,6 +16,7 @@ window.totalCommentsCount = 0;
 window.clearAllComments = function clearAllComments() {
   window.commentHistory = [];
   window.totalCommentsCount = 0;
+  window.newsCommentQueue = [];
   localStorage.setItem("savedCommentHistory", JSON.stringify([]));
   localStorage.setItem("savedTotalCommentsCount", 0);
   window.el = document.getElementById("stat-comments");
@@ -26,8 +27,11 @@ window.clearAllComments = function clearAllComments() {
   if (statSubscribers) statSubscribers.textContent = "0";
   window.statViewers = document.getElementById("stat-viewers");
   if (statViewers) statViewers.textContent = "0";
+  window.statLikes = document.getElementById("stat-likes");
+  if (statLikes) statLikes.textContent = "0";
 
   window.renderAllComments();
+  console.log("[コメント] 🗑️ 画面上のコメントと統計を全消去しました");
 };
 
 try {

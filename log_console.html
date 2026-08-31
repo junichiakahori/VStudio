@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📋 VStudio 統合ログコンソール</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0c0d12;
+            --bg-header: #14161d;
+            --bg-footer: #12141a;
+            --bg-log: #090a0e;
+            --border-color: #262933;
+            --text-main: #e2e8f0;
+            --text-muted: #8b949e;
+            --accent-blue: #2563eb;
+            --accent-blue-hover: #1d4ed8;
+            --tab-inactive-bg: #1c202a;
+            --tab-inactive-border: #333a47;
+            --tab-active-bg: #2563eb;
+            --tab-active-border: #60a5fa;
+            
+            /* Log Syntax Colors */
+            --log-time: #6b7280;
+            --log-text: #d1d5db;
+            --log-err: #f87171;
+            --log-warn: #fbbf24;
+            --log-ok: #34d399;
+            --log-info: #60a5fa;
+            --log-highlight: rgba(250, 204, 21, 0.35);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 1. Header Toolbar */
+        header {
+            background-color: var(--bg-header);
+            border-bottom: 1px solid var(--border-color);
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .tabs-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .tabs-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        .tab-btn {
+            background-color: var(--tab-inactive-bg);
+            border: 1px solid var(--tab-inactive-border);
+            color: #dbeafe;
+            font-size: 12.5px;
+            font-weight: 500;
+            padding: 7px 13px;
+            border-radius: 7px;
+            cursor: pointer;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .tab-btn:hover {
+            background-color: #262c3a;
+            border-color: #4b5563;
+        }
+
+        .tab-btn.active {
+            background-color: var(--tab-active-bg);
+            border-color: var(--tab-active-border);
+            color: #ffffff;
+            font-weight: 600;
+            box-shadow: 0 0 12px rgba(37, 99, 235, 0.4);
+        }
+
+        .toolbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .search-box {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-box input {
+            background-color: #1a1e28;
+            border: 1px solid #333a47;
+            border-radius: 6px;
+            color: #f3f4f6;
+            font-size: 12px;
+            padding: 6px 10px 6px 28px;
+            width: 150px;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .search-box input:focus {
+            border-color: var(--accent-blue);
+            width: 190px;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+        }
+
+        .search-box .search-icon {
+            position: absolute;
+            left: 8px;
+            font-size: 12px;
+            color: #9ca3af;
+            pointer-events: none;
+        }
+
+        .action-btn {
+            background-color: #212631;
+            border: 1px solid #3b4252;
+            color: #f1f5f9;
+            font-size: 12px;
+            font-weight: 500;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.15s ease;
+        }
+
+        .action-btn:hover {
+            background-color: #2c3342;
+            border-color: #525c70;
+        }
+
+        .action-btn:active {
+            transform: scale(0.97);
+        }
+
+        .action-btn.danger:hover {
+            background-color: #7f1d1d;
+            border-color: #ef4444;
+            color: #fee2e2;
+        }
+
+        /* 2. Main Log Content */
+        main {
+            flex: 1;
+            background-color: var(--bg-log);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #log-view {
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: auto;
+            padding: 14px 18px;
+            font-family: 'Fira Code', Menlo, Monaco, Consolas, monospace;
+            font-size: 12.5px;
+            line-height: 1.55;
+            color: var(--log-text);
+            user-select: text;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .log-line {
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .log-err { color: var(--log-err); font-weight: 600; }
+        .log-warn { color: var(--log-warn); }
+        .log-ok { color: var(--log-ok); font-weight: 600; }
+        .log-time { color: var(--log-time); }
+        .match-hl {
+            background-color: var(--log-highlight);
+            border-radius: 2px;
+            padding: 0 2px;
+            color: #ffffff;
+        }
+
+        /* 3. Footer Status Bar */
+        footer {
+            background-color: var(--bg-footer);
+            border-top: 1px solid var(--border-color);
+            padding: 6px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11.5px;
+            color: var(--text-main);
+            flex-shrink: 0;
+            height: 32px;
+        }
+
+        .status-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-family: 'Fira Code', monospace;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .status-msg {
+            color: #93c5fd;
+            font-weight: 500;
+        }
+
+        .status-right {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-shrink: 0;
+        }
+
+        .checkbox-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            color: #f1f5f9;
+            font-size: 11.5px;
+            font-weight: 500;
+        }
+
+        .checkbox-label input {
+            cursor: pointer;
+            accent-color: var(--accent-blue);
+        }
+
+        /* In-App Modal */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: fadeIn 0.15s ease;
+        }
+
+        .modal-card {
+            background: #161820;
+            border: 1px solid #2e3444;
+            border-radius: 12px;
+            padding: 24px;
+            width: 360px;
+            max-width: 90vw;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+            text-align: center;
+        }
+
+        .modal-icon {
+            font-size: 34px;
+            margin-bottom: 12px;
+        }
+
+        .modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #f8fafc;
+            margin-bottom: 8px;
+        }
+
+        .modal-desc {
+            font-size: 13px;
+            color: #94a3b8;
+            line-height: 1.5;
+            margin-bottom: 22px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 9px 14px;
+            border-radius: 7px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.15s;
+        }
+
+        .modal-btn.cancel {
+            background: #242935;
+            border-color: #3b4455;
+            color: #e2e8f0;
+        }
+        .modal-btn.cancel:hover {
+            background: #2f3647;
+        }
+
+        .modal-btn.danger {
+            background: #dc2626;
+            color: #ffffff;
+        }
+        .modal-btn.danger:hover {
+            background: #b91c1c;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.96); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="tabs-container" id="tabs-container">
+            <button class="tab-btn active" data-tab="launcher">🚀 ランチャー</button>
+            <button class="tab-btn" data-tab="api_server">⚙️ API (8001)</button>
+            <button class="tab-btn" data-tab="vite">⚡ Vite (8443)</button>
+            <button class="tab-btn" data-tab="youtube_server">💬 YouTube WS</button>
+            <button class="tab-btn" data-tab="tiktok_server">📱 TikTok WS</button>
+            <button class="tab-btn" data-tab="browser_console">🌐 ブラウザログ</button>
+        </div>
+
+        <div class="toolbar-actions">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="search-input" placeholder="フィルタ検索...">
+            </div>
+            <button class="action-btn danger" id="btn-clear" title="選択中のログファイルを空にする">🗑️ クリア</button>
+            <button class="action-btn" id="btn-copy" title="クリップボードにコピー">📋 コピー</button>
+            <button class="action-btn" id="btn-refresh" title="最新ログを取得">🔄 更新</button>
+        </div>
+    </header>
+
+    <main>
+        <div id="log-view">ログを読み込んでいます...</div>
+    </main>
+
+    <footer>
+        <div class="status-left">
+            <span id="file-info">📄 待機中...</span>
+            <span id="toast-msg" class="status-msg"></span>
+        </div>
+        <div class="status-right">
+            <label class="checkbox-label">
+                <input type="checkbox" id="auto-scroll" checked>
+                <span>自動追従</span>
+            </label>
+        </div>
+    </footer>
+
+    <!-- In-App Confirm Modal -->
+    <div id="confirm-modal" class="modal-backdrop" style="display:none;">
+        <div class="modal-card">
+            <div class="modal-icon">🗑️</div>
+            <h3 class="modal-title">ログのクリア</h3>
+            <p class="modal-desc" id="confirm-modal-desc">現在選択中のログファイルを空にします。この操作は取り消せません。</p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" id="modal-cancel">キャンセル</button>
+                <button class="modal-btn danger" id="modal-ok">クリアする</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://localhost:8001/api";
+        let currentTab = "launcher";
+        let rawContent = "";
+        let autoScroll = true;
+        let isFetching = false;
+        let toastTimeout = null;
+        let confirmResolve = null;
+
+        const logView = document.getElementById("log-view");
+        const fileInfo = document.getElementById("file-info");
+        const toastMsg = document.getElementById("toast-msg");
+        const autoScrollCheck = document.getElementById("auto-scroll");
+        const searchInput = document.getElementById("search-input");
+        const confirmModal = document.getElementById("confirm-modal");
+        const confirmModalDesc = document.getElementById("confirm-modal-desc");
+
+        // Tab Switching
+        document.querySelectorAll(".tab-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+                btn.classList.add("active");
+                currentTab = btn.dataset.tab;
+                fetchLog(true);
+            });
+        });
+
+        autoScrollCheck.addEventListener("change", (e) => {
+            autoScroll = e.target.checked;
+            if (autoScroll) {
+                logView.scrollTop = logView.scrollHeight;
+            }
+        });
+
+        searchInput.addEventListener("input", () => {
+            renderFormattedLog();
+        });
+
+        function showToast(text, duration = 3000) {
+            toastMsg.textContent = text;
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toastMsg.textContent = "";
+            }, duration);
+        }
+
+        // Highlight syntax logic
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        function highlightLine(line, searchKeyword) {
+            let escaped = escapeHtml(line);
+            
+            // Syntax highlight
+            const timeRegex = /^(\[\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:?\d{2}|Z)?\]|\[\d{1,2}:\d{2}:\d{2}(?: [AP]M)?\])/;
+            escaped = escaped.replace(timeRegex, '<span class="log-time">$1</span>');
+
+            if (/(?:error|exception|traceback|failed|fatal|ERR)/i.test(line)) {
+                escaped = `<span class="log-err">${escaped}</span>`;
+            } else if (/(?:warn|warning)/i.test(line)) {
+                escaped = `<span class="log-warn">${escaped}</span>`;
+            } else if (/(?:started|ready|success|200 OK|listening|connected|UP)/i.test(line)) {
+                escaped = `<span class="log-ok">${escaped}</span>`;
+            }
+
+            // Search highlight
+            if (searchKeyword) {
+                const kwRegex = new RegExp(`(${searchKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                escaped = escaped.replace(kwRegex, '<mark class="match-hl">$1</mark>');
+            }
+
+            return `<span class="log-line">${escaped}</span>`;
+        }
+
+        function renderFormattedLog() {
+            if (!rawContent) {
+                logView.innerHTML = '<div style="color: #64748b; padding: 20px;">(ログファイルが空か、まだ生成されていません)</div>';
+                return;
+            }
+
+            const searchKw = searchInput.value.trim();
+            const lines = rawContent.split("\n");
+            
+            let filteredLines = lines;
+            if (searchKw) {
+                filteredLines = lines.filter(l => l.toLowerCase().includes(searchKw.toLowerCase()));
+            }
+
+            if (filteredLines.length === 0) {
+                logView.innerHTML = `<div style="color: #64748b; padding: 20px;">「${escapeHtml(searchKw)}」に一致するログは見つかりませんでした</div>`;
+                return;
+            }
+
+            const html = filteredLines.map(l => highlightLine(l, searchKw)).join("");
+            logView.innerHTML = html;
+
+            if (autoScroll) {
+                logView.scrollTop = logView.scrollHeight;
+            }
+        }
+
+        async function fetchLog(forceScroll = false) {
+            if (isFetching) return;
+            isFetching = true;
+            try {
+                const res = await fetch(`${API_BASE}/log?tab=${currentTab}&_=${Date.now()}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.content !== rawContent || forceScroll) {
+                        rawContent = data.content;
+                        renderFormattedLog();
+                    }
+                    fileInfo.textContent = `📄 ${data.filename}  (${data.lineCount} 行) - ${data.modifiedTime || '最新'}`;
+                }
+            } catch (err) {
+                fileInfo.textContent = `⚠️ ログ取得エラー (APIサーバー 8001 接続待機中)`;
+            } finally {
+                isFetching = false;
+            }
+        }
+
+        // Modal Confirm helper
+        function showConfirm(msg) {
+            confirmModalDesc.textContent = msg;
+            confirmModal.style.display = "flex";
+            return new Promise((resolve) => {
+                confirmResolve = resolve;
+            });
+        }
+
+        document.getElementById("modal-cancel").addEventListener("click", () => {
+            confirmModal.style.display = "none";
+            if (confirmResolve) confirmResolve(false);
+        });
+
+        document.getElementById("modal-ok").addEventListener("click", () => {
+            confirmModal.style.display = "none";
+            if (confirmResolve) confirmResolve(true);
+        });
+
+        // Action Buttons
+        document.getElementById("btn-refresh").addEventListener("click", () => {
+            fetchLog(true);
+            showToast("🔄 ログを更新しました");
+        });
+
+        document.getElementById("btn-copy").addEventListener("click", async () => {
+            if (!rawContent) return;
+            try {
+                await navigator.clipboard.writeText(rawContent);
+                showToast("📋 クリップボードにコピーしました");
+            } catch (err) {
+                showToast("⚠️ コピーに失敗しました");
+            }
+        });
+
+        document.getElementById("btn-clear").addEventListener("click", async () => {
+            const ok = await showConfirm(`「${currentTab}」のログを空にしてもよろしいですか？`);
+            if (!ok) return;
+            try {
+                const res = await fetch(`${API_BASE}/log_clear?tab=${currentTab}`, { method: "POST" });
+                const result = await res.json();
+                if (result.success) {
+                    rawContent = "";
+                    renderFormattedLog();
+                    showToast(`🗑️ ${result.filename} をクリアしました`);
+                } else {
+                    showToast(`⚠️ クリア失敗: ${result.error || '不明なエラー'}`);
+                }
+            } catch (err) {
+                showToast("⚠️ クリアAPI通信エラー");
+            }
+        });
+
+        // Initialize & Polling
+        fetchLog(true);
+        setInterval(() => {
+            fetchLog(false);
+        }, 1500);
+    </script>
+</body>
+</html>

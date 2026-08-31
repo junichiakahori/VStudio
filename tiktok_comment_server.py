@@ -14,7 +14,28 @@ import websockets
 from TikTokLive import TikTokLiveClient
 from TikTokLive.events import ConnectEvent, CommentEvent, DisconnectEvent, JoinEvent, GiftEvent, LikeEvent
 
-logging.basicConfig(level=logging.INFO)
+from datetime import datetime, timezone, timedelta
+
+JST = timezone(timedelta(hours=9))
+
+class JSTFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
+        dt = datetime.fromtimestamp(record.created, tz=JST)
+        if datefmt:
+            return dt.strftime(datefmt)
+        return dt.strftime('%Y-%m-%d %H:%M:%S')
+
+_log_handler = logging.StreamHandler()
+_log_handler.setFormatter(JSTFormatter('[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+logging.root.handlers = [_log_handler]
+logging.root.setLevel(logging.INFO)
+
+logging.getLogger("websockets").setLevel(logging.CRITICAL)
+logging.getLogger("websockets.server").setLevel(logging.CRITICAL)
+logging.getLogger("websockets.protocol").setLevel(logging.CRITICAL)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 # 接続中のWebSocketクライアントを保持するセット
 connected_clients = set()

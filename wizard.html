@@ -308,21 +308,54 @@
                     <!-- 日時範囲コントロール -->
                     <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px; margin-bottom: 10px;">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
-                            <label style="font-size: 0.75rem; color: var(--text-muted);">🕒 ニュース取得の日時範囲（時間指定可能）</label>
-                            <div style="display:flex; gap: 4px;">
+                            <label style="font-size: 0.75rem; color: var(--text-muted);">🕒 ニュース取得の日時範囲（クリック操作対応）</label>
+                            <div style="display:flex; gap: 3px; flex-wrap: wrap;">
+                                <button type="button" id="btn-quick-6h" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 3px; color: #fff; font-size: 0.65rem; padding: 2px 5px; cursor: pointer;">直近6h</button>
                                 <button type="button" id="btn-quick-12h" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 3px; color: #fff; font-size: 0.65rem; padding: 2px 5px; cursor: pointer;">直近12h</button>
                                 <button type="button" id="btn-quick-24h" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 3px; color: #fff; font-size: 0.65rem; padding: 2px 5px; cursor: pointer;">直近24h</button>
                                 <button type="button" id="btn-quick-today" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 3px; color: #fff; font-size: 0.65rem; padding: 2px 5px; cursor: pointer;">今日</button>
                                 <button type="button" id="btn-quick-all" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 3px; color: #fff; font-size: 0.65rem; padding: 2px 5px; cursor: pointer;">クリア</button>
                             </div>
                         </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; align-items: center;">
+
+                        <!-- 内部値同期用 hidden -->
+                        <input type="hidden" id="wizard-news-date-start">
+                        <input type="hidden" id="wizard-news-date-end">
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end;">
+                            <!-- 開始日時 -->
                             <div>
-                                <input type="datetime-local" id="wizard-news-date-start" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid var(--border-neon, #00d2d3); border-radius: 4px; padding: 5px 6px; color: #fff; font-size: 0.75rem; outline: none;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+                                    <span style="font-size:0.68rem; color:var(--text-muted);">開始日時</span>
+                                    <div style="display:flex; gap:2px;">
+                                        <button type="button" onclick="window.stepWizardDate('start', -1)" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:3px; color:#fff; font-size:0.62rem; padding:1px 5px; cursor:pointer;" title="1時間前">-1h</button>
+                                        <button type="button" onclick="window.stepWizardDate('start', 1)" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:3px; color:#fff; font-size:0.62rem; padding:1px 5px; cursor:pointer;" title="1時間後">+1h</button>
+                                    </div>
+                                </div>
+                                <div style="display:flex; gap:3px;">
+                                    <input type="date" id="wizard-start-date" style="flex:1.4; background: rgba(0,0,0,0.5); border: 1px solid var(--border-neon, #00d2d3); border-radius: 4px; padding: 4px 4px; color: #fff; font-size: 0.75rem; color-scheme:dark; outline: none; min-width:0;">
+                                    <select id="wizard-start-hour" style="flex:1; background: rgba(0,0,0,0.5); border: 1px solid var(--border-neon, #00d2d3); border-radius: 4px; padding: 4px 2px; color: #fff; font-size: 0.75rem; color-scheme:dark; outline: none; text-align:center;">
+                                    </select>
+                                </div>
                             </div>
+
+                            <!-- 終了日時 -->
                             <div>
-                                <input type="datetime-local" id="wizard-news-date-end" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid var(--border-neon, #00d2d3); border-radius: 4px; padding: 5px 6px; color: #fff; font-size: 0.75rem; outline: none;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+                                    <span style="font-size:0.68rem; color:var(--text-muted);">終了日時</span>
+                                    <div style="display:flex; gap:2px;">
+                                        <button type="button" onclick="window.stepWizardDate('end', -1)" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:3px; color:#fff; font-size:0.62rem; padding:1px 5px; cursor:pointer;" title="1時間前">-1h</button>
+                                        <button type="button" onclick="window.stepWizardDate('end', 1)" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:3px; color:#fff; font-size:0.62rem; padding:1px 5px; cursor:pointer;" title="1時間後">+1h</button>
+                                        <button type="button" onclick="window.setWizardNow()" style="background:rgba(0,210,211,0.2); border:1px solid rgba(0,210,211,0.5); border-radius:3px; color:#00f3ff; font-size:0.62rem; padding:1px 5px; cursor:pointer;" title="現在時刻にセット">現在</button>
+                                    </div>
+                                </div>
+                                <div style="display:flex; gap:3px;">
+                                    <input type="date" id="wizard-end-date" style="flex:1.4; background: rgba(0,0,0,0.5); border: 1px solid var(--border-neon, #00d2d3); border-radius: 4px; padding: 4px 4px; color: #fff; font-size: 0.75rem; color-scheme:dark; outline: none; min-width:0;">
+                                    <select id="wizard-end-hour" style="flex:1; background: rgba(0,0,0,0.5); border: 1px solid var(--border-neon, #00d2d3); border-radius: 4px; padding: 4px 2px; color: #fff; font-size: 0.75rem; color-scheme:dark; outline: none; text-align:center;">
+                                    </select>
+                                </div>
                             </div>
+
                             <button id="wizard-fetch-news-btn" class="btn" style="background: #00e676; color: #000; font-weight: bold; font-size: 0.8rem; padding: 5px 12px; border-radius: 4px; border: none; cursor: pointer; height: 28px; white-space: nowrap;">⬇️ 取得</button>
                         </div>
                     </div>
@@ -886,7 +919,7 @@
             }
         }
 
-        // クイック日時プリセットボタン
+        // クイック日時プリセット＆セレクト初期化
         const formatDT = (d) => {
             const y = d.getFullYear();
             const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -896,13 +929,100 @@
             return `${y}-${m}-${day}T${hh}:${mm}`;
         };
 
+        const formatDateOnly = (d) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            return `${y}-${m}-${day}`;
+        };
+
+        // 00時〜23時のセレクトボックス初期化
+        const initHourSelects = () => {
+            const sHour = document.getElementById("wizard-start-hour");
+            const eHour = document.getElementById("wizard-end-hour");
+            if (sHour && sHour.options.length === 0) {
+                for (let i = 0; i < 24; i++) {
+                    const val = String(i).padStart(2, "0");
+                    sHour.innerHTML += `<option value="${val}">${val}時</option>`;
+                }
+            }
+            if (eHour && eHour.options.length === 0) {
+                for (let i = 0; i < 24; i++) {
+                    const val = String(i).padStart(2, "0");
+                    eHour.innerHTML += `<option value="${val}">${val}時</option>`;
+                }
+            }
+        };
+
+        const syncWizardInputsFromHidden = () => {
+            initHourSelects();
+            const startHidden = document.getElementById("wizard-news-date-start");
+            const endHidden = document.getElementById("wizard-news-date-end");
+            const sDate = document.getElementById("wizard-start-date");
+            const sHour = document.getElementById("wizard-start-hour");
+            const eDate = document.getElementById("wizard-end-date");
+            const eHour = document.getElementById("wizard-end-hour");
+
+            if (startHidden && startHidden.value) {
+                const parts = startHidden.value.split("T");
+                if (sDate && parts[0]) sDate.value = parts[0];
+                if (sHour && parts[1]) sHour.value = parts[1].slice(0, 2);
+            }
+            if (endHidden && endHidden.value) {
+                const parts = endHidden.value.split("T");
+                if (eDate && parts[0]) eDate.value = parts[0];
+                if (eHour && parts[1]) eHour.value = parts[1].slice(0, 2);
+            }
+        };
+
+        const syncWizardHiddenFromInputs = () => {
+            const startHidden = document.getElementById("wizard-news-date-start");
+            const endHidden = document.getElementById("wizard-news-date-end");
+            const sDate = document.getElementById("wizard-start-date");
+            const sHour = document.getElementById("wizard-start-hour");
+            const eDate = document.getElementById("wizard-end-date");
+            const eHour = document.getElementById("wizard-end-hour");
+
+            if (startHidden && sDate && sHour) {
+                startHidden.value = sDate.value ? `${sDate.value}T${sHour.value || "00"}:00` : "";
+            }
+            if (endHidden && eDate && eHour) {
+                endHidden.value = eDate.value ? `${eDate.value}T${eHour.value || "23"}:59` : "";
+            }
+        };
+
+        document.getElementById("wizard-start-date")?.addEventListener("change", syncWizardHiddenFromInputs);
+        document.getElementById("wizard-start-hour")?.addEventListener("change", syncWizardHiddenFromInputs);
+        document.getElementById("wizard-end-date")?.addEventListener("change", syncWizardHiddenFromInputs);
+        document.getElementById("wizard-end-hour")?.addEventListener("change", syncWizardHiddenFromInputs);
+
+        window.stepWizardDate = function(type, hoursDiff) {
+            syncWizardHiddenFromInputs();
+            const hidden = document.getElementById(type === "start" ? "wizard-news-date-start" : "wizard-news-date-end");
+            if (!hidden) return;
+            let current = hidden.value ? new Date(hidden.value) : new Date();
+            if (isNaN(current.getTime())) current = new Date();
+            current.setTime(current.getTime() + hoursDiff * 60 * 60 * 1000);
+            hidden.value = formatDT(current);
+            syncWizardInputsFromHidden();
+        };
+
+        window.setWizardNow = function() {
+            const endHidden = document.getElementById("wizard-news-date-end");
+            if (endHidden) {
+                endHidden.value = formatDT(new Date());
+                syncWizardInputsFromHidden();
+            }
+        };
+
         const applyWizardQuickRange = (rangeKey = "12h") => {
             const now = new Date();
+            const btn6 = document.getElementById("btn-quick-6h");
             const btn12 = document.getElementById("btn-quick-12h");
             const btn24 = document.getElementById("btn-quick-24h");
             const btnToday = document.getElementById("btn-quick-today");
             const btnAll = document.getElementById("btn-quick-all");
-            const allBtns = [btn12, btn24, btnToday, btnAll].filter(Boolean);
+            const allBtns = [btn6, btn12, btn24, btnToday, btnAll].filter(Boolean);
 
             allBtns.forEach(btn => {
                 btn.style.background = "rgba(255,255,255,0.08)";
@@ -914,7 +1034,17 @@
             const startInput = document.getElementById("wizard-news-date-start");
             const endInput = document.getElementById("wizard-news-date-end");
 
-            if (rangeKey === "12h") {
+            if (rangeKey === "6h") {
+                const past = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+                if (startInput) startInput.value = formatDT(past);
+                if (endInput) endInput.value = formatDT(now);
+                if (btn6) {
+                    btn6.style.background = "rgba(0, 210, 211, 0.25)";
+                    btn6.style.borderColor = "#00d2d3";
+                    btn6.style.color = "#00ffff";
+                    btn6.style.fontWeight = "bold";
+                }
+            } else if (rangeKey === "12h") {
                 const past = new Date(now.getTime() - 12 * 60 * 60 * 1000);
                 if (startInput) startInput.value = formatDT(past);
                 if (endInput) endInput.value = formatDT(now);
@@ -956,9 +1086,11 @@
                 }
             }
 
+            syncWizardInputsFromHidden();
             localStorage.setItem("savedNewsQuickRange", rangeKey);
         };
 
+        document.getElementById("btn-quick-6h")?.addEventListener("click", () => applyWizardQuickRange("6h"));
         document.getElementById("btn-quick-12h")?.addEventListener("click", () => applyWizardQuickRange("12h"));
         document.getElementById("btn-quick-24h")?.addEventListener("click", () => applyWizardQuickRange("24h"));
         document.getElementById("btn-quick-today")?.addEventListener("click", () => applyWizardQuickRange("today"));

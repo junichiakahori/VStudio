@@ -21,12 +21,24 @@ export function initSettingsBackup() {
       }
 
       const jsonStr = JSON.stringify(settings, null, 2);
+      const filename = `live2d_settings_${new Date().toISOString().split('T')[0]}.json`;
+
+      // If running inside VStudio Native Mac App with native bridge
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nativeHost) {
+        window.webkit.messageHandlers.nativeHost.postMessage({
+          action: "saveFile",
+          filename: filename,
+          content: jsonStr
+        });
+        return;
+      }
+
       const blob = new Blob([jsonStr], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       
       const a = document.createElement("a");
       a.href = url;
-      a.download = `live2d_settings_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

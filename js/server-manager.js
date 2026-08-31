@@ -88,7 +88,9 @@ function updateUI(status) {
 (window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("server-manager", () => {
   const buttons = document.querySelectorAll(".sm-btn");
   buttons.forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       const serverName = btn.dataset.server;
       const action = btn.dataset.action; // start or stop
       
@@ -104,7 +106,9 @@ function updateUI(status) {
 
   const logButtons = document.querySelectorAll(".sm-log-btn");
   logButtons.forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       const serverName = btn.dataset.server;
       const logContainer = document.getElementById(`sm-log-${serverName}`);
       

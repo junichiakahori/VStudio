@@ -7,6 +7,8 @@
 
   const savedTab = localStorage.getItem("activeTab") || "tab-avatar";
 
+  const scrollContainer = document.getElementById("panel-scroll-container") || document.getElementById("control-panel");
+
   tabBtns.forEach((btn) => {
     btn.onclick = () => {
       const targetTab = btn.getAttribute("data-target");
@@ -27,6 +29,11 @@
           sec.style.display = "none";
         }
       });
+
+      // 🎯 タブ切り替え時は必ず一番上（先頭）から綺麗に表示する
+      if (scrollContainer) {
+        scrollContainer.scrollTop = 0;
+      }
     };
   });
 
@@ -42,19 +49,9 @@
     tabBtns[0].click();
   }
 
-  // スクロール位置の保存と復元（タブの下のスクロールコンテナを対象）
-  const scrollContainer = document.getElementById("panel-scroll-container") || document.getElementById("control-panel");
+  // 初期ロード時も一番上から表示
   if (scrollContainer) {
-    const savedScroll = localStorage.getItem("controlPanelScrollY");
-    if (savedScroll !== null) {
-      setTimeout(() => {
-        scrollContainer.scrollTop = parseInt(savedScroll, 10);
-      }, 150); 
-    }
-
-    scrollContainer.addEventListener("scroll", () => {
-      localStorage.setItem("controlPanelScrollY", scrollContainer.scrollTop);
-    });
+    scrollContainer.scrollTop = 0;
   }
 
   // ラジオモードの設定表示切り替え

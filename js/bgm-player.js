@@ -1,5 +1,25 @@
 // BGM制御 (IndexedDB 記憶対応)
 // =====================================================================
+function getBgmAudioContext() {
+  if (
+    !window.bgmAudioContext ||
+    window.bgmAudioContext.state === "closed" ||
+    window.bgmAudioContext.state === "interrupted"
+  ) {
+    try {
+      if (window.bgmAudioContext && typeof window.bgmAudioContext.close === "function") {
+        window.bgmAudioContext.close().catch(() => {});
+      }
+    } catch (e) {}
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    window.bgmAudioContext = new AudioCtx();
+    window.bgmGainNode = null;
+    console.log("[BGM AudioContext] 🔄 オーディオセッションを新規初期化・再生成しました");
+  }
+  return window.bgmAudioContext;
+}
+window.getBgmAudioContext = getBgmAudioContext;
+
 function safeDecodeAudioData(audioCtx, arrayBuffer) {
   return new Promise((resolve, reject) => {
     try {
@@ -228,12 +248,13 @@ window.fadeOutBgm = function (durationMs = 1800) {
 
 // スムーズなフェードイン再生 (デフォルト 2.0秒)
 window.fadeInBgm = async function (durationMs = 2000) {
-  if (!window.bgmBuffer || !window.bgmAudioContext) return;
-  if (window.bgmAudioContext.state === "suspended") {
+  if (!window.bgmBuffer) return;
+  const ctx = getBgmAudioContext();
+  if (ctx.state === "suspended" || ctx.state === "interrupted") {
     try {
-      await window.bgmAudioContext.resume();
+      await ctx.resume();
     } catch (e) {
-      console.warn("AudioContext resume failed:", e);
+      console.warn("BGM AudioContext resume failed:", e);
     }
   }
 
@@ -244,9 +265,9 @@ window.fadeInBgm = async function (durationMs = 2000) {
   window.stopBgm();
 
   if (!window.bgmGainNode) {
-    window.bgmGainNode = window.bgmAudioContext.createGain();
-    window.bgmGainNode.gain.setValueAtTime(0.0001, window.bgmAudioContext.currentTime);
-    window.bgmGainNode.connect(window.bgmAudioContext.destination);
+    window.bgmGainNode = ctx.createGain();
+    window.bgmGainNode.gain.setValueAtTime(0.0001, ctx.currentTime);
+    window.bgmGainNode.connect(ctx.destination);
   }
 
   const currTime = window.bgmAudioContext.currentTime;
@@ -294,19 +315,15 @@ window.fadeInBgm = async function (durationMs = 2000) {
       if (!file) return;
       if (window.bgmFileName) window.bgmFileName.textContent = file.name;
 
-      if (!window.bgmAudioContext) {
-        window.bgmAudioContext = new (
-          window.AudioContext || window.webkitAudioContext
-        )();
-      }
-      if (window.bgmAudioContext.state === "suspended") {
-        await window.bgmAudioContext.resume();
+      const bgmCtx = getBgmAudioContext();
+      if (bgmCtx.state === "suspended" || bgmCtx.state === "interrupted") {
+        await bgmCtx.resume().catch(() => {});
       }
 
       const arrayBuffer = await file.arrayBuffer();
       try {
         window.bgmBuffer = await safeDecodeAudioData(
-          window.bgmAudioContext,
+          bgmCtx,
           arrayBuffer,
         );
         console.log(
@@ -361,15 +378,11 @@ window.fadeInBgm = async function (durationMs = 2000) {
     window.__bgmRestoredFromDB = true;
     const savedBGM = await loadBgmFromDB();
     if (savedBGM && savedBGM.buffer) {
-      if (!window.bgmAudioContext) {
-        window.bgmAudioContext = new (
-          window.AudioContext || window.webkitAudioContext
-        )();
-      }
+      const bgmCtx = getBgmAudioContext();
       try {
         if (bgmFileName) bgmFileName.textContent = savedBGM.name;
         window.bgmBuffer = await safeDecodeAudioData(
-          window.bgmAudioContext,
+          bgmCtx,
           savedBGM.buffer,
         );
         console.log(

@@ -1,5 +1,51 @@
 let currentPlayingDisplayText = "";
 
+// 🍏 Safari / Web Audio 共通: AudioContextの自動復旧・自己修復関数
+function getVoicevoxAudioContext() {
+  if (
+    !window.voicevoxAudioContext ||
+    window.voicevoxAudioContext.state === "closed" ||
+    window.voicevoxAudioContext.state === "interrupted"
+  ) {
+    try {
+      if (window.voicevoxAudioContext && typeof window.voicevoxAudioContext.close === "function") {
+        window.voicevoxAudioContext.close().catch(() => {});
+      }
+    } catch (e) {}
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    window.voicevoxAudioContext = new AudioCtx();
+    window.voicevoxAnalyser = null;
+    window.voicevoxGainNode = null;
+    console.log("[VOICEVOX AudioContext] 🔄 オーディオセッションを新規初期化・再生成しました");
+  }
+  return window.voicevoxAudioContext;
+}
+window.getVoicevoxAudioContext = getVoicevoxAudioContext;
+
+// 🍏 Safari 画面操作（クリック・タッチ・キー入力）時の自動音声ロック解除＆ハードウェア起動
+(function setupSafariAudioAutoUnlock() {
+  const unlock = () => {
+    try {
+      const ctx = getVoicevoxAudioContext();
+      if (ctx.state === "suspended" || ctx.state === "interrupted") {
+        ctx.resume().catch(() => {});
+      }
+      if (window.bgmAudioContext && (window.bgmAudioContext.state === "suspended" || window.bgmAudioContext.state === "interrupted")) {
+        window.bgmAudioContext.resume().catch(() => {});
+      }
+      // Safari hardware wake-up (無音バッファキック)
+      const silentBuffer = ctx.createBuffer(1, 1, 22050);
+      const src = ctx.createBufferSource();
+      src.buffer = silentBuffer;
+      src.connect(ctx.destination);
+      src.start(0);
+    } catch (e) {}
+  };
+  ['click', 'pointerdown', 'keydown', 'touchstart'].forEach(evt => {
+    document.addEventListener(evt, unlock, { passive: true, capture: true });
+  });
+})();
+
 function showSubtitles(text) {
   const subEl = document.getElementById("avatar-subtitles");
   const textEl = document.getElementById("avatar-subtitles-text");
@@ -30,21 +76,30 @@ async function playNextVoicevox() {
     if (typeof resetIdleTimer === "function") resetIdleTimer();
     return;
   }
-  isVoicevoxPlaying = true;
-  const item = voicevoxAudioQueue.shift();
 
-  let text = item;
-  let rawDisplayText = typeof item === "object" && item !== null ? item.displayText || item.original : item;
+  const item = voicevoxAudioQueue.shift();
+  // console.log("[DEBUG 最終キュー確認] displayText:", item.displayText, "/ original:", item.original);
+
+  isVoicevoxPlaying = true;
   currentPlayingIsIdle = false;
 
+  // 1. 表示用（字幕・原稿ログ）は常に item.displayText を死守する
+  let displayString = typeof item === "object" && item !== null ? (item.displayText || item.original || String(item)) : String(item);
+
+  // 2. 音声合成用（読み）は item.original を基本にする
+  let speakString = typeof item === "object" && item !== null ? (item.original || item.displayText || String(item)) : String(item);
   if (typeof item === "object" && item !== null && item.promise) {
     currentPlayingIsIdle = item.isIdle || false;
     try {
-      text = await item.promise;
+      const resolvedYomi = await item.promise;
+      if (resolvedYomi && typeof resolvedYomi === "string") {
+        speakString = resolvedYomi;
+      }
     } catch (e) {
-      text = item.original;
+      speakString = item.original || displayString;
     }
   }
+
   const speakerIdEl = document.getElementById("voicevox-speaker-id");
   const speedEl = document.getElementById("voicevox-speed");
   const pitchEl = document.getElementById("voicevox-pitch");
@@ -52,141 +107,141 @@ async function playNextVoicevox() {
   const speedScaleVal = speedEl ? parseFloat(speedEl.value) || 1.0 : 1.0;
   const pitchScaleVal = pitchEl ? parseFloat(pitchEl.value) || 0.0 : 0.0;
 
-// VOICEVOX音声合成バッファの先行キャッシュ（先読み時に事前に音声化してラグ0.0秒化）
-const voicevoxAudioBufferCache = new Map();
+  // VOICEVOX音声合成バッファの先行キャッシュ（先読み時に事前に音声化してラグ0.0秒化）
+  const voicevoxAudioBufferCache = new Map();
 
-async function fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal) {
-  if (!text || !text.trim()) return null;
-  const cacheKey = `${speakerId}_${speedScaleVal}_${pitchScaleVal}_${text.trim()}`;
-  if (voicevoxAudioBufferCache.has(cacheKey)) {
-    return await voicevoxAudioBufferCache.get(cacheKey);
-  }
+  async function fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal) {
+    if (!text || !text.trim()) return null;
+    const cacheKey = `${speakerId}_${speedScaleVal}_${pitchScaleVal}_${text.trim()}`;
+    if (voicevoxAudioBufferCache.has(cacheKey)) {
+      return await voicevoxAudioBufferCache.get(cacheKey);
+    }
 
-  const promise = (async () => {
-    try {
-      // 1. Python バックエンド経由で辞書適用＆音声合成
-      const synthRes = await fetch("/api/voicevox/synthesize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: text,
-          speakerId: parseInt(speakerId, 10) || 3,
-          speedScale: speedScaleVal,
-          pitchScale: pitchScaleVal
-        })
-      });
-      if (synthRes.ok) {
-        const kanaHeader = synthRes.headers.get("X-Voicevox-Kana");
-        const cleanKanaHeader = synthRes.headers.get("X-Voicevox-Clean-Kana");
-        const finalTextHeader = synthRes.headers.get("X-Voicevox-Final-Text");
-        const corrected = synthRes.headers.get("X-Voicevox-Corrected");
-
-        let rawKana = "";
-        let cleanKana = "";
-        let finalText = text.trim();
-
-        if (kanaHeader) {
-          try { rawKana = decodeURIComponent(kanaHeader); } catch (e) {}
-        }
-        if (cleanKanaHeader) {
-          try { cleanKana = decodeURIComponent(cleanKanaHeader); } catch (e) {}
-        }
-        if (finalTextHeader) {
-          try { finalText = decodeURIComponent(finalTextHeader); } catch (e) {}
-        }
-
-        if (corrected === "1") {
-          console.warn(`[VOICEVOX誤読補正] ⚠️ 補正適用: "${text.trim()}" ➔ 補正後: "${finalText}" ➔ 実際の読み: 🗣️ "${cleanKana || rawKana}"`);
-        } else {
-          console.log(`[VOICEVOX発音確認] 🗣️ 読み: "${cleanKana || rawKana}"`);
-        }
-        return await synthRes.arrayBuffer();
-      }
-      throw new Error("Backend synthesis failed: " + synthRes.statusText);
-    } catch (backendErr) {
-      // Fallback: 直接 VOICEVOX (:50021) 呼び出し
-      const queryRes = await fetch(
-        `http://localhost:50021/audio_query?text=${encodeURIComponent(text)}&speaker=${speakerId}`,
-        { method: "POST" }
-      );
-      if (!queryRes.ok) throw new Error("Audio query failed");
-      const queryJson = await queryRes.json();
-      if (queryJson.kana) {
-        console.log(`[VOICEVOX発音カナ] 🗣️ ${queryJson.kana}`);
-      }
-      const directSynthRes = await fetch(
-        `http://localhost:50021/synthesis?speaker=${speakerId}`,
-        {
+    const promise = (async () => {
+      try {
+        // 1. Python バックエンド経由で辞書適用＆音声合成
+        const synthRes = await fetch("/api/voicevox/synthesize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(queryJson)
+          body: JSON.stringify({
+            text: text,
+            speakerId: parseInt(speakerId, 10) || 3,
+            speedScale: speedScaleVal,
+            pitchScale: pitchScaleVal
+          })
+        });
+        if (synthRes.ok) {
+          const kanaHeader = synthRes.headers.get("X-Voicevox-Kana");
+          const cleanKanaHeader = synthRes.headers.get("X-Voicevox-Clean-Kana");
+          const finalTextHeader = synthRes.headers.get("X-Voicevox-Final-Text");
+          const corrected = synthRes.headers.get("X-Voicevox-Corrected");
+
+          let rawKana = "";
+          let cleanKana = "";
+          let finalText = text.trim();
+
+          if (kanaHeader) {
+            try { rawKana = decodeURIComponent(kanaHeader); } catch (e) { }
+          }
+          if (cleanKanaHeader) {
+            try { cleanKana = decodeURIComponent(cleanKanaHeader); } catch (e) { }
+          }
+          if (finalTextHeader) {
+            try { finalText = decodeURIComponent(finalTextHeader); } catch (e) { }
+          }
+
+          if (corrected === "1") {
+            console.warn(`[VOICEVOX誤読補正] ⚠️ 補正適用: "${text.trim()}" ➔ 補正後: "${finalText}" ➔ 実際の読み: 🗣️ "${cleanKana || rawKana}"`);
+          } else {
+            console.log(`[VOICEVOX発音確認] 🗣️ 読み: "${cleanKana || rawKana}"`);
+          }
+          return await synthRes.arrayBuffer();
         }
-      );
-      if (!directSynthRes.ok) throw new Error("Direct synthesis failed");
-      return await directSynthRes.arrayBuffer();
+        throw new Error("Backend synthesis failed: " + synthRes.statusText);
+      } catch (backendErr) {
+        // Fallback: 直接 VOICEVOX (:50021) 呼び出し
+        const queryRes = await fetch(
+          `http://localhost:50021/audio_query?text=${encodeURIComponent(text)}&speaker=${speakerId}`,
+          { method: "POST" }
+        );
+        if (!queryRes.ok) throw new Error("Audio query failed");
+        const queryJson = await queryRes.json();
+        if (queryJson.kana) {
+          console.log(`[VOICEVOX発音カナ] 🗣️ ${queryJson.kana}`);
+        }
+        const directSynthRes = await fetch(
+          `http://localhost:50021/synthesis?speaker=${speakerId}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(queryJson)
+          }
+        );
+        if (!directSynthRes.ok) throw new Error("Direct synthesis failed");
+        return await directSynthRes.arrayBuffer();
+      }
+    })();
+
+    voicevoxAudioBufferCache.set(cacheKey, promise);
+    if (voicevoxAudioBufferCache.size > 80) {
+      const firstKey = voicevoxAudioBufferCache.keys().next().value;
+      voicevoxAudioBufferCache.delete(firstKey);
     }
-  })();
-
-  voicevoxAudioBufferCache.set(cacheKey, promise);
-  if (voicevoxAudioBufferCache.size > 80) {
-    const firstKey = voicevoxAudioBufferCache.keys().next().value;
-    voicevoxAudioBufferCache.delete(firstKey);
+    return await promise;
   }
-  return await promise;
-}
 
-window.preloadVoicevoxSentenceAudio = function(text, speakerId, speed, pitch) {
-  const speakerIdEl = document.getElementById("voicevox-speaker-id");
-  const speedEl = document.getElementById("voicevox-speed");
-  const pitchEl = document.getElementById("voicevox-pitch");
-  const spk = speakerId || (speakerIdEl ? speakerIdEl.value : (window.voicevoxSpeakerId ? window.voicevoxSpeakerId.value : "3"));
-  const spd = speed !== undefined ? speed : (speedEl ? parseFloat(speedEl.value) || 1.0 : 1.0);
-  const ptc = pitch !== undefined ? pitch : (pitchEl ? parseFloat(pitchEl.value) || 0.0 : 0.0);
-  return fetchVoicevoxBuffer(text, spk, spd, ptc);
-};
+  window.preloadVoicevoxSentenceAudio = function (text, speakerId, speed, pitch) {
+    const speakerIdEl = document.getElementById("voicevox-speaker-id");
+    const speedEl = document.getElementById("voicevox-speed");
+    const pitchEl = document.getElementById("voicevox-pitch");
+    const spk = speakerId || (speakerIdEl ? speakerIdEl.value : (window.voicevoxSpeakerId ? window.voicevoxSpeakerId.value : "3"));
+    const spd = speed !== undefined ? speed : (speedEl ? parseFloat(speedEl.value) || 1.0 : 1.0);
+    const ptc = pitch !== undefined ? pitch : (pitchEl ? parseFloat(pitchEl.value) || 0.0 : 0.0);
+    return fetchVoicevoxBuffer(text, spk, spd, ptc);
+  };
 
   try {
-    let arrayBuffer = await fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal);
+    // 📝 ログと画面字幕には「常に漢字の displayString」を使う
+    if (displayString) {
+      console.log(`[原稿] "${displayString}"`);
+    }
+    // 🗣️ VOICEVOXの音声合成と再生ログには「音声用の speakString」を使う
+    console.log(`[VOICEVOX] Playing: "${speakString}" (Speaker ID: ${speakerId})`);
+
+    currentPlayingDisplayText = displayString;
+    showSubtitles(displayString); // 画面の字幕には漢字混じりの綺麗な原稿を表示
+    // 音声バッファの取得と再生には speakString を渡す
+    let arrayBuffer = await fetchVoicevoxBuffer(speakString, speakerId, speedScaleVal, pitchScaleVal);
     if (!arrayBuffer) throw new Error("Empty audio buffer");
 
-    // 3. Play Audio
-    if (!voicevoxAudioContext) {
-      voicevoxAudioContext = new (
-        window.AudioContext || window.webkitAudioContext
-      )();
-    }
-    if (voicevoxAudioContext.state === "suspended") {
-      console.warn(
-        "[VOICEVOX] AudioContext is suspended. Please click the page to unmute.",
-      );
-      voicevoxAudioContext
-        .resume()
-        .catch((e) => console.error("[VOICEVOX] Resume error:", e));
+    const ctx = getVoicevoxAudioContext();
+    if (ctx.state === "suspended" || ctx.state === "interrupted") {
+      await ctx.resume().catch((e) => console.warn("[VOICEVOX] Resume error:", e));
     }
 
-    const audioBuffer = await voicevoxAudioContext.decodeAudioData(arrayBuffer);
-    currentVoicevoxSource = voicevoxAudioContext.createBufferSource();
+    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    currentVoicevoxSource = ctx.createBufferSource();
     currentVoicevoxSource.buffer = audioBuffer;
 
-    if (!voicevoxAnalyser) {
-      voicevoxAnalyser = voicevoxAudioContext.createAnalyser();
-      voicevoxAnalyser.fftSize = 256;
+    if (!window.voicevoxAnalyser) {
+      window.voicevoxAnalyser = ctx.createAnalyser();
+      window.voicevoxAnalyser.fftSize = 256;
     }
     const volSlider = document.getElementById("voicevox-volume-slider");
     const savedVol = localStorage.getItem("savedVoicevoxVolume");
     const targetVol = volSlider ? (parseFloat(volSlider.value) / 100.0) : (savedVol ? (parseFloat(savedVol) / 100.0) : 1.0);
 
-    if (!voicevoxGainNode) {
-      voicevoxGainNode = voicevoxAudioContext.createGain();
-      voicevoxGainNode.gain.setValueAtTime(targetVol, voicevoxAudioContext.currentTime);
-      voicevoxGainNode.connect(voicevoxAnalyser);
-      voicevoxAnalyser.connect(voicevoxAudioContext.destination);
+    if (!window.voicevoxGainNode) {
+      window.voicevoxGainNode = ctx.createGain();
+      window.voicevoxGainNode.gain.setValueAtTime(targetVol, ctx.currentTime);
+      window.voicevoxGainNode.connect(window.voicevoxAnalyser);
+      window.voicevoxAnalyser.connect(ctx.destination);
     } else {
-      voicevoxGainNode.gain.cancelScheduledValues(voicevoxAudioContext.currentTime);
-      voicevoxGainNode.gain.setValueAtTime(targetVol, voicevoxAudioContext.currentTime);
+      window.voicevoxGainNode.gain.cancelScheduledValues(ctx.currentTime);
+      window.voicevoxGainNode.gain.setValueAtTime(targetVol, ctx.currentTime);
     }
 
-    currentVoicevoxSource.connect(voicevoxGainNode);
+    currentVoicevoxSource.connect(window.voicevoxGainNode);
 
     currentVoicevoxSource.onended = () => {
       if (currentVoicevoxSource) currentVoicevoxSource.disconnect();
@@ -197,13 +252,9 @@ window.preloadVoicevoxSentenceAudio = function(text, speakerId, speed, pitch) {
         hideSubtitles();
       }
 
-      // ラジオモードかつキューが空の場合、短い間隔で次の台本行を読む
       const radioModeToggle = document.getElementById("ai-radio-mode-toggle");
       const isRadioMode = radioModeToggle && radioModeToggle.checked;
-      const aiRemakeToggle = document.getElementById("ai-idle-remake-toggle");
-      const aiApiKeyInput = document.getElementById("ai-api-key");
-      const hasApiKey = aiApiKeyInput && aiApiKeyInput.value.trim();
-      const isRadioActive = isRadioMode; // ラジオモードはAI機能に依存しない
+      const isRadioActive = isRadioMode;
 
       if (
         isRadioActive &&
@@ -212,25 +263,17 @@ window.preloadVoicevoxSentenceAudio = function(text, speakerId, speed, pitch) {
         radioModeState.currentScriptIndex < radioModeState.scriptLines.length &&
         voicevoxAudioQueue.length === 0
       ) {
-        // 1〜2秒後に次の行を読む
         setTimeout(() => triggerIdleSpeech(), 1500);
       } else {
         playNextVoicevox();
       }
     };
-
-    if (rawDisplayText && rawDisplayText !== text) {
-      console.log(`[原稿] "${rawDisplayText}"`);
-    }
-    console.log(`[VOICEVOX] Playing: "${text}" (Speaker ID: ${speakerId})`);
-    currentPlayingDisplayText = rawDisplayText || text;
-    showSubtitles(rawDisplayText);
     currentVoicevoxSource.start(0);
   } catch (e) {
     console.error("VOICEVOX Error:", e);
     currentPlayingDisplayText = "";
     hideSubtitles();
-    playNextVoicevox(); // Skip to next
+    playNextVoicevox();
   }
 }
 
@@ -335,7 +378,7 @@ function stopVoicevoxPlayback() {
     try {
       currentVoicevoxSource.onended = null;
       currentVoicevoxSource.stop();
-    } catch (e) {}
+    } catch (e) { }
     currentVoicevoxSource = null;
   }
   const audioEl = document.getElementById("voicevox-audio");
@@ -343,7 +386,7 @@ function stopVoicevoxPlayback() {
     try {
       audioEl.pause();
       audioEl.currentTime = 0;
-    } catch (e) {}
+    } catch (e) { }
   }
   isVoicevoxPlaying = false;
   if (typeof hideSubtitles === "function") hideSubtitles();
@@ -351,6 +394,65 @@ function stopVoicevoxPlayback() {
 }
 
 window.stopVoicevoxPlayback = stopVoicevoxPlayback;
+
+// 🚨 全ての番組・音声・BGMを一発で即時完全停止する緊急停止関数
+window.emergencyStopAll = function emergencyStopAll() {
+  console.log("[緊急停止] 🚨 緊急停止を実行しました");
+
+  // 1. ニュース番組の停止
+  if (typeof window.stopNewsBroadcast === "function") {
+    window.stopNewsBroadcast();
+  }
+  if (window.newsBroadcastState) {
+    window.newsBroadcastState.isRunning = false;
+  }
+  window.isReadingNews = false;
+
+  // 2. ラジオ番組・待機発話の停止
+  if (window.radioModeState) {
+    window.radioModeState.isRunning = false;
+    window.radioModeState.currentPhase = "idle";
+  }
+
+  // 3. VOICEVOX音声の完全停止
+  stopVoicevoxPlayback();
+
+  // 4. BGMの停止
+  if (window.bgmPlayer && typeof window.bgmPlayer.stop === "function") {
+    window.bgmPlayer.stop();
+  } else if (typeof window.stopBgm === "function") {
+    window.stopBgm();
+  }
+
+  // 5. 字幕の消去
+  if (typeof hideSubtitles === "function") hideSubtitles();
+
+  // 6. UIボタン状態の復元
+  const startBtn = document.getElementById("news-broadcast-start-btn");
+  const stopBtn = document.getElementById("news-broadcast-stop-btn");
+  const progressEl = document.getElementById("news-broadcast-progress");
+  if (startBtn) startBtn.style.display = "block";
+  if (stopBtn) stopBtn.style.display = "none";
+  if (progressEl) progressEl.textContent = "🚨 緊急停止しました";
+};
+
+// ⌨️ Escキーによる即座の緊急停止（入力欄フォーカス中以外）
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    const active = document.activeElement;
+    if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT")) {
+      return;
+    }
+    if (
+      (window.newsBroadcastState && window.newsBroadcastState.isRunning) ||
+      (typeof isVoicevoxPlaying !== "undefined" && isVoicevoxPlaying) ||
+      window.isReadingNews
+    ) {
+      e.preventDefault();
+      window.emergencyStopAll();
+    }
+  }
+});
 
 // VOICEVOXのキューが空になり、再生が終わるまで待つ関数
 function waitForVoicevoxFinish() {
@@ -426,7 +528,7 @@ function initSubtitlesControl() {
     e.preventDefault();
   };
 
-  document.onmousemove = (e) => {
+  const onMouseMove = (e) => {
     if (!isDragging) return;
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
@@ -434,7 +536,7 @@ function initSubtitlesControl() {
     subtitlesEl.style.top = `${initTop + dy}px`;
   };
 
-  document.onmouseup = () => {
+  const onMouseUp = () => {
     if (!isDragging) return;
     isDragging = false;
     subtitlesEl.classList.remove("dragging");
@@ -446,6 +548,9 @@ function initSubtitlesControl() {
     };
     localStorage.setItem("subtitlesPosition", JSON.stringify(pos));
   };
+
+  window.addEventListener("mousemove", onMouseMove);
+  window.addEventListener("mouseup", onMouseUp);
 }
 
 // uiLoaded（サイドバー読み込み完了）と DOMContentLoaded の両方で初期化

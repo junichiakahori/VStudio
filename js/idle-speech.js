@@ -435,12 +435,12 @@ window.triggerIdleSpeech = async function () {
   if (idleFirstPerson && idleFirstPerson.value) {
     const fp = idleFirstPerson.value;
     phrase = phrase.replace(
-      /わたくし|わたし|あたし|私|ぼく|僕|おれ|俺|うち/g,
+      /わたくし|わたし|あたし|私(?![一-龠々])|ぼく|僕(?![一-龠々])|おれ|俺(?![一-龠々])|うち/g,
       fp,
     );
     if (typeof yomiPhrase !== "undefined")
       yomiPhrase = yomiPhrase.replace(
-        /わたくし|わたし|あたし|私|ぼく|僕|おれ|俺|うち/g,
+        /わたくし|わたし|あたし|私(?![一-龠々])|ぼく|僕(?![一-龠々])|おれ|俺(?![一-龠々])|うち/g,
         fp,
       );
   }
@@ -476,13 +476,9 @@ window.triggerIdleSpeech = async function () {
     (async () => {
       try {
         // まずvoicevoxAudioContextが初期化・解除済みであることを確認
-        if (!voicevoxAudioContext) {
-          voicevoxAudioContext = new (
-            window.AudioContext || window.webkitAudioContext
-          )();
-        }
-        if (voicevoxAudioContext.state === "suspended") {
-          await voicevoxAudioContext.resume();
+        const ctx = typeof getVoicevoxAudioContext === "function" ? getVoicevoxAudioContext() : (window.voicevoxAudioContext || new (window.AudioContext || window.webkitAudioContext)());
+        if (ctx.state === "suspended" || ctx.state === "interrupted") {
+          await ctx.resume().catch(() => {});
         }
         // mp3を優先、失敗したらwavを試みる
         const tryFetch = async (url) => {
@@ -497,8 +493,8 @@ window.triggerIdleSpeech = async function () {
           arrayBuffer = await tryFetch(`se/${seToPlay}.wav`);
         }
         const audioBuffer =
-          await voicevoxAudioContext.decodeAudioData(arrayBuffer);
-        const source = voicevoxAudioContext.createBufferSource();
+          await ctx.decodeAudioData(arrayBuffer);
+        const source = ctx.createBufferSource();
         source.buffer = audioBuffer;
 
         window.seVolSlider = document.getElementById("se-volume-slider");

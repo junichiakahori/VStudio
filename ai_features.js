@@ -168,55 +168,20 @@ export async function callAI(prompt, apiKey, provider, pureText=false, maxTokens
 export function applyCustomHiraganaDict(text) {
     let processedText = text;
 
-    // 1. システム組み込みのよくある読み間違い辞書（AIのミスをカバー）
-    const DEFAULT_DICT = {
-        "焼肉": "やきにく",
-        "明日": "あした",
-        "今日": "きょう",
-        "昨日": "きのう",
-        "明後日": "あさって",
-        "一昨日": "おととい",
-        "初見": "しょけん",
-        "配信": "はいしん",
-        "枠": "わく",
-        "耐久": "たいきゅう",
-        "同接": "どうせつ",
-        "高評価": "こうひょうか",
-        "登録": "とうろく",
-        "概要欄": "がいようらん",
-        "何": "なに",
-        "私": "わたし",
-        "俺": "おれ",
-        "僕": "ぼく",
-        "君": "きみ"
-    };
-
-    for (const [target, replacement] of Object.entries(DEFAULT_DICT)) {
-        if (processedText.includes(target)) {
-            processedText = processedText.split(target).join(replacement);
-        }
-    }
-
-    // ユーザー名に含まれるピリオドやアンダースコア（例: drone.akahori → drone akahori）を
-    // スペースに変換することでAIの誤読を防ぐ
-    processedText = processedText.replace(/([a-zA-Z0-9])([._])([a-zA-Z0-9])/g, '$1 $3');
-
-    // 2. ユーザーが画面上で登録したカスタム辞書
+    // ユーザーが画面上で明示的に登録したカスタム辞書（例: VTuber, ぶいちゅーばー 等）のみを素直に適用
     const aiHiraganaDict = document.getElementById('ai-hiragana-dict');
     if (!aiHiraganaDict || !aiHiraganaDict.value.trim()) return processedText;
     const lines = aiHiraganaDict.value.split('\n');
-        for (const line of lines) {
+    for (const line of lines) {
         const parts = line.split(',');
         if (parts.length >= 2) {
             const target = parts[0].trim();
             const replacement = parts[1].trim();
             if (target && replacement) {
-                // 大文字・小文字を問わず一致するように正規表現で置換
                 try {
                     const regex = new RegExp(target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
                     processedText = processedText.replace(regex, replacement);
                 } catch (e) {
-                    // 正規表現が無効な場合は従来の方法でフォールバック
                     processedText = processedText.split(target).join(replacement);
                 }
             }
@@ -226,10 +191,97 @@ export function applyCustomHiraganaDict(text) {
 }
 
 export async function convertToHiraganaWithAI(text) {
-    if (!text) return text;
-    // LLMによる平仮名化ハルシネーション（「要請した」→「ようした」等の脱落）を完全遮断し、
-    // 辞書適用済みのテキストを返却して VOICEVOX（OpenJTalk）に正確に読ませる
-    return applyCustomHiraganaDict(text);
+    if (!text || !text.trim()) return text;
+
+    // 1. キャッシュが存在する場合は即座に返却（0ms）
+    const cacheKey = text.trim();
+    if (window.aiHiraganaCache && window.aiHiraganaCache[cacheKey]) {
+        return window.aiHiraganaCache[cacheKey];
+    }
+
+    // 2. カスタム辞書（手動登録）を適用
+    let dictApplied = applyCustomHiraganaDict(text);
+
+    // 3. AI設定の取得
+    const aiHiraganaToggle = document.getElementById('ai-hiragana-toggle');
+    const isAiHiraganaEnabled = aiHiraganaToggle ? aiHiraganaToggle.checked : true;
+    const aiApiKeyInput = document.getElementById('ai-api-key');
+    const apiKey = (aiApiKeyInput ? aiApiKeyInput.value.trim() : '') || localStorage.getItem('savedAiApiKey') || '';
+    const providerSelect = document.getElementById('ai-provider-select');
+    const provider = (providerSelect ? providerSelect.value : '') || localStorage.getItem('savedAiProvider') || 'ollama';
+
+    // AIが利用できない場合は辞書適用結果をそのまま返却
+    if (!isAiHiraganaEnabled || (!apiKey && provider !== 'ollama')) {
+        return dictApplied;
+    }
+
+    try {
+        const prompt = `あなたは日本語の音声合成（VOICEVOX）用の文脈校正アシスタントです。
+与えられた日本語の文章の中で、「文脈によって読み方が変わる漢字（中央市場、株式市場、私立、1日など）」や「誤読されやすい城名などの固有名詞（丸岡城→丸岡じょう等）」だけを、正しいひらがなでピンポイントに補正してください。
+通常の漢字、人名（下地幹郎など）、一般的な熟語（速報、知事選、立候補、表明など）はそのまま漢字で維持してください。
+
+テキスト: ${dictApplied}
+校正後:`;
+
+        let result = null;
+        if (provider === 'ollama') {
+            const aiModelInput = document.getElementById('ai-model-input');
+            const targetModel = (aiModelInput && aiModelInput.value.trim()) || 'qwen2.5:7b';
+            const systemPrompt = `You are a professional Japanese phonetic proofreader for speech synthesis (TTS).
+Your task is to fix mispronounced Japanese words, rare names/usernames, and ambiguous context-dependent kanji so VOICEVOX pronounces them naturally:
+1. Replace rare or unusual names, usernames, and handles before honorifics (e.g. 魂児さん/魂児くん → こんじさん/こんじくん) with their natural phonetic reading in Hiragana.
+2. Replace context-dependent kanji with phonetic hiragana (e.g. 丸岡城 → 丸岡じょう, 中央市場 → 中央いちば, 私立 → しりつ, 1日 → ついたち/いちにち).
+3. Keep common standard dictionary Kanji and well-known proper nouns intact (e.g. 速報, 下地幹郎, 沖縄知事選).
+4. Do NOT translate, summarize, or comment. Output the corrected Japanese text only.`;
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+            const res = await fetch('http://localhost:11434/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
+                body: JSON.stringify({
+                    model: targetModel,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: dictApplied }
+                    ],
+                    stream: false,
+                    options: {
+                        temperature: 0.0
+                    }
+                })
+            });
+            clearTimeout(timeoutId);
+            const json = await res.json();
+            if (res.ok && json.message && json.message.content) {
+                result = json.message.content.trim();
+            }
+        } else {
+            result = await callAI(prompt, apiKey, provider, false, 200);
+        }
+
+        if (result && typeof result === 'string') {
+            result = result.replace(/^校正後[:：\s]*/i, '').trim();
+            result = result.replace(/[\r\n]+/g, ' ').trim();
+            console.log(`[AI文脈校正] 🤖 AIの校正結果: "${result}"`);
+            if (result && result.length > 0) {
+                if (!window.aiHiraganaCache) window.aiHiraganaCache = {};
+                window.aiHiraganaCache[cacheKey] = result;
+                if (typeof window.saveHiraganaData === 'function') {
+                    window.saveHiraganaData();
+                }
+                return result;
+            }
+        }
+    } catch (e) {
+        if (e.name !== 'AbortError') {
+            console.warn("[AI文脈校正] エラー:", e);
+        }
+    }
+
+    return dictApplied;
 }
 
 export function restorePunctuation(original, hiragana) {

@@ -233,51 +233,58 @@ body {
     color: #00f3ff !important;
 }
 
-/* カプセル型ピルタブ */
+/* カプセル型セグメントタブ (直感的なタブUI) */
 .tabs-pill-container {
-    background: rgba(0, 0, 0, 0.45);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(10, 14, 26, 0.75);
+    border: 1px solid rgba(0, 243, 255, 0.22);
     border-radius: 8px;
     padding: 3px;
     display: flex;
-    gap: 3px;
+    gap: 4px;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.45);
 }
 
 .tab-btn {
     flex: 1;
-    background: transparent;
-    border: none;
-    color: #8395a7;
-    padding: 6px 4px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #9aa0a6;
+    padding: 6px 2px;
     white-space: nowrap;
-    font-size: 0.76rem;
+    font-size: 0.72rem;
     font-weight: 600;
+    letter-spacing: -0.2px;
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: 2px;
 }
 
 .tab-btn:hover {
-    color: #ffffff;
-    background: rgba(255, 255, 255, 0.05);
+    color: #00f3ff;
+    background: rgba(0, 243, 255, 0.12);
+    border-color: rgba(0, 243, 255, 0.35);
+    transform: translateY(-1px);
 }
 
 .tab-btn.active {
-    background: linear-gradient(135deg, rgba(108, 92, 231, 0.9), rgba(0, 210, 211, 0.9));
+    background: linear-gradient(135deg, #6c5ce7 0%, #00d2d3 100%);
+    border: 1px solid rgba(255, 255, 255, 0.35);
     color: #ffffff;
-    font-weight: 700;
-    box-shadow: 0 2px 8px rgba(0, 210, 211, 0.35);
+    font-weight: 800;
+    box-shadow: 0 2px 10px rgba(0, 210, 211, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    transform: translateY(-1px);
 }
 
 .panel-scroll-container {
-    flex: 1;
+    flex: 1 1 0;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 0.6rem 1rem 1.5rem 1rem;
+    padding: 0.6rem 0.85rem 2.5rem 0.85rem;
     display: flex;
     flex-direction: column;
     gap: 1.2rem;
@@ -491,14 +498,94 @@ input:checked + .slider:before { transform: translateX(21px); }
     font-family: monospace;
 }
 
+/* =====================================================================
+   ボタンの共通タクタイル・インタラクション（立体感・ホバー・押し込み演出）
+   ===================================================================== */
+.btn,
+.btn-wizard-compact,
+.btn-header-icon,
+.sm-btn,
+.sm-log-btn,
+.start-here-btn,
+button.btn,
+button:not(.tab-btn):not(.slider):not(.close-btn):not(#news-quick-floating-btn) {
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.btn:hover,
+.btn-wizard-compact:hover,
+.btn-header-icon:hover,
+.sm-btn:hover,
+.sm-log-btn:hover,
+.start-here-btn:hover,
+button.btn:hover,
+button:not(.tab-btn):not(.slider):not(.close-btn):not(#news-quick-floating-btn):hover {
+    transform: translateY(-1.5px);
+    filter: brightness(1.12);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 8px rgba(0, 243, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.btn:active,
+.btn-wizard-compact:active,
+.btn-header-icon:active,
+.sm-btn:active,
+.sm-log-btn:active,
+.start-here-btn:active,
+button.btn:active,
+button:not(.tab-btn):not(.slider):not(.close-btn):not(#news-quick-floating-btn):active {
+    transform: translateY(1.5px) scale(0.97) !important;
+    filter: brightness(0.92);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 2px 4px rgba(0, 0, 0, 0.4) !important;
+    transition: all 0.05s ease-out !important;
+}
+
+/* 📰 画面右下の常時フローティング記事一覧ボタン */
+#news-quick-floating-btn {
+    position: fixed !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    z-index: 99999 !important;
+    background: linear-gradient(135deg, rgba(30, 39, 46, 0.95), rgba(15, 20, 30, 0.98)) !important;
+    color: #81ecec !important;
+    border: 1px solid rgba(129, 236, 236, 0.4) !important;
+    border-radius: 20px !important;
+    padding: 8px 16px !important;
+    font-size: 0.82rem !important;
+    font-weight: bold !important;
+    cursor: pointer !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: blur(8px) !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    transition: all 0.2s ease !important;
+}
+#news-quick-floating-btn:hover {
+    transform: translateY(-2px) scale(1.05) !important;
+    border-color: #81ecec !important;
+    box-shadow: 0 6px 20px rgba(129, 236, 236, 0.45) !important;
+}
+#news-quick-floating-btn:active {
+    transform: translateY(1px) scale(0.98) !important;
+}
+
 .btn {
-    border: none;
-    padding: 0.6rem 0.9rem;
-    border-radius: 8px;
-    font-size: 0.8rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 0.5rem 0.9rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
 }
 
 .btn-copy {
@@ -511,7 +598,7 @@ input:checked + .slider:before { transform: translateX(21px); }
 .btn-copy:hover {
     background: #fff;
     box-shadow: 0 0 12px var(--secondary-glow);
-    transform: scale(1.02);
+    transform: translateY(-1.5px) scale(1.02);
 }
 
 /* Camera preview */
@@ -628,13 +715,22 @@ body.face-mask-mode .camera-label {
 
 /* Scrollbar */
 .panel-scroll-container::-webkit-scrollbar,
-.control-panel::-webkit-scrollbar { width: 5px; }
+.control-panel::-webkit-scrollbar {
+    width: 5px;
+}
 .panel-scroll-container::-webkit-scrollbar-track,
-.control-panel::-webkit-scrollbar-track { background: transparent; }
+.control-panel::-webkit-scrollbar-track {
+    background: transparent;
+}
 .panel-scroll-container::-webkit-scrollbar-thumb,
-.control-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+.control-panel::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
 .panel-scroll-container::-webkit-scrollbar-thumb:hover,
-.control-panel::-webkit-scrollbar-thumb:hover { background: rgba(0, 210, 211, 0.4); }
+.control-panel::-webkit-scrollbar-thumb:hover {
+    background: var(--primary, #00d2d3);
+}
 
 /* OBS mode */
 body.obs-mode .control-panel,

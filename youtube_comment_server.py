@@ -15,11 +15,121 @@ from googleapiclient.discovery import build
 from pytchat.processors.default.processor import DefaultProcessor, Chatdata
 from pytchat.parser.live import Parser
 import time
+from datetime import datetime, timezone, timedelta
 
-logging.basicConfig(level=logging.INFO)
+JST = timezone(timedelta(hours=9))
+
+class JSTFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
+        dt = datetime.fromtimestamp(record.created, tz=JST)
+        if datefmt:
+            return dt.strftime(datefmt)
+        return dt.strftime('%Y-%m-%d %H:%M:%S')
+
+_log_handler = logging.StreamHandler()
+_log_handler.setFormatter(JSTFormatter('[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+logging.root.handlers = [_log_handler]
+logging.root.setLevel(logging.INFO)
+
+logging.getLogger("websockets").setLevel(logging.CRITICAL)
+logging.getLogger("websockets.server").setLevel(logging.CRITICAL)
+logging.getLogger("websockets.protocol").setLevel(logging.CRITICAL)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("googleapiclient.discovery_cache").setLevel(logging.ERROR)
 
 import urllib.parse
 import base64
+
+# ----------------------------------------------------
+# YouTube チャンネル表示名（DisplayName）キャッシュ＆自動解決
+# ----------------------------------------------------
+USER_CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dict", "youtube_user_cache.json")
+_user_name_cache = {}
+
+def load_user_cache():
+    global _user_name_cache
+    if os.path.exists(USER_CACHE_FILE):
+        try:
+            with open(USER_CACHE_FILE, "r", encoding="utf-8") as f:
+                _user_name_cache = json.load(f)
+        except Exception as e:
+            logging.warning(f"Failed to load youtube_user_cache.json: {e}")
+
+def save_user_cache():
+    try:
+        os.makedirs(os.path.dirname(USER_CACHE_FILE), exist_ok=True)
+        with open(USER_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(_user_name_cache, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logging.warning(f"Failed to save youtube_user_cache.json: {e}")
+
+load_user_cache()
+
+async def resolve_author_name(author_name: str, channel_id: str = None) -> str:
+    """ハンドル名（例: @drone.akahori）や channel_id から YouTube チャンネル正式表示名（例: ドローン赤堀）を解決"""
+    if not author_name:
+        return "視聴者"
+    
+    clean_handle = author_name.strip()
+    # 既にキャッシュにある場合は即座に返却
+    if clean_handle in _user_name_cache:
+        return _user_name_cache[clean_handle]
+    if channel_id and channel_id in _user_name_cache:
+        return _user_name_cache[channel_id]
+        
+    # @ で始まらない（既に通常の名義）ならそのままキャッシュして返す
+    if not clean_handle.startswith("@"):
+        _user_name_cache[clean_handle] = clean_handle
+        save_user_cache()
+        return clean_handle
+
+    resolved_name = None
+
+    # 1. スクレイピングによる超高速解決 (https://www.youtube.com/@handle)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "ja,en;q=0.9"
+    }
+    
+    urls_to_try = [f"https://www.youtube.com/{clean_handle}"]
+    if channel_id:
+        urls_to_try.append(f"https://www.youtube.com/channel/{channel_id}")
+
+    for target_url in urls_to_try:
+        try:
+            def _fetch():
+                return requests.get(target_url, headers=headers, timeout=3).text
+            html = await asyncio.to_thread(_fetch)
+            og_match = re.search(r'<meta property="og:title" content="([^"]+)">', html)
+            if og_match:
+                candidate = og_match.group(1).strip()
+                if candidate and candidate != clean_handle:
+                    resolved_name = candidate
+                    break
+            title_match = re.search(r'<title>([^<]+?)(?: - YouTube)?</title>', html)
+            if title_match:
+                candidate = title_match.group(1).strip()
+                if candidate and candidate != clean_handle:
+                    resolved_name = candidate
+                    break
+        except Exception as e:
+            logging.debug(f"Fetch channel title failed for {target_url}: {e}")
+
+    if resolved_name:
+        logging.info(f"✨ [YouTube Author Resolved] {clean_handle} ➔ 『{resolved_name}』")
+        _user_name_cache[clean_handle] = resolved_name
+        if channel_id:
+            _user_name_cache[channel_id] = resolved_name
+        save_user_cache()
+        return resolved_name
+
+    # 解決できなかった場合は @ を除いたハンドル名をデフォルトとする
+    fallback_name = clean_handle.lstrip("@")
+    _user_name_cache[clean_handle] = fallback_name
+    save_user_cache()
+    return fallback_name
 
 def _resolve_single_emoji(s):
     if not s:
@@ -107,10 +217,10 @@ def _extract_emojis_from_payload(m_payload, fountain, buckets):
 # YouTube InnerTube Live Reactions (emojiFountainDataEntity) Hook
 _original_get_contents = Parser.get_contents
 _last_fountain_update_time = None
-_last_fountain_total_reactions = 0
+_last_fountain_emoji_counts = {}
 
 def _custom_get_contents(self, jsn):
-    global _last_fountain_update_time, _last_fountain_total_reactions
+    global _last_fountain_update_time, _last_fountain_emoji_counts
     if jsn and "frameworkUpdates" in jsn:
         try:
             mutations = jsn["frameworkUpdates"].get("entityBatchUpdate", {}).get("mutations", [])
@@ -120,32 +230,57 @@ def _custom_get_contents(self, jsn):
                     fountain = payload["emojiFountainDataEntity"]
                     update_time = fountain.get("updateTimeUsec")
                     buckets = fountain.get("reactionBuckets", [])
-                    total_rx = sum(b.get("totalReactions", 0) for b in buckets)
                     
-                    # リアクションが検知された場合（初回または更新時）
-                    if total_rx > 0 or (update_time and _last_fountain_update_time and update_time != _last_fountain_update_time):
+                    # 以前と同一の updateTime なら重複処理をスキップ
+                    if update_time and update_time == _last_fountain_update_time:
+                        continue
+                    
+                    # 各絵文字の現在のカウントを集計
+                    current_counts = {}
+                    for b in buckets:
+                        for r in b.get("reactionsData", []) or b.get("reactions", []):
+                            cnt = r.get("reactionCount", 0)
+                            em = r.get("unicodeEmojiId") or r.get("emojiId") or _resolve_single_emoji(json.dumps(r, ensure_ascii=False))
+                            if em and cnt > 0:
+                                current_counts[em] = current_counts.get(em, 0) + cnt
+                    for r in fountain.get("reactionsData", []) or fountain.get("reactions", []):
+                        cnt = r.get("reactionCount", 0)
+                        em = r.get("unicodeEmojiId") or r.get("emojiId") or _resolve_single_emoji(json.dumps(r, ensure_ascii=False))
+                        if em and cnt > 0:
+                            current_counts[em] = current_counts.get(em, 0) + cnt
+                    
+                    # 初回接続時は現在のカウントをベースラインとして記憶（過去の累積を即時発火させない）
+                    if _last_fountain_update_time is None:
                         _last_fountain_update_time = update_time
-                        
+                        _last_fountain_emoji_counts = current_counts
+                        continue
+                    
+                    _last_fountain_update_time = update_time
+                    
+                    # 差分（新規に増加したリアクション数）のみを発火
+                    new_reactions = []
+                    for em, cnt in current_counts.items():
+                        prev_cnt = _last_fountain_emoji_counts.get(em, 0)
+                        diff = cnt - prev_cnt
+                        if diff > 0:
+                            new_reactions.append((em, diff))
+                    
+                    _last_fountain_emoji_counts = current_counts
+                    
+                    if new_reactions:
                         contents = jsn.get('continuationContents')
                         if contents and 'liveChatContinuation' in contents:
                             lc = contents['liveChatContinuation']
                             if 'actions' not in lc or lc['actions'] is None:
                                 lc['actions'] = []
-                            
-                            # ペイロードから絵文字の種類と個数を動的に抽出
-                            extracted_items = _extract_emojis_from_payload(payload, fountain, buckets)
-                            for em, cnt in extracted_items:
-                                count = max(cnt, 1)
-                                logging.info(f"[YouTube Live Reaction Intercepted!] emoji={em} count={count} updateTime={update_time}")
+                            for em, diff in new_reactions:
+                                logging.info(f"[YouTube Live Reaction Intercepted!] emoji={em} count={diff} updateTime={update_time}")
                                 lc['actions'].append({
                                     "vstudioLiveReaction": {
                                         "emoji": em,
-                                        "count": count
+                                        "count": min(diff, 10)  # 一度のバースト上限
                                     }
                                 })
-                    else:
-                        if update_time:
-                            _last_fountain_update_time = update_time
         except Exception as err:
             logging.debug(f"Error parsing emojiFountainDataEntity: {err}")
 
@@ -192,10 +327,11 @@ class VStudioChatProcessor(DefaultProcessor):
                     else:
                         try:
                             action_str = json.dumps(action, ensure_ascii=False)
-                            action_lower = action_str.lower()
-                            if any(k in action_lower for k in ["reaction", "heart", "emoji", "like", "viewerreaction", "actionpanel", "ticker"]):
-                                found_emojis = re.findall(r'[❤️💖💕💓💗💘✨🌟🎉🥳👍😻🐾🔥🥰😍🙌⭐💯👏]', action_str)
-                                emoji = found_emojis[0] if found_emojis else "❤️"
+                            # 高評価(Like)や通知パネル等の無関係なイベントをハートリアクションとして誤検知しないようガード
+                            # 絵文字が明示的に含まれるリアクションイベント（例: viewerReaction, liveChatReaction）のみ対象とする
+                            found_emojis = re.findall(r'[❤️💖💕💓💗💘✨🌟🎉🥳👍😻🐾🔥🥰😍🙌⭐💯👏😭😂]', action_str)
+                            if found_emojis and any(k in action_str.lower() for k in ["viewerreaction", "livechatreaction", "reactionaction"]):
+                                emoji = found_emojis[0]
                                 logging.info(f"[YouTube Live Reaction Raw Match] {emoji} (Payload: {action_str[:160]})")
                                 chatlist.append(ReactionItem(emoji=emoji, count=1))
                             else:
@@ -395,8 +531,9 @@ async def fetch_stats(video_id):
         while current_video_id == video_id:
             viewers = ""
             subscribers = ""
+            likes = ""
 
-            # 1. YouTube Data API が利用可能な場合（同時接続数・累計再生数・チャンネル登録者数）
+            # 1. YouTube Data API が利用可能な場合（同時接続数・累計再生数・チャンネル登録者数・高評価数）
             if youtube_api_client:
                 try:
                     req = youtube_api_client.videos().list(
@@ -413,6 +550,9 @@ async def fetch_stats(video_id):
                         elif "concurrentViewers" in lsd:
                             viewers = f"{int(lsd['concurrentViewers']):,}"
                         
+                        if "likeCount" in stats:
+                            likes = f"{int(stats['likeCount']):,}"
+                        
                         channel_id = item.get("snippet", {}).get("channelId")
                         if channel_id:
                             ch_req = youtube_api_client.channels().list(
@@ -428,7 +568,7 @@ async def fetch_stats(video_id):
                     logging.warning(f"YouTube Data API fetch stats failed: {e}")
 
             # 2. スクレイピングによる抽出（フォールバック）
-            if not viewers or not subscribers:
+            if not viewers or not subscribers or not likes:
                 url = f"https://www.youtube.com/watch?v={video_id}"
                 headers = {
                     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -459,6 +599,19 @@ async def fetch_stats(video_id):
                         if vc_match:
                             viewers = f"{int(vc_match.group(1)):,}"
 
+                    if not likes:
+                        like_lbl_match = re.search(r'"label"\s*:\s*"([\d,]+)\s*(?:件の|人による)?高評価"', html)
+                        if like_lbl_match:
+                            likes = like_lbl_match.group(1)
+                        else:
+                            like_txt_match = re.search(r'"(?:simpleText|label)"\s*:\s*"([\d,]+)\s*(?:件の高評価|高評価)"', html)
+                            if like_txt_match:
+                                likes = like_txt_match.group(1)
+                            else:
+                                like_cnt_match = re.search(r'"likeCount"\s*:\s*"?(\d+)"?', html)
+                                if like_cnt_match:
+                                    likes = f"{int(like_cnt_match.group(1)):,}"
+
                     if not subscribers:
                         sub_match1 = re.search(r'"subscriberCountText":\{"accessibility":\{"accessibilityData":\{"label":"([^"]+)"\}\}', html)
                         if sub_match1:
@@ -472,12 +625,15 @@ async def fetch_stats(video_id):
 
             if not viewers:
                 viewers = "-"
+            if not likes:
+                likes = "-"
 
             await broadcast_to_clients({
                 "type": "stats",
                 "videoId": video_id,
                 "viewers": viewers,
-                "subscribers": subscribers
+                "subscribers": subscribers,
+                "likes": likes
             })
                 
             await asyncio.sleep(10) # 10秒ごとに更新
@@ -620,7 +776,9 @@ async def start_youtube_client(video_id_or_channel: str, websocket):
                 item = action.get("addChatItemAction", {}).get("item", {})
                 if "liveChatTextMessageRenderer" in item:
                     renderer = item["liveChatTextMessageRenderer"]
-                    author = renderer.get("authorName", {}).get("simpleText", "")
+                    raw_author = renderer.get("authorName", {}).get("simpleText", "")
+                    ch_id = renderer.get("authorExternalChannelId", "")
+                    author = await resolve_author_name(raw_author, ch_id)
                     message = "".join([r.get("text", "") for r in renderer.get("message", {}).get("runs", [])])
                     icon_url = ""
                     thumbnails = renderer.get("authorPhoto", {}).get("thumbnails", [])
@@ -715,7 +873,9 @@ async def start_youtube_client(video_id_or_channel: str, websocket):
                             })
                             continue
 
-                        comment_sig = f"{c.author.name}:{c.message}"
+                        # 投稿者表示名（ハンドル名からチャンネル正式名）の解決
+                        author_disp = await resolve_author_name(c.author.name, getattr(c.author, 'channelId', None))
+                        comment_sig = f"{author_disp}:{c.message}"
                         if comment_sig in recent_comments:
                             continue
                         
@@ -723,13 +883,13 @@ async def start_youtube_client(video_id_or_channel: str, websocket):
                         if len(recent_comments) > 100:
                             recent_comments.pop(0)
 
-                        logging.info(f"[YouTube] {c.author.name}: {c.message}")
+                        logging.info(f"[YouTube] {author_disp}: {c.message}")
                         
                         if c.amountValue > 0:
-                            logging.info(f"[SuperChat] {c.author.name} sent {c.amountString}")
+                            logging.info(f"[SuperChat] {author_disp} sent {c.amountString}")
                             msg = {
                                 "type": "gift",
-                                "nickname": c.author.name,
+                                "nickname": author_disp,
                                 "amount": c.amountString,
                                 "iconUrl": c.author.imageUrl
                             }
@@ -739,7 +899,7 @@ async def start_youtube_client(video_id_or_channel: str, websocket):
                         
                         msg = {
                             "type": "comment",
-                            "nickname": c.author.name,
+                            "nickname": author_disp,
                             "comment": c.message,
                             "iconUrl": c.author.imageUrl
                         }
@@ -753,7 +913,7 @@ async def start_youtube_client(video_id_or_channel: str, websocket):
                             await broadcast_to_clients({
                                 "type": "reaction",
                                 "emoji": rx_emojis[0],
-                                "nickname": c.author.name,
+                                "nickname": author_disp,
                                 "count": len(rx_emojis)
                             })
                     

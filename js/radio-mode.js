@@ -109,40 +109,28 @@
 
   if (radioPoolTestBtn) {
     radioPoolTestBtn.addEventListener("click", () => {
-      if (typeof queueCommentAudio === "function") {
-        const nickname = "テスト";
-        window.inputEl = document.getElementById("radio-pool-test-input");
-        const comment =
-          inputEl && inputEl.value.trim().length > 0
-            ? inputEl.value.trim()
-            : "手動テストコメントです！";
+      const nickname = "テスト";
+      window.inputEl = document.getElementById("radio-pool-test-input");
+      const comment =
+        inputEl && inputEl.value.trim().length > 0
+          ? inputEl.value.trim()
+          : "手動テストコメントです！";
 
-        // コメントを画面のビューアーにも表示する
-        if (typeof addCommentToViewer === "function") {
-          addCommentToViewer(nickname, comment, "youtube", false, "");
-        }
+      // コメントを画面のビューアーにも表示する
+      if (typeof addCommentToViewer === "function") {
+        addCommentToViewer(nickname, comment, "youtube", false, "");
+      }
 
-        // コメント自体を読み上げキューへ（通常フローと同じ）
+      // 共通コメント処理ハンドラへ（ニュースモード・ラジオモード・通常モードを自動判定）
+      if (typeof handleIncomingComment === "function") {
+        handleIncomingComment(nickname, comment);
+      } else if (typeof queueCommentAudio === "function") {
         queueCommentAudio(`${nickname}さん、${comment}`);
-
-        // AI返答の生成をトリガー（通常フローと同じ）
         if (typeof generateAIResponse === "function") {
-          window.aiApiKeyInput = document.getElementById("ai-api-key");
-          window.isAiReplyEnabled =
-            document.getElementById("ai-reply-toggle")?.checked;
-          if (
-            isAiReplyEnabled &&
-            aiApiKeyInput &&
-            aiApiKeyInput.value.trim().length > 0
-          ) {
+          const isAiReplyEnabled = document.getElementById("ai-reply-toggle")?.checked;
+          const aiApiKeyInput = document.getElementById("ai-api-key");
+          if (isAiReplyEnabled && aiApiKeyInput && aiApiKeyInput.value.trim().length > 0) {
             generateAIResponse(nickname, comment);
-            console.log(
-              "[ラジオモード] テストコメントとAI返信生成をリクエストしました",
-            );
-          } else {
-            console.log(
-              "[ラジオモード] テストコメントを追加しました (AI返信はOFFです)",
-            );
           }
         }
       }

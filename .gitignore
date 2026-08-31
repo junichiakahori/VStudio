@@ -13,3 +13,7 @@ generate_procedural.py
 .DS_Store
 browser_console.log
 yt_dump.html
+logs/
+logs_backup/
+VStudio.app
+AppIcon.icns

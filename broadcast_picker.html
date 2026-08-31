@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📋 配信枠・予約枠の選択 - Live2D Studio</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+JP:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0f121d;
+            --bg-card: rgba(255, 255, 255, 0.04);
+            --bg-card-hover: rgba(0, 210, 211, 0.12);
+            --border-neon: rgba(0, 210, 211, 0.35);
+            --border-dim: rgba(255, 255, 255, 0.1);
+            --primary: #00d2d3;
+            --text-main: #f1f2f6;
+            --text-muted: #8b949e;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: 'Outfit', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 14px 16px;
+            overflow-y: auto;
+            min-height: 100vh;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-dim);
+            position: sticky;
+            top: 0;
+            background: rgba(15, 18, 29, 0.96);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+        }
+
+        h2 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 6px 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            border: 1px solid var(--border-dim);
+        }
+
+        .filter-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-dim);
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .filter-btn.active {
+            background: rgba(0, 210, 211, 0.2);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .refresh-btn {
+            margin-left: auto;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-dim);
+            color: #fff;
+            font-size: 0.72rem;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .refresh-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .broadcast-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .broadcast-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dim);
+            border-radius: 8px;
+            padding: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .broadcast-card:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--primary);
+            transform: translateY(-1px);
+        }
+
+        .broadcast-thumb {
+            width: 100px;
+            aspect-ratio: 16/9;
+            object-fit: cover;
+            border-radius: 6px;
+            background: #000;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            flex-shrink: 0;
+        }
+
+        .broadcast-info {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .broadcast-title {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #fff;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h2>📋 配信枠・予約枠の選択</h2>
+        <span style="font-size:0.75rem; color:var(--text-muted);">枠をクリックして適用</span>
+    </header>
+
+    <div class="filter-bar">
+        <span style="font-size:0.72rem; color:var(--text-muted);">絞り込み:</span>
+        <button type="button" id="filter-all" class="filter-btn active">すべて</button>
+        <button type="button" id="filter-upcoming" class="filter-btn">🟢 予約・待機中のみ</button>
+        <button type="button" id="btn-refresh" class="refresh-btn">🔄 更新</button>
+    </div>
+
+    <div id="broadcast-list" class="broadcast-list">
+        <div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:30px;">⏳ 配信枠一覧を取得中...</div>
+    </div>
+
+    <script>
+        let cachedBroadcasts = [];
+        let activeFilter = "all";
+
+        async function loadBroadcasts() {
+            const listEl = document.getElementById("broadcast-list");
+            listEl.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:30px;">⏳ 配信枠一覧を取得中...</div>';
+            try {
+                const res = await fetch("http://localhost:8001/api/youtube/list_broadcasts", { cache: "no-store" });
+                const data = await res.json();
+                if (data.success && Array.isArray(data.items)) {
+                    cachedBroadcasts = data.items;
+                    renderBroadcasts();
+                } else {
+                    listEl.innerHTML = `<div style="color:#ff7675; font-size:0.8rem; text-align:center; padding:30px;">⚠️ 取得エラー: ${data.error || "未認証です"}</div>`;
+                }
+            } catch (err) {
+                listEl.innerHTML = `<div style="color:#ff7675; font-size:0.8rem; text-align:center; padding:30px;">❌ 通信エラー: ${err.message}</div>`;
+            }
+        }
+
+        function renderBroadcasts() {
+            const listEl = document.getElementById("broadcast-list");
+            listEl.innerHTML = "";
+            let filtered = cachedBroadcasts;
+            if (activeFilter === "upcoming") {
+                filtered = cachedBroadcasts.filter(b => b.lifeCycleStatus === "ready" || b.lifeCycleStatus === "created" || b.lifeCycleStatus === "upcoming");
+            }
+            if (filtered.length === 0) {
+                listEl.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:30px;">該当する配信枠が見つかりませんでした。</div>';
+                return;
+            }
+
+            filtered.forEach(item => {
+                const card = document.createElement("div");
+                card.className = "broadcast-card";
+
+                let statusBadge = "⚪️ 待機中";
+                let statusColor = "#aaa";
+                if (item.lifeCycleStatus === "live") { statusBadge = "🟢 配信中 (Live)"; statusColor = "#00e676"; }
+                else if (item.lifeCycleStatus === "ready" || item.lifeCycleStatus === "upcoming") { statusBadge = "🟡 予約・待機中"; statusColor = "#ffb400"; }
+                else if (item.lifeCycleStatus === "complete") { statusBadge = "⚪️ 終了済"; statusColor = "#777"; }
+
+                let timeStr = "指定なし";
+                if (item.scheduledStartTime) {
+                    try {
+                        const d = new Date(item.scheduledStartTime);
+                        timeStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+                    } catch (e) {}
+                }
+
+                let privacyBadge = item.privacyStatus === "public" ? "🌐 公開" : (item.privacyStatus === "unlisted" ? "🔒 限定公開" : "👁️ 非公開");
+                const thumbUrl = item.thumbnail || `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`;
+
+                card.innerHTML = `
+                    <img src="${thumbUrl}" alt="Thumbnail" class="broadcast-thumb" onerror="this.src='https://i.ytimg.com/vi/${item.id}/hqdefault.jpg'">
+                    <div class="broadcast-info">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:0.72rem; font-weight:bold; color:${statusColor};">${statusBadge}</span>
+                            <span style="font-size:0.68rem; color:var(--text-muted); background:rgba(0,0,0,0.3); padding:2px 6px; border-radius:4px;">${privacyBadge}</span>
+                        </div>
+                        <div class="broadcast-title">${item.title || "無題の配信"}</div>
+                        <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:var(--text-muted); margin-top:2px;">
+                            <span>⏰ 予定: ${timeStr}</span>
+                            <span style="font-family:monospace; color:#00d2d3;">ID: ${item.id}</span>
+                        </div>
+                    </div>
+                `;
+
+                card.onclick = () => {
+                    if (window.opener && !window.opener.closed) {
+                        const hostDoc = window.opener.document;
+                        const ytInput = hostDoc.getElementById("youtube-user-id");
+                        if (ytInput) {
+                            ytInput.value = item.id;
+                            ytInput.dispatchEvent(new Event("change"));
+                            ytInput.dispatchEvent(new Event("input"));
+                        }
+                        try {
+                            window.opener.localStorage.setItem("savedYoutubeVideoId", item.id);
+                            window.opener.localStorage.setItem("savedYoutubeId", item.id);
+                        } catch (e) {}
+                    }
+                    window.close();
+                };
+
+                listEl.appendChild(card);
+            });
+        }
+
+        document.getElementById("filter-all").onclick = () => {
+            activeFilter = "all";
+            document.getElementById("filter-all").classList.add("active");
+            document.getElementById("filter-upcoming").classList.remove("active");
+            renderBroadcasts();
+        };
+
+        document.getElementById("filter-upcoming").onclick = () => {
+            activeFilter = "upcoming";
+            document.getElementById("filter-upcoming").classList.add("active");
+            document.getElementById("filter-all").classList.remove("active");
+            renderBroadcasts();
+        };
+
+        document.getElementById("btn-refresh").onclick = loadBroadcasts;
+
+        window.onload = loadBroadcasts;
+    </script>
+</body>
+</html>

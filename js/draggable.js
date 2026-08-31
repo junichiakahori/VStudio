@@ -77,17 +77,31 @@ window.makeDraggable = function (element, handleElement, storageKeyPrefix) {
   });
 };
 
-(window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("draggable", () => {
+function initDraggableElements() {
   // 1. Clock
   const clock = document.getElementById("stream-clock");
-  if (clock) window.makeDraggable(clock, clock, "streamClock");
+  if (clock && !clock.dataset.draggableInit) {
+    clock.dataset.draggableInit = "true";
+    window.makeDraggable(clock, clock, "streamClock");
+  }
 
   // 2. Stats
   const stats = document.getElementById("stream-stats");
-  if (stats) window.makeDraggable(stats, stats, "streamStats");
+  if (stats && !stats.dataset.draggableInit) {
+    stats.dataset.draggableInit = "true";
+    window.makeDraggable(stats, stats, "streamStats");
+  }
 
   // 3. Comment Viewer
   const commentViewer = document.getElementById("comment-viewer");
-  if (commentViewer)
+  if (commentViewer && !commentViewer.dataset.draggableInit) {
+    commentViewer.dataset.draggableInit = "true";
     window.makeDraggable(commentViewer, commentViewer, "commentViewer");
-});
+  }
+}
+
+(window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("draggable", initDraggableElements);
+document.addEventListener("DOMContentLoaded", initDraggableElements);
+if (document.readyState === "complete" || document.readyState === "interactive") {
+  initDraggableElements();
+}

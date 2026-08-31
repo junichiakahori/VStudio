@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web Live2D Avatar Studio</title>
     <meta name="description" content="Live2Dモデルを使ったリアルタイムVTuberアバタースタジオ。">
-    <link rel="stylesheet" href="live2d-styles.css?v=2.7">
+    <link rel="stylesheet" href="live2d-styles.css?v=3.4">
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+JP:wght@300;500;700&display=swap"
         rel="stylesheet">
@@ -14,6 +14,22 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
     <script>
         (function () {
+            function getJSTTimestamp() {
+                const d = new Date();
+                const jstOffset = 9 * 60; // minutes
+                const localOffset = d.getTimezoneOffset(); // minutes
+                const jstTime = new Date(d.getTime() + (jstOffset + localOffset) * 60000);
+                const pad = (n, len = 2) => String(n).padStart(len, '0');
+                const yyyy = jstTime.getFullYear();
+                const mm = pad(jstTime.getMonth() + 1);
+                const dd = pad(jstTime.getDate());
+                const hh = pad(jstTime.getHours());
+                const min = pad(jstTime.getMinutes());
+                const ss = pad(jstTime.getSeconds());
+                const ms = pad(jstTime.getMilliseconds(), 3);
+                return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}.${ms}`;
+            }
+
             function sendLogToServer(level, args) {
                 try {
                     const message = args.map(arg => {
@@ -21,17 +37,14 @@
                         return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
                     }).join(' ').trim();
                     if (!message || message.includes("[CSM]") || message.includes("Google Identity Services loaded") || message.includes("Model positioned:")) return;
-                    const timestamp = new Date().toISOString();
+                    const timestamp = getJSTTimestamp();
                     const logString = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
-                    if (navigator.sendBeacon) {
-                        navigator.sendBeacon('/log', new Blob([JSON.stringify({ message: logString })], { type: 'application/json' }));
-                    } else {
-                        fetch('/log', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ message: logString })
-                        }).catch(() => { });
-                    }
+                    fetch('/log', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: logString }),
+                        keepalive: true
+                    }).catch(() => { });
                 } catch (e) { }
             }
 
@@ -52,6 +65,30 @@
                 sendLogToServer('error', args);
             };
         })();
+
+        // =====================================================================
+        // 放送事故防止: ブラウザネイティブalert()の完全Toast化
+        // 配信画面中央に被るダイアログを完全遮断し、右側コントロールパネル上部に安全表示
+        // =====================================================================
+        window.alert = function (message) {
+            console.log(`[Notification] ${message}`);
+            let toast = document.getElementById("vstudio-safe-toast");
+            if (!toast) {
+                toast = document.createElement("div");
+                toast.id = "vstudio-safe-toast";
+                toast.style.cssText = "position:fixed; top:12px; right:12px; z-index:999999; max-width:300px; background:linear-gradient(135deg, rgba(20,24,38,0.96), rgba(10,14,24,0.98)); border:1px solid rgba(0,243,255,0.6); border-radius:8px; padding:10px 14px; color:#fff; font-size:0.8rem; line-height:1.45; box-shadow:0 8px 24px rgba(0,0,0,0.7), 0 0 12px rgba(0,243,255,0.25); backdrop-filter:blur(10px); transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1); opacity:0; transform:translateY(-10px); pointer-events:auto; cursor:pointer; font-weight:500;";
+                toast.onclick = () => { toast.style.opacity = "0"; toast.style.transform = "translateY(-10px)"; };
+                document.body.appendChild(toast);
+            }
+            toast.textContent = String(message);
+            toast.style.opacity = "1";
+            toast.style.transform = "translateY(0)";
+            if (window._toastTimeout) clearTimeout(window._toastTimeout);
+            window._toastTimeout = setTimeout(() => {
+                toast.style.opacity = "0";
+                toast.style.transform = "translateY(-10px)";
+            }, 3500);
+        };
 
         // =====================================================================
         // UIイベント重複防止＆モジュール登録エンジン
@@ -81,6 +118,7 @@
             <div class="stream-stats" id="stream-stats" style="display:none;">
                 <div class="stat-item"><span class="stat-icon">👤</span><span id="stat-subscribers">-</span></div>
                 <div class="stat-item"><span class="stat-icon">👁️</span><span id="stat-viewers">-</span></div>
+                <div class="stat-item"><span class="stat-icon">👍</span><span id="stat-likes">-</span></div>
                 <div class="stat-item"><span class="stat-icon">💬</span><span id="stat-comments">0</span></div>
             </div>
             <!-- ニュースボード -->
@@ -126,12 +164,12 @@
                     <video id="webcam" autoplay playsinline></video>
                     <div class="camera-label">Webcam</div>
                 </div>
-                <div class="loading-overlay" id="loading-overlay" style="pointer-events:auto;">
+                <div class="loading-overlay" id="loading-overlay">
                     <div class="spinner"></div>
                     <p id="loading-text">Live2Dモデルを読み込み中...</p>
                 </div>
                 <!-- 配信オーバーレイ -->
-                <div class="overlay-screen" id="stream-overlay" style="pointer-events:auto;"></div>
+                <div class="overlay-screen" id="stream-overlay"></div>
             </div>
         </div>
     </div>
@@ -144,30 +182,30 @@
     <!-- OBS WebSocket JS v5 -->
     <script src="https://cdn.jsdelivr.net/npm/obs-websocket-js@5.0.3/dist/obs-ws.min.js"></script>
     <!-- UI Overlay and Features -->
-    <script src="js/draggable.js?v=4.2"></script>
+    <script src="js/draggable.js?v=4.3"></script>
     <!-- Extracted Modules -->
-    <script src="js/prompt-loader.js?v=1.0"></script>
-    <script src="js/audio-voicevox.js?v=4.6"></script>
-    <script src="js/bgm-player.js?v=4.5"></script>
-    <script src="js/ai-settings.js?v=4.5"></script>
-    <script src="js/ui-tabs.js?v=4.5"></script>
-    <script src="js/ui-state-autosave.js?v=4.5"></script>
-    <script src="js/idle-speech.js?v=4.5"></script>
-    <script src="js/chat-ui.js?v=4.5"></script>
-    <script src="js/chat-client.js?v=4.5"></script>
-    <script src="js/stream-automation.js?v=4.5"></script>
-    <script src="js/news-mode.js?v=5.0"></script>
-    <script src="js/radio-mode.js?v=4.6"></script>
-    <script src="js/stream-tools.js?v=4.6"></script>
-    <script src="js/stream-wizard.js?v=4.5"></script>
-    <script src="js/obs-websocket.js?v=4.5"></script>
-    <script src="js/screen-overlay.js?v=4.5"></script>
-    <script src="js/tracking-camera.js?v=4.5"></script>
-    <script src="js/avatar-features.js?v=4.5"></script>
-    <script src="js/reaction-effects.js?v=4.5"></script>
-    <script src="js/layout-manager.js?v=4.5"></script>
-    <script src="js/hot-reload.js?v=4.5"></script>
-    <script type="module" src="/live2d-app.js?v=4.5"></script>
+    <script src="js/prompt-loader.js?v=5.0"></script>
+    <script src="js/audio-voicevox.js?v=5.7"></script>
+    <script src="js/bgm-player.js?v=5.0"></script>
+    <script src="js/ai-settings.js?v=5.0"></script>
+    <script src="js/ui-tabs.js?v=5.0"></script>
+    <script src="js/ui-state-autosave.js?v=5.0"></script>
+    <script src="js/idle-speech.js?v=5.0"></script>
+    <script src="js/chat-ui.js?v=5.2"></script>
+    <script src="js/chat-client.js?v=6.6"></script>
+    <script src="js/stream-automation.js?v=6.6"></script>
+    <script src="js/news-mode.js?v=8.6"></script>
+    <script src="js/radio-mode.js?v=6.6"></script>
+    <script src="js/stream-tools.js?v=6.6"></script>
+    <script src="js/stream-wizard.js?v=6.6"></script>
+    <script src="js/obs-websocket.js?v=6.6"></script>
+    <script src="js/screen-overlay.js?v=6.6"></script>
+    <script src="js/tracking-camera.js?v=6.6"></script>
+    <script src="js/avatar-features.js?v=6.6"></script>
+    <script src="js/reaction-effects.js?v=6.6"></script>
+    <script src="js/layout-manager.js?v=6.6"></script>
+    <script src="js/hot-reload.js?v=6.6"></script>
+    <script type="module" src="/live2d-app.js?v=6.6"></script>
 </body>
 
 </html>

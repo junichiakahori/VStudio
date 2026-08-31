@@ -7,7 +7,10 @@ window.loadHiraganaData = async function () {
       if (data.dictionary !== undefined || data.cache !== undefined) {
         aiHiraganaCache = data.cache || {};
         if (aiHiraganaDict && data.dictionary !== undefined) {
-          aiHiraganaDict.value = data.dictionary;
+          // 「私, わたし」などの危険な単漢字置換行があれば自動的に除去
+          let dictText = data.dictionary || "";
+          dictText = dictText.split("\n").filter(l => !/^\s*私\s*,\s*(わたし|わたくし)\s*$/i.test(l)).join("\n");
+          aiHiraganaDict.value = dictText;
         }
         localStorage.removeItem("aiHiraganaCache");
         return;

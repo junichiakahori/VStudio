@@ -1,4 +1,5 @@
 let readNewsTitles = new Set(JSON.parse(localStorage.getItem("newsReadTitles") || "[]")); // 既読ニュースのタイトルを保持するセット
+window.readNewsTitles = readNewsTitles;
 try {
   const savedNews = localStorage.getItem("latestFetchedNews");
   if (savedNews) {
@@ -18,9 +19,36 @@ function stripHtmlTags(htmlStr) {
   try {
     const doc = new DOMParser().parseFromString(clean, "text/html");
     clean = doc.body.textContent || "";
-  } catch (e) {}
+  } catch (e) { }
   return clean.replace(/<[^>]*>/g, " ").replace(/&[a-zA-Z0-9#]+;/g, " ").replace(/\s+/g, " ").trim();
 }
+
+// 📰 記事一覧を別ウィンドウ（ポップアップ）で開く共通関数（配信画面への被りを完全防止）
+window.openNewsListPopup = function () {
+  if (window.latestFetchedNews && window.latestFetchedNews.length > 0) {
+    try {
+      localStorage.setItem("latestFetchedNews", JSON.stringify(window.latestFetchedNews));
+    } catch (e) { }
+  }
+
+  try {
+    if (window.newsListPopup && !window.newsListPopup.closed) {
+      if (typeof window.newsListPopup.renderNewsList === "function") {
+        window.newsListPopup.renderNewsList();
+      }
+      window.newsListPopup.focus();
+      return;
+    }
+
+    const popup = window.open("/news_list.html", "NewsListPopup", "width=740,height=780,menubar=no,toolbar=no,location=no,status=no");
+    if (popup) {
+      popup.focus();
+      window.newsListPopup = popup;
+    }
+  } catch (err) {
+    console.error("[記事一覧] 別窓起動エラー:", err);
+  }
+};
 
 // ニュース見出しを読み上げ用にクリーニングする
 // 例: "[みんなのケータイ]Pixel 11は買い - ケータイ Watch" → "Pixel 11は買い"
@@ -163,10 +191,6 @@ async function playNextContinuousNews(isOneOff = false, isFetchOnly = false) {
     }
 
     if (!rssUrl) throw new Error("RSS URLが設定されていません");
-
-    const apiKeyInput = document.getElementById("ai-api-key");
-    const apiKey = apiKeyInput ? apiKeyInput.value.trim() : "";
-    if (!apiKey) throw new Error("AIのAPIキー（Gemini等）が設定されていません");
 
     // キューが空ならRSSから取得
     if (continuousNewsItems.length === 0) {
@@ -390,7 +414,9 @@ async function playNextContinuousNews(isOneOff = false, isFetchOnly = false) {
 
     // プロンプト作成
     const providerSelect = document.getElementById("ai-provider-select");
-    const provider = providerSelect ? providerSelect.value : "gemini";
+    const provider = (providerSelect && providerSelect.value) || localStorage.getItem("savedAiProvider") || "ollama";
+    const apiKeyInput = document.getElementById("ai-api-key");
+    const apiKey = (apiKeyInput ? apiKeyInput.value.trim() : "") || localStorage.getItem("savedAiApiKey") || localStorage.getItem("ai_api_key") || "";
     const isZunda =
       currentModelId === "zundamon" || currentModelId === "zundamon_human";
     const zundaPrompt = isZunda
@@ -422,6 +448,7 @@ ${plainDesc}`;
     const modelName = (modelInput ? modelInput.value.trim() : "") || localStorage.getItem("savedAiModel") || (provider === "ollama" ? "qwen2.5:7b" : "gemini-1.5-flash");
 
     let scriptItems = [];
+    let scriptData = null;
     try {
       const res = await fetch("/api/news/generate_item_script", {
         method: "POST",
@@ -440,6 +467,7 @@ ${plainDesc}`;
       });
       if (res.ok) {
         const data = await res.json();
+        scriptData = data;
         if (data.status === "ok" && Array.isArray(data.items) && data.items.length > 0) {
           scriptItems = data.items;
         }
@@ -459,12 +487,19 @@ ${plainDesc}`;
     }
 
     if (scriptItems.length === 0) {
-      console.warn("[ニュースモード] AI生成が空欄のため、フォールバック原稿を使用します");
-      const isZunda = currentModelId === "zundamon" || currentModelId === "zundamon_human";
-      const prefix = isOneOff ? "" : (isZunda ? "次のニュースなのだ！" : "次のニュースですにゃ！");
-      const suffix = isZunda ? "なのだ。" : "にゃ。";
-      const fallbackText = `${prefix} ${item.title}。${plainDesc ? plainDesc.slice(0, 100) : ""}${suffix}`;
-      scriptItems = [{ display: fallbackText, speech: fallbackText }];
+      console.warn("[ニュースモード] ⚠️ AI原稿の生成に失敗したため、番組品質維持のためニュース読み上げを中断し、待機・再試行します。");
+      if (newsBoard) {
+        if (newsArticleTitle) newsArticleTitle.textContent = "📡 通信状況を確認中...";
+        if (newsArticleDesc) newsArticleDesc.textContent = "AI原稿サーバーの応答を待機しています。しばらくお待ちください...";
+        newsBoard.classList.add("active");
+      }
+      isReadingNews = false;
+      setTimeout(() => {
+        if (window.isContinuousNewsMode && typeof window.playNextContinuousNews === "function") {
+          window.playNextContinuousNews();
+        }
+      }, 4000);
+      return;
     }
 
     // 各文をVOICEVOXに順次キュー追加して再生
@@ -473,6 +508,7 @@ ${plainDesc}`;
       const fp = idleFirstPerson ? idleFirstPerson.value : "";
 
       scriptItems.forEach((sItem, sIdx) => {
+        // console.log(`sItem.display"${sItem.display}"/sItem.speech"${sItem.speech}"`);
         let displayTxt = sItem.display || sItem.speech;
         let speechTxt = sItem.speech || sItem.display;
 
@@ -480,8 +516,8 @@ ${plainDesc}`;
         speechTxt = aiFeatures.adjustIdlePhraseForModel(speechTxt, currentModelId);
 
         if (fp) {
-          displayTxt = displayTxt.replace(/わたくし|わたし|あたし|私|ぼく|僕|おれ|俺|うち/g, fp);
-          speechTxt = speechTxt.replace(/わたくし|わたし|あたし|私|ぼく|僕|おれ|俺|うち/g, fp);
+          displayTxt = displayTxt.replace(/わたくし|わたし|あたし|私(?![一-龠々])|ぼく|僕(?![一-龠々])|おれ|俺(?![一-龠々])|うち/g, fp);
+          speechTxt = speechTxt.replace(/わたくし|わたし|あたし|私(?![一-龠々])|ぼく|僕(?![一-龠々])|おれ|俺(?![一-龠々])|うち/g, fp);
         }
 
         if (typeof aiChatHistory !== "undefined") {
@@ -489,20 +525,34 @@ ${plainDesc}`;
           if (aiChatHistory.length > 10) aiChatHistory.shift();
         }
 
-        queueVoicevoxAudio(speechTxt, true, displayTxt).catch((e) => console.warn(e));
+        // 🎯 【修正】音声用（speechTxt）を第1引数、表示用（displayTxt）を明確に紐付けてキューに直接プッシュする
+        // （queueVoicevoxAudio の引数に頼らず、内部のオブジェクト構造を直接渡すことで混線を完全防止）
+        if (typeof voicevoxAudioQueue !== "undefined") {
+          voicevoxAudioQueue.push({
+            original: speechTxt,       // 🗣️ 音声用の読み（ひらがな等）
+            displayText: displayTxt,   // 📝 字幕・原稿用の綺麗な漢字テキスト
+            promise: Promise.resolve(speechTxt),
+            isIdle: true
+          });
+          if (!isVoicevoxPlaying && typeof playNextVoicevox === "function") {
+            playNextVoicevox();
+          }
+        }
 
         // 🗞️ 1文目（「次のニュースですにゃ！」）の直後に見出しを読む
         if (sIdx === 0 && item && item.title) {
-          const headlineText = cleanTitleForSpeech(item.title);
+          const headlineDisplay = (scriptData && scriptData.headline && scriptData.headline.display) || item.title;
+          const headlineText = cleanTitleForSpeech(headlineDisplay);
+          const headlineSpeech = (scriptData && (scriptData.headline_speech || (scriptData.headline && scriptData.headline.speech))) || headlineText;
           if (headlineText) {
             console.log(`[原稿] [見出し] "${headlineText}"`);
-            queueVoicevoxAudio(headlineText, true, headlineText).catch((e) => console.warn(e));
+            queueVoicevoxAudio(headlineText, true, headlineSpeech).catch((e) => console.warn(e));
           }
         }
       });
 
       // 読み上げ完了を監視
-      const checkInterval = setInterval(() => {
+      const checkInterval = setInterval(async () => {
         const isDone =
           (typeof voicevoxAudioQueue !== "undefined"
             ? voicevoxAudioQueue.length === 0
@@ -512,6 +562,12 @@ ${plainDesc}`;
             : true);
         if (isDone) {
           clearInterval(checkInterval);
+
+          // 🎙️ 単発モードでも待機コメントがあれば合間に紹介＆返信
+          if (typeof processNewsInterludeComments === "function" && window.newsCommentQueue && window.newsCommentQueue.length > 0) {
+            await processNewsInterludeComments();
+          }
+
           setTimeout(() => {
             newsBoard.classList.remove("active");
             isReadingNews = false;
@@ -551,6 +607,85 @@ ${plainDesc}`;
 
 window.playNextContinuousNews = playNextContinuousNews;
 
+// 📰 記事一覧からの特定記事指定再生
+window.startNewsFromTitle = async function (targetTitle) {
+  console.log(`[ニュースモード] 🎯 指定記事から開始リクエスト: "${targetTitle}"`);
+
+  let newsList = window.latestFetchedNews || [];
+  if (!newsList || newsList.length === 0) {
+    try {
+      newsList = JSON.parse(localStorage.getItem("latestFetchedNews") || "[]");
+    } catch (e) {}
+  }
+
+  if (!newsList || newsList.length === 0) {
+    console.warn("[ニュースモード] ニュース記事データが存在しません");
+    return;
+  }
+
+  const CATEGORY_ORDER = ["cat_top", "cat_society", "cat_world", "cat_business", "cat_politics", "cat_entertainment", "cat_sports", "cat_tech", "cat_science", "cat_local"];
+  const sortedNews = [...newsList].sort((a, b) => {
+    const ai = CATEGORY_ORDER.indexOf(a.categoryKey || "cat_top");
+    const bi = CATEGORY_ORDER.indexOf(b.categoryKey || "cat_top");
+    const catDiff = (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    if (catDiff !== 0) return catDiff;
+    const dateA = new Date(a.pubDate || 0).getTime();
+    const dateB = new Date(b.pubDate || 0).getTime();
+    return dateA - dateB;
+  });
+
+  const targetIdx = sortedNews.findIndex((n) => n.title === targetTitle || n.title.includes(targetTitle));
+  if (targetIdx === -1) {
+    console.warn("[ニュースモード] 指定記事が見つかりませんでした:", targetTitle);
+    return;
+  }
+
+  // 全自動ニュース番組（アジェンダボード＋先読み＋待機制御付き）を指定インデックスから開始（OBS制御はスキップ）
+  if (typeof window.startNewsBroadcast === "function") {
+    await window.startNewsBroadcast(targetIdx, null, true);
+    return;
+  }
+
+  // フォールバック（従来方式）
+  const beforeItems = sortedNews.slice(0, targetIdx);
+  const remainingItems = sortedNews.slice(targetIdx);
+
+  beforeItems.forEach((item) => readNewsTitles.add(item.title));
+  remainingItems.forEach((item) => readNewsTitles.delete(item.title));
+  localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles)));
+
+  window.continuousNewsItems = [...remainingItems];
+
+  const newsToggle = document.getElementById("ai-news-mode-toggle");
+  if (newsToggle && !newsToggle.checked) {
+    newsToggle.checked = true;
+    newsToggle.dispatchEvent(new Event("change"));
+  }
+  window.isContinuousNewsMode = true;
+
+  if (window.voicevoxAudioQueue) {
+    window.voicevoxAudioQueue = [];
+  }
+  if (window.currentVoicevoxSource) {
+    try { window.currentVoicevoxSource.stop(); } catch (e) {}
+  }
+  window.isVoicevoxPlaying = false;
+
+  await window.playNextContinuousNews(false);
+};
+
+// 別ウィンドウからのstorageイベントリクエストを監視
+window.addEventListener("storage", (e) => {
+  if (e.key === "startNewsRequest" && e.newValue) {
+    try {
+      const data = JSON.parse(e.newValue);
+      if (data && data.title) {
+        window.startNewsFromTitle(data.title);
+      }
+    } catch (err) {}
+  }
+});
+
 (window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("news-mode", () => {
   window.newsRssSelect = document.getElementById("news-rss-select");
   const localNewsRssUrlInput = document.getElementById("news-rss-url");
@@ -586,262 +721,13 @@ window.playNextContinuousNews = playNextContinuousNews;
 
   window.newsListPopup = window.newsListPopup || null;
   window.updateNewsListPopup = function () {
-    if (!window.newsListPopup || window.newsListPopup.closed) {
+    if (window.newsListPopup && !window.newsListPopup.closed) {
       try {
-        const w = window.open("", "NewsList");
-        if (w && !w.closed && w.document && w.document.getElementById("news-list-container")) {
-          window.newsListPopup = w;
-        } else {
-          return;
+        if (typeof window.newsListPopup.renderNewsList === "function") {
+          window.newsListPopup.renderNewsList();
         }
-      } catch (e) {
-        return;
-      }
-    }
-    const doc = window.newsListPopup.document;
-    const container = doc.getElementById("news-list-container");
-    if (!container) return;
-
-    if (!window.latestFetchedNews || window.latestFetchedNews.length === 0) {
-      try {
-        const saved = localStorage.getItem("latestFetchedNews");
-        if (saved) window.latestFetchedNews = JSON.parse(saved);
       } catch (e) { }
     }
-
-    // 🔗 未取得URLがある場合はバックグラウンドで全件一括逆引き解決を実行
-    if (typeof window.enrichCurrentNewsWithLinks === "function") {
-      window.enrichCurrentNewsWithLinks();
-    }
-
-    container.innerHTML = "";
-    if (!window.latestFetchedNews || window.latestFetchedNews.length === 0) {
-      container.innerHTML = '<p style="color:#aaa; font-size:0.8rem; text-align:center; padding:20px;">まだニュースが取得されていません。<br><span style="font-size:0.75rem; color:#888;">「⬇️ ニュースを取得」を押してください。</span></p>';
-      return;
-    }
-
-    const CATEGORY_ORDER = ["cat_top", "cat_society", "cat_world", "cat_business", "cat_politics", "cat_entertainment", "cat_sports", "cat_tech", "cat_science", "cat_local"];
-    const sortedNews = [...window.latestFetchedNews].sort((a, b) => {
-      const ai = CATEGORY_ORDER.indexOf(a.categoryKey || "cat_top");
-      const bi = CATEGORY_ORDER.indexOf(b.categoryKey || "cat_top");
-      const catDiff = (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-      if (catDiff !== 0) return catDiff;
-      const dateA = new Date(a.pubDate || 0).getTime();
-      const dateB = new Date(b.pubDate || 0).getTime();
-      return dateA - dateB; // カテゴリ内は古い順（時系列昇順: 朝➔夜）
-    });
-
-    const currentRead = window.readNewsTitles || readNewsTitles || new Set();
-    let storedReadList = [];
-    try {
-      storedReadList = JSON.parse(localStorage.getItem("newsReadTitles") || "[]");
-    } catch (e) {}
-
-    const progressEl = document.getElementById("news-broadcast-progress") || document.getElementById("news-setlist-progress-badge");
-    const m = progressEl ? (progressEl.textContent || "").match(/(\d+)\s*\/\s*(\d+)/) : null;
-    const curIdx = m ? parseInt(m[1], 10) : ((window.newsBroadcastState && window.newsBroadcastState.currentIndex) || 0);
-    const isBroadcasting = m !== null || (window.newsBroadcastState && window.newsBroadcastState.isRunning);
-    const curTitle = (document.getElementById("news-title") ? document.getElementById("news-title").textContent.trim() : "") || (window.newsBroadcastState && window.newsBroadcastState.currentTitle) || "";
-
-    let firstUnreadMarked = false;
-
-    sortedNews.forEach((item, idx) => {
-      const isCurrentByTitle = curTitle && item.title && (item.title.includes(curTitle.slice(0, 10)) || curTitle.includes(item.title.slice(0, 10)));
-      const isPlaying = isBroadcasting && (isCurrentByTitle || (curIdx > 0 && idx === curIdx - 1));
-      const isRead = isBroadcasting ? ((curIdx > 0 && idx < curIdx - 1) || (!isPlaying && isCurrentByTitle)) : (currentRead.has(item.title) || storedReadList.includes(item.title));
-
-      const card = doc.createElement("div");
-      if (isPlaying) {
-        card.id = "current-playing-news-card";
-      } else if (!isRead && !firstUnreadMarked) {
-        card.classList.add("is-unread-first");
-        firstUnreadMarked = true;
-      }
-      card.style.display = "flex";
-      card.style.flexDirection = "column";
-      card.style.gap = "6px";
-      card.style.padding = "10px 14px";
-      card.style.background = isPlaying
-        ? "linear-gradient(135deg, rgba(0, 230, 118, 0.2), rgba(0, 230, 118, 0.08))"
-        : (isRead ? "rgba(255, 255, 255, 0.03)" : "linear-gradient(135deg, rgba(108, 92, 231, 0.12), rgba(255, 255, 255, 0.04))");
-      card.style.borderRadius = "8px";
-      card.style.border = isPlaying
-        ? "1px solid rgba(0, 230, 118, 0.6)"
-        : (isRead ? "1px solid rgba(255, 255, 255, 0.06)" : "1px solid rgba(108, 92, 231, 0.25)");
-      card.style.borderLeft = isPlaying
-        ? "5px solid #00e676"
-        : (isRead ? "4px solid #555" : "4px solid #6c5ce7");
-      if (isPlaying) {
-        card.style.boxShadow = "0 0 16px rgba(0, 230, 118, 0.35)";
-      }
-      card.style.transition = "all 0.25s ease";
-
-      // 上段: 番号 + バッジ + カテゴリ/配信元/日時 + 右端の再開ボタン
-      const headerRow = doc.createElement("div");
-      headerRow.style.display = "flex";
-      headerRow.style.alignItems = "center";
-      headerRow.style.justifyContent = "space-between";
-      headerRow.style.gap = "8px";
-
-      const leftMeta = doc.createElement("div");
-      leftMeta.style.display = "flex";
-      leftMeta.style.alignItems = "center";
-      leftMeta.style.gap = "6px";
-      leftMeta.style.flexWrap = "wrap";
-
-      const numBadge = doc.createElement("span");
-      numBadge.style.fontSize = "0.78rem";
-      numBadge.style.color = isPlaying ? "#00e676" : (isRead ? "#777" : "#a29bfe");
-      numBadge.style.fontFamily = "monospace";
-      numBadge.style.fontWeight = "bold";
-      numBadge.textContent = `#${idx + 1}`;
-
-      const badge = doc.createElement("span");
-      badge.style.fontSize = "0.68rem";
-      badge.style.padding = "2px 8px";
-      badge.style.borderRadius = "10px";
-      badge.style.fontWeight = "bold";
-      badge.style.textAlign = "center";
-      if (isPlaying) {
-        badge.textContent = "🎙️ 放送中";
-        badge.style.background = "#00e676";
-        badge.style.color = "#000";
-        badge.style.boxShadow = "0 0 8px rgba(0, 230, 118, 0.5)";
-      } else if (isRead) {
-        badge.textContent = "既読";
-        badge.style.background = "rgba(255, 255, 255, 0.1)";
-        badge.style.color = "#888";
-      } else {
-        badge.textContent = "未読";
-        badge.style.background = "rgba(108, 92, 231, 0.35)";
-        badge.style.color = "#d6d0ff";
-        badge.style.border = "1px solid rgba(108, 92, 231, 0.5)";
-      }
-
-      const catSpan = doc.createElement("span");
-      catSpan.style.fontSize = "0.72rem";
-      catSpan.style.color = isRead ? "#777" : "#81ecec";
-      catSpan.style.fontWeight = "500";
-      catSpan.textContent = `[${item.categoryName || '一般'}] ${item.publisherName || ''}`;
-
-      leftMeta.appendChild(numBadge);
-      leftMeta.appendChild(badge);
-      leftMeta.appendChild(catSpan);
-
-      if (item.pubDate) {
-        const d = new Date(item.pubDate);
-        if (!isNaN(d.getTime())) {
-          const dateSpan = doc.createElement("span");
-          dateSpan.style.color = isRead ? "#666" : "#888";
-          dateSpan.style.fontSize = "0.68rem";
-          dateSpan.textContent = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-          leftMeta.appendChild(dateSpan);
-        }
-      }
-
-      const playBtn = doc.createElement("button");
-      playBtn.textContent = "▶️ ここから再開";
-      playBtn.style.background = isPlaying
-        ? "linear-gradient(135deg, #00e676, #00b894)"
-        : "linear-gradient(135deg, rgba(108, 92, 231, 0.4), rgba(108, 92, 231, 0.2))";
-      playBtn.style.color = isPlaying ? "#000" : "#fff";
-      playBtn.style.border = isPlaying ? "none" : "1px solid rgba(108, 92, 231, 0.5)";
-      playBtn.style.borderRadius = "12px";
-      playBtn.style.padding = "3px 10px";
-      playBtn.style.fontSize = "0.72rem";
-      playBtn.style.fontWeight = "600";
-      playBtn.style.cursor = "pointer";
-      playBtn.style.whiteSpace = "nowrap";
-      playBtn.style.transition = "transform 0.1s ease, filter 0.2s ease";
-      playBtn.onmouseenter = () => { playBtn.style.filter = "brightness(1.2)"; playBtn.style.transform = "scale(1.03)"; };
-      playBtn.onmouseleave = () => { playBtn.style.filter = "brightness(1.0)"; playBtn.style.transform = "scale(1.0)"; };
-      playBtn.onclick = () => {
-        console.log(`[ニュース一覧] 指定位置(#${idx + 1})から再開リクエストを受信しました`);
-        const starter = (typeof window.startNewsBroadcast === "function"
-          ? window.startNewsBroadcast
-          : (window.opener && typeof window.opener.startNewsBroadcast === "function" ? window.opener.startNewsBroadcast : null));
-        if (starter) {
-          starter(idx);
-          setTimeout(() => {
-            if (typeof window.updateNewsListPopup === "function") window.updateNewsListPopup();
-            if (window.opener && typeof window.opener.updateNewsListPopup === "function") window.opener.updateNewsListPopup();
-          }, 300);
-        } else {
-          console.error("[ニュース一覧] startNewsBroadcast 関数が見つかりません");
-        }
-      };
-
-      const btnGroup = doc.createElement("div");
-      btnGroup.style.display = "flex";
-      btnGroup.style.alignItems = "center";
-      btnGroup.style.gap = "6px";
-
-      const articleUrl = item.link || item.url || "";
-      if (articleUrl) {
-        const linkBtn = doc.createElement("a");
-        linkBtn.href = articleUrl;
-        linkBtn.target = "_blank";
-        linkBtn.rel = "noopener noreferrer";
-        linkBtn.textContent = "🔗 記事元";
-        linkBtn.style.background = "rgba(255, 255, 255, 0.08)";
-        linkBtn.style.color = "#74b9ff";
-        linkBtn.style.border = "1px solid rgba(116, 185, 255, 0.4)";
-        linkBtn.style.borderRadius = "12px";
-        linkBtn.style.padding = "3px 8px";
-        linkBtn.style.fontSize = "0.72rem";
-        linkBtn.style.fontWeight = "600";
-        linkBtn.style.textDecoration = "none";
-        linkBtn.style.whiteSpace = "nowrap";
-        linkBtn.style.transition = "all 0.15s ease";
-        linkBtn.onmouseenter = () => { linkBtn.style.background = "rgba(116, 185, 255, 0.25)"; linkBtn.style.color = "#fff"; };
-        linkBtn.onmouseleave = () => { linkBtn.style.background = "rgba(255, 255, 255, 0.08)"; linkBtn.style.color = "#74b9ff"; };
-        btnGroup.appendChild(linkBtn);
-      } else {
-        const searchBtn = doc.createElement("a");
-        searchBtn.href = `https://www.google.com/search?q=${encodeURIComponent(item.title)}`;
-        searchBtn.target = "_blank";
-        searchBtn.rel = "noopener noreferrer";
-        searchBtn.textContent = "🔍 検索";
-        searchBtn.style.background = "rgba(255, 255, 255, 0.05)";
-        searchBtn.style.color = "#a4b0be";
-        searchBtn.style.border = "1px solid rgba(255, 255, 255, 0.15)";
-        searchBtn.style.borderRadius = "12px";
-        searchBtn.style.padding = "3px 8px";
-        searchBtn.style.fontSize = "0.72rem";
-        searchBtn.style.textDecoration = "none";
-        searchBtn.style.whiteSpace = "nowrap";
-        searchBtn.onmouseenter = () => { searchBtn.style.background = "rgba(255, 255, 255, 0.15)"; searchBtn.style.color = "#fff"; };
-        searchBtn.onmouseleave = () => { searchBtn.style.background = "rgba(255, 255, 255, 0.05)"; searchBtn.style.color = "#a4b0be"; };
-        btnGroup.appendChild(searchBtn);
-      }
-
-      btnGroup.appendChild(playBtn);
-      headerRow.appendChild(leftMeta);
-      headerRow.appendChild(btnGroup);
-
-      // 下段: 全幅を使った読みやすいタイトル（クリックでも記事元へ飛べるリンク対応）
-      const titleSpan = doc.createElement(articleUrl ? "a" : "div");
-      if (articleUrl) {
-        titleSpan.href = articleUrl;
-        titleSpan.target = "_blank";
-        titleSpan.rel = "noopener noreferrer";
-        titleSpan.style.display = "block";
-        titleSpan.style.textDecoration = "none";
-        titleSpan.style.cursor = "pointer";
-        titleSpan.onmouseenter = () => { titleSpan.style.textDecoration = "underline"; };
-        titleSpan.onmouseleave = () => { titleSpan.style.textDecoration = "none"; };
-      }
-      titleSpan.style.fontSize = "0.88rem";
-      titleSpan.style.lineHeight = "1.45";
-      titleSpan.style.fontWeight = isPlaying ? "bold" : "normal";
-      titleSpan.style.color = isPlaying ? "#fff" : (isRead ? "#888" : "#f1f2f6");
-      titleSpan.style.wordBreak = "break-word";
-      titleSpan.textContent = item.title;
-
-      card.appendChild(headerRow);
-      card.appendChild(titleSpan);
-      container.appendChild(card);
-    });
   };
 
   window.clearNewsReadFlags = function (silent = false) {
@@ -865,194 +751,19 @@ window.playNextContinuousNews = playNextContinuousNews;
     });
   }
 
-  // 📰 記事一覧ポップアップを開く共通関数
-  window.openNewsListPopup = function () {
-    if (window.newsListPopup && !window.newsListPopup.closed) {
-      window.updateNewsListPopup();
-      window.newsListPopup.focus();
-      return;
-    }
 
-    window.newsListPopup = window.open("", "NewsList", "width=680,height=720,menubar=no,toolbar=no,location=no,status=no");
-    if (!window.newsListPopup) {
-      alert("ポップアップがブロックされました。ブラウザの設定で許可してください。");
-      return;
-    }
-
-    const doc = window.newsListPopup.document;
-    doc.open();
-    doc.write(`
-      <!DOCTYPE html>
-      <html lang="ja">
-      <head>
-        <meta charset="UTF-8">
-        <title>📰 取得済みのニュース一覧</title>
-        <style>
-          * { box-sizing: border-box; }
-          body {
-            background: #0f121d;
-            color: #f1f2f6;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", Meiryo, sans-serif;
-            margin: 0;
-            padding: 16px 20px;
-          }
-          header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 14px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            position: sticky;
-            top: 0;
-            background: rgba(15, 18, 29, 0.95);
-            backdrop-filter: blur(8px);
-            z-index: 100;
-          }
-          h3 {
-            margin: 0;
-            font-size: 1.05rem;
-            font-weight: 700;
-            color: #fff;
-          }
-          .jump-btn {
-            background: linear-gradient(135deg, #00e676, #00b894);
-            color: #000;
-            border: none;
-            border-radius: 16px;
-            padding: 5px 12px;
-            font-size: 0.78rem;
-            font-weight: bold;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            box-shadow: 0 2px 10px rgba(0, 230, 118, 0.35);
-            transition: all 0.2s ease;
-          }
-          .jump-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 4px 14px rgba(0, 230, 118, 0.6);
-          }
-          .jump-btn:active {
-            transform: scale(0.96);
-          }
-          #news-list-container {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-          }
-          ::-webkit-scrollbar { width: 6px; }
-          ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-          ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
-          ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.35); }
-          
-          @keyframes focusPulse {
-            0% { transform: scale(1); box-shadow: 0 0 16px rgba(0, 230, 118, 0.4); }
-            50% { transform: scale(1.02); box-shadow: 0 0 24px rgba(0, 230, 118, 0.8); }
-            100% { transform: scale(1); box-shadow: 0 0 16px rgba(0, 230, 118, 0.4); }
-          }
-          .pulse-active {
-            animation: focusPulse 0.8s ease;
-          }
-        </style>
-      </head>
-      <body>
-        <header>
-          <h3>📰 取得済みのニュース一覧</h3>
-          <button class="jump-btn" id="jump-to-current-btn" onclick="scrollToPlayingNews(true)">
-            🎯 放送中へジャンプ
-          </button>
-        </header>
-        <div id="news-list-container"></div>
-        <script>
-          window.scrollToPlayingNews = function(smooth = true) {
-            const target = document.getElementById("current-playing-news-card") || document.querySelector(".is-unread-first");
-            if (target) {
-              target.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "center" });
-              target.classList.remove("pulse-active");
-              void target.offsetWidth; // reflow
-              target.classList.add("pulse-active");
-            } else {
-              window.scrollTo({ top: 0, behavior: smooth ? "smooth" : "auto" });
-            }
-          };
-
-          setInterval(() => {
-            if (window.opener && typeof window.opener.updateNewsListPopup === 'function') {
-              window.opener.updateNewsListPopup();
-            }
-          }, 3000);
-        </script>
-      </body>
-      </html>
-    `);
-    doc.close();
-
-    setTimeout(() => {
-      window.updateNewsListPopup();
-      // 初回表示時にも自動で放送中の位置までスクロール
-      setTimeout(() => {
-        if (window.newsListPopup && typeof window.newsListPopup.scrollToPlayingNews === "function") {
-          window.newsListPopup.scrollToPlayingNews(true);
-        }
-      }, 250);
-    }, 100);
-  };
 
   const newsListBtn = document.getElementById("news-list-btn") || document.getElementById("news-list-popup-btn");
+  const headerNewsListBtn = document.getElementById("header-news-list-btn");
   if (newsListBtn) {
     newsListBtn.addEventListener("click", () => {
       window.openNewsListPopup();
     });
   }
-
-  // 🚀 画面右下に常時配置されるスマートな「📰 記事一覧」クイックランチャーボタンを生成
-  function injectNewsListQuickButton() {
-    if (document.getElementById("news-quick-floating-btn")) return;
-    const qBtn = document.createElement("button");
-    qBtn.id = "news-quick-floating-btn";
-    qBtn.title = "記事一覧を開く (ショートカット: Nキー / Alt+N)";
-    qBtn.innerHTML = `📰 記事一覧 <span style="font-size:0.65rem; opacity:0.75; background:rgba(255,255,255,0.18); padding:1px 5px; border-radius:6px; margin-left:4px;">N</span>`;
-    qBtn.style.position = "fixed";
-    qBtn.style.bottom = "20px";
-    qBtn.style.right = "20px";
-    qBtn.style.zIndex = "99999";
-    qBtn.style.background = "linear-gradient(135deg, rgba(30, 39, 46, 0.92), rgba(15, 20, 30, 0.96))";
-    qBtn.style.color = "#81ecec";
-    qBtn.style.border = "1px solid rgba(129, 236, 236, 0.4)";
-    qBtn.style.borderRadius = "20px";
-    qBtn.style.padding = "8px 16px";
-    qBtn.style.fontSize = "0.82rem";
-    qBtn.style.fontWeight = "bold";
-    qBtn.style.cursor = "pointer";
-    qBtn.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.4)";
-    qBtn.style.backdropFilter = "blur(8px)";
-    qBtn.style.transition = "all 0.2s ease";
-    qBtn.style.display = "flex";
-    qBtn.style.alignItems = "center";
-    qBtn.style.gap = "4px";
-
-    qBtn.onmouseenter = () => {
-      qBtn.style.transform = "translateY(-2px) scale(1.05)";
-      qBtn.style.borderColor = "#81ecec";
-      qBtn.style.boxShadow = "0 6px 20px rgba(129, 236, 236, 0.35)";
-    };
-    qBtn.onmouseleave = () => {
-      qBtn.style.transform = "translateY(0) scale(1.0)";
-      qBtn.style.borderColor = "rgba(129, 236, 236, 0.4)";
-      qBtn.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.4)";
-    };
-    qBtn.onclick = () => {
+  if (headerNewsListBtn) {
+    headerNewsListBtn.addEventListener("click", () => {
       window.openNewsListPopup();
-    };
-    document.body.appendChild(qBtn);
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", injectNewsListQuickButton);
-  } else {
-    injectNewsListQuickButton();
+    });
   }
 
   // ⌨️ キーボードショートカット: 'N' キー または 'Alt+N' で即座に記事一覧を開く
@@ -1060,9 +771,13 @@ window.playNextContinuousNews = playNextContinuousNews;
     const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
     if (tag === "input" || tag === "textarea" || (e.target && e.target.isContentEditable)) return;
 
-    if (e.key === "n" || e.key === "N" || (e.altKey && (e.key === "n" || e.key === "N"))) {
+    // 物理キー "KeyN"、英数 "n"/"N"、日本語入力状態 "ん" 等に包括対応
+    if (e.code === "KeyN" || e.key === "n" || e.key === "N" || e.key === "ん" || (e.altKey && (e.code === "KeyN" || e.key === "n" || e.key === "N"))) {
+      if (e.isComposing) return;
       e.preventDefault();
-      window.openNewsListPopup();
+      if (typeof window.openNewsListPopup === "function") {
+        window.openNewsListPopup();
+      }
     }
   });
 
@@ -1605,7 +1320,7 @@ ${creditsInstruction}
     const isZunda = currentModelId === "zundamon" || currentModelId === "zundamon_human";
     const saved = JSON.parse(localStorage.getItem("newsScriptConfig") || "{}");
     const title = document.getElementById("news-config-title")?.value.trim() || saved.title || "ニュース番組";
-    
+
     let rawOp = document.getElementById("news-config-opening")?.value.trim() || saved.opGreeting;
     let op = rawOp ? adjustGreetingToCurrentTime(rawOp) : getTimeBasedGreeting(isZunda, title);
 
@@ -1625,7 +1340,7 @@ ${creditsInstruction}
         if (!window.voicevoxAudioContext) window.voicevoxAudioContext = ctx;
 
         if (ctx.state === "suspended") {
-          await ctx.resume().catch(() => {});
+          await ctx.resume().catch(() => { });
         }
 
         const tryFetch = async (path) => {
@@ -1810,8 +1525,8 @@ ${creditsInstruction}
     const providerSelect = document.getElementById("ai-provider-select");
     const modelInput = document.getElementById("ai-model-input");
     const apiKey = (apiKeyInput ? apiKeyInput.value.trim() : "") || localStorage.getItem("savedAiApiKey") || localStorage.getItem("ai_api_key") || "";
-    const provider = (providerSelect ? providerSelect.value : "") || localStorage.getItem("savedAiProvider") || "gemini";
-    const modelName = (modelInput ? modelInput.value.trim() : "") || localStorage.getItem("savedAiModel") || "gemini-1.5-flash";
+    const provider = (providerSelect ? providerSelect.value : "") || localStorage.getItem("savedAiProvider") || "ollama";
+    const modelName = (modelInput ? modelInput.value.trim() : "") || localStorage.getItem("savedAiModel") || (provider === "ollama" ? "qwen2.5:7b" : "gemini-1.5-flash");
 
     let plainDesc = stripHtmlTags(item.description || "");
     if (plainDesc.length > 120) plainDesc = plainDesc.substring(0, 120) + "…";
@@ -1854,7 +1569,7 @@ ${creditsInstruction}
             if (firstSentence && typeof window.preloadVoicevoxSentenceAudio === "function") {
               window.preloadVoicevoxSentenceAudio(firstSentence);
             }
-          } catch (audioPreloadErr) {}
+          } catch (audioPreloadErr) { }
           return data;
         }
         return null;
@@ -1868,6 +1583,104 @@ ${creditsInstruction}
   }
 
   window.triggerNewsPrefetch = triggerNewsPrefetch;
+
+  /**
+   * 🎙️ ニュース記事合間のキャスターコメント返信ハンドラ
+   * ニュース読み上げ中に視聴者から届いたコメントを記事終了時にキャスターとして紹介＆返信
+   */
+  async function processNewsInterludeComments() {
+    if (!window.newsCommentQueue || window.newsCommentQueue.length === 0) return;
+    if (typeof newsBroadcastState !== "undefined" && !newsBroadcastState.isRunning && !window.isReadingNews) return;
+
+    const item = window.newsCommentQueue.shift();
+    if (!item || !item.comment) return;
+
+    console.log(`[ニュース番組] 🎙️ 記事合間のコメント紹介を開始: ${item.nickname}さん「${item.comment}」 (残り待機: ${window.newsCommentQueue.length}件)`);
+
+    const isZunda = (currentModelId in ["zundamon", "zundamon_human"]);
+    const isCat = (currentModelId in ["tororo", "hijiki"]);
+
+    // 1. コメント読み上げの導入セリフ
+    let intro = `リスナーの${item.nickname}さんからコメントをいただきました。「${item.comment}」とのことです。`;
+    if (isZunda) {
+      intro = `ここでリスナーの${item.nickname}さんからコメントなのだ！「${item.comment}」とのことなのだ！`;
+    } else if (isCat) {
+      intro = `ここでリスナーの${item.nickname}さんからコメントをいただきました！「${item.comment}」とのことですにゃ！`;
+    }
+    intro = aiFeatures.adjustIdlePhraseForModel(intro, currentModelId);
+
+    // 一人称置換設定を反映
+    const idleFirstPerson = document.getElementById("idle-first-person");
+    const fp = idleFirstPerson ? idleFirstPerson.value : "";
+    if (fp) {
+      intro = intro.replace(/わたくし|わたし|あたし|私(?![一-龠々])|ぼく|僕(?![一-龠々])|おれ|俺(?![一-龠々])|うち/g, fp);
+    }
+
+    await queueVoicevoxAudio(intro, true);
+
+    // 2. AIによるキャスター風の返信生成
+    const isAiReplyEnabled = document.getElementById("ai-reply-toggle")?.checked;
+    const apiKeyInput = document.getElementById("ai-api-key");
+    const apiKey = (apiKeyInput ? apiKeyInput.value.trim() : "") || localStorage.getItem("savedAiApiKey") || "";
+    const providerSelect = document.getElementById("ai-provider-select");
+    const provider = (providerSelect ? providerSelect.value : "") || localStorage.getItem("savedAiProvider") || "ollama";
+    const modelInput = document.getElementById("ai-model-input");
+    const modelName = (modelInput ? modelInput.value.trim() : "") || localStorage.getItem("savedAiModel") || (provider === "ollama" ? "qwen2.5:7b" : "gemini-1.5-flash");
+
+    if (isAiReplyEnabled && (apiKey || provider === "ollama")) {
+      try {
+        let charDesc = isZunda
+          ? "明るく元気なずんだ妖精のニュースキャスター「ずんだもん」です。語尾は「〜のだ」「〜なのだ」です。"
+          : (isCat ? "愛嬌のある白猫のニュースキャスター「とろろ」です。語尾は自然に「〜にゃ」を使います。" : "明るく丁寧なニュースキャスターです。");
+
+        const prompt = `あなたはニュース番組のキャスターです。${charDesc}
+リスナーの「${item.nickname}」さんから『${item.comment}』というコメントをいただきました。
+ニュースキャスターとして、このコメントに対して1〜2文で親しみやすく自然に応答・返信してください（20〜40文字程度）。
+※「次のニュース」などの繋ぎフレーズや自己紹介・名前の署名は絶対に含めず、コメントに対する返答セリフのみを出力してください。`;
+
+        let reply = "";
+        const res = await fetch("/api/news/generate_item_script", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: `コメント返信: ${item.nickname}さん`,
+            description: prompt,
+            categoryName: "コメント返信",
+            modelId: currentModelId,
+            isFirst: false,
+            isCategoryChanged: false,
+            apiKey: apiKey,
+            provider: provider,
+            modelName: modelName
+          })
+        });
+        if (res.ok) {
+          const d = await res.json();
+          if (d && d.items && d.items.length > 0) {
+            reply = d.items.map(it => it.display).join(" ");
+          } else if (d && d.fullText) {
+            reply = d.fullText;
+          }
+        }
+
+        if (reply) {
+          reply = aiFeatures.adjustIdlePhraseForModel(reply, currentModelId);
+          if (fp) {
+            reply = reply.replace(/わたくし|わたし|あたし|私(?![一-龠々])|ぼく|僕(?![一-龠々])|おれ|俺(?![一-龠々])|うち/g, fp);
+          }
+          await queueVoicevoxAudio(reply, true);
+        }
+      } catch (e) {
+        console.warn("[ニュース番組] キャスターコメントAI返信エラー:", e);
+      }
+    }
+
+    // 発話完了まで待機
+    await waitForVoicevoxFinish();
+    console.log(`[ニュース番組] 🎙️ 記事合間のコメント紹介が完了しました。`);
+  }
+
+  window.processNewsInterludeComments = processNewsInterludeComments;
 
   async function readOneNewsItem(item, config, isCategoryChanged, isFirst, nextItem = null, nextIsCatChanged = false) {
     if (!newsBroadcastState.isRunning) return false;
@@ -1890,8 +1703,8 @@ ${creditsInstruction}
     const providerSelect = document.getElementById("ai-provider-select");
     const modelInput = document.getElementById("ai-model-input");
     const apiKey = (apiKeyInput ? apiKeyInput.value.trim() : "") || localStorage.getItem("savedAiApiKey") || localStorage.getItem("ai_api_key") || "";
-    const provider = (providerSelect ? providerSelect.value : "") || localStorage.getItem("savedAiProvider") || "gemini";
-    const modelName = (modelInput ? modelInput.value.trim() : "") || localStorage.getItem("savedAiModel") || "gemini-1.5-flash";
+    const provider = (providerSelect ? providerSelect.value : "") || localStorage.getItem("savedAiProvider") || "ollama";
+    const modelName = (modelInput ? modelInput.value.trim() : "") || localStorage.getItem("savedAiModel") || (provider === "ollama" ? "qwen2.5:7b" : "gemini-1.5-flash");
 
     if (!item.link && window.latestFetchedNews) {
       const found = window.latestFetchedNews.find(x => x.title === item.title);
@@ -1989,6 +1802,11 @@ ${creditsInstruction}
         // セットリストボードの進行目印を更新
         updateNewsSetlistProgress(item.categoryKey || "cat_top", newsBroadcastState.currentIndex, newsBroadcastState.totalCount);
 
+        // 記事読み上げ開始時に即座に既読フラグを記録・保存
+        readNewsTitles.add(item.title);
+        window.readNewsTitles = readNewsTitles;
+        try { localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles))); } catch (e) { }
+
         const count = (data.items || data.sentences || []).length;
         const articleUrl = item.link || item.url || "";
         console.log(`[ニュース原稿(Backend)] [${newsBroadcastState.currentIndex}/${newsBroadcastState.totalCount}件] 🔗 ${articleUrl || 'URLなし'}\n「${data.fullText}」 (${count}文)`);
@@ -2006,15 +1824,17 @@ ${creditsInstruction}
                 sentenceIndex: sIdx,
                 timestamp: Date.now()
               }));
-            } catch (e) {}
+            } catch (e) { }
             await queueVoicevoxAudio(it.display, true, it.speech);
 
             // 🗞️ 1文目（「次のニュースですにゃ！」）の直後に見出しを読む
             if (sIdx === 0 && item.title) {
-              const headlineText = cleanTitleForSpeech(item.title);
+              const headlineDisplay = (data && data.headline && data.headline.display) || item.title;
+              const headlineText = cleanTitleForSpeech(headlineDisplay);
+              const headlineSpeech = (data && (data.headline_speech || (data.headline && data.headline.speech))) || headlineText;
               if (headlineText) {
                 console.log(`[原稿] [見出し] "${headlineText}"`);
-                await queueVoicevoxAudio(headlineText, true, headlineText);
+                await queueVoicevoxAudio(headlineText, true, headlineSpeech);
               }
             }
 
@@ -2035,6 +1855,11 @@ ${creditsInstruction}
         }
         // VOICEVOXの読み上げが完全に終わるまで待機
         await waitForVoicevoxFinish();
+
+        // 🎙️ 記事終了時に待機コメントがあればキャスターとして紹介＆返信！
+        if (typeof processNewsInterludeComments === "function") {
+          await processNewsInterludeComments();
+        }
 
         // 既読マーク
         readNewsTitles.add(item.title);
@@ -2065,7 +1890,7 @@ ${creditsInstruction}
         const waitMsg = isZunda
           ? "電波の状況を確認中なのだ。復旧までしばらくお待ちくださいなのだ！"
           : (isCat ? "電波の状況を確認中ですにゃ。復旧までしばらくお待ちくださいにゃ！" : "通信状況を確認中です。復旧までしばらくお待ちください。");
-        
+
         await queueVoicevoxAudio(waitMsg, true);
         await waitForVoicevoxFinish();
       }
@@ -2081,7 +1906,7 @@ ${creditsInstruction}
 
   window.readOneNewsItem = readOneNewsItem;
 
-  async function startNewsBroadcast(startIndex = 0, items = null) {
+  async function startNewsBroadcast(startIndex = 0, items = null, isFromNewsList = false) {
     if (newsBroadcastState.isRunning) {
       console.log(`[ニュース番組] 指定位置(#${startIndex + 1})から再開するため、現在の番組を安全に切り替えます...`);
       newsBroadcastState.isRunning = false;
@@ -2121,7 +1946,8 @@ ${creditsInstruction}
       return dateA - dateB; // カテゴリ内は古い順（時系列昇順: 朝➔夜）
     });
 
-    newsBroadcastState = { isRunning: true, currentIndex: startIndex, totalCount: sortedNews.length, lastCategory: "" };
+    const isMidwayStart = (startIndex > 0) || isFromNewsList;
+    newsBroadcastState = { isRunning: true, currentIndex: startIndex, totalCount: sortedNews.length, lastCategory: "", isFromNewsList: isMidwayStart };
     if (startBtn) startBtn.style.display = "none";
     if (stopBtn) stopBtn.style.display = "block";
     if (progressEl) progressEl.style.display = "block";
@@ -2134,9 +1960,14 @@ ${creditsInstruction}
     // 番組開始時にセットリストボードを初期化・表示
     initNewsSetlist(sortedNews);
 
-    // 番組開始時にすべての記事を未読状態に初期化（途中再開でない場合のみクリア）
-    if (startIndex === 0 && typeof window.clearNewsReadFlags === "function") {
-      window.clearNewsReadFlags(true);
+    // 途中から開始した場合は、それ以前の記事をすべて既読フラグに反映して保存
+    if (startIndex > 0) {
+      for (let k = 0; k < startIndex; k++) {
+        if (sortedNews[k]) readNewsTitles.add(sortedNews[k].title);
+      }
+      try {
+        localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles)));
+      } catch (e) { }
     }
 
     // 番組開始時にコメント履歴とコメント数を初期化（途中再開でない場合のみクリア）
@@ -2144,17 +1975,21 @@ ${creditsInstruction}
       window.clearAllComments();
     }
 
-    // OBS配信状態の確認（「OBS配信も同時にスタートする」トグルがONの場合のみ実行）
+    // OBS配信状態の確認（「OBS配信も同時にスタートする」トグルがON、かつ第1件目からの新規スタートの場合のみ実行）
     const obsStreamToggle = document.getElementById("news-obs-auto-stream-toggle");
     const isObsStreamEnabled = obsStreamToggle ? obsStreamToggle.checked : false;
 
-    if (isObsStreamEnabled && typeof window.ensureObsStreamingStarted === "function") {
+    if (!isMidwayStart && isObsStreamEnabled && typeof window.ensureObsStreamingStarted === "function") {
       if (progressEl) progressEl.textContent = "📡 OBS配信接続を確認中...";
       await window.ensureObsStreamingStarted((msg) => {
         if (progressEl) progressEl.textContent = `📡 ${msg}`;
       });
     } else {
-      console.log("[ニュース番組] OBS自動配信連携はOFFのため、OBS配信開始をスキップしてローカルで番組を進行します。");
+      if (isMidwayStart) {
+        console.log("[ニュース番組] 途中レジューム・個別再生のため、OBS WebSocket配信制御はスキップします。");
+      } else {
+        console.log("[ニュース番組] OBS自動配信連携はOFFのため、OBS配信開始をスキップしてローカルで番組を進行します。");
+      }
     }
 
     // YouTube接続の自動確認（未接続なら保存済みの動画ID/チャンネルへ自動接続して統計・コメントを取得開始）
@@ -2242,14 +2077,14 @@ ${creditsInstruction}
 
     // 独り言は絶対に言わない（startIdleTimerは起動しない）
 
-    // ニュース終了時自動終了がON、または時計自動終了がONの場合は配信終了プロセスを実行
+    // ニュース終了時自動終了がON、または時計自動終了がONの場合は配信終了プロセスを実行（途中レジューム・個別再生時は配信停止させない）
     const isAutoEndNews = (typeof window.isAutoEndAfterNews === "undefined") || window.isAutoEndAfterNews === true;
     const endToggle = document.getElementById("stream-end-toggle");
-    if ((isAutoEndNews || (endToggle && endToggle.checked)) && typeof window.executeStreamEndProcess === "function") {
+    if (!newsBroadcastState.isFromNewsList && (isAutoEndNews || (endToggle && endToggle.checked)) && typeof window.executeStreamEndProcess === "function") {
       console.log("[ニュース番組] ニュース読み終わりによる配信終了プロセスを開始します");
       window.executeStreamEndProcess();
     } else {
-      console.log("[ニュース番組] 自動終了が無効のため、配信を継続します（待機状態）");
+      console.log("[ニュース番組] 途中レジューム・個別再生または自動終了が無効のため、配信を継続します（待機状態）");
     }
   }
 
@@ -2366,12 +2201,12 @@ ${creditsInstruction}
     function calculateTitleSimilarity(str1, str2) {
       if (!str1 || !str2) return 0;
       if (str1 === str2) return 1.0;
-      
+
       // 片方がもう片方（10文字以上）を完全に含む場合
       if (str1.length >= 10 && str2.length >= 10) {
         if (str1.includes(str2) || str2.includes(str1)) return 0.9;
       }
-      
+
       const getBiGrams = (s) => {
         const biGrams = new Set();
         for (let i = 0; i < s.length - 1; i++) {
@@ -2379,16 +2214,16 @@ ${creditsInstruction}
         }
         return biGrams;
       };
-      
+
       const bg1 = getBiGrams(str1);
       const bg2 = getBiGrams(str2);
       if (bg1.size === 0 || bg2.size === 0) return 0;
-      
+
       let intersection = 0;
       for (const g of bg1) {
         if (bg2.has(g)) intersection++;
       }
-      
+
       return (2.0 * intersection) / (bg1.size + bg2.size);
     }
 
@@ -2396,23 +2231,23 @@ ${creditsInstruction}
     function smartDeduplicateNewsItems(items) {
       const uniqueList = [];
       let dupCount = 0;
-      
+
       for (const item of items) {
         if (!item.title) continue;
         const normTitle = normalizeNewsTitle(item.title);
-        
+
         let duplicateIndex = -1;
         for (let i = 0; i < uniqueList.length; i++) {
           const existing = uniqueList[i];
           const existingNorm = normalizeNewsTitle(existing.title);
-          
+
           // 完全一致、または類似度が0.65以上の場合
           if (normTitle === existingNorm || calculateTitleSimilarity(normTitle, existingNorm) >= 0.65) {
             duplicateIndex = i;
             break;
           }
         }
-        
+
         if (duplicateIndex === -1) {
           uniqueList.push(item);
         } else {
@@ -2502,7 +2337,7 @@ ${creditsInstruction}
     };
 
     const CATEGORY_ORDER = ["cat_top", "cat_society", "cat_world", "cat_business", "cat_politics", "cat_entertainment", "cat_sports", "cat_tech", "cat_science", "cat_local"];
-    
+
     // 各カテゴリから重複しない記事を maxPerCategory 件ずつ選出
     CATEGORY_ORDER.forEach(catKey => {
       if (categorized[catKey]) {
@@ -2849,6 +2684,17 @@ ${creditsInstruction}
         btnToday.style.color = "#00ffff";
         btnToday.style.fontWeight = "bold";
       }
+    } else if (rangeKey === "6h") {
+      const past = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+      if (pStartInput) pStartInput.value = formatDatetimeLocal(past);
+      if (pEndInput) pEndInput.value = formatDatetimeLocal(now);
+      const btn6 = document.getElementById("panel-quick-6h");
+      if (btn6) {
+        btn6.style.background = "rgba(0, 210, 211, 0.25)";
+        btn6.style.borderColor = "#00d2d3";
+        btn6.style.color = "#00ffff";
+        btn6.style.fontWeight = "bold";
+      }
     } else if (rangeKey === "all") {
       if (pStartInput) pStartInput.value = "";
       if (pEndInput) pEndInput.value = "";
@@ -2860,9 +2706,99 @@ ${creditsInstruction}
       }
     }
 
+    syncPanelInputsFromHidden();
     localStorage.setItem("savedNewsQuickRange", rangeKey);
   };
 
+  // メインパネルの時セレクト初期化＆双方向同期
+  const initPanelHourSelects = () => {
+    const sHour = document.getElementById("panel-start-hour");
+    const eHour = document.getElementById("panel-end-hour");
+    if (sHour && sHour.options.length === 0) {
+      for (let i = 0; i < 24; i++) {
+        const val = String(i).padStart(2, "0");
+        sHour.innerHTML += `<option value="${val}">${val}時</option>`;
+      }
+    }
+    if (eHour && eHour.options.length === 0) {
+      for (let i = 0; i < 24; i++) {
+        const val = String(i).padStart(2, "0");
+        eHour.innerHTML += `<option value="${val}">${val}時</option>`;
+      }
+    }
+  };
+
+  const syncPanelInputsFromHidden = () => {
+    initPanelHourSelects();
+    const startHidden = document.getElementById("news-date-start");
+    const endHidden = document.getElementById("news-date-end");
+    const sDate = document.getElementById("panel-start-date");
+    const sHour = document.getElementById("panel-start-hour");
+    const eDate = document.getElementById("panel-end-date");
+    const eHour = document.getElementById("panel-end-hour");
+
+    if (startHidden && startHidden.value) {
+      const parts = startHidden.value.split("T");
+      if (sDate && parts[0]) sDate.value = parts[0];
+      if (sHour && parts[1]) sHour.value = parts[1].slice(0, 2);
+    }
+    if (endHidden && endHidden.value) {
+      const parts = endHidden.value.split("T");
+      if (eDate && parts[0]) eDate.value = parts[0];
+      if (eHour && parts[1]) eHour.value = parts[1].slice(0, 2);
+    }
+  };
+
+  const syncPanelHiddenFromInputs = () => {
+    const startHidden = document.getElementById("news-date-start");
+    const endHidden = document.getElementById("news-date-end");
+    const sDate = document.getElementById("panel-start-date");
+    const sHour = document.getElementById("panel-start-hour");
+    const eDate = document.getElementById("panel-end-date");
+    const eHour = document.getElementById("panel-end-hour");
+
+    if (startHidden && sDate && sHour) {
+      startHidden.value = sDate.value ? `${sDate.value}T${sHour.value || "00"}:00` : "";
+    }
+    if (endHidden && eDate && eHour) {
+      endHidden.value = eDate.value ? `${eDate.value}T${eHour.value || "23"}:59` : "";
+    }
+  };
+
+  document.getElementById("panel-start-date")?.addEventListener("change", syncPanelHiddenFromInputs);
+  document.getElementById("panel-start-hour")?.addEventListener("change", syncPanelHiddenFromInputs);
+  document.getElementById("panel-end-date")?.addEventListener("change", syncPanelHiddenFromInputs);
+  document.getElementById("panel-end-hour")?.addEventListener("change", syncPanelHiddenFromInputs);
+
+  window.stepPanelDate = function(type, hoursDiff) {
+    syncPanelHiddenFromInputs();
+    const hidden = document.getElementById(type === "start" ? "news-date-start" : "news-date-end");
+    if (!hidden) return;
+    let current = hidden.value ? new Date(hidden.value) : new Date();
+    if (isNaN(current.getTime())) current = new Date();
+    current.setTime(current.getTime() + hoursDiff * 60 * 60 * 1000);
+    hidden.value = formatDatetimeLocal(current);
+    syncPanelInputsFromHidden();
+  };
+
+  window.setPanelNow = function() {
+    const endHidden = document.getElementById("news-date-end");
+    if (endHidden) {
+      endHidden.value = formatDatetimeLocal(new Date());
+      syncPanelInputsFromHidden();
+    }
+  };
+
+  window.adjustNumberInput = function(inputId, diff, minVal = -Infinity, maxVal = Infinity) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const current = parseInt(input.value, 10) || 0;
+    const nextVal = Math.min(maxVal, Math.max(minVal, current + diff));
+    input.value = nextVal;
+    input.dispatchEvent(new Event('change'));
+  };
+
+  document.getElementById("panel-quick-6h")?.addEventListener("click", () => applyQuickRange("6h"));
   document.getElementById("panel-quick-12h")?.addEventListener("click", () => applyQuickRange("12h"));
   document.getElementById("panel-quick-24h")?.addEventListener("click", () => applyQuickRange("24h"));
   document.getElementById("panel-quick-today")?.addEventListener("click", () => applyQuickRange("today"));
@@ -3062,7 +2998,7 @@ ${creditsInstruction}
           <button id="news-discard-resume-btn" class="resume-btn resume-btn-secondary">✕ 破棄</button>
         </div>
       `;
-      
+
       const resumeContainer = document.getElementById("news-resume-container");
       if (resumeContainer) {
         resumeContainer.innerHTML = "";
@@ -3094,7 +3030,7 @@ ${creditsInstruction}
 
     // 1. AudioContextアンミュート
     if (window.voicevoxAudioContext && window.voicevoxAudioContext.state === "suspended") {
-      await window.voicevoxAudioContext.resume().catch(() => {});
+      await window.voicevoxAudioContext.resume().catch(() => { });
     }
 
     // 2. YouTube WebSocket再接続
@@ -3149,7 +3085,7 @@ ${creditsInstruction}
           sentenceIndex: sIdx,
           timestamp: Date.now()
         }));
-      } catch (e) {}
+      } catch (e) { }
       await queueVoicevoxAudio(it.display, true, it.speech);
     }
     await waitForVoicevoxFinish();
@@ -3157,10 +3093,10 @@ ${creditsInstruction}
     // 5. 既読にして次の記事の通常ループへ突入
     readNewsTitles.add(saved.item.title);
     if (window.readNewsTitles) window.readNewsTitles.add(saved.item.title);
-    try { localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles))); } catch (e) {}
+    try { localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles))); } catch (e) { }
 
     if (newsBroadcastState.isRunning) {
-      startNewsBroadcast((saved.articleIndex || 0) + 1);
+      startNewsBroadcast((saved.articleIndex || 0) + 1, null, true);
     }
   };
 
@@ -3178,7 +3114,7 @@ ${creditsInstruction}
         try {
           const saved = localStorage.getItem("latestFetchedNews");
           if (saved) window.latestFetchedNews = JSON.parse(saved);
-        } catch (e) {}
+        } catch (e) { }
       }
       if (!window.latestFetchedNews || window.latestFetchedNews.length === 0) return;
 
@@ -3194,7 +3130,7 @@ ${creditsInstruction}
           const data = await res.json();
           if (data && data.urls) serverUrlMap = data.urls;
         }
-      } catch (e) {}
+      } catch (e) { }
 
       let enrichedCount = 0;
       const missingTitles = [];
@@ -3252,9 +3188,9 @@ ${creditsInstruction}
               }
             }
           }
-        } catch (batchErr) {}
+        } catch (batchErr) { }
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   window.enrichCurrentNewsWithLinks();
