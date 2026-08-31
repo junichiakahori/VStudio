@@ -51,14 +51,20 @@ window.openNewsListPopup = function () {
 };
 
 // ニュース見出しを読み上げ用にクリーニングする
-// 例: "[みんなのケータイ]Pixel 11は買い - ケータイ Watch" → "Pixel 11は買い"
+// 例: "遺伝子を切断（CNN.co.jp） - Yahoo!ニュース" → "遺伝子を切断"
 function cleanTitleForSpeech(title) {
   if (!title) return "";
   let t = String(title).trim();
-  // 先頭の [タグ] や 【タグ】 を除去
-  t = t.replace(/^[\[【][^\]】]*[\]】]\s*/, "");
-  // 末尾の " - 出典名" を除去（ハイフン後ろのソース名）
-  t = t.replace(/\s[-－]\s*[^-－]+$/, "");
+  // 先頭の [タグ]、 【タグ】、 〈タグ〉 を除去
+  t = t.replace(/^[\[【〈][^\]】〉]*[\]】〉]\s*/, "");
+  // 末尾の " - 出典名"、 "- 出典名"、 " - Yahoo!ニュース" などを再帰的に完全除去
+  t = t.replace(/\s*[-－–—]\s*[^-－–—]+$/g, "");
+  t = t.replace(/\s*[-－–—]\s*[^-－–—]+$/g, "");
+  // 末尾のメディア括弧（例: （スポニチアネックス）、（CNN.co.jp）、（テレビ朝日系（ANN）））を除去
+  t = t.replace(/[\(（][^\)）]*(?:ニュース|WEB|新聞|通信|テレビ|アネックス|公式|提供|co\.jp|jp|com|ANN|TBS|NHK|CNN|BBC|共同|時事)[\)）]\s*$/gi, "");
+  t = t.replace(/[\(（][^\)）]+[\)）]\s*$/g, "");
+  // ハッシュタグ（例: #エキスパートトピ）を除去
+  t = t.replace(/#[^\s#]+/g, "");
   // 全角記号・HTMLタグを除去
   t = stripHtmlTags(t);
   return t.trim();
@@ -1946,8 +1952,8 @@ ${creditsInstruction}
       return dateA - dateB; // カテゴリ内は古い順（時系列昇順: 朝➔夜）
     });
 
-    const isMidwayStart = (startIndex > 0) || isFromNewsList;
-    newsBroadcastState = { isRunning: true, currentIndex: startIndex, totalCount: sortedNews.length, lastCategory: "", isFromNewsList: isMidwayStart };
+    const isMidwayStart = (startIndex > 0);
+    newsBroadcastState = { isRunning: true, currentIndex: startIndex, totalCount: sortedNews.length, lastCategory: "", isFromNewsList: !!isFromNewsList };
     if (startBtn) startBtn.style.display = "none";
     if (stopBtn) stopBtn.style.display = "block";
     if (progressEl) progressEl.style.display = "block";
@@ -2063,28 +2069,46 @@ ${creditsInstruction}
 
     // ED挨拶
     if (progressEl) progressEl.textContent = "🏁 エンディング再生中...";
-    await queueVoicevoxAudio(config.ed, true, config.ed);
-    await waitForVoicevoxFinish();
-    if (config.useEdChime) { await playSE("放送終了チャイム"); await new Promise(r => setTimeout(r, 600)); }
+    
+    // EDの各文を直接VOICEVOX再生し、最後の1文字が鳴り終わるまで1文ずつ確実に待機
+    const edSentences = config.ed.split(/(?<=[。！？\n])/g).map(s => s.trim()).filter(s => s.length > 0);
+    for (const edSentence of edSentences) {
+      if (!newsBroadcastState.isRunning) break;
+      if (typeof window.playVoicevoxDirectAndWait === "function") {
+        await window.playVoicevoxDirectAndWait(edSentence, edSentence);
+      } else {
+        await queueVoicevoxAudio(edSentence, true, edSentence);
+        await waitForVoicevoxFinish();
+      }
+      await new Promise(r => setTimeout(r, 400));
+    }
+    await new Promise(r => setTimeout(r, 800)); // 全セリフ完了後の息継ぎ余白
 
-    // 番組終了（セットリスト完了状態に更新）
+    // EDチャイム再生（セリフが完全に全部喋り終わってから初めて鳴らす）
+    if (config.useEdChime) {
+      await playSE("放送終了チャイム");
+      await new Promise(r => setTimeout(r, 4800)); // チャイムがしっかり鳴り響いて静まるまで待機
+    }
+
+    // 番組終了（セットリスト完了状態に更新＆レジューム一時状態を完全消去）
     finishNewsSetlist(sortedNews.length);
     newsBroadcastState.isRunning = false;
+    try { localStorage.removeItem("newsActiveState"); } catch (e) { }
     if (startBtn) startBtn.style.display = "block";
     if (stopBtn) stopBtn.style.display = "none";
     if (progressEl) progressEl.textContent = `✅ 番組終了（全${sortedNews.length}件を読み終えました）`;
     console.log("[ニュース番組] 全件放送完了！");
 
-    // 独り言は絶対に言わない（startIdleTimerは起動しない）
-
-    // ニュース終了時自動終了がON、または時計自動終了がONの場合は配信終了プロセスを実行（途中レジューム・個別再生時は配信停止させない）
-    const isAutoEndNews = (typeof window.isAutoEndAfterNews === "undefined") || window.isAutoEndAfterNews === true;
+    // ニュース終了時自動終了が有効な場合は配信終了プロセスを実行
+    const mainEndModeEl = document.getElementById("main-stream-end-mode");
+    const isAutoEndNews = (typeof window.isAutoEndAfterNews === "undefined") || window.isAutoEndAfterNews === true || (mainEndModeEl && mainEndModeEl.value === "news_end");
     const endToggle = document.getElementById("stream-end-toggle");
-    if (!newsBroadcastState.isFromNewsList && (isAutoEndNews || (endToggle && endToggle.checked)) && typeof window.executeStreamEndProcess === "function") {
-      console.log("[ニュース番組] ニュース読み終わりによる配信終了プロセスを開始します");
+    
+    if ((isAutoEndNews || (endToggle && endToggle.checked)) && typeof window.executeStreamEndProcess === "function") {
+      console.log("[ニュース番組] 🏁 ニュース全件読み終わりによる配信終了プロセスを開始します");
       window.executeStreamEndProcess();
     } else {
-      console.log("[ニュース番組] 途中レジューム・個別再生または自動終了が無効のため、配信を継続します（待機状態）");
+      console.log("[ニュース番組] 自動終了が無効（耐久・手動停止モード）のため、配信を継続します（待機状態）");
     }
   }
 
@@ -2966,9 +2990,13 @@ ${creditsInstruction}
       const raw = localStorage.getItem("newsActiveState");
       if (!raw) return;
       const saved = JSON.parse(raw);
-      // 30分以内の有効な中断データが存在する場合のみバナーを表示
+      // 30分以内の有効な中断データが存在する場合のみバナーを表示（番組完了直前データは破棄）
       if (!saved || !saved.isRunning || !saved.item || !saved.scriptData) return;
-      if (Date.now() - (saved.timestamp || 0) > 30 * 60 * 1000) {
+      const totalSentences = (saved.scriptData.items || []).length;
+      if (
+        (saved.articleIndex >= (saved.totalArticles || 298) - 1 && (saved.sentenceIndex || 0) >= totalSentences - 1) ||
+        (Date.now() - (saved.timestamp || 0) > 30 * 60 * 1000)
+      ) {
         localStorage.removeItem("newsActiveState");
         return;
       }
@@ -3096,7 +3124,7 @@ ${creditsInstruction}
     try { localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles))); } catch (e) { }
 
     if (newsBroadcastState.isRunning) {
-      startNewsBroadcast((saved.articleIndex || 0) + 1, null, true);
+      startNewsBroadcast((saved.articleIndex || 0) + 1, null, false);
     }
   };
 

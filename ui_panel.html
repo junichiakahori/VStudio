@@ -111,21 +111,22 @@
                     style="width:100%; box-sizing:border-box; padding:0.4rem; border-radius:4px; border:1px solid var(--border-neon); background:#1a1a2e; color:#fff; font-size:0.8rem;">
             </div>
             <div class="control-group"
-                style="margin-top:10px; display: flex; flex-direction: column; gap:8px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 0.8rem; font-weight: bold; color: var(--primary);">⏱️ 配信の自動終了設定</span>
-                    <select id="main-stream-end-mode"
-                        style="background:#1a1a2e; border:1px solid var(--border-neon); border-radius:4px; padding:0.3rem 0.5rem; color:#fff; font-size:0.8rem;">
-                        <option value="none">自動終了なし (耐久)</option>
-                        <option value="timer">タイマー指定</option>
-                        <option value="time">指定時刻</option>
-                    </select>
-                </div>
+                style="margin-top:10px; display: flex; flex-direction: column; gap:6px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px;">
+                <label style="font-size: 0.8rem; font-weight: bold; color: var(--primary); white-space: nowrap; display: flex; align-items: center; gap: 4px;">
+                    ⏱️ 配信の自動終了設定
+                </label>
+                <select id="main-stream-end-mode"
+                    style="width: 100%; box-sizing: border-box; background:#1a1a2e; border:1px solid var(--border-neon); border-radius:4px; padding:0.4rem 0.6rem; color:#fff; font-size:0.82rem;">
+                    <option value="news_end" selected>📰 ニュース全件終了時</option>
+                    <option value="none">自動終了なし (耐久・手動停止)</option>
+                    <option value="timer">タイマー指定</option>
+                    <option value="time">指定時刻</option>
+                </select>
                 <div id="main-stream-timer-row"
-                    style="display:none; justify-content: space-between; align-items: center; gap: 8px;">
-                    <span style="font-size: 0.75rem; color: var(--text-muted);">終了までの時間:</span>
+                    style="display:none; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px;">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap;">終了までの時間:</span>
                     <select id="main-stream-duration-select"
-                        style="background:#1a1a2e; border:1px solid var(--border-neon); border-radius:4px; padding:0.3rem; color:#fff; font-size:0.8rem; flex:1;">
+                        style="background:#1a1a2e; border:1px solid var(--border-neon); border-radius:4px; padding:0.35rem; color:#fff; font-size:0.8rem; flex:1;">
                         <option value="30">30分後</option>
                         <option value="60">1時間後</option>
                         <option value="120">2時間後</option>
@@ -137,10 +138,10 @@
                     </select>
                 </div>
                 <div id="main-stream-time-row"
-                    style="display:none; justify-content: space-between; align-items: center; gap: 8px;">
-                    <span style="font-size: 0.75rem; color: var(--text-muted);">終了時刻:</span>
+                    style="display:none; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px;">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap;">終了時刻:</span>
                     <input type="time" id="stream-end-time"
-                        style="background:#1a1a2e; border:1px solid var(--border-neon); border-radius:4px; padding:0.3rem; color:#fff; font-size:0.85rem; width:100px;">
+                        style="background:#1a1a2e; border:1px solid var(--border-neon); border-radius:4px; padding:0.3rem; color:#fff; font-size:0.85rem; width:110px;">
                 </div>
                 <!-- 互換用隠しトグル -->
                 <input type="checkbox" id="stream-end-toggle" style="display:none;">

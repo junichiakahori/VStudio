@@ -30,6 +30,23 @@
                 return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}.${ms}`;
             }
 
+            function getCallerSource() {
+                try {
+                    const stack = (new Error()).stack || "";
+                    const lines = stack.split("\n");
+                    for (let i = 2; i < lines.length; i++) {
+                        const line = lines[i];
+                        if (!line || line.includes("live2d.html")) continue;
+                        // ファイル名、クエリバージョン(?v=X.X)、行番号を抽出 (例: news-mode.js?v=9.4:2085)
+                        const match = line.match(/([a-zA-Z0-9_\-]+\.(?:js|html)(?:\?[a-zA-Z0-9_=\.\-]+)?(?::\d+)?)/);
+                        if (match) {
+                            return `[${match[1]}]`;
+                        }
+                    }
+                } catch (e) { }
+                return "";
+            }
+
             function sendLogToServer(level, args) {
                 try {
                     const message = args.map(arg => {
@@ -38,7 +55,9 @@
                     }).join(' ').trim();
                     if (!message || message.includes("[CSM]") || message.includes("Google Identity Services loaded") || message.includes("Model positioned:")) return;
                     const timestamp = getJSTTimestamp();
-                    const logString = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
+                    const caller = getCallerSource();
+                    const callerTag = caller ? ` ${caller}` : "";
+                    const logString = `[${timestamp}]${callerTag} [${level.toUpperCase()}] ${message}`;
                     fetch('/log', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -182,30 +201,30 @@
     <!-- OBS WebSocket JS v5 -->
     <script src="https://cdn.jsdelivr.net/npm/obs-websocket-js@5.0.3/dist/obs-ws.min.js"></script>
     <!-- UI Overlay and Features -->
-    <script src="js/draggable.js?v=4.3"></script>
+    <script src="js/draggable.js?v=8.1"></script>
     <!-- Extracted Modules -->
-    <script src="js/prompt-loader.js?v=5.0"></script>
-    <script src="js/audio-voicevox.js?v=5.7"></script>
-    <script src="js/bgm-player.js?v=5.0"></script>
-    <script src="js/ai-settings.js?v=5.0"></script>
-    <script src="js/ui-tabs.js?v=5.0"></script>
-    <script src="js/ui-state-autosave.js?v=5.0"></script>
-    <script src="js/idle-speech.js?v=5.0"></script>
-    <script src="js/chat-ui.js?v=5.2"></script>
-    <script src="js/chat-client.js?v=6.6"></script>
-    <script src="js/stream-automation.js?v=6.6"></script>
-    <script src="js/news-mode.js?v=8.6"></script>
-    <script src="js/radio-mode.js?v=6.6"></script>
-    <script src="js/stream-tools.js?v=6.6"></script>
-    <script src="js/stream-wizard.js?v=6.6"></script>
-    <script src="js/obs-websocket.js?v=6.6"></script>
-    <script src="js/screen-overlay.js?v=6.6"></script>
-    <script src="js/tracking-camera.js?v=6.6"></script>
-    <script src="js/avatar-features.js?v=6.6"></script>
-    <script src="js/reaction-effects.js?v=6.6"></script>
-    <script src="js/layout-manager.js?v=6.6"></script>
-    <script src="js/hot-reload.js?v=6.6"></script>
-    <script type="module" src="/live2d-app.js?v=6.6"></script>
+    <script src="js/prompt-loader.js?v=8.1"></script>
+    <script src="js/audio-voicevox.js?v=8.1"></script>
+    <script src="js/bgm-player.js?v=8.1"></script>
+    <script src="js/ai-settings.js?v=8.1"></script>
+    <script src="js/ui-tabs.js?v=8.1"></script>
+    <script src="js/ui-state-autosave.js?v=8.1"></script>
+    <script src="js/idle-speech.js?v=8.1"></script>
+    <script src="js/chat-ui.js?v=8.1"></script>
+    <script src="js/chat-client.js?v=8.1"></script>
+    <script src="js/stream-automation.js?v=8.1"></script>
+    <script src="js/news-mode.js?v=10.1"></script>
+    <script src="js/radio-mode.js?v=8.1"></script>
+    <script src="js/stream-tools.js?v=8.1"></script>
+    <script src="js/stream-wizard.js?v=8.1"></script>
+    <script src="js/obs-websocket.js?v=8.1"></script>
+    <script src="js/screen-overlay.js?v=8.1"></script>
+    <script src="js/tracking-camera.js?v=8.1"></script>
+    <script src="js/avatar-features.js?v=8.1"></script>
+    <script src="js/reaction-effects.js?v=8.1"></script>
+    <script src="js/layout-manager.js?v=8.1"></script>
+    <script src="js/hot-reload.js?v=8.1"></script>
+    <script type="module" src="/live2d-app.js?v=8.1"></script>
 </body>
 
 </html>

@@ -447,18 +447,27 @@ window.executeStreamEndProcess = executeStreamEndProcess;
   if (mainEndMode) {
     mainEndMode.addEventListener("change", () => {
       const mode = mainEndMode.value;
-      if (mode === "timer") {
+      if (mode === "news_end") {
+        window.isAutoEndAfterNews = true;
+        if (mainTimerRow) mainTimerRow.style.display = "none";
+        if (mainTimeRow) mainTimeRow.style.display = "none";
+        if (streamEndToggle) streamEndToggle.checked = false;
+        window.clearStreamEndTimer();
+      } else if (mode === "timer") {
+        window.isAutoEndAfterNews = false;
         if (mainTimerRow) mainTimerRow.style.display = "flex";
         if (mainTimeRow) mainTimeRow.style.display = "none";
         if (streamEndToggle) streamEndToggle.checked = false;
         const dur = mainDurationSelect ? parseInt(mainDurationSelect.value, 10) : 1440;
         window.setStreamEndTimer(dur);
       } else if (mode === "time") {
+        window.isAutoEndAfterNews = false;
         if (mainTimerRow) mainTimerRow.style.display = "none";
         if (mainTimeRow) mainTimeRow.style.display = "flex";
         if (streamEndToggle) streamEndToggle.checked = true;
         window.clearStreamEndTimer();
       } else {
+        window.isAutoEndAfterNews = false;
         if (mainTimerRow) mainTimerRow.style.display = "none";
         if (mainTimeRow) mainTimeRow.style.display = "none";
         if (streamEndToggle) streamEndToggle.checked = false;

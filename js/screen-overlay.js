@@ -57,12 +57,14 @@
         chatQueue.length = 0;
       }
 
-      // BGMの滑らかなフェードアウト停止処理
-      wasBgmPlayingBeforeOverlay = (typeof bgmIsPlaying !== "undefined" ? bgmIsPlaying : false);
-      if (wasBgmPlayingBeforeOverlay && typeof fadeOutBgm === "function") {
-        fadeOutBgm(2000);
-      } else if (wasBgmPlayingBeforeOverlay && typeof stopBgm === "function") {
-        stopBgm();
+      // 手動で終了ボタンを押した場合のみBGMを停止（自動終了プロセス中は20秒待機後にBGMを停止するため維持）
+      if (!window.isStreamEndProcessRunning) {
+        wasBgmPlayingBeforeOverlay = (typeof bgmIsPlaying !== "undefined" ? bgmIsPlaying : false);
+        if (wasBgmPlayingBeforeOverlay && typeof fadeOutBgm === "function") {
+          fadeOutBgm(2000);
+        } else if (wasBgmPlayingBeforeOverlay && typeof stopBgm === "function") {
+          stopBgm();
+        }
       }
 
       // API自動終了中ではない手動操作の場合、コメント取得も即座に切断する
