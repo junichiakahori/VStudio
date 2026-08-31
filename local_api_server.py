@@ -1204,10 +1204,15 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
                 # 🗞️ AIが生成した見出しルビ（[HEADLINE: ...] または 【見出し】: ...）の抽出
                 clean_text = raw_text
+                # 話者名プレフィックス（とろろ:、ずんだもん:等）のサニタイズ
+                clean_text = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', clean_text, flags=re.MULTILINE).strip()
+
                 ai_headline_raw = None
                 headline_match = re.search(r'(?:\[HEADLINE:\s*|【見出し】:\s*)(.*?)(?:\]|\n|$)', raw_text)
                 if headline_match:
                     ai_headline_raw = headline_match.group(1).strip()
+                    # 見出し内の話者名プレフィックスも除去
+                    ai_headline_raw = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', ai_headline_raw).strip()
                     # 本文処理対象から [HEADLINE: ...] 行を除去
                     clean_text = re.sub(r'(?:\[HEADLINE:\s*|【見出し】:\s*).*?(?:\]|\n|$)', '', clean_text).strip()
 
@@ -1356,6 +1361,11 @@ def inspect_and_correct_pronunciation(raw_sentences, provider="ollama", api_key=
     new_learned_dict = {}
 
     for s in raw_sentences:
+        # 話者名プレフィックス（とろろ:、ずんだもん:等）の完全除去
+        s = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', s).strip()
+        if not s:
+            continue
+
         # 字幕用: 漢字（ふりがな）から（ふりがな）を除去して綺麗な漢字表記にし、「のかた」等を「の方」に美しく整える
         display_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\1', s)
         display_s = display_s.replace("（", "").replace("）", "").replace("(", "").replace(")", "").strip()
