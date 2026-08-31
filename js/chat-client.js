@@ -1513,8 +1513,9 @@ function initChatClient() {
       return;
     }
 
-    // 3. 通常時: コメントを即時読み上げ ＆ AI/定型返信
-    queueCommentAudio(`${cleanNickname}さん、${cleanComment}`);
+    // コメント読み上げ（投稿者名がテストや空の場合は本文のみ読み上げ）
+    const speakPrompt = (!cleanNickname || cleanNickname === "テスト" || cleanNickname === "匿名") ? cleanComment : `${cleanNickname}さん、${cleanComment}`;
+    queueCommentAudio(speakPrompt);
 
     if (
       isAiReplyEnabled &&
