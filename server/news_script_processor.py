@@ -117,6 +117,49 @@ def call_llm_backend(provider, prompt, api_key="", model_name=""):
     else:
         return call_gemini_backend(prompt, api_key, model=model_name)
 
+
+def is_title_duplicate_sentence(sentence, title):
+    """
+    文が見出し（タイトル）の単なる復唱・重複であるかを高度に判定する。
+    例:
+      タイトル: 'みんなで大家さん、事実上の事業終了へ'
+      文: 'みんなで大家さん、事実上の事業終了へ。' ➔ True
+      文: 'みんなで大家さんが、事実上の事業終了となる見込みです。' ➔ True
+      文: 'みんなで大家さんについて、事実上の事業終了へ向かっているそうです。' ➔ True
+    """
+    if not sentence or not title:
+        return False
+    
+    norm_s = re.sub(r'[★【】〈〉\[\]「」『』\s　\(\)（）\.,、。！？\!\?…・：:;；]', '', sentence)
+    norm_t = re.sub(r'[★【】〈〉\[\]「」『』\s　\(\)（）\.,、。！？\!\?…・：:;；]', '', title)
+    
+    if not norm_s or not norm_t:
+        return False
+
+    # 1. 完全一致または前方一致
+    if norm_s == norm_t or norm_s.startswith(norm_t) or norm_t.startswith(norm_s):
+        if len(norm_s) <= len(norm_t) + 18:
+            return True
+
+    # 2. タイトルの主要キーワード（2文字以上の名詞・英数字・漢字カタカナ）の一致率チェック
+    title_tokens = set(re.findall(r'[一-鿿゠-ヿA-Za-z0-9]{2,}', norm_t))
+    if title_tokens:
+        matched_tokens = sum(1 for tok in title_tokens if tok in norm_s)
+        match_ratio = matched_tokens / len(title_tokens)
+        if match_ratio >= 0.70 and len(norm_s) <= len(norm_t) * 1.4 + 12:
+            return True
+
+    # 3. 2文字バイグラム類似度
+    s_bigrams = set(norm_s[i:i+2] for i in range(len(norm_s)-1))
+    t_bigrams = set(norm_t[i:i+2] for i in range(len(norm_t)-1))
+    if s_bigrams and t_bigrams:
+        intersection = len(s_bigrams & t_bigrams)
+        similarity = (2.0 * intersection) / (len(s_bigrams) + len(t_bigrams))
+        if similarity >= 0.60 and len(norm_s) <= len(norm_t) * 1.4 + 12:
+            return True
+
+    return False
+
 def is_chinese_sentence(text):
     """中国語混入判定フィルター"""
     if not text:
@@ -384,16 +427,19 @@ def generate_news_item_script_data(payload, custom_dict=None):
 
     deduped_sentences = []
     seen_transition = False
-    clean_title_core = re.sub(r'[★【】〈〉\[\]「」\s　\(\)（）]', '', title)
     for idx, s in enumerate(split_sentences):
         if is_transition_phrase(s):
             if idx > 0 or seen_transition:
                 continue
             seen_transition = True
-        if idx == 0 and clean_title_core:
-            clean_s = re.sub(r'[★【】〈〉\[\]「」\s　\(\)（）]', '', s)
-            if (clean_s.startswith(clean_title_core) or clean_title_core.startswith(clean_s)) and len(clean_s) <= len(clean_title_core) + 14:
-                continue
+            deduped_sentences.append(s)
+            continue
+        
+        # 見出し（タイトル）との重複・復唱を自動検知して除去
+        if is_title_duplicate_sentence(s, title):
+            print(f"[見出し重複カット] ✂️ タイトルと重複する文を除去しました: '{s}' (タイトル: '{title}')", flush=True)
+            continue
+
         if deduped_sentences and s == deduped_sentences[-1]:
             continue
         deduped_sentences.append(s)
