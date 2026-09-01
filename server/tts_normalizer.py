@@ -59,9 +59,8 @@ def lookup_wikipedia_reading(term):
                 if pid == "-1":
                     continue
                 extract = pdata.get("extract", "")
-                m = re.search(r'[\(（]([ぁ-ん\s、]+)[）\)]', extract)
-                if not m:
-                    m = re.search(r'[\(（]([ァ-ヶー\s、]+)[）\)]', extract)
+                # 括弧内の先頭にあるひらがな/カタカナ読みを抽出（英語併記があっても確実に取得）
+                m = re.search(r'[\(（]\s*([ぁ-んァ-ヶー]+)', extract)
                 if m:
                     yomi_raw = m.group(1).split("、")[0].split(" ")[0].strip()
                     if yomi_raw and yomi_raw not in INVALID_READINGS:
@@ -89,9 +88,16 @@ def lookup_wikipedia_reading(term):
 
 def extract_special_terms(text):
     """
-    発音ミスが起きやすいアルファベット略称・英字混じり固有名詞を自動抽出
+    発音ミスが起きやすいアルファベット略称・英字混じり固有名詞・『』内の作品名を自動抽出
     """
     terms = []
+    # 1. 『...』で囲まれた作品名・固有名詞
+    for m in re.finditer(r'『(.*?)』', text):
+        t = m.group(1).strip()
+        if len(t) >= 2 and len(t) <= 25:
+            terms.append(t)
+
+    # 2. 英字略称
     for m in re.finditer(r'(?<![A-Za-z0-9])[A-Za-z]{2,}(?![A-Za-z0-9])', text):
         t = m.group(0)
         if t.lower() not in {"https", "http", "www", "com", "net", "jp", "org", "co"}:
