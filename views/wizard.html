@@ -3252,6 +3252,15 @@
         // グローバルエイリアス
         window.generateStreamReservationMetadata = generateStreamReservationMetadata;
         window.updateSuggestedMetadata = generateStreamReservationMetadata;
+
+        // 🚪 ウィンドウクローズ時に親ウィンドウの参照を明示的にクリア
+        window.addEventListener('beforeunload', () => {
+            try {
+                if (window.opener && window.opener.streamWizardPopup) {
+                    window.opener.streamWizardPopup = null;
+                }
+            } catch (e) {}
+        });
     </script>
 </body>
 </html>
