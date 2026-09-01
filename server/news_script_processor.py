@@ -269,6 +269,13 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
         if CLICHE_PATTERN.match(display_s.strip()) or CLICHE_PATTERN.match(speech_s.strip()):
             continue
 
+        # 直前の文と完全に重複している場合は2重読み上げを防止してスキップ
+        if corrected_items:
+            prev_display = corrected_items[-1]["display"].strip()
+            if prev_display == display_s.strip():
+                print(f"[重複文スキップ] ✂️ 直前と同一の文をスキップしました: 「{display_s}」")
+                continue
+
         corrected_items.append({
             "display": display_s,
             "speech": speech_s
