@@ -66,29 +66,31 @@ window.openNewsListPopup = function () {
   }
 
   try {
-    if (window.newsListPopup) {
+    if (window.newsListPopup && !window.newsListPopup.closed) {
       try {
-        if (!window.newsListPopup.closed) {
-          if (typeof window.newsListPopup.renderNewsList === "function") {
-            window.newsListPopup.renderNewsList();
-          }
-          window.newsListPopup.focus();
-          return;
+        if (typeof window.newsListPopup.renderNewsList === "function") {
+          window.newsListPopup.renderNewsList();
         }
+        window.newsListPopup.focus();
+        return;
       } catch (checkErr) {
         window.newsListPopup = null;
       }
     }
+  } catch (e) {
+    window.newsListPopup = null;
+  }
 
-    const url = "news_list.html?t=" + Date.now();
-    const popup = window.open(url, "NewsListPopup", "width=780,height=820,menubar=no,toolbar=no,location=no,status=no");
+  try {
+    const url = "/news_list.html?t=" + Date.now();
+    const popup = window.open(url, "_blank", "width=820,height=860,menubar=no,toolbar=no,location=no,status=no");
     if (popup) {
-      try { popup.focus(); } catch (e) {}
       window.newsListPopup = popup;
+      try { popup.focus(); } catch (e) {}
     }
   } catch (err) {
     console.error("[記事一覧] 別窓起動エラー:", err);
-    try { window.open("news_list.html", "_blank"); } catch (e) {}
+    try { window.open("/news_list.html", "_blank"); } catch (e) {}
   }
 };
 
