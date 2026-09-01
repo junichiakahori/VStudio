@@ -359,6 +359,10 @@ def validate_news_script_quality(raw_text, title="", article_context=""):
     if len(split_sentences_check) < 5:
         return False, f"原稿の文数が不足しています ({len(split_sentences_check)}文 < 5文)。出来事の経緯・背景・影響・感想を含む最低5文の深掘り解説が必要です。"
 
+    # 不自然な二重語尾チェック
+    if re.search(r'(?:だよですね|だねですね|よねですね|よですね|ねですね)', raw_text):
+        return False, "不自然な二重語尾（だよですね等）が含まれています"
+
     # 1. 英語単語の混入チェック
     english_words = re.findall(r'[a-zA-Z]{3,}', raw_text)
     invalid_english = []
@@ -495,6 +499,15 @@ def generate_news_item_script_data(payload, custom_dict=None):
             clean_text = re.sub(r'(?:\[HEADLINE:\s*|【見出し】:\s*).*?(?:\]|\n|$)', '', clean_text).strip()
 
         clean_text = clean_text.replace("「", "").replace("」", "").strip()
+        # 不自然な二重語尾（だよですね、だねですね、よですね等）の徹底修正
+        clean_text = re.sub(r'だよですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)
+        clean_text = re.sub(r'だねですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)
+        clean_text = re.sub(r'よねですね([！!？?。、\s　]|$)', r'ですよね\1', clean_text)
+        clean_text = re.sub(r'よですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)
+        clean_text = re.sub(r'ねですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)
+        clean_text = re.sub(r'だよにゃ([！!？?。、\s　]|$)', r'だにゃ\1', clean_text)
+        clean_text = re.sub(r'だよねにゃ([！!？?。、\s　]|$)', r'だよね\1', clean_text)
+        clean_text = re.sub(r'ですよねにゃ([！!？?。、\s　]|$)', r'ですよね\1', clean_text)
         clean_text = re.sub(r'にゃ{2,}', 'にゃ', clean_text)
         clean_text = re.sub(r'にゃ[か？\?]+にゃ', 'かにゃ', clean_text)
         clean_text = re.sub(r'のだ{2,}', 'のだ', clean_text)
