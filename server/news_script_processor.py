@@ -321,11 +321,15 @@ def validate_news_script_quality(raw_text, title="", article_context=""):
     """
     生成されたニュース原稿の品質をダブルチェックする。
     不自然な英語混入、中国語混入、句読点欠落、中身のない同語反復（トートロジー）、
-    および元記事にない架空エピソード・捏造作品名を検知して不合格理由を返す。
+    報道メタ説明のみのスカスカ原稿、文数不足、および元記事にない架空エピソードを検知して不合格理由を返す。
     合格の場合は (True, "") を返す。
     """
-    if not raw_text or len(raw_text.strip()) < 20:
-        return False, "テキストが短すぎるか空です"
+    if not raw_text or len(raw_text.strip()) < 45:
+        return False, f"原稿の文字数が少なすぎます ({len(raw_text.strip()) if raw_text else 0}文字 < 45文字)"
+
+    lines = [l.strip() for l in raw_text.splitlines() if l.strip() and re.search(r'[一-鿿぀-ゟ゠-ヿA-Za-z0-9]', l)]
+    if len(lines) < 2:
+        return False, f"原稿の文数が不足しています ({len(lines)}文 < 2文)。具体的な出来事の解説と感想を含む複数文が必要です。"
 
     # 1. 英語単語の混入チェック
     english_words = re.findall(r'[a-zA-Z]{3,}', raw_text)
@@ -337,12 +341,22 @@ def validate_news_script_quality(raw_text, title="", article_context=""):
         return False, f"不要な英語単語が混入しています: {invalid_english}"
 
     # 2. 中国語・簡体字チェック
-    lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
     for l in lines:
         if is_chinese_sentence(l):
             return False, f"中国語・簡体字表現が検知されました: '{l}'"
 
-    # 3. トートロジー・中身のない水増し文句チェック
+    # 3. 報道メタ説明（「〜で報じられています」等の中身のない空虚な文）の検知
+    META_REPORT_PATTERNS = [
+        re.compile(r'[0-9]+年?[0-9]+月?[0-9]+日.*?(で|に|から|として)?(報じられてい|報道されてい|伝えられてい|掲載されてい|配信されてい|記事になってい)'),
+        re.compile(r'(ライブドアニュース|Yahoo!ニュース|NHK|共同通信|時事通信|各社|メディア|新聞|ネットニュース)で(報じ|報道|伝え|掲載)'),
+        re.compile(r'^(これ|このニュース|この記事)は.*?(報じられて|報道されて|伝えられて)'),
+        re.compile(r'という(ニュース|記事|報道)が(あり|報じられ|伝えられ)ました'),
+    ]
+    for pat in META_REPORT_PATTERNS:
+        if pat.search(raw_text):
+            return False, f"具体的な内容のない報道メタ説明文が検知されました: '{pat.pattern}'"
+
+    # 4. トートロジー・中身のない水増し文句チェック
     TAUTOLOGY_PATTERNS = [
         re.compile(r'これは一体どういうことなのか説明してみよう'),
         re.compile(r'(名作映画|人気作品|話題作|新作|商品)ってどんな作品だろうか'),
@@ -356,12 +370,12 @@ def validate_news_script_quality(raw_text, title="", article_context=""):
         if pat.search(raw_text):
             return False, f"中身のない同語反復・水増し文句が検知されました: '{pat.pattern}'"
 
-    # 4. 句読点（。）の存在チェック
+    # 5. 句読点（。）の存在チェック
     has_kuten = any(c in raw_text for c in ['。', '！', '？', '!', '?'])
-    if not has_kuten and len(raw_text) > 40:
-        return False, "文末の句点（。）が完全に欠落しています"
+    if not has_kuten:
+        return False, "文末の句点（。）が欠落しています"
 
-    # 5. ファクト照合・架空作品名や捏造エピソードの検知
+    # 6. ファクト照合・架空作品名や捏造エピソードの検知
     if article_context and len(article_context) > 40:
         invented_titles = re.findall(r'『(.*?)』', raw_text)
         for inv_t in invented_titles:
@@ -417,7 +431,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
     for attempt in range(1, max_retries + 1):
         cur_prompt = prompt
         if attempt > 1:
-            cur_prompt += "\n\n【重要・品質修正指示（再生成）】前回の出力はファクト不一致・架空エピソード捏造・不要な英単語・または中身のない同語反復が検知されたため破棄されました。必ず【ニュース内容】に記載されている具体的な事実・背景・詳細データのみに基づいて、100%自然な日本語で各文末に句点（。）を付けて解説を作成してください（架空の作品名や一般論の水増し解説は厳禁です）。"
+            cur_prompt += "\n\n【重要・品質修正指示（再生成）】前回の出力は『文数不足（1文のみ）』『〜で報じられています等の空虚なメタ説明』『中身のない同語反復』または『ファクト不一致』により破棄されました。必ず【ニュース内容】に記載されている具体的な事実・背景・詳細データを2〜3文でしっかり解説し、最後に配信者としての感想を1文添えて、全体で3〜4文の充実した台本を作成してください（1文だけや『〜で報じられています』のような薄い文章は厳禁です）。"
             print(f"[ダブルチェック・品質再生成] 🔄 試行 {attempt}/{max_retries} 回目の原稿生成を実行中... (前回の破棄理由: {reason})", flush=True)
 
         candidate_text = call_llm_backend(provider, cur_prompt, api_key, model_name)
