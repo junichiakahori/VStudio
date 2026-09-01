@@ -25,6 +25,22 @@ def clean_news_title(title):
     t = re.sub(r'^[★【】〈〉\[\]「」『』\s　]+', '', t)
     t = re.sub(r'[★【】〈〉\[\]「」『』\s　]+$', '', t)
     return t.strip()
+
+def split_sentences_safely(text):
+    """Yahoo! や M!LK 等のブランド名感嘆符で誤分割されない安全な文分割"""
+    if not text:
+        return []
+    t_safe = re.sub(r'Yahoo[!！]', 'Yahoo__EXCL__', text, flags=re.IGNORECASE)
+    t_safe = re.sub(r'M[!！]LK', 'M__EXCL__LK', t_safe)
+    t_safe = re.sub(r'Y[!！]ニュース', 'Y__EXCL__ニュース', t_safe)
+    
+    parts = [s.strip() for s in re.split(r'(?<=[。！？\n])|(?<=[!?])(?![A-Za-z0-9])', t_safe) if s.strip() and re.search(r'[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ffA-Za-z0-9]', s)]
+    
+    restored = [
+        s.replace('Yahoo__EXCL__', 'Yahoo!').replace('M__EXCL__LK', 'M!LK').replace('Y__EXCL__ニュース', 'Y!ニュース')
+        for s in parts
+    ]
+    return restored
 # -*- coding: utf-8 -*-
 """
 news_script_processor.py
@@ -339,7 +355,7 @@ def validate_news_script_quality(raw_text, title="", article_context=""):
         return False, f"原稿の文字数が少なすぎます ({len(raw_text.strip()) if raw_text else 0}文字 < 120文字)"
 
     # 改行または句点でセンテンスを分割
-    split_sentences_check = [s.strip() for s in re.split(r'(?<=[。！？\n])|(?<=[!?])(?![A-Za-z0-9])', raw_text) if s.strip() and re.search(r'[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ffA-Za-z0-9]', s)]
+    split_sentences_check = split_sentences_safely(raw_text)
     if len(split_sentences_check) < 5:
         return False, f"原稿の文数が不足しています ({len(split_sentences_check)}文 < 5文)。出来事の経緯・背景・影響・感想を含む最低5文の深掘り解説が必要です。"
 
@@ -496,7 +512,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
         clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)へん([の|ね|よ|な|にゃ|！|？|。|、]|$)', r'\1ない\2', clean_text)
         clean_text = re.sub(r'\b[a-z]{3,}な', '大変な', clean_text)
 
-        split_sentences = [s.strip() for s in re.split(r'(?<=[。！？\n])|(?<=[!?])(?![A-Za-z0-9])', clean_text) if s.strip() and re.search(r'[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ffA-Za-z0-9]', s)]
+        split_sentences = split_sentences_safely(clean_text)
 
         def is_transition_phrase(txt):
             cleaned = re.sub(r'[。！？\!\? \s　、]+', '', txt)

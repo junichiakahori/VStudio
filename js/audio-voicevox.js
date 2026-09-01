@@ -292,8 +292,17 @@ async function queueVoicevoxAudio(
 ) {
   if (!text || !text.trim()) return;
 
-  // 1文ずつ（句点・感嘆符・疑問符・改行）に分割する正規表現（M!LK等の英単語内の感嘆符は文末とみなさない）
-  const splitPattern = /(?<=[。！？\n])|(?<=[!?])(?![A-Za-z0-9])/g;
+  // Yahoo! や M!LK 等のブランド名感嘆符で誤分割されない安全な文分割関数
+  const splitSentencesSafely = (rawText) => {
+    if (!rawText) return [];
+    let tSafe = rawText.replace(/Yahoo[!！]/gi, "Yahoo__EXCL__")
+                       .replace(/M[!！]LK/g, "M__EXCL__LK")
+                       .replace(/Y[!！]ニュース/g, "Y__EXCL__ニュース");
+    const parts = tSafe.split(/(?<=[。！？\n])|(?<=[!?])(?![A-Za-z0-9])/g)
+                       .map(s => s.trim())
+                       .filter(s => s.length > 0 && /[\u4E00-\u9FFFぁ-んァ-ヶーA-Za-z0-9]/.test(s));
+    return parts.map(s => s.replace(/Yahoo__EXCL__/g, "Yahoo!").replace(/M__EXCL__LK/g, "M!LK").replace(/Y__EXCL__ニュース/g, "Y!ニュース"));
+  };
 
   // クリーンアップ関数
   const cleanYomi = (t) => {
@@ -307,10 +316,10 @@ async function queueVoicevoxAudio(
     return pt;
   };
 
-  const origSentences = text.split(splitPattern).map(s => s.trim()).filter(s => s.length > 0 && /[\u4E00-\u9FFFぁ-んァ-ヶーA-Za-z0-9]/.test(s));
+  const origSentences = splitSentencesSafely(text);
 
   if (preConvertedYomi) {
-    const yomiSentences = preConvertedYomi.split(splitPattern).map(s => s.trim()).filter(s => s.length > 0 && /[\u4E00-\u9FFFぁ-んァ-ヶーA-Za-z0-9]/.test(s));
+    const yomiSentences = splitSentencesSafely(preConvertedYomi);
 
     if (origSentences.length > 0 && origSentences.length === yomiSentences.length) {
       // 1対1で文が一致する場合（各文ごとにキューへ投入）
@@ -327,7 +336,7 @@ async function queueVoicevoxAudio(
     } else {
       // 文数が異なる場合でも1文ずつ分割して投入
       const fullProcessed = cleanYomi(preConvertedYomi);
-      const parts = fullProcessed.split(splitPattern).map(s => s.trim()).filter(s => s.length > 0 && /[\u4E00-\u9FFFぁ-んァ-ヶーA-Za-z0-9]/.test(s));
+      const parts = splitSentencesSafely(fullProcessed);
       for (let i = 0; i < parts.length; i++) {
         const s = parts[i];
         const disp = origSentences[i] || origSentences[origSentences.length - 1] || text;
