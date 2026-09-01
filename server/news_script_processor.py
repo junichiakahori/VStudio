@@ -16,14 +16,16 @@ def clean_news_description(desc):
     return t
 
 def clean_news_title(title):
-    """ニュースタイトルからPR TIMESやメディア名サフィックス、不要なサイト名を除去"""
+    """ニュースタイトルから（メディア名）や末尾の - Yahoo!ニュース 等のサフィックスを除去"""
     if not title:
         return ""
     t = str(title).strip()
+    t = re.sub(r'[（\(][^）\)]*(?:新聞|通信|日報|新報|NEWS|スポニチ|デイリー|スポーツ|ORICON|文春|新潮|テレビ|WEB|DIG|編集部|Japan|PR|タイムス)[^）\)]*[）\)]', '', t, flags=re.IGNORECASE)
     t = re.sub(r'[\s|｜\-–—]+(?:[A-Za-z0-9\u4e00-\u9fff\u30a0-\u30ff\s]+のプレスリリース|PR\s*TIMES|PRTIMES|プレスリリース).*$', '', t, flags=re.IGNORECASE)
-    t = re.sub(r'[\s|｜\-–—]+(?:Google\s*ニュース|Google\s*News|Yahoo!\s*ニュース|Yahoo!\s*JAPAN|NHK\s*NEWS\s*WEB|ITmedia[A-Za-z0-9\s]*|共同通信|時事通信|読売新聞|朝日新聞|毎日新聞|産経新聞|日経新聞|日本経済新聞|TBS\s*NEWS\s*DIG|FNNプライムオンライン|テレ朝news|日テレNEWS[A-Za-z0-9\s]*|ORICON\s*NEWS|モデルプレス|デイリースポーツ|スポニチ|zakzak|zakⅡ|ねとらぼ|AUTOMATON|IGN\s*Japan|Game\s*Watch|4Gamer.*)$', '', t, flags=re.IGNORECASE)
-    t = re.sub(r'^[★【】〈〉\[\]「」『』\s　]+', '', t)
-    t = re.sub(r'[★【】〈〉\[\]「」『』\s　]+$', '', t)
+    t = re.sub(r'[\s|｜\-–—]+(?:Google\s*ニュース|Google\s*News|Yahoo!\s*ニュース|Yahoo!\s*JAPAN|Yahoo!|ヤフー|NHK\s*NEWS\s*WEB|ITmedia[A-Za-z0-9\s]*|共同通信|時事通信|読売新聞|朝日新聞|毎日新聞|産経新聞|日経新聞|日本経済新聞|TBS\s*NEWS\s*DIG|FNNプライムオンライン|テレ朝news|日テレNEWS[A-Za-z0-9\s]*|ORICON\s*NEWS|モデルプレス|デイリースポーツ|日刊スポーツ|スポニチ|zakzak|zakⅡ|ねとらぼ|AUTOMATON|IGN\s*Japan|Game\s*Watch|4Gamer.*)$', '', t, flags=re.IGNORECASE)
+    t = re.sub(r'[\s|｜\-–—]+$', '', t).strip()
+    if re.match(r'^(?:ニュース|Google\s*ニュース|Google\s*News|Yahoo!\s*ニュース|Yahoo!|ヤフー|トップニュース|主要ニュース|トピックス)$', t, flags=re.IGNORECASE):
+        return ""
     return t.strip()
 
 def split_sentences_safely(text):

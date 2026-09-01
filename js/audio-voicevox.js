@@ -291,6 +291,11 @@ async function queueVoicevoxAudio(
   preConvertedYomi = null,
 ) {
   if (!text || !text.trim()) return;
+  // 単独の「ニュース」「？」などの無意味なゴミ単語・記号のみの行を完全遮断
+  const trimmed = text.trim();
+  if (/^(ニュース|主要ニュース|トピックス|[？!！\?。、\-–—…\s　]+)$/.test(trimmed)) {
+    return;
+  }
 
   // Yahoo! や M!LK 等のブランド名感嘆符で誤分割されない安全な文分割関数
   const splitSentencesSafely = (rawText) => {
@@ -496,6 +501,7 @@ function waitForVoicevoxFinish() {
 // 1文を直接VOICEVOX合成して再生し、再生完了（onended）まで確実に待機する関数
 async function playVoicevoxDirectAndWait(displayText, speakText = null) {
   if (!displayText || !displayText.trim()) return;
+  if (/^(ニュース|主要ニュース|トピックス|[？!！\?。、\-–—…\s　]+)$/.test(displayText.trim())) return;
   const rawSpeak = speakText || displayText;
   
   const cleanYomi = (t) => {
