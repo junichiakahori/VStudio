@@ -161,9 +161,28 @@ def is_title_duplicate_sentence(sentence, title):
     return False
 
 def is_chinese_sentence(text):
-    """中国語混入判定フィルター"""
+    """中国語（簡体字・特有構文）混入判定フィルター"""
     if not text:
         return False
+    t = text.strip()
+    # 簡体字が明確に含まれている場合
+    if re.search(r'[这俩们么谁哪几没为发时说着从让给过]', t):
+        return True
+
+    hiragana_count = len(re.findall(r'[ぁ-ん]', t))
+    kanji_count = len(re.findall(r'[一-鿿]', t))
+    total_len = len(t)
+
+    # 全角カンマ（，）やダブルクォート（“ ”）が含まれ、ひらがなが極端に少ない場合
+    if '，' in t or '“' in t or '”' in t:
+        if hiragana_count < 3 or (total_len > 8 and (hiragana_count / total_len) < 0.20):
+            return True
+
+    # 6文字以上でひらがなが0個かつ漢字ばかりの場合
+    if total_len >= 6 and hiragana_count == 0 and kanji_count >= 3:
+        return True
+
+    return False
     t = text.strip()
     CHINESE_CHARS = re.compile(
         r'[听说这那我他她它他们俩们呢吧吗么着过从让给于把被会能想说看吃写开关点去来里边头問做多真假現誰哪幾沒不'
@@ -294,10 +313,11 @@ ALLOWED_ENGLISH_TERMS = {
     "softbank", "jr", "jra", "jfa", "usj", "tdl", "tdr", "tbs", "fuji", "asahi", "mbs"
 }
 
-def validate_news_script_quality(raw_text, title=""):
+def validate_news_script_quality(raw_text, title="", article_context=""):
     """
     生成されたニュース原稿の品質をダブルチェックする。
-    不自然な英語混入、中国語混入、句読点欠落、中身のない同語反復（トートロジー）を検知して不合格理由を返す。
+    不自然な英語混入、中国語混入、句読点欠落、中身のない同語反復（トートロジー）、
+    および元記事にない架空エピソード・捏造作品名を検知して不合格理由を返す。
     合格の場合は (True, "") を返す。
     """
     if not raw_text or len(raw_text.strip()) < 20:
@@ -325,6 +345,8 @@ def validate_news_script_quality(raw_text, title=""):
         re.compile(r'長年愛され続けている.*のことを指すんだ'),
         re.compile(r'という配信プラットフォームに'),
         re.compile(r'どういうことなのか、詳しく見ていきましょうか'),
+        re.compile(r'別の(銘柄|会社|企業|人物|人|作品|ゲーム|商品|団体|地域)でした'),
+        re.compile(r'(某|某有名|とある)(会社|企業|人物|人|作品|銘柄)'),
     ]
     for pat in TAUTOLOGY_PATTERNS:
         if pat.search(raw_text):
@@ -334,6 +356,26 @@ def validate_news_script_quality(raw_text, title=""):
     has_kuten = any(c in raw_text for c in ['。', '！', '？', '!', '?'])
     if not has_kuten and len(raw_text) > 40:
         return False, "文末の句点（。）が完全に欠落しています"
+
+    # 5. ファクト照合・架空作品名や捏造エピソードの検知
+    if article_context and len(article_context) > 40:
+        invented_titles = re.findall(r'『(.*?)』', raw_text)
+        for inv_t in invented_titles:
+            if inv_t and inv_t not in article_context and inv_t not in title:
+                return False, f"元記事に存在しない作品名が捏造されています: 『{inv_t}』"
+
+        for l in lines:
+            if len(l) >= 15:
+                is_pure_impression = bool(re.search(r'^(これ|このニュース|そう|本当|ボク|私|僕|みんな|皆|視聴者)?.*(楽しみ|嬉しい|うれしい|悲しい|残念|すごい|凄い|驚き|びっくり|注目|期待|応援|注視|和解|複雑|不思議|気になり|気をつ|注意|大切|安心|よかった|良かった)(です|だ|ね|よね|よ|な|と思います|にゃ|のだ|わ).*$', l))
+                if not is_pure_impression:
+                    nouns = re.findall(r'[一-鿿゠-ヿA-Za-z0-9]{2,}', l)
+                    FILTER_TERMS = {'こと', 'よう', 'そう', 'ため', 'ニュース', '記事', '内容', '今回', '発表', '紹介', '情報'}
+                    meaningful_nouns = [n for n in nouns if n not in FILTER_TERMS]
+                    if len(meaningful_nouns) >= 3:
+                        matched_count = sum(1 for n in meaningful_nouns if n in article_context or n in title)
+                        match_ratio = matched_count / len(meaningful_nouns)
+                        if match_ratio < 0.20:
+                            return False, f"元記事と一致しない架空エピソードが含まれています: '{l}' (一致率: {match_ratio:.2f})"
 
     return True, ""
 
@@ -371,14 +413,14 @@ def generate_news_item_script_data(payload, custom_dict=None):
     for attempt in range(1, max_retries + 1):
         cur_prompt = prompt
         if attempt > 1:
-            cur_prompt += "\n\n【重要・品質修正指示（再生成）】前回の出力に不自然な英単語（英語）や句読点の欠落、中身のない同語反復が含まれていたため破棄されました。すべて100%自然でスマートな日本語のみで、各文末に必ず句点（。）を付け、ニュースの具体的な事実のみを解説してください。"
-            print(f"[ダブルチェック・品質再生成] 🔄 試行 {attempt}/{max_retries} 回目の原稿生成を実行中...", flush=True)
+            cur_prompt += "\n\n【重要・品質修正指示（再生成）】前回の出力はファクト不一致・架空エピソード捏造・不要な英単語・または中身のない同語反復が検知されたため破棄されました。必ず【ニュース内容】に記載されている具体的な事実・背景・詳細データのみに基づいて、100%自然な日本語で各文末に句点（。）を付けて解説を作成してください（架空の作品名や一般論の水増し解説は厳禁です）。"
+            print(f"[ダブルチェック・品質再生成] 🔄 試行 {attempt}/{max_retries} 回目の原稿生成を実行中... (前回の破棄理由: {reason})", flush=True)
 
         candidate_text = call_llm_backend(provider, cur_prompt, api_key, model_name)
         if not candidate_text:
             continue
 
-        is_valid, reason = validate_news_script_quality(candidate_text, title)
+        is_valid, reason = validate_news_script_quality(candidate_text, title, full_article_content)
         if is_valid:
             raw_text = candidate_text
             if attempt > 1:
