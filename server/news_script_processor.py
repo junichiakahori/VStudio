@@ -230,6 +230,11 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
         if not s or not re.search(r'[一-鿿぀-ゟ゠-ヿA-Za-z0-9]', s):
             continue
 
+        # 単独の「にゃ！」「なのだ！」など意味のある文でないものはスキップ
+        core_chars = re.sub(r'[にゃのだ！!？?。、 \s　]+', '', s)
+        if len(core_chars) < 2:
+            continue
+
         display_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\1', s)
         display_s = display_s.replace("（", "").replace("）", "").replace("(", "").replace(")", "").strip()
         display_s = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)のかた([たち|がた|も|は|が|に|へ|で|を|、|。|！|？\s]|$)', r'\1の方\2', display_s)
