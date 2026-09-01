@@ -516,6 +516,11 @@ def generate_news_item_script_data(payload, custom_dict=None):
             clean_text = re.sub(r'(?:\[HEADLINE:\s*|【見出し】:\s*).*?(?:\]|\n|$)', '', clean_text).strip()
 
         clean_text = clean_text.replace("「", "").replace("」", "").strip()
+                # 不自然な名乗り・導入語尾（「とろろにゃ、」「とろろはにゃ、」等）を「とろろとしては、」に正規化
+        clean_text = re.sub(r'(?:^|(?<=[。！？\s]))(?:とろろ|トロロ)にゃ[、,\s　]*', 'とろろとしては、', clean_text)
+        clean_text = re.sub(r'(?:^|(?<=[。！？\s]))(?:とろろ|トロロ)はにゃ[、,\s　]*', 'とろろとしては、', clean_text)
+        clean_text = re.sub(r'(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)(?:なのだ|のだ)[、,\s　]*', 'ずんだもんとしては、', clean_text)
+        clean_text = re.sub(r'(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)は(?:なのだ|のだ)[、,\s　]*', 'ずんだもんとしては、', clean_text)
         # 不自然な二重語尾（だよですね、だねですね、よですね等）の徹底修正
         clean_text = re.sub(r'だよですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)
         clean_text = re.sub(r'だねですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)
