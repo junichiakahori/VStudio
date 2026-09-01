@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 APP_NAME="VStudio.app"
 APP_DIR="$DIR/$APP_NAME"
 
@@ -10,7 +10,7 @@ echo "🔨 Building Native VStudio.app (Dedicated Window)..."
 echo "================================================="
 
 # 1. Generate icon if not present
-if [ ! -f "$DIR/AppIcon.icns" ]; then
+if [ ! -f "$DIR/assets/AppIcon.icns" ]; then
     echo "🎨 Generating AppIcon.icns..."
     python3 "$DIR/scripts/make_icon.py"
 fi
@@ -21,7 +21,7 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 
 # 3. Copy Icon
-cp "$DIR/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
+cp "$DIR/assets/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 
 # 4. Create Info.plist
 cat << 'EOF' > "$APP_DIR/Contents/Info.plist"

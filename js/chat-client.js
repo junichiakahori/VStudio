@@ -615,9 +615,6 @@ function initChatClient() {
               const countdownEl = document.getElementById(
                 "youtube-schedule-countdown",
               );
-              const autoStartCb = document.getElementById(
-                "youtube-auto-start-cb",
-              );
 
               if (scheduleContainer) scheduleContainer.style.display = "block";
 
@@ -635,107 +632,10 @@ function initChatClient() {
                 if (diff <= 0) {
                   clearInterval(window.youtubeScheduleTimer);
                   if (countdownEl) countdownEl.textContent = "00:00:00";
-
-                  // DOM要素を最新状態で取得し直す
-                  const currentAutoStartCb = document.getElementById(
-                    "youtube-auto-start-cb",
-                  );
-
-                  let shouldStart = false;
-                  if (currentAutoStartCb && currentAutoStartCb.checked) {
-                    shouldStart = true;
-                  } else {
-                    // ブラウザのキャッシュでチェックが外れていた場合のフォールバック
-                    shouldStart = confirm(
-                      "予定時刻を過ぎていますが、自動開始のチェックが外れています。\n今すぐOBSのストリーミングとラジオの自動再生を開始しますか？",
-                    );
-                  }
-
-                  if (shouldStart && youtubeWs && youtubeWs.readyState === 1) {
-                    console.log(
-                      "[YouTube] 予約時間になりました。配信開始プロセスをトリガーします。",
-                    );
-
-                    // 配信準備中などのオーバーレイを自動で解除する
-                    if (
-                      typeof window.executeOverlayClearProcess === "function"
-                    ) {
-                      window.executeOverlayClearProcess();
-                    } else {
-                      // フォールバック
-                      const streamOverlayEl =
-                        document.getElementById("stream-overlay");
-                      if (streamOverlayEl)
-                        streamOverlayEl.classList.remove("active");
-                      if (typeof isPreparing !== "undefined")
-                        isPreparing = false;
-                    }
-
-                    // 1. OBSの配信を開始する
-                    if (typeof window.ensureObsStreamingStarted === "function") {
-                      window.ensureObsStreamingStarted().catch((e) => console.warn(e));
-                    } else if (
-                      typeof isObsWsConnected !== "undefined" &&
-                      isObsWsConnected &&
-                      typeof obsWsClient !== "undefined" &&
-                      obsWsClient
-                    ) {
-                      obsWsClient.call("StartStream").catch((err) => {
-                        console.warn("[OBS] StartStream warning:", err);
-                      });
-                    }
-
-                    // 2. 映像がYouTubeに届くまで少し待機してから、YouTubeのステータスをLiveにする
-                    setTimeout(() => {
-                      console.log(
-                        "[YouTube] YouTube側の配信(Live)を開始します...",
-                      );
-                      try {
-                        youtubeWs.send(
-                          JSON.stringify({
-                            type: "start_youtube_stream",
-                            videoId: videoId,
-                          }),
-                        );
-                      } catch (e) {
-                        alert(
-                          "YouTubeへの開始コマンド送信に失敗しました: " + e,
-                        );
-                      }
-
-                      // 3. ラジオ台本ボタンを押す
-                      setTimeout(() => {
-                        // ラジオモードがOFFの場合は強制的にONにする
-                        const radioModeToggle = document.getElementById(
-                          "ai-radio-mode-toggle",
-                        );
-                        if (radioModeToggle && !radioModeToggle.checked) {
-                          console.log(
-                            "[YouTube] ラジオモードを強制的にONにします",
-                          );
-                          radioModeToggle.checked = true;
-                          radioModeToggle.dispatchEvent(new Event("change"));
-                        }
-
-                        const playBtn = document.getElementById(
-                          "radio-script-play-btn",
-                        );
-                        if (playBtn) {
-                          console.log("[YouTube] ラジオ自動再生を実行");
-                          playBtn.click();
-                        }
-                      }, 2000); // 配信開始から少し遅らせて再生
-                    }, 8000); // OBS開始から8秒待機
-                  } else {
-                    console.log(
-                      "【自動開始スキップ】ユーザーがキャンセルしたか、接続が失われています。",
-                    );
-                  }
-
                   if (scheduleContainer) {
                     setTimeout(() => {
                       scheduleContainer.style.display = "none";
-                    }, 5000);
+                    }, 3000);
                   }
                 } else {
                   const hours = Math.floor(diff / (1000 * 60 * 60));
@@ -754,40 +654,11 @@ function initChatClient() {
                 }
               }, 1000);
             } else if (data.liveBroadcastContent === "live") {
-              if (
-                confirm(
-                  "この配信はすでにYouTube上で「Live」状態です。\nOBSのストリーミングとラジオの自動再生だけを開始しますか？",
-                )
-              ) {
-                if (typeof window.ensureObsStreamingStarted === "function") {
-                  window.ensureObsStreamingStarted().catch((e) => console.warn(e));
-                } else if (
-                  typeof isObsWsConnected !== "undefined" &&
-                  isObsWsConnected &&
-                  typeof obsWsClient !== "undefined" &&
-                  obsWsClient
-                ) {
-                  obsWsClient.call("StartStream").catch((err) => {
-                    console.warn("[OBS] StartStream warning:", err);
-                  });
-                }
-
-                setTimeout(() => {
-                  const radioModeToggle = document.getElementById(
-                    "ai-radio-mode-toggle",
-                  );
-                  if (radioModeToggle && !radioModeToggle.checked) {
-                    radioModeToggle.checked = true;
-                    radioModeToggle.dispatchEvent(new Event("change"));
-                  }
-                  const playBtn = document.getElementById(
-                    "radio-script-play-btn",
-                  );
-                  if (playBtn) {
-                    playBtn.click();
-                  }
-                }, 2000);
-              }
+              console.log("[YouTube] 配信枠は現在「Live」状態です。");
+              const scheduleContainer = document.getElementById(
+                "youtube-schedule-container",
+              );
+              if (scheduleContainer) scheduleContainer.style.display = "none";
             }
           } else if (data.type === "stats") {
             const statViewers = document.getElementById("stat-viewers");

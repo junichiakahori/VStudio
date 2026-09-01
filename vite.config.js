@@ -29,9 +29,9 @@ const killProcessOnPort = (port) => {
 };
 
 const scriptMap = {
-  'local_api_server': { file: 'local_api_server.py', port: 8001 },
-  'youtube_comment_server': { file: 'youtube_comment_server.py', port: 8768 },
-  'tiktok_comment_server': { file: 'tiktok_comment_server.py', port: 8767 }
+  'local_api_server': { file: 'server/local_api_server.py', port: 8001 },
+  'youtube_comment_server': { file: 'server/youtube_comment_server.py', port: 8768 },
+  'tiktok_comment_server': { file: 'server/tiktok_comment_server.py', port: 8767 }
 };
 
 const serverLogs = {
@@ -63,6 +63,13 @@ const backendManagerPlugin = () => ({
         return;
       }
       // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+      // ── views/ への透過HTMLルーティング ──
+      if (req.url === '/' || req.url.startsWith('/?')) {
+        req.url = '/views/live2d.html' + (req.url.includes('?') ? '?' + req.url.split('?')[1] : '');
+      } else if (/^\/([a-zA-Z0-9_-]+\.html)(\?.*)?$/.test(req.url)) {
+        req.url = req.url.replace(/^\/([a-zA-Z0-9_-]+\.html)/, '/views/$1');
+      }
+
       const url = new URL(req.url, `http://${req.headers.host}`);
       if (url.pathname.startsWith('/_api/servers')) {
         res.setHeader('Content-Type', 'application/json');
@@ -172,7 +179,7 @@ export default defineConfig({
       ignored: ['**'] // ファイル監視を完全無効化し、配信画面へのエラーポップアップ通知を根絶
     },
     proxy: {
-      '^/(api|news_script|log|update_hiragana_data|radio_script|radio_script_yomi|radio_script_config|custom_idle_phrases|hiragana_data|se_list|add_idle_phrase|convert_remaining_kanji|fetch_rss|get_youtube_video_info)': {
+      '^/(api|news_script|log(?:$|[/?])|update_hiragana_data|radio_script|radio_script_yomi|radio_script_config|custom_idle_phrases|hiragana_data|se_list|add_idle_phrase|convert_remaining_kanji|fetch_rss|get_youtube_video_info)': {
         target: 'http://localhost:8001',
         changeOrigin: true,
         secure: false,

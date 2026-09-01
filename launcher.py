@@ -157,9 +157,9 @@ def start_services(open_browser=True):
     log(f"Using Python: {py_exec}")
     
     services = [
-        ("local_api_server.py", [py_exec, str(BASE_DIR / "local_api_server.py")], 8001, "api_server.log"),
-        ("youtube_comment_server.py", [py_exec, str(BASE_DIR / "youtube_comment_server.py")], 8768, "youtube_server.log"),
-        ("tiktok_comment_server.py", [py_exec, str(BASE_DIR / "tiktok_comment_server.py")], 8767, "tiktok_server.log"),
+        ("local_api_server.py", [py_exec, str(BASE_DIR / "server" / "local_api_server.py")], 8001, "api_server.log"),
+        ("youtube_comment_server.py", [py_exec, str(BASE_DIR / "server" / "youtube_comment_server.py")], 8768, "youtube_server.log"),
+        ("tiktok_comment_server.py", [py_exec, str(BASE_DIR / "server" / "tiktok_comment_server.py")], 8767, "tiktok_server.log"),
         ("vite_dev_server", ["npm", "run", "dev"], 8443, "vite.log"),
     ]
     

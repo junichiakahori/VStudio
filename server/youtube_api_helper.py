@@ -11,9 +11,9 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 
 SCOPES = ['https://www.googleapis.com/auth/youtube']
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TOKEN_PATH = os.path.join(BASE_DIR, 'token.pickle')
-CLIENT_SECRET_PATH = os.path.join(BASE_DIR, 'client_secret.json')
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TOKEN_PATH = os.path.join(BASE_DIR, 'config', 'token.pickle')
+CLIENT_SECRET_PATH = os.path.join(BASE_DIR, 'config', 'client_secret.json')
 
 _cached_youtube_client = None
 
@@ -338,3 +338,87 @@ def list_my_broadcasts(max_results=15):
         })
     return items
 
+
+def fetch_video_info(raw_input):
+    """URLまたは動画ID、チャンネル名から動画・ライブ配信情報を取得"""
+    raw_input = (raw_input or "").strip()
+    if not raw_input:
+        raise ValueError("URL or Video ID is required")
+        
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
+    video_id = raw_input
+    if "youtu.be/" in raw_input:
+        video_id = raw_input.split("youtu.be/")[1].split("?")[0].split("&")[0]
+    elif "youtube.com/watch" in raw_input:
+        m = re.search(r'[?&]v=([a-zA-Z0-9_-]+)', raw_input)
+        if m:
+            video_id = m.group(1)
+    elif "youtube.com/live/" in raw_input:
+        video_id = raw_input.split("youtube.com/live/")[1].split("?")[0].split("&")[0]
+    elif "/live" in raw_input:
+        video_id = raw_input.split("?")[0].split("#")[0]
+        if not video_id.startswith("http"):
+            video_id = "https://www.youtube.com/" + video_id.lstrip("/")
+
+    if video_id.startswith("http"):
+        target_url = video_id
+    else:
+        target_url = f"https://www.youtube.com/watch?v={video_id}"
+
+    req = urllib.request.Request(
+        target_url,
+        headers={
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8'
+        }
+    )
+    with urllib.request.urlopen(req, context=ctx, timeout=8) as response:
+        html = response.read().decode('utf-8', errors='ignore')
+
+    match_actual_id = re.search(r'<meta property="og:video:url" content="[^"]*?[?&]v=([a-zA-Z0-9_-]{11})', html)
+    if not match_actual_id:
+        match_actual_id = re.search(r'"videoId":"([a-zA-Z0-9_-]{11})"', html)
+    if match_actual_id:
+        video_id = match_actual_id.group(1)
+
+    match_time = re.search(r'"scheduledStartTime":\s*"([^"]+)"', html)
+    if not match_time:
+        match_time = re.search(r'"upcomingEventData":\s*\{\s*"startTime":\s*"([^"]+)"', html)
+    if not match_time:
+        match_time = re.search(r'"startTimestamp":\s*"([^"]+)"', html)
+    scheduled_start_time = match_time.group(1) if match_time else None
+
+    is_live = '"isLive":true' in html or '"isLiveNow":true' in html
+
+    match_title = re.search(r'<title>([^<]+)</title>', html)
+    title = match_title.group(1).replace(" - YouTube", "").strip() if match_title else ""
+
+    if not title:
+        try:
+            oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+            with urllib.request.urlopen(oembed_url, context=ctx, timeout=4) as oembed_res:
+                oembed_data = json.loads(oembed_res.read().decode('utf-8'))
+                title = oembed_data.get('title', '')
+        except Exception:
+            pass
+
+    if not title:
+        if len(video_id) == 11:
+            title = f"YouTube予約・配信枠 ({video_id})"
+            status = "scheduled_private"
+        else:
+            title = f"チャンネル配信 ({raw_input})"
+            status = "channel_autodetect"
+    else:
+        status = "live" if is_live else ("scheduled" if scheduled_start_time else "ready")
+
+    return {
+        "videoId": video_id,
+        "title": title,
+        "scheduledStartTime": scheduled_start_time,
+        "isLive": is_live,
+        "status": status
+    }

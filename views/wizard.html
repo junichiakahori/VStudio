@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🚀 YouTube 配信準備ウィザード - Live2D Studio</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+JP:wght@300;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="live2d-styles.css?v=1.3">
+    <link rel="stylesheet" href="/css/live2d-styles.css?v=1.4">
     <style>
         body {
             background: #0d0e17;
@@ -506,18 +506,45 @@
                     </div>
                 </div>
 
-                <!-- 配信開始予定日時の設定 -->
-                <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 10px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                        <label style="font-size: 0.8rem; font-weight: bold; color: var(--primary, #00d2d3);">📅 配信開始予定日時</label>
-                        <label style="font-size: 0.75rem; color: #fff; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                <!-- 配信開始予定日時の設定（スマホ最適化・時計ダイヤル式ピッカー連動） -->
+                <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(0,210,211,0.3); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label style="font-size: 0.82rem; font-weight: bold; color: #00d2d3; display: flex; align-items: center; gap: 4px;">
+                            <span>📅 配信開始予定日時</span>
+                        </label>
+                        <label style="font-size: 0.75rem; color: #fff; display: flex; align-items: center; gap: 6px; cursor: pointer; background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15);">
                             <input type="checkbox" id="wizard-start-schedule-toggle" style="cursor: pointer;">
-                            <span>指定日時に自動開始する</span>
+                            <span style="font-weight: 500;">指定日時に自動開始する</span>
                         </label>
                     </div>
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <input id="wizard-start-time" type="datetime-local" style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.4); border: 1px solid var(--border-neon, #00d2d3); border-radius: 6px; padding: 6px 10px; color: #fff; font-size: 0.88rem; outline: none; font-family: sans-serif;">
-                        <span id="wizard-start-time-hint" style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap;">（チェックなしで即時開始）</span>
+
+                    <!-- 日時カード ＆ タップで時計ダイヤルピッカーを開く -->
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                        <!-- 今日 / 明日 切り替え -->
+                        <div style="display: flex; background: rgba(0,0,0,0.4); padding: 3px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15);">
+                            <button type="button" id="wizard-date-today-btn" class="btn" style="background: #00d2d3; color: #000; font-size: 0.75rem; font-weight: bold; padding: 4px 10px; border-radius: 4px; border: none; cursor: pointer;">今日</button>
+                            <button type="button" id="wizard-date-tomorrow-btn" class="btn" style="background: transparent; color: var(--text-muted); font-size: 0.75rem; font-weight: bold; padding: 4px 10px; border-radius: 4px; border: none; cursor: pointer;">明日</button>
+                        </div>
+
+                        <!-- 大型デジタル時刻表示（タップで時計ピッカー起動） -->
+                        <div id="wizard-clock-display-btn" role="button" tabindex="0" title="タップして時計ダイヤルで時刻を変更" style="flex: 1; min-width: 140px; display: flex; justify-content: center; align-items: center; gap: 6px; background: rgba(0, 210, 211, 0.1); border: 1.5px solid #00d2d3; border-radius: 6px; padding: 6px 12px; cursor: pointer; transition: all 0.2s; box-shadow: 0 0 10px rgba(0,210,211,0.15);">
+                            <span style="font-size: 0.95rem;">⏰</span>
+                            <span id="wizard-clock-display-text" style="font-size: 1.25rem; font-weight: 800; color: #00d2d3; letter-spacing: 1px; font-family: 'Outfit', sans-serif;">--:--</span>
+                            <span style="font-size: 0.68rem; color: #88d8d8; margin-left: 2px;">(変更 ▾)</span>
+                        </div>
+
+                        <!-- 隠し互換input（既存ロジックと100%連動） -->
+                        <input id="wizard-start-time" type="hidden">
+                    </div>
+
+                    <!-- クイック1分単位微調整ボタン（スマホ親指タップ対応） -->
+                    <div style="display: flex; gap: 5px; align-items: center; overflow-x: auto; padding-top: 2px;">
+                        <span style="font-size: 0.7rem; color: var(--text-muted); white-space: nowrap;">微調整:</span>
+                        <button type="button" class="btn wizard-step-btn" data-step-min="-10" style="flex:1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.72rem; padding: 4px 6px; border-radius: 4px; cursor: pointer; white-space: nowrap;">-10分</button>
+                        <button type="button" class="btn wizard-step-btn" data-step-min="-1" style="flex:1; background: rgba(0,210,211,0.1); border: 1px solid #00d2d3; color: #00d2d3; font-size: 0.72rem; font-weight: bold; padding: 4px 6px; border-radius: 4px; cursor: pointer; white-space: nowrap;">-1分</button>
+                        <button type="button" class="btn wizard-step-btn" data-step-min="1" style="flex:1; background: rgba(0,210,211,0.1); border: 1px solid #00d2d3; color: #00d2d3; font-size: 0.72rem; font-weight: bold; padding: 4px 6px; border-radius: 4px; cursor: pointer; white-space: nowrap;">+1分</button>
+                        <button type="button" class="btn wizard-step-btn" data-step-min="10" style="flex:1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.72rem; padding: 4px 6px; border-radius: 4px; cursor: pointer; white-space: nowrap;">+10分</button>
+                        <button type="button" class="btn wizard-step-btn" data-step-min="30" style="flex:1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.72rem; padding: 4px 6px; border-radius: 4px; cursor: pointer; white-space: nowrap;">+30分</button>
                     </div>
                 </div>
 
@@ -628,6 +655,59 @@
                     <button type="button" id="btn-cancel-greeting-template" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; font-size:0.75rem; padding:5px 12px; border-radius:4px; cursor:pointer;">キャンセル</button>
                     <button type="button" id="btn-save-greeting-template" style="background:linear-gradient(135deg, #0984e3, #00cec9); border:none; color:#fff; font-weight:bold; font-size:0.75rem; padding:5px 14px; border-radius:4px; cursor:pointer;">💾 保存して反映</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⏰ 時計ダイヤル式ピッカーモーダル (Material Time Picker) -->
+    <div id="modal-clock-picker" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.78); backdrop-filter:blur(6px); z-index:10000; justify-content:center; align-items:center;">
+        <div style="width:92%; max-width:340px; background:#141624; border:1px solid #00d2d3; border-radius:14px; display:flex; flex-direction:column; box-shadow:0 12px 36px rgba(0,0,0,0.85); overflow:hidden;">
+            <!-- ヘッダー / デジタル時刻表示 -->
+            <div style="padding:14px 16px 10px; background:rgba(0,0,0,0.45); border-bottom:1px solid rgba(255,255,255,0.1); display:flex; flex-direction:column; align-items:center; gap:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                    <span style="font-size:0.8rem; font-weight:bold; color:var(--text-muted);">⏰ 配信開始時刻を設定</span>
+                    <div style="display:flex; gap:4px; background:rgba(255,255,255,0.08); padding:2px; border-radius:4px;">
+                        <button type="button" id="picker-day-today" class="btn" style="background:#00d2d3; color:#000; font-size:0.7rem; font-weight:bold; padding:2px 8px; border-radius:3px; border:none; cursor:pointer;">今日</button>
+                        <button type="button" id="picker-day-tomorrow" class="btn" style="background:transparent; color:#888; font-size:0.7rem; font-weight:bold; padding:2px 8px; border-radius:3px; border:none; cursor:pointer;">明日</button>
+                    </div>
+                </div>
+
+                <div style="display:flex; align-items:center; justify-content:center; gap:6px; margin:4px 0;">
+                    <button type="button" id="picker-tab-hour" class="btn" style="background:rgba(0,210,211,0.2); border:1.5px solid #00d2d3; color:#00d2d3; font-size:2rem; font-weight:800; padding:4px 12px; border-radius:8px; cursor:pointer; font-family:'Outfit',sans-serif; min-width:64px; text-align:center;">03</button>
+                    <span style="font-size:2rem; font-weight:800; color:#fff; font-family:'Outfit',sans-serif;">:</span>
+                    <button type="button" id="picker-tab-min" class="btn" style="background:rgba(255,255,255,0.06); border:1.5px solid rgba(255,255,255,0.15); color:var(--text-muted); font-size:2rem; font-weight:800; padding:4px 12px; border-radius:8px; cursor:pointer; font-family:'Outfit',sans-serif; min-width:64px; text-align:center;">16</button>
+                </div>
+                <div style="font-size:0.72rem; color:#88d8d8;">
+                    <span id="picker-mode-hint">文字盤をタップして「時」を選択</span>
+                </div>
+            </div>
+
+            <!-- 円形時計文字盤 (Clock Dial) -->
+            <div style="padding:16px 12px 10px; display:flex; justify-content:center; align-items:center; position:relative; user-select:none; touch-action:none;">
+                <div id="clock-dial-face" style="width:230px; height:230px; border-radius:50%; background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.12); position:relative; display:flex; justify-content:center; align-items:center; cursor:pointer;">
+                    <!-- 中央ピボット -->
+                    <div style="width:8px; height:8px; background:#00d2d3; border-radius:50%; position:absolute; z-index:3;"></div>
+                    <!-- ポインター針 -->
+                    <div id="clock-pointer-hand" style="position:absolute; bottom:50%; left:50%; width:2px; height:82px; background:#00d2d3; transform-origin:bottom center; transform:rotate(0deg); z-index:2; transition:transform 0.1s ease-out; pointer-events:none;">
+                        <div style="position:absolute; top:-16px; left:-15px; width:32px; height:32px; border-radius:50%; background:rgba(0,210,211,0.35); border:2px solid #00d2d3; box-shadow:0 0 10px rgba(0,210,211,0.5);"></div>
+                    </div>
+                    <!-- 文字盤数字コンテナ -->
+                    <div id="clock-numbers-container" style="position:absolute; width:100%; height:100%; top:0; left:0; pointer-events:none;"></div>
+                </div>
+            </div>
+
+            <!-- 1分単位微調整ステッパー -->
+            <div style="display:flex; justify-content:center; gap:8px; padding:4px 16px 8px;">
+                <button type="button" id="picker-step-minus5" class="btn" style="flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:#fff; font-size:0.75rem; padding:4px; border-radius:4px; cursor:pointer;">-5分</button>
+                <button type="button" id="picker-step-minus1" class="btn" style="flex:1; background:rgba(0,210,211,0.12); border:1px solid #00d2d3; color:#00d2d3; font-size:0.75rem; font-weight:bold; padding:4px; border-radius:4px; cursor:pointer;">-1分</button>
+                <button type="button" id="picker-step-plus1" class="btn" style="flex:1; background:rgba(0,210,211,0.12); border:1px solid #00d2d3; color:#00d2d3; font-size:0.75rem; font-weight:bold; padding:4px; border-radius:4px; cursor:pointer;">+1分</button>
+                <button type="button" id="picker-step-plus5" class="btn" style="flex:1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:#fff; font-size:0.75rem; padding:4px; border-radius:4px; cursor:pointer;">+5分</button>
+            </div>
+
+            <!-- アクションボタン -->
+            <div style="padding:10px 16px; background:rgba(0,0,0,0.35); border-top:1px solid rgba(255,255,255,0.1); display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" id="picker-btn-cancel" class="btn" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2); color:#fff; font-size:0.8rem; padding:6px 14px; border-radius:6px; cursor:pointer;">キャンセル</button>
+                <button type="button" id="picker-btn-ok" class="btn" style="background:linear-gradient(135deg, #0984e3, #00cec9); border:none; color:#fff; font-weight:bold; font-size:0.8rem; padding:6px 18px; border-radius:6px; cursor:pointer; box-shadow:0 0 10px rgba(0,210,211,0.3);">決定</button>
             </div>
         </div>
     </div>
@@ -1507,6 +1587,420 @@
             }
         });
 
+        // ============================================================
+        // ⏰ 時計ダイヤル式ピッカー (Material Time Picker) 制御ロジック
+        // ============================================================
+        let pickerState = {
+            isTomorrow: false,
+            hour: 3,
+            min: 16,
+            mode: "hour", // 'hour' | 'min'
+            isDragging: false
+        };
+
+        function getWizardStartTimeDate() {
+            const input = document.getElementById("wizard-start-time");
+            if (input && input.value) {
+                const d = new Date(input.value);
+                if (!isNaN(d.getTime())) return d;
+            }
+            const now = new Date();
+            now.setMinutes(now.getMinutes() + 5);
+            return now;
+        }
+
+        function setWizardStartTimeDate(dateObj) {
+            const input = document.getElementById("wizard-start-time");
+            if (!input) return;
+            const yyyy = dateObj.getFullYear();
+            const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+            const dd = String(dateObj.getDate()).padStart(2, "0");
+            const h = String(dateObj.getHours()).padStart(2, "0");
+            const m = String(dateObj.getMinutes()).padStart(2, "0");
+            const iso = `${yyyy}-${mm}-${dd}T${h}:${m}`;
+            input.value = iso;
+            input.dispatchEvent(new Event("input"));
+            input.dispatchEvent(new Event("change"));
+            updateWizardClockDisplay();
+        }
+
+        function updateWizardClockDisplay() {
+            const d = getWizardStartTimeDate();
+            const now = new Date();
+            const isTomorrow = d.getDate() !== now.getDate() || d.getMonth() !== now.getMonth();
+            
+            const todayBtn = document.getElementById("wizard-date-today-btn");
+            const tomorrowBtn = document.getElementById("wizard-date-tomorrow-btn");
+            if (todayBtn && tomorrowBtn) {
+                if (isTomorrow) {
+                    todayBtn.style.background = "transparent";
+                    todayBtn.style.color = "var(--text-muted)";
+                    tomorrowBtn.style.background = "#00d2d3";
+                    tomorrowBtn.style.color = "#000";
+                } else {
+                    todayBtn.style.background = "#00d2d3";
+                    todayBtn.style.color = "#000";
+                    tomorrowBtn.style.background = "transparent";
+                    tomorrowBtn.style.color = "var(--text-muted)";
+                }
+            }
+
+            const textEl = document.getElementById("wizard-clock-display-text");
+            if (textEl) {
+                const hh = String(d.getHours()).padStart(2, "0");
+                const mm = String(d.getMinutes()).padStart(2, "0");
+                textEl.textContent = `${hh}:${mm}`;
+            }
+
+            const schedEl = document.getElementById("wizard-yt-schedule");
+            if (schedEl) {
+                const schedStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+                schedEl.textContent = `⏰ 配信予定: ${schedStr}`;
+                schedEl.style.color = "#00d2d3";
+            }
+        }
+
+        // 今日 / 明日 ボタン
+        document.getElementById("wizard-date-today-btn")?.addEventListener("click", () => {
+            const d = getWizardStartTimeDate();
+            const now = new Date();
+            d.setFullYear(now.getFullYear(), now.getMonth(), now.getDate());
+            setWizardStartTimeDate(d);
+        });
+
+        document.getElementById("wizard-date-tomorrow-btn")?.addEventListener("click", () => {
+            const d = getWizardStartTimeDate();
+            const now = new Date();
+            now.setDate(now.getDate() + 1);
+            d.setFullYear(now.getFullYear(), now.getMonth(), now.getDate());
+            setWizardStartTimeDate(d);
+        });
+
+        // クイック微調整ボタン (-10分, -1分, +1分, +10分, +30分)
+        document.querySelectorAll(".wizard-step-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const step = parseInt(btn.getAttribute("data-step-min"), 10) || 0;
+                const d = getWizardStartTimeDate();
+                d.setMinutes(d.getMinutes() + step);
+                setWizardStartTimeDate(d);
+            });
+        });
+
+        // モーダル開閉
+        const modalClock = document.getElementById("modal-clock-picker");
+        const openClockModalBtn = document.getElementById("wizard-clock-display-btn");
+        const cancelClockModalBtn = document.getElementById("picker-btn-cancel");
+        const okClockModalBtn = document.getElementById("picker-btn-ok");
+
+        function openClockPickerModal() {
+            const d = getWizardStartTimeDate();
+            const now = new Date();
+            pickerState.isTomorrow = d.getDate() !== now.getDate() || d.getMonth() !== now.getMonth();
+            pickerState.hour = d.getHours();
+            pickerState.min = d.getMinutes();
+            pickerState.mode = "hour";
+            renderClockPickerUI();
+            if (modalClock) modalClock.style.display = "flex";
+        }
+
+        function closeClockPickerModal() {
+            if (modalClock) modalClock.style.display = "none";
+        }
+
+        openClockModalBtn?.addEventListener("click", openClockPickerModal);
+        cancelClockModalBtn?.addEventListener("click", closeClockPickerModal);
+
+        okClockModalBtn?.addEventListener("click", () => {
+            const now = new Date();
+            if (pickerState.isTomorrow) {
+                now.setDate(now.getDate() + 1);
+            }
+            now.setHours(pickerState.hour, pickerState.min, 0, 0);
+            setWizardStartTimeDate(now);
+            closeClockPickerModal();
+        });
+
+        // モーダル内 今日 / 明日 切り替え
+        const pDayToday = document.getElementById("picker-day-today");
+        const pDayTomorrow = document.getElementById("picker-day-tomorrow");
+        pDayToday?.addEventListener("click", () => {
+            pickerState.isTomorrow = false;
+            updatePickerDayUI();
+        });
+        pDayTomorrow?.addEventListener("click", () => {
+            pickerState.isTomorrow = true;
+            updatePickerDayUI();
+        });
+
+        function updatePickerDayUI() {
+            if (pDayToday && pDayTomorrow) {
+                if (pickerState.isTomorrow) {
+                    pDayToday.style.background = "transparent";
+                    pDayToday.style.color = "#888";
+                    pDayTomorrow.style.background = "#00d2d3";
+                    pDayTomorrow.style.color = "#000";
+                } else {
+                    pDayToday.style.background = "#00d2d3";
+                    pDayToday.style.color = "#000";
+                    pDayTomorrow.style.background = "transparent";
+                    pDayTomorrow.style.color = "#888";
+                }
+            }
+        }
+
+        // モーダル内 時 / 分 タブ
+        const pTabHour = document.getElementById("picker-tab-hour");
+        const pTabMin = document.getElementById("picker-tab-min");
+        const pHint = document.getElementById("picker-mode-hint");
+
+        pTabHour?.addEventListener("click", () => {
+            pickerState.mode = "hour";
+            renderClockPickerUI();
+        });
+        pTabMin?.addEventListener("click", () => {
+            pickerState.mode = "min";
+            renderClockPickerUI();
+        });
+
+        // モーダル内 1分単位ステッパー
+        document.getElementById("picker-step-minus5")?.addEventListener("click", () => stepPickerMin(-5));
+        document.getElementById("picker-step-minus1")?.addEventListener("click", () => stepPickerMin(-1));
+        document.getElementById("picker-step-plus1")?.addEventListener("click", () => stepPickerMin(1));
+        document.getElementById("picker-step-plus5")?.addEventListener("click", () => stepPickerMin(5));
+
+        function stepPickerMin(diff) {
+            let m = pickerState.min + diff;
+            let h = pickerState.hour;
+            while (m < 0) {
+                m += 60;
+                h = (h - 1 + 24) % 24;
+            }
+            while (m >= 60) {
+                m -= 60;
+                h = (h + 1) % 24;
+            }
+            pickerState.min = m;
+            pickerState.hour = h;
+            renderClockPickerUI();
+        }
+
+        // 文字盤描画 ＆ ポインター計算
+        function renderClockPickerUI() {
+            updatePickerDayUI();
+            const hh = String(pickerState.hour).padStart(2, "0");
+            const mm = String(pickerState.min).padStart(2, "0");
+            if (pTabHour) pTabHour.textContent = hh;
+            if (pTabMin) pTabMin.textContent = mm;
+
+            if (pickerState.mode === "hour") {
+                if (pTabHour) {
+                    pTabHour.style.background = "rgba(0,210,211,0.25)";
+                    pTabHour.style.borderColor = "#00d2d3";
+                    pTabHour.style.color = "#00d2d3";
+                }
+                if (pTabMin) {
+                    pTabMin.style.background = "rgba(255,255,255,0.06)";
+                    pTabMin.style.borderColor = "rgba(255,255,255,0.15)";
+                    pTabMin.style.color = "var(--text-muted)";
+                }
+                if (pHint) pHint.textContent = "文字盤をタップして「時 (00〜23)」を選択";
+            } else {
+                if (pTabMin) {
+                    pTabMin.style.background = "rgba(0,210,211,0.25)";
+                    pTabMin.style.borderColor = "#00d2d3";
+                    pTabMin.style.color = "#00d2d3";
+                }
+                if (pTabHour) {
+                    pTabHour.style.background = "rgba(255,255,255,0.06)";
+                    pTabHour.style.borderColor = "rgba(255,255,255,0.15)";
+                    pTabHour.style.color = "var(--text-muted)";
+                }
+                if (pHint) pHint.textContent = "文字盤をタップまたはなぞって「分 (1分単位)」を選択";
+            }
+
+            renderClockNumbers();
+            updateClockPointer();
+        }
+
+        function renderClockNumbers() {
+            const container = document.getElementById("clock-numbers-container");
+            if (!container) return;
+            container.innerHTML = "";
+
+            const radiusOuter = 90; // px
+            const radiusInner = 58; // px for 24h inner circle
+            const cx = 115;
+            const cy = 115;
+
+            if (pickerState.mode === "hour") {
+                const outerHours = [0, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
+                const innerHours = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+
+                outerHours.forEach((val, idx) => {
+                    const angle = idx * 30 * (Math.PI / 180);
+                    const x = cx + radiusOuter * Math.sin(angle) - 13;
+                    const y = cy - radiusOuter * Math.cos(angle) - 13;
+                    const numDiv = document.createElement("div");
+                    numDiv.style.position = "absolute";
+                    numDiv.style.left = `${x}px`;
+                    numDiv.style.top = `${y}px`;
+                    numDiv.style.width = "26px";
+                    numDiv.style.height = "26px";
+                    numDiv.style.borderRadius = "50%";
+                    numDiv.style.display = "flex";
+                    numDiv.style.justifyContent = "center";
+                    numDiv.style.alignItems = "center";
+                    numDiv.style.fontSize = "0.75rem";
+                    numDiv.style.fontWeight = val === pickerState.hour ? "bold" : "normal";
+                    numDiv.style.color = val === pickerState.hour ? "#00d2d3" : "#fff";
+                    numDiv.textContent = String(val).padStart(2, "0");
+                    container.appendChild(numDiv);
+                });
+
+                innerHours.forEach((val, idx) => {
+                    const angle = idx * 30 * (Math.PI / 180);
+                    const x = cx + radiusInner * Math.sin(angle) - 11;
+                    const y = cy - radiusInner * Math.cos(angle) - 11;
+                    const numDiv = document.createElement("div");
+                    numDiv.style.position = "absolute";
+                    numDiv.style.left = `${x}px`;
+                    numDiv.style.top = `${y}px`;
+                    numDiv.style.width = "22px";
+                    numDiv.style.height = "22px";
+                    numDiv.style.borderRadius = "50%";
+                    numDiv.style.display = "flex";
+                    numDiv.style.justifyContent = "center";
+                    numDiv.style.alignItems = "center";
+                    numDiv.style.fontSize = "0.68rem";
+                    numDiv.style.fontWeight = val === pickerState.hour ? "bold" : "normal";
+                    numDiv.style.color = val === pickerState.hour ? "#00d2d3" : "var(--text-muted)";
+                    numDiv.textContent = String(val);
+                    container.appendChild(numDiv);
+                });
+            } else {
+                for (let m = 0; m < 60; m += 5) {
+                    const angle = (m / 60) * 360 * (Math.PI / 180);
+                    const x = cx + radiusOuter * Math.sin(angle) - 13;
+                    const y = cy - radiusOuter * Math.cos(angle) - 13;
+                    const numDiv = document.createElement("div");
+                    numDiv.style.position = "absolute";
+                    numDiv.style.left = `${x}px`;
+                    numDiv.style.top = `${y}px`;
+                    numDiv.style.width = "26px";
+                    numDiv.style.height = "26px";
+                    numDiv.style.borderRadius = "50%";
+                    numDiv.style.display = "flex";
+                    numDiv.style.justifyContent = "center";
+                    numDiv.style.alignItems = "center";
+                    numDiv.style.fontSize = "0.78rem";
+                    numDiv.style.fontWeight = m === pickerState.min ? "bold" : "normal";
+                    numDiv.style.color = m === pickerState.min ? "#00d2d3" : "#fff";
+                    numDiv.textContent = String(m).padStart(2, "0");
+                    container.appendChild(numDiv);
+                }
+            }
+        }
+
+        function updateClockPointer() {
+            const hand = document.getElementById("clock-pointer-hand");
+            if (!hand) return;
+
+            let angleDeg = 0;
+            let handHeight = 82;
+
+            if (pickerState.mode === "hour") {
+                const h = pickerState.hour;
+                const isOuter = (h === 0 || h >= 13);
+                const step = h % 12;
+                angleDeg = step * 30;
+                handHeight = isOuter ? 90 : 58;
+            } else {
+                const m = pickerState.min;
+                angleDeg = (m / 60) * 360;
+                handHeight = 90;
+            }
+
+            hand.style.height = `${handHeight}px`;
+            hand.style.transform = `rotate(${angleDeg}deg)`;
+        }
+
+        const dialFace = document.getElementById("clock-dial-face");
+
+        function handleClockPointerEvent(e, isEnd = false) {
+            if (!dialFace) return;
+            const rect = dialFace.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+
+            const dx = clientX - cx;
+            const dy = clientY - cy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            let angle = Math.atan2(dx, -dy) * (180 / Math.PI);
+            if (angle < 0) angle += 360;
+
+            if (pickerState.mode === "hour") {
+                const step = Math.round(angle / 30) % 12;
+                const isOuter = dist > 74;
+                if (isOuter) {
+                    pickerState.hour = step === 0 ? 0 : step + 12;
+                } else {
+                    pickerState.hour = step === 0 ? 12 : step;
+                }
+                renderClockPickerUI();
+
+                if (isEnd) {
+                    setTimeout(() => {
+                        pickerState.mode = "min";
+                        renderClockPickerUI();
+                    }, 180);
+                }
+            } else {
+                const m = Math.round(angle / 6) % 60;
+                pickerState.min = m;
+                renderClockPickerUI();
+            }
+        }
+
+        if (dialFace) {
+            dialFace.addEventListener("mousedown", (e) => {
+                pickerState.isDragging = true;
+                handleClockPointerEvent(e, false);
+            });
+            window.addEventListener("mousemove", (e) => {
+                if (pickerState.isDragging) {
+                    e.preventDefault();
+                    handleClockPointerEvent(e, false);
+                }
+            });
+            window.addEventListener("mouseup", (e) => {
+                if (pickerState.isDragging) {
+                    pickerState.isDragging = false;
+                    handleClockPointerEvent(e, true);
+                }
+            });
+
+            dialFace.addEventListener("touchstart", (e) => {
+                pickerState.isDragging = true;
+                handleClockPointerEvent(e, false);
+            }, { passive: false });
+            dialFace.addEventListener("touchmove", (e) => {
+                if (pickerState.isDragging) {
+                    e.preventDefault();
+                    handleClockPointerEvent(e, false);
+                }
+            }, { passive: false });
+            dialFace.addEventListener("touchend", (e) => {
+                if (pickerState.isDragging) {
+                    pickerState.isDragging = false;
+                    handleClockPointerEvent(e, true);
+                }
+            });
+        }
+
         // Step 4 初期化
         function updateStep4Inputs() {
             const channelInput = document.getElementById("wizard-yt-channel");
@@ -1557,6 +2051,8 @@
                     wizardStartToggle.checked = mainScheduleToggle.checked;
                 }
             }
+
+            updateWizardClockDisplay();
 
             const optNews = document.getElementById("opt-news-end");
             const selectEl = document.getElementById("wizard-end-mode-select");

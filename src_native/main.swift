@@ -2,59 +2,7 @@ import Cocoa
 import WebKit
 import UniformTypeIdentifiers
 
-@available(macOS 11.3, *)
-class LogWindowController: NSWindowController, WKNavigationDelegate, WKUIDelegate {
-    var webView: WKWebView!
-    var appPath: String = ""
-    
-    convenience init(appPath: String) {
-        let window = NSWindow(
-            contentRect: NSRect(x: 140, y: 140, width: 1020, height: 640),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "📋 VStudio 統合ログコンソール"
-        window.minSize = NSSize(width: 780, height: 420)
-        window.backgroundColor = NSColor(red: 0.05, green: 0.05, blue: 0.07, alpha: 1.0)
-        window.appearance = NSAppearance(named: .darkAqua)
-        self.init(window: window)
-        self.appPath = appPath
-        setupUI()
-    }
-    
-    func setupUI() {
-        guard let win = self.window, let contentView = win.contentView else { return }
-        
-        let config = WKWebViewConfiguration()
-        config.preferences.setValue(true, forKey: "developerExtrasEnabled")
-        config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
-        config.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
-        
-        webView = WKWebView(frame: contentView.bounds, configuration: config)
-        webView.autoresizingMask = [.width, .height]
-        webView.navigationDelegate = self
-        webView.uiDelegate = self
-        webView.setValue(false, forKey: "drawsBackground")
-        
-        contentView.addSubview(webView)
-        loadLogPage()
-    }
-    
-    func loadLogPage() {
-        if let url = URL(string: "https://localhost:8443/log_console.html") {
-            var req = URLRequest(url: url)
-            req.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-            webView.load(req)
-        }
-    }
-    
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        let localPath = (appPath as NSString).appendingPathComponent("log_console.html")
-        let localURL = URL(fileURLWithPath: localPath)
-        webView.loadFileURL(localURL, allowingReadAccessTo: URL(fileURLWithPath: appPath))
-    }
-}
+// Native Dedicated App for VStudio (macOS Native WebKit Wrapper)
 
 @available(macOS 11.3, *)
 class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, WKDownloadDelegate, NSWindowDelegate {
@@ -69,8 +17,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
     var launcherProcess: Process?
     var appPath: String = ""
     var isPageLoaded: Bool = false
-    var logWindowController: LogWindowController?
     var popupWindows: [NSWindowController] = []
+    var logWindow: NSWindow?
+    var logWebView: WKWebView?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -225,11 +174,53 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
     }
     
     @objc func showLogWindow() {
-        if logWindowController == nil {
-            logWindowController = LogWindowController(appPath: appPath)
+        if let existing = logWindow, existing.isVisible {
+            existing.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
         }
-        logWindowController?.showWindow(nil)
-        logWindowController?.window?.makeKeyAndOrderFront(nil)
+        
+        if logWindow == nil {
+            let width: CGFloat = 1020
+            let height: CGFloat = 640
+            let rect = NSRect(x: 120, y: 120, width: width, height: height)
+            
+            let win = NSWindow(
+                contentRect: rect,
+                styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                backing: .buffered,
+                defer: false
+            )
+            win.title = "📋 VStudio 統合ログコンソール"
+            win.center()
+            win.backgroundColor = NSColor(red: 0.05, green: 0.05, blue: 0.07, alpha: 1.0)
+            win.appearance = NSAppearance(named: .darkAqua)
+            win.isReleasedWhenClosed = false
+            
+            let config = WKWebViewConfiguration()
+            config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+            config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+            config.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
+            config.preferences.javaScriptCanOpenWindowsAutomatically = true
+            
+            let logWV = WKWebView(frame: win.contentView!.bounds, configuration: config)
+            logWV.autoresizingMask = [.width, .height]
+            logWV.navigationDelegate = self
+            logWV.uiDelegate = self
+            logWV.setValue(false, forKey: "drawsBackground")
+            
+            win.contentView?.addSubview(logWV)
+            self.logWindow = win
+            self.logWebView = logWV
+        }
+        
+        let timestamp = String(Int(Date().timeIntervalSince1970))
+        if let url = URL(string: "http://localhost:8443/log_console.html?v=\(timestamp)") {
+            let req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 10.0)
+            logWebView?.load(req)
+        }
+        
+        logWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -395,43 +386,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
     }
 
     func loadVStudioPage() {
-        if let url = URL(string: "http://localhost:8443/live2d.html") {
-            // 💡 localStorage（設定値）は絶対に消さず、メモリ・ディスクキャッシュとセッションのみをクリアする
-            let dataStore = WKWebsiteDataStore.default()
-            let cacheTypes: Set<String> = [
-                WKWebsiteDataTypeDiskCache,
-                WKWebsiteDataTypeMemoryCache,
-                WKWebsiteDataTypeOfflineWebApplicationCache
-            ]
-            
-            dataStore.removeData(ofTypes: cacheTypes, modifiedSince: Date(timeIntervalSince1970: 0)) { [weak self] in
-                DispatchQueue.main.async {
-                    guard let self = self else { return }
-                    
-                    // URLにタイムスタンプ（?v=...）を付与して、Viteの古いJS/CSSキャッシュを確実にバイパスさせる
-                    var mutableReq = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 10.0)
-                    if let originalURL = mutableReq.url, var components = URLComponents(url: originalURL, resolvingAgainstBaseURL: false) {
-                        let timestamp = String(Int(Date().timeIntervalSince1970))
-                        var queryItems = components.queryItems ?? []
-                        queryItems.removeAll { $0.name == "v" }
-                        queryItems.append(URLQueryItem(name: "v", value: timestamp))
-                        components.queryItems = queryItems
-                        if let stampedURL = components.url {
-                            mutableReq.url = stampedURL
-                        }
-                    }
-                    
-                    self.webView.load(mutableReq)
-                }
+        guard let url = URL(string: "http://localhost:8443/live2d.html") else { return }
+        
+        // URLにタイムスタンプ（?v=...）を付与して、Viteの古いJS/CSSキャッシュを確実にバイパスさせる
+        var mutableReq = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 10.0)
+        if let originalURL = mutableReq.url, var components = URLComponents(url: originalURL, resolvingAgainstBaseURL: false) {
+            let timestamp = String(Int(Date().timeIntervalSince1970))
+            var queryItems = components.queryItems ?? []
+            queryItems.removeAll { $0.name == "v" }
+            queryItems.append(URLQueryItem(name: "v", value: timestamp))
+            components.queryItems = queryItems
+            if let stampedURL = components.url {
+                mutableReq.url = stampedURL
             }
         }
+        
+        self.webView.load(mutableReq)
     }
     
-    // MARK: - WKUIDelegate: Popup Windows (window.open support for Stream Wizard, etc.)
+    // MARK: - WKUIDelegate: Popup Windows (window.open support for Stream Wizard, Log Console, etc.)
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        let width = windowFeatures.width?.doubleValue ?? 820
-        let height = windowFeatures.height?.doubleValue ?? 720
-        let popupRect = NSRect(x: 100, y: 100, width: width, height: height)
+        let width = windowFeatures.width?.doubleValue ?? 880
+        let height = windowFeatures.height?.doubleValue ?? 680
+        let popupRect = NSRect(x: 120, y: 120, width: width, height: height)
         
         let popupWindow = NSWindow(
             contentRect: popupRect,
@@ -439,9 +416,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
             backing: .buffered,
             defer: false
         )
-        popupWindow.title = "🪄 VStudio ウィザード / ツール"
+        let reqURL = navigationAction.request.url?.absoluteString ?? ""
+        if reqURL.contains("log_console") {
+            popupWindow.title = "📋 VStudio 統合ログコンソール"
+        } else if reqURL.contains("wizard") {
+            popupWindow.title = "🚀 YouTube 配信準備ウィザード"
+        } else if reqURL.contains("news_list") {
+            popupWindow.title = "📰 取得済みのニュース一覧"
+        } else {
+            popupWindow.title = "🪄 VStudio サブウィンドウ"
+        }
         popupWindow.center()
-        popupWindow.backgroundColor = NSColor(red: 0.08, green: 0.09, blue: 0.12, alpha: 1.0)
+        popupWindow.backgroundColor = NSColor(red: 0.05, green: 0.05, blue: 0.07, alpha: 1.0)
         popupWindow.appearance = NSAppearance(named: .darkAqua)
         
         configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
@@ -459,6 +445,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         let controller = NSWindowController(window: popupWindow)
         controller.showWindow(nil)
         popupWindows.append(controller)
+        
+        if let targetURL = navigationAction.request.url, !targetURL.absoluteString.isEmpty, targetURL.absoluteString != "about:blank" {
+            popupWebView.load(navigationAction.request)
+        }
         
         return popupWebView
     }

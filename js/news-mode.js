@@ -32,42 +32,50 @@ window.openNewsListPopup = function () {
   }
 
   try {
-    if (window.newsListPopup && !window.newsListPopup.closed) {
-      if (typeof window.newsListPopup.renderNewsList === "function") {
-        window.newsListPopup.renderNewsList();
+    if (window.newsListPopup) {
+      try {
+        if (!window.newsListPopup.closed) {
+          if (typeof window.newsListPopup.renderNewsList === "function") {
+            window.newsListPopup.renderNewsList();
+          }
+          window.newsListPopup.focus();
+          return;
+        }
+      } catch (checkErr) {
+        window.newsListPopup = null;
       }
-      window.newsListPopup.focus();
-      return;
     }
 
-    const popup = window.open("/news_list.html", "NewsListPopup", "width=740,height=780,menubar=no,toolbar=no,location=no,status=no");
+    const url = "news_list.html?t=" + Date.now();
+    const popup = window.open(url, "NewsListPopup", "width=780,height=820,menubar=no,toolbar=no,location=no,status=no");
     if (popup) {
-      popup.focus();
+      try { popup.focus(); } catch (e) {}
       window.newsListPopup = popup;
     }
   } catch (err) {
     console.error("[記事一覧] 別窓起動エラー:", err);
+    try { window.open("news_list.html", "_blank"); } catch (e) {}
   }
 };
 
-// ニュース見出しを読み上げ用にクリーニングする
-// 例: "遺伝子を切断（CNN.co.jp） - Yahoo!ニュース" → "遺伝子を切断"
+// ニュース見出しをそのまま読み上げる（HTMLタグ・余白のみ除去）
 function cleanTitleForSpeech(title) {
   if (!title) return "";
-  let t = String(title).trim();
-  // 先頭の [タグ]、 【タグ】、 〈タグ〉 を除去
-  t = t.replace(/^[\[【〈][^\]】〉]*[\]】〉]\s*/, "");
-  // 末尾の " - 出典名"、 "- 出典名"、 " - Yahoo!ニュース" などを再帰的に完全除去
-  t = t.replace(/\s*[-－–—]\s*[^-－–—]+$/g, "");
-  t = t.replace(/\s*[-－–—]\s*[^-－–—]+$/g, "");
-  // 末尾のメディア括弧（例: （スポニチアネックス）、（CNN.co.jp）、（テレビ朝日系（ANN）））を除去
-  t = t.replace(/[\(（][^\)）]*(?:ニュース|WEB|新聞|通信|テレビ|アネックス|公式|提供|co\.jp|jp|com|ANN|TBS|NHK|CNN|BBC|共同|時事)[\)）]\s*$/gi, "");
-  t = t.replace(/[\(（][^\)）]+[\)）]\s*$/g, "");
-  // ハッシュタグ（例: #エキスパートトピ）を除去
-  t = t.replace(/#[^\s#]+/g, "");
-  // 全角記号・HTMLタグを除去
-  t = stripHtmlTags(t);
-  return t.trim();
+  return stripHtmlTags(String(title)).trim();
+}
+
+function getNewsTransitionPhrase(isFirst = false, isCatChanged = false, catName = "") {
+  const modelId = (typeof currentModelId !== "undefined" ? String(currentModelId) : "");
+  const isZunda = modelId.includes("zunda");
+  const isCat = modelId.includes("tororo") || modelId.includes("cat");
+
+  if (isFirst) {
+    return isZunda ? "最初のニュースなのだ！" : (isCat ? "最初のニュースですにゃ！" : "最初のニュースです！");
+  } else if (isCatChanged && catName) {
+    return isZunda ? `続いては、${catName}のニュースなのだ！` : (isCat ? `続いては、${catName}のニュースですにゃ！` : `続いては、${catName}のニュースです！`);
+  } else {
+    return isZunda ? "次のニュースなのだ！" : (isCat ? "次のニュースですにゃ！" : "次のニュースです！");
+  }
 }
 
 const NEWS_CATEGORIES = {
@@ -525,13 +533,26 @@ async function playNextContinuousNews(isOneOff = false, isFetchOnly = false) {
       return;
     }
 
+    // 🎙️ ① システムによる定型繋ぎセリフを発話
+    const categoryDisplayName = CATEGORY_NAMES[item.categoryKey || "cat_top"] || catName || "";
+    const transitionPhrase = getNewsTransitionPhrase(false, false, categoryDisplayName);
+    queueVoicevoxAudio(transitionPhrase, true).catch((e) => console.warn(e));
+
+    // 📰 ② 元記事タイトルをそのまま発話
+    if (item && item.title) {
+      const headlineText = cleanTitleForSpeech(item.title);
+      if (headlineText) {
+        console.log(`[原稿] [見出し] "${headlineText}"`);
+        queueVoicevoxAudio(headlineText, true, headlineText).catch((e) => console.warn(e));
+      }
+    }
+
     // 各文をVOICEVOXに順次キュー追加して再生
     setTimeout(() => {
       const idleFirstPerson = document.getElementById("idle-first-person");
       const fp = idleFirstPerson ? idleFirstPerson.value : "";
 
       scriptItems.forEach((sItem, sIdx) => {
-        // console.log(`sItem.display"${sItem.display}"/sItem.speech"${sItem.speech}"`);
         let displayTxt = sItem.display || sItem.speech;
         let speechTxt = sItem.speech || sItem.display;
 
@@ -549,7 +570,6 @@ async function playNextContinuousNews(isOneOff = false, isFetchOnly = false) {
         }
 
         // 🎯 【修正】音声用（speechTxt）を第1引数、表示用（displayTxt）を明確に紐付けてキューに直接プッシュする
-        // （queueVoicevoxAudio の引数に頼らず、内部のオブジェクト構造を直接渡すことで混線を完全防止）
         if (typeof voicevoxAudioQueue !== "undefined") {
           voicevoxAudioQueue.push({
             original: speechTxt,       // 🗣️ 音声用の読み（ひらがな等）
@@ -559,17 +579,6 @@ async function playNextContinuousNews(isOneOff = false, isFetchOnly = false) {
           });
           if (!isVoicevoxPlaying && typeof playNextVoicevox === "function") {
             playNextVoicevox();
-          }
-        }
-
-        // 🗞️ 1文目（「次のニュースですにゃ！」）の直後に見出しを読む
-        if (sIdx === 0 && item && item.title) {
-          const headlineDisplay = (scriptData && scriptData.headline && scriptData.headline.display) || item.title;
-          const headlineText = cleanTitleForSpeech(headlineDisplay);
-          const headlineSpeech = (scriptData && (scriptData.headline_speech || (scriptData.headline && scriptData.headline.speech))) || headlineText;
-          if (headlineText) {
-            console.log(`[原稿] [見出し] "${headlineText}"`);
-            queueVoicevoxAudio(headlineText, true, headlineSpeech).catch((e) => console.warn(e));
           }
         }
       });
@@ -697,19 +706,38 @@ window.startNewsFromTitle = async function (targetTitle) {
   await window.playNextContinuousNews(false);
 };
 
-// 別ウィンドウからのstorageイベントリクエストを監視
+// 別ウィンドウからのstorageイベントリクエストを監視（ポーリング併用で100%確実に受信）
+let lastProcessedNewsRequestTime = 0;
+function processStartNewsRequest(raw) {
+  if (!raw) return;
+  try {
+    const data = JSON.parse(raw);
+    if (data && data.title && data.timestamp && data.timestamp > lastProcessedNewsRequestTime) {
+      lastProcessedNewsRequestTime = data.timestamp;
+      console.log(`[ニュースモード] 📥 記事一覧からの再生リクエストを受信: "${data.title}"`);
+      window.startNewsFromTitle(data.title);
+    }
+  } catch (err) {}
+}
+
 window.addEventListener("storage", (e) => {
   if (e.key === "startNewsRequest" && e.newValue) {
-    try {
-      const data = JSON.parse(e.newValue);
-      if (data && data.title) {
-        window.startNewsFromTitle(data.title);
-      }
-    } catch (err) {}
+    processStartNewsRequest(e.newValue);
   }
 });
 
+// イベント不達時のためのポーリングバックアップ
+setInterval(() => {
+  const req = localStorage.getItem("startNewsRequest");
+  if (req) {
+    processStartNewsRequest(req);
+  }
+}, 500);
+
 (window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("news-mode", () => {
+  if (typeof window.initNewsResumeSystem === "function") {
+    window.initNewsResumeSystem();
+  }
   window.newsRssSelect = document.getElementById("news-rss-select");
   const localNewsRssUrlInput = document.getElementById("news-rss-url");
   if (window.newsRssSelect && localNewsRssUrlInput) {
@@ -1837,6 +1865,30 @@ ${creditsInstruction}
         window.readNewsTitles = readNewsTitles;
         try { localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles))); } catch (e) { }
 
+        // 🎙️ ① システムによる定型繋ぎセリフを発話
+        const isFirstItem = isFirst || (newsBroadcastState.currentIndex === 1);
+        const isCatChanged = !!isCategoryChanged;
+        const catName = CATEGORY_NAMES[item.categoryKey || "cat_top"] || item.categoryName || "";
+        const transitionPhrase = getNewsTransitionPhrase(isFirstItem, isCatChanged, catName);
+        newsBroadcastState.lastCategory = item.categoryKey || "cat_top";
+
+        await queueVoicevoxAudio(transitionPhrase, true);
+
+        // 📰 ② 元記事タイトルをそのまま発話
+        if (item.title) {
+          const headlineText = cleanTitleForSpeech(item.title);
+          if (headlineText) {
+            console.log(`[原稿] [見出し] "${headlineText}"`);
+            await queueVoicevoxAudio(headlineText, true, headlineText);
+          }
+        }
+
+        // 🚀 ③ 次の記事の裏側先読みをトリガー（発話中に先読み）
+        if (nextItem) {
+          triggerNewsPrefetch(nextItem, false, nextIsCatChanged);
+        }
+
+        // 📝 ④ AIが生成したニュース本文の解説・感想を発話
         const count = (data.items || data.sentences || []).length;
         const articleUrl = item.link || item.url || "";
         console.log(`[ニュース原稿(Backend)] [${newsBroadcastState.currentIndex}/${newsBroadcastState.totalCount}件] 🔗 ${articleUrl || 'URLなし'}\n「${data.fullText}」 (${count}文)`);
@@ -1856,31 +1908,12 @@ ${creditsInstruction}
               }));
             } catch (e) { }
             await queueVoicevoxAudio(it.display, true, it.speech);
-
-            // 🗞️ 1文目（「次のニュースですにゃ！」）の直後に見出しを読む
-            if (sIdx === 0 && item.title) {
-              const headlineDisplay = (data && data.headline && data.headline.display) || item.title;
-              const headlineText = cleanTitleForSpeech(headlineDisplay);
-              const headlineSpeech = (data && (data.headline_speech || (data.headline && data.headline.speech))) || headlineText;
-              if (headlineText) {
-                console.log(`[原稿] [見出し] "${headlineText}"`);
-                await queueVoicevoxAudio(headlineText, true, headlineSpeech);
-              }
-            }
-
-            // 🚀 1文目の発話キュー投入と同時に、裏側で「次の記事」の先読み生成を開始！（喋っている間に生成）
-            if (sIdx === 0 && nextItem) {
-              triggerNewsPrefetch(nextItem, false, nextIsCatChanged);
-            }
           }
         } else if (data.sentences) {
           for (let sIdx = 0; sIdx < data.sentences.length; sIdx++) {
             if (!newsBroadcastState.isRunning) return false;
             const s = data.sentences[sIdx];
             await queueVoicevoxAudio(s, true);
-            if (sIdx === 0 && nextItem) {
-              triggerNewsPrefetch(nextItem, false, nextIsCatChanged);
-            }
           }
         }
         // VOICEVOXの読み上げが完全に終わるまで待機
@@ -3011,66 +3044,123 @@ ${creditsInstruction}
   // =========================================================================
   window.initNewsResumeSystem = function () {
     try {
-      const raw = localStorage.getItem("newsActiveState");
-      if (!raw) return;
-      const saved = JSON.parse(raw);
-      // 30分以内の有効な中断データが存在する場合のみバナーを表示（番組完了直前データは破棄）
-      if (!saved || !saved.isRunning || !saved.item || !saved.scriptData) return;
-      const totalSentences = (saved.scriptData.items || []).length;
-      if (
-        (saved.articleIndex >= (saved.totalArticles || 298) - 1 && (saved.sentenceIndex || 0) >= totalSentences - 1) ||
-        (Date.now() - (saved.timestamp || 0) > 30 * 60 * 1000)
-      ) {
-        localStorage.removeItem("newsActiveState");
-        return;
-      }
-
       const container = document.getElementById("news-resume-container") || document.querySelector(".panel-header-wrapper") || document.body;
-      const existing = document.getElementById("news-resume-banner");
-      if (existing) existing.remove();
-
-      const banner = document.createElement("div");
-      banner.id = "news-resume-banner";
-      banner.className = "news-resume-banner";
-      const totalS = (saved.scriptData.items || []).length;
-      const currentS = (saved.sentenceIndex || 0) + 1;
-      const artNum = (saved.articleIndex || 0) + 1;
-      const titleShort = saved.item.title.length > 22 ? saved.item.title.substring(0, 22) + "…" : saved.item.title;
-
-      banner.innerHTML = `
-        <div class="resume-info">
-          <div class="resume-header-row">
-            <span class="resume-badge">⚠️ 配信中断を検知</span>
-            <span class="resume-progress-tag">第${artNum}件 (${currentS}/${totalS}文目)</span>
-          </div>
-          <div class="resume-text" title="${saved.item.title}">「${titleShort}」</div>
-        </div>
-        <div class="resume-actions">
-          <button id="news-quick-resume-btn" class="resume-btn resume-btn-primary">⚡ 途中から再開</button>
-          <button id="news-discard-resume-btn" class="resume-btn resume-btn-secondary">✕ 破棄</button>
-        </div>
-      `;
-
       const resumeContainer = document.getElementById("news-resume-container");
-      if (resumeContainer) {
-        resumeContainer.innerHTML = "";
-        resumeContainer.appendChild(banner);
-        resumeContainer.style.display = "block";
-      } else {
-        container.appendChild(banner);
+
+      // 1. ピンポイント中断データ（newsActiveState）が存在する場合
+      const raw = localStorage.getItem("newsActiveState");
+      if (raw) {
+        try {
+          const saved = JSON.parse(raw);
+          if (saved && saved.item && (Date.now() - (saved.timestamp || 0) < 60 * 60 * 1000)) {
+            const totalS = (saved.scriptData && saved.scriptData.items) ? saved.scriptData.items.length : 1;
+            const currentS = (saved.sentenceIndex || 0) + 1;
+            const artNum = (saved.articleIndex || 0) + 1;
+            const titleShort = saved.item.title.length > 20 ? saved.item.title.substring(0, 20) + "…" : saved.item.title;
+
+            const existing = document.getElementById("news-resume-banner");
+            if (existing) existing.remove();
+
+            const banner = document.createElement("div");
+            banner.id = "news-resume-banner";
+            banner.className = "news-resume-banner";
+            banner.innerHTML = `
+              <div class="resume-info">
+                <div class="resume-header-row">
+                  <span class="resume-badge">⚠️ 中断復帰</span>
+                  <span class="resume-progress-tag">第${artNum}件 (${currentS}/${totalS}文目)</span>
+                </div>
+                <div class="resume-text" title="${saved.item.title}">「${titleShort}」</div>
+              </div>
+              <div class="resume-actions">
+                <button id="news-quick-resume-btn" class="resume-btn resume-btn-primary">⚡ 途中から再開</button>
+                <button id="news-discard-resume-btn" class="resume-btn resume-btn-secondary">✕ 破棄</button>
+              </div>
+            `;
+
+            if (resumeContainer) {
+              resumeContainer.innerHTML = "";
+              resumeContainer.appendChild(banner);
+              resumeContainer.style.display = "block";
+            } else {
+              container.appendChild(banner);
+            }
+
+            document.getElementById("news-quick-resume-btn").onclick = async () => {
+              if (resumeContainer) resumeContainer.style.display = "none";
+              banner.remove();
+              if (saved.scriptData && saved.scriptData.items) {
+                await window.quickResumeNewsBroadcast(saved);
+              } else {
+                await window.startNewsBroadcast(saved.articleIndex || 0);
+              }
+            };
+
+            document.getElementById("news-discard-resume-btn").onclick = () => {
+              if (resumeContainer) resumeContainer.style.display = "none";
+              banner.remove();
+              localStorage.removeItem("newsActiveState");
+            };
+            return;
+          }
+        } catch (e) {}
       }
 
-      document.getElementById("news-quick-resume-btn").onclick = async () => {
-        if (resumeContainer) resumeContainer.style.display = "none";
-        banner.remove();
-        await window.quickResumeNewsBroadcast(saved);
-      };
+      // 2. ピンポイント中断データがない場合：既読リストから「未読の先頭」を自動判定して開始位置をセット
+      const savedNews = window.latestFetchedNews || JSON.parse(localStorage.getItem("latestFetchedNews") || "[]");
+      const readTitles = new Set(JSON.parse(localStorage.getItem("newsReadTitles") || "[]"));
+      if (savedNews && savedNews.length > 0 && readTitles.size > 0) {
+        const CATEGORY_ORDER = ["cat_top", "cat_society", "cat_world", "cat_business", "cat_politics", "cat_entertainment", "cat_sports", "cat_tech", "cat_science", "cat_local"];
+        const sorted = [...savedNews].sort((a, b) => {
+          const ai = CATEGORY_ORDER.indexOf(a.categoryKey || "cat_top");
+          const bi = CATEGORY_ORDER.indexOf(b.categoryKey || "cat_top");
+          const catDiff = (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+          if (catDiff !== 0) return catDiff;
+          return new Date(a.pubDate || 0).getTime() - new Date(b.pubDate || 0).getTime();
+        });
 
-      document.getElementById("news-discard-resume-btn").onclick = () => {
-        if (resumeContainer) resumeContainer.style.display = "none";
-        banner.remove();
-        localStorage.removeItem("newsActiveState");
-      };
+        const firstUnreadIdx = sorted.findIndex(n => !readTitles.has(n.title));
+        if (firstUnreadIdx !== -1 && firstUnreadIdx < sorted.length) {
+          const startIdxInput = document.getElementById("news-broadcast-start-index");
+          if (startIdxInput) {
+            startIdxInput.value = firstUnreadIdx + 1;
+          }
+          console.log(`[ニュースレジューム] 🎯 未読の先頭記事(#${firstUnreadIdx + 1}: ${sorted[firstUnreadIdx].title.substring(0, 15)}...) を開始位置に自動セットしました`);
+
+          // 復帰バナーを表示
+          const existing = document.getElementById("news-resume-banner");
+          if (existing) existing.remove();
+
+          const banner = document.createElement("div");
+          banner.id = "news-resume-banner";
+          banner.className = "news-resume-banner";
+          const titleShort = sorted[firstUnreadIdx].title.length > 20 ? sorted[firstUnreadIdx].title.substring(0, 20) + "…" : sorted[firstUnreadIdx].title;
+          banner.innerHTML = `
+            <div class="resume-info">
+              <div class="resume-header-row">
+                <span class="resume-badge" style="background:#00d2d3; color:#0f121d;">🔁 続きから再開</span>
+                <span class="resume-progress-tag">第${firstUnreadIdx + 1}件 / 全${sorted.length}件</span>
+              </div>
+              <div class="resume-text" title="${sorted[firstUnreadIdx].title}">「${titleShort}」</div>
+            </div>
+            <div class="resume-actions">
+              <button id="news-quick-resume-btn" class="resume-btn resume-btn-primary">▶ 続きから開始</button>
+            </div>
+          `;
+
+          if (resumeContainer) {
+            resumeContainer.innerHTML = "";
+            resumeContainer.appendChild(banner);
+            resumeContainer.style.display = "block";
+          }
+
+          document.getElementById("news-quick-resume-btn").onclick = async () => {
+            if (resumeContainer) resumeContainer.style.display = "none";
+            banner.remove();
+            await window.startNewsBroadcast(firstUnreadIdx);
+          };
+        }
+      }
     } catch (e) {
       console.warn("[ニュース復帰システム] 初期化エラー:", e);
     }

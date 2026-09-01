@@ -1,0 +1,174 @@
+# -*- coding: utf-8 -*-
+"""
+tts_normalizer.py
+音声合成（TTS / VOICEVOX）専用のテキスト正規化・発音補正・言語規則処理モジュール
+"""
+
+import re
+import json
+import ssl
+import urllib.request
+import urllib.parse
+
+# ── 国名略称（1文字）の報道文法プレフィックスマップ ──
+COUNTRY_PREFIX_MAP = {
+    '米': 'べい',
+    '英': 'えい',
+    '仏': 'ふつ',
+    '独': 'どく',
+    '露': 'ろ',
+    '伊': 'い',
+    '豪': 'ごう',
+    '韓': 'かん',
+    '中': 'ちゅう',
+    '日': 'にち',
+}
+
+# ── Wikipedia 読み取得キャッシュ ──
+_wiki_reading_cache = {}
+
+def lookup_wikipedia_reading(term):
+    """
+    Wikipedia APIで特殊な固有名詞・アルファベット名の読み（ひらがな）を動的取得。
+    記事タイトルの直後にある最初の括弧から正確に読みを抽出。
+    """
+    if not term or len(term) < 2:
+        return None, None
+    if term in _wiki_reading_cache:
+        return _wiki_reading_cache[term]
+
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
+    headers = {
+        "User-Agent": "VStudio-TTS-Bot/1.0 (https://github.com/junichiakahori/VStudio)"
+    }
+    INVALID_READINGS = {"あるいは", "または", "かつて", "えいご", "ちゅうごくご", "ちょうせんご", "かんこくご", "りゃくしょう", "つうしょう", "ほんみょう", "きゅうせい"}
+
+    try:
+        ext_url = (
+            "https://ja.wikipedia.org/w/api.php"
+            "?action=query&prop=extracts&exintro=true&exsentences=2"
+            "&explaintext=true&titles={}&redirects=1&format=json"
+        ).format(urllib.parse.quote(term))
+        req = urllib.request.Request(ext_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=5, context=ctx) as r:
+            pages = json.loads(r.read().decode("utf-8")).get("query", {}).get("pages", {})
+            for pid, pdata in pages.items():
+                if pid == "-1":
+                    continue
+                extract = pdata.get("extract", "")
+                m = re.search(r'[\(（]([ぁ-ん\s、]+)[）\)]', extract)
+                if not m:
+                    m = re.search(r'[\(（]([ァ-ヶー\s、]+)[）\)]', extract)
+                if m:
+                    yomi_raw = m.group(1).split("、")[0].split(" ")[0].strip()
+                    if yomi_raw and yomi_raw not in INVALID_READINGS:
+                        yomi_hira = "".join(
+                            chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c
+                            for c in yomi_raw
+                        )
+                        if len(yomi_hira) >= 2 and re.match(r'^[ぁ-んー]+$', yomi_hira):
+                            _wiki_reading_cache[term] = (yomi_hira, term)
+                            return yomi_hira, term
+
+        search_url = f"https://ja.wikipedia.org/w/api.php?action=opensearch&search={urllib.parse.quote(term)}&limit=1&format=json"
+        req_s = urllib.request.Request(search_url, headers=headers)
+        with urllib.request.urlopen(req_s, timeout=5, context=ctx) as r_s:
+            s_res = json.loads(r_s.read().decode("utf-8"))
+            if s_res and len(s_res) > 1 and s_res[1]:
+                exact_title = s_res[1][0]
+                if exact_title != term:
+                    return lookup_wikipedia_reading(exact_title)
+    except Exception as e:
+        print(f"[Wikipedia読み取得エラー] '{term}': {e}")
+
+    _wiki_reading_cache[term] = (None, None)
+    return None, None
+
+def extract_special_terms(text):
+    """
+    発音ミスが起きやすいアルファベット略称・英字混じり固有名詞を自動抽出
+    """
+    terms = []
+    for m in re.finditer(r'(?<![A-Za-z0-9])[A-Za-z]{2,}(?![A-Za-z0-9])', text):
+        t = m.group(0)
+        if t.lower() not in {"https", "http", "www", "com", "net", "jp", "org", "co"}:
+            terms.append(t)
+    return list(dict.fromkeys(terms))
+
+def sanitize_speech_text(text):
+    """不要なネットスラングや記号のサニタイズ"""
+    if not text:
+        return ""
+    t = text
+    t = re.sub(r'[\(（][笑草爆][）\)]', '', t)
+    t = re.sub(r'(?<![A-Za-z0-9])[wWｗW]{2,}(?![A-Za-z0-9])', '', t)
+    return t.strip()
+
+def apply_country_prefixes(text):
+    """報道文法における国名1文字プレフィックス（例: 米アンソロピック -> べいアンソロピック）の正規化"""
+    if not text:
+        return ""
+    t = text
+    for char, yomi in COUNTRY_PREFIX_MAP.items():
+        t = re.sub(
+            rf'(?<![一-龥ぁ-んァ-ヶA-Za-z]){char}(?=[ァ-ヴーA-Z][ァ-ヴーA-Za-z0-9・]+)',
+            f'{yomi}',
+            t
+        )
+    return t
+
+def normalize_for_tts(text, custom_dict=None):
+    """
+    TTS用テキストの包括的正規化処理
+    """
+    if not text:
+        return ""
+
+    t = text
+
+    if custom_dict and isinstance(custom_dict, dict):
+        for orig, yomi in custom_dict.items():
+            if orig and yomi and orig in t:
+                t = t.replace(orig, yomi)
+
+    t = apply_country_prefixes(t)
+
+    terms = extract_special_terms(t)
+    for term in terms:
+        yomi, _ = lookup_wikipedia_reading(term)
+        if yomi:
+            print(f"[Wikipedia自動発音解決] '{term}' ➔ '{yomi}'")
+            t = re.sub(rf'(?<![A-Za-z0-9]){re.escape(term)}(?![A-Za-z0-9])', yomi, t)
+
+    t = sanitize_speech_text(t)
+    return t
+
+def convert_remaining_kanji_to_hiragana(text):
+    """原稿中の残存漢字のみをpykakasiでひらがなに変換（タグ [SE:...] 等は維持）"""
+    import pykakasi
+    kks = pykakasi.kakasi()
+
+    def process_segment(seg):
+        res = kks.convert(seg)
+        out = ""
+        for item in res:
+            if re.search(r'[\u4e00-\u9faf]', item.get('orig', '')):
+                out += item.get('hira', item.get('orig', ''))
+            else:
+                out += item.get('orig', '')
+        return out
+
+    output = []
+    for line in text.split('\n'):
+        parts = re.split(r'(\[.*?\])', line)
+        line_out = ""
+        for p in parts:
+            if p.startswith('[') and p.endswith(']'):
+                line_out += p
+            else:
+                line_out += process_segment(p)
+        output.append(line_out)
+    return '\n'.join(output)

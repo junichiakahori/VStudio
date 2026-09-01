@@ -1,3 +1,8 @@
+import sys
+import os
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 import asyncio
 import json
 import logging
@@ -45,7 +50,7 @@ import base64
 # ----------------------------------------------------
 # YouTube チャンネル表示名（DisplayName）キャッシュ＆自動解決
 # ----------------------------------------------------
-USER_CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dict", "youtube_user_cache.json")
+USER_CACHE_FILE = os.path.join(BASE_DIR, "dict", "youtube_user_cache.json")
 _user_name_cache = {}
 
 def load_user_cache():
@@ -345,8 +350,8 @@ class VStudioChatProcessor(DefaultProcessor):
 
 # YouTube API scopes
 SCOPES = ['https://www.googleapis.com/auth/youtube']
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TOKEN_PATH = os.path.join(BASE_DIR, 'token.pickle')
+BASE_DIR = BASE_DIR
+TOKEN_PATH = os.path.join(BASE_DIR, 'config', 'token.pickle')
 youtube_api_client = None
 
 def get_authenticated_service():
