@@ -19,7 +19,8 @@
         </div>
         <!-- ▼ ウィザード・記事一覧・ホット更新ボタン（上段に3つ並列配置） -->
         <div class="header-action-group" style="margin-bottom:6px; display:flex; gap:4px;">
-            <button class="btn-wizard-compact" id="stream-wizard-launch-btn" title="YouTube配信準備ウィザードを起動"
+            <button class="btn-wizard-compact" id="stream-wizard-launch-btn"
+                onclick="window.openWizardPopup && window.openWizardPopup()" title="YouTube配信準備ウィザードを起動 (Wキー)"
                 style="flex:1; justify-content:center; padding:5px 2px; font-size:0.72rem;">
                 <span>🚀 ウィザード</span>
             </button>
