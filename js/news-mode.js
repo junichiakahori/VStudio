@@ -57,7 +57,9 @@ function stripHtmlTags(htmlStr) {
   return clean.replace(/<[^>]*>/g, " ").replace(/&[a-zA-Z0-9#]+;/g, " ").replace(/\s+/g, " ").trim();
 }
 
-// 📰 記事一覧を別ウィンドウ（ポップアップ）で開く共通関数（配信画面への被りを完全防止）
+window.newsListPopup = null;
+
+// 📰 記事一覧を別ウィンドウ（ポップアップ）で開く共通関数（配信中も何度でも確実に起動）
 window.openNewsListPopup = function () {
   if (window.latestFetchedNews && window.latestFetchedNews.length > 0) {
     try {
@@ -66,31 +68,47 @@ window.openNewsListPopup = function () {
   }
 
   try {
-    if (window.newsListPopup && !window.newsListPopup.closed) {
+    // 既存ポップアップが本当に生きているか検証
+    if (window.newsListPopup) {
       try {
-        if (typeof window.newsListPopup.renderNewsList === "function") {
-          window.newsListPopup.renderNewsList();
+        if (!window.newsListPopup.closed && window.newsListPopup.document) {
+          if (typeof window.newsListPopup.renderNewsList === "function") {
+            window.newsListPopup.renderNewsList();
+          }
+          window.newsListPopup.focus();
+          return;
         }
-        window.newsListPopup.focus();
-        return;
-      } catch (checkErr) {
+      } catch (e) {
+        // クロスオリジンまたは破棄済みの場合は参照クリアして再生成へ進む
         window.newsListPopup = null;
       }
     }
-  } catch (e) {
-    window.newsListPopup = null;
-  }
 
-  try {
-    const url = "/news_list.html?t=" + Date.now();
-    const popup = window.open(url, "_blank", "width=820,height=860,menubar=no,toolbar=no,location=no,status=no");
-    if (popup) {
-      window.newsListPopup = popup;
-      try { popup.focus(); } catch (e) {}
+    // 画面中央付近に配置
+    const dualScreenLeft = window.screenLeft !== undefined ? window.screenLeft : window.screenX;
+    const dualScreenTop = window.screenTop !== undefined ? window.screenTop : window.screenY;
+    const width = window.innerWidth ? window.innerWidth : document.documentElement.clientWidth ? document.documentElement.clientWidth : screen.width;
+    const height = window.innerHeight ? window.innerHeight : document.documentElement.clientHeight ? document.documentElement.clientHeight : screen.height;
+
+    const popupWidth = 820;
+    const popupHeight = 860;
+    const left = ((width / 2) - (popupWidth / 2)) + dualScreenLeft;
+    const top = ((height / 2) - (popupHeight / 2)) + dualScreenTop;
+
+    const url = `/news_list.html?t=${Date.now()}`;
+    const windowFeatures = `scrollbars=yes,width=${popupWidth},height=${popupHeight},top=${top},left=${left},resizable=yes,status=no,toolbar=no,menubar=no,location=no`;
+
+    window.newsListPopup = window.open(url, "_blank", windowFeatures);
+    if (window.newsListPopup) {
+      try { window.newsListPopup.focus(); } catch (e) {}
+    } else {
+      // フォールバック
+      window.newsListPopup = window.open(url, "_blank");
     }
   } catch (err) {
-    console.error("[記事一覧] 別窓起動エラー:", err);
+    console.error("[記事一覧] ポップアップ起動エラー:", err);
     try { window.open("/news_list.html", "_blank"); } catch (e) {}
+    window.newsListPopup = null;
   }
 };
 
@@ -2065,4 +2083,25 @@ async function playNextContinuousNews(isOneOff = false, isFetchOnly = false) {
   };
 
   window.enrichCurrentNewsWithLinks();
+
+  // 📰 記事一覧ボタンの明示的イベントリスナー登録
+  const newsListBtn = document.getElementById("header-news-list-btn");
+  if (newsListBtn) {
+    newsListBtn.onclick = (e) => {
+      e.preventDefault();
+      window.openNewsListPopup();
+    };
+  }
+
+  // ⌨️ キーボードショートカット: 'N' キー または 'Alt+N' で記事一覧を開く
+  window.addEventListener("keydown", (e) => {
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
+    if (tag === "input" || tag === "textarea" || (e.target && e.target.isContentEditable)) return;
+
+    if (e.code === "KeyN" || e.key === "n" || e.key === "N" || (e.altKey && (e.code === "KeyN" || e.key === "n" || e.key === "N"))) {
+      if (e.isComposing) return;
+      e.preventDefault();
+      window.openNewsListPopup();
+    }
+  });
 });
