@@ -185,9 +185,22 @@ def is_title_duplicate_sentence(sentence, title):
     return False
 
 def is_chinese_sentence(text):
-    """中国語（簡体字）混入判定フィルター（厳密な簡体字Unicodeのみ）"""
+    """中国語（簡体字）混入判定フィルター（日本の漢字に存在しない純粋な簡体字Unicodeのみ）"""
     if not text:
         return False
+    t = text.strip()
+    # 日本の常用漢字・人名用漢字に存在しない明確な簡体字（这/俩/们/么/谁/说/给/让/还/时/发）
+    if re.search(r'[这俩们么谁说给让还时发]', t):
+        return True
+
+    hiragana_count = len(re.findall(r'[ぁ-ん]', t))
+    total_len = len(t)
+
+    # 中国語句読点（，、“ ”）があり、ひらがなが極少
+    if ('，' in t or '“' in t or '”' in t) and (hiragana_count < 2 or (total_len > 10 and (hiragana_count / total_len) < 0.10)):
+        return True
+
+    return False
     t = text.strip()
     # 日本語の常用漢字・旧字体・人名用漢字に一切存在しない純粋な中国語簡体字
     STRICT_SIMPLIFIED = re.compile(r'[这俩们么谁哪几没为发时说着从让给过还话对头点个样现见后买卖听动东车长门问关]')
@@ -204,48 +217,7 @@ def is_chinese_sentence(text):
         return True
 
     return False
-    t = text.strip()
-    # 簡体字が明確に含まれている場合
-    if re.search(r'[这俩们么谁哪几没为发时说着从让给过]', t):
-        return True
 
-    hiragana_count = len(re.findall(r'[ぁ-ん]', t))
-    kanji_count = len(re.findall(r'[一-鿿]', t))
-    total_len = len(t)
-
-    # 全角カンマ（，）やダブルクォート（“ ”）が含まれ、ひらがなが極端に少ない場合
-    if '，' in t or '“' in t or '”' in t:
-        if hiragana_count < 3 or (total_len > 8 and (hiragana_count / total_len) < 0.20):
-            return True
-
-    # 6文字以上でひらがなが0個かつ漢字ばかりの場合
-    if total_len >= 6 and hiragana_count == 0 and kanji_count >= 3:
-        return True
-
-    return False
-    t = text.strip()
-    CHINESE_CHARS = re.compile(
-        r'[听说这那我他她它他们俩们呢吧吗么着过从让给于把被会能想说看吃写开关点去来里边头問做多真假現誰哪幾沒不'
-        r'好开心关注加油打气关系可爱封面消息大家为喜欢的人非常但是因为所以如果虽然已经还是就是是不是吃惊开始结束继续停止选择确认取消]'
-    )
-    hiragana_count = len(re.findall(r'[\u3040-\u309f]', t))
-    kanji_count = len(re.findall(r'[\u4e00-\u9fff]', t))
-    total_len = len(t)
-
-    if '，' in t or '“' in t or '”' in t:
-        if hiragana_count < 4 or (total_len > 6 and (hiragana_count / total_len) < 0.25):
-            return True
-
-    if total_len >= 5 and hiragana_count == 0 and kanji_count >= 2:
-        return True
-
-    if total_len >= 7 and (hiragana_count / total_len) < 0.18:
-        return True
-
-    if len(CHINESE_CHARS.findall(t)) >= 2 and (hiragana_count / total_len) < 0.35:
-        return True
-
-    return False
 
 def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_dict=None):
     """
@@ -356,13 +328,13 @@ def validate_news_script_quality(raw_text, title="", article_context=""):
     報道メタ説明のみのスカスカ原稿、文数不足、および元記事にない架空エピソードを検知して不合格理由を返す。
     合格の場合は (True, "") を返す。
     """
-    if not raw_text or len(raw_text.strip()) < 45:
-        return False, f"原稿の文字数が少なすぎます ({len(raw_text.strip()) if raw_text else 0}文字 < 45文字)"
+    if not raw_text or len(raw_text.strip()) < 120:
+        return False, f"原稿の文字数が少なすぎます ({len(raw_text.strip()) if raw_text else 0}文字 < 120文字)"
 
     # 改行または句点でセンテンスを分割
     split_sentences_check = [s.strip() for s in re.split(r'(?<=[。！？\n])|(?<=[!?])(?![A-Za-z0-9])', raw_text) if s.strip() and re.search(r'[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ffA-Za-z0-9]', s)]
-    if len(split_sentences_check) < 2:
-        return False, f"原稿の文数が不足しています ({len(split_sentences_check)}文 < 2文)。具体的な出来事の解説と感想を含む複数文が必要です。"
+    if len(split_sentences_check) < 5:
+        return False, f"原稿の文数が不足しています ({len(split_sentences_check)}文 < 5文)。出来事の経緯・背景・影響・感想を含む最低5文の深掘り解説が必要です。"
 
     # 1. 英語単語の混入チェック
     english_words = re.findall(r'[a-zA-Z]{3,}', raw_text)
@@ -467,7 +439,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
     for attempt in range(1, max_retries + 1):
         cur_prompt = prompt
         if attempt > 1:
-            cur_prompt += "\n\n【重要・品質修正指示（再生成）】前回の出力は『文数不足（1文のみ）』『〜についてお伝えします等の無駄な前置き』『中身のない同語反復』または『ファクト不一致』により破棄されました。挨拶や前置き（〜についてお伝えします等）は一切言わず、1文目から直接【ニュースの具体的な出来事・経緯・背景】を2〜3文でしっかり解説し、最後に配信者としての感想を1文添えて、全体で3〜4文の充実した台本を作成してください。"
+            cur_prompt += "\n\n【重要・品質修正指示（再生成）】前回の出力は『文数不足（5文未満）』または『内容の薄さ』により破棄されました。必ず【ニュース内容】に記載されている具体的な事実・経緯・背景・影響をしっかり深掘りし、最後に感想を添えて【全体で5文以上（目安5〜7文）】の充実した長尺解説台本を作成してください（4文以下は厳禁です）。"
             print(f"[ダブルチェック・品質再生成] 🔄 試行 {attempt}/{max_retries} 回目の原稿生成を実行中... (前回の破棄理由: {reason if 'reason' in locals() else '品質不足'})", flush=True)
 
         candidate_text = call_llm_backend(provider, cur_prompt, api_key, model_name)
@@ -542,8 +514,8 @@ def generate_news_item_script_data(payload, custom_dict=None):
         candidate_items = inspect_and_correct_pronunciation(raw_sentences, full_article_content + " " + title, custom_dict=custom_dict)
 
         total_chars = sum(len(it["display"]) for it in candidate_items)
-        if len(candidate_items) < 2 or total_chars < 45:
-            reason = f"フィルター適用後の文数・文字数不足 ({len(candidate_items)}文, {total_chars}文字 < 45文字)"
+        if len(candidate_items) < 5 or total_chars < 120:
+            reason = f"フィルター適用後の文数・文字数不足 ({len(candidate_items)}文 < 5文, {total_chars}文字 < 120文字)"
             print(f"[ダブルチェック・最終文数不足] ⚠️ {attempt}/{max_retries} 回目の最終原稿が不足 (理由: {reason}) ➔ 再試行します", flush=True)
             continue
 
