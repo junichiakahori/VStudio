@@ -1963,16 +1963,12 @@ ${creditsInstruction}
 
         await queueVoicevoxAudio(transitionPhrase, true);
 
-        // 📰 ② 元記事タイトルをそのまま発話（見出しは文分割させず1文として直接発話）
+        // 📰 ② 元記事タイトルをそのまま発話（見出しは文分割させず、字幕テロップも完全表示）
         if (item.title) {
           const headlineText = cleanTitleForSpeech(item.title);
           if (headlineText && headlineText.length >= 3 && !/^(ニュース|主要ニュース|トピックス)$/.test(headlineText)) {
             console.log(`[原稿] [見出し] "${headlineText}"`);
-            if (typeof playVoicevoxDirectAndWait === "function") {
-              await playVoicevoxDirectAndWait(headlineText, headlineText);
-            } else {
-              await queueVoicevoxAudio(headlineText, true, headlineText);
-            }
+            await queueVoicevoxAudio(headlineText, true, headlineText, false, true);
           }
         }
 
