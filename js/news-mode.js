@@ -111,6 +111,8 @@ window.openNewsListPopup = function () {
 // ニュース見出しのスマート整形（メディア名サフィックスや無意味なサイト名の除去）
 // 🌐 記事URLのドメインからメディア名（出典）を特定する逆引き辞書
 const DOMAIN_MEDIA_MAP = {
+    "bloomberg.co.jp": "ブルームバーグ",
+  "bloomberg.com": "ブルームバーグ",
   "news.yahoo.co.jp": "Yahoo!ニュース",
   "yahoo.co.jp": "Yahoo!ニュース",
   "nhk.or.jp": "NHK",
@@ -213,18 +215,23 @@ function cleanTitleForSpeech(itemOrTitle) {
   let t = stripHtmlTags(String(title)).trim();
   const mediaSrc = extractMediaSource(itemOrTitle);
   
-  // タイトル本体からメディア表記サフィックスを綺麗に除去
-  t = t.replace(/[（\(][^）\)]*(?:新聞|通信|日報|新報|NEWS|スポニチ|デイリー|スポーツ|ORICON|文春|新潮|テレビ|WEB|DIG|編集部|Japan|PR|タイムス|Yahoo!|ヤフー)[^）\)]*[）\)]/gi, "");
+  // 1. タイトル末尾のメディア名サフィックス（ドメイン名、英語名、日本語名）を徹底除去
+  t = t.replace(/[（\(][^）\)]*(?:新聞|通信|日報|新報|NEWS|スポニチ|デイリー|スポーツ|ORICON|文春|新潮|テレビ|WEB|DIG|編集部|Japan|PR|タイムス|Yahoo!|ヤフー|Bloomberg|Reuters|bloomberg|reuters)[^）\)]*[）\)]/gi, "");
   t = t.replace(/[\s|｜\-–—]+(?:[A-Za-z0-9\u4e00-\u9fff\u30a0-\u30ff\s]+のプレスリリース|PR\s*TIMES|PRTIMES|プレスリリース).*$/gi, "");
-  t = t.replace(/[\s|｜\-–—]+(?:Google\s*ニュース|Google\s*News|Yahoo!\s*ニュース|Yahoo!\s*JAPAN|Yahoo!|ヤフー|NHK\s*NEWS\s*WEB|ITmedia[A-Za-z0-9\s]*|共同通信|時事通信|読売新聞|朝日新聞|毎日新聞|産経新聞|日経新聞|日本経済新聞|TBS\s*NEWS\s*DIG|FNNプライムオンライン|テレ朝news|日テレNEWS[A-Za-z0-9\s]*|ORICON\s*NEWS|モデルプレス|デイリースポーツ|日刊スポーツ|スポニチ|zakzak|zakⅡ|ねとらぼ|AUTOMATON|IGN\s*Japan|Game\s*Watch|4Gamer.*)$/gi, "");
+  t = t.replace(/[\s|｜\-–—]+(?:Google\s*ニュース|Google\s*News|Yahoo!\s*ニュース|Yahoo!\s*JAPAN|Yahoo!|ヤフー|NHK\s*NEWS\s*WEB|ITmedia[A-Za-z0-9\s]*|共同通信|時事通信|読売新聞|朝日新聞|毎日新聞|産経新聞|日経新聞|日本経済新聞|TBS\s*NEWS\s*DIG|FNNプライムオンライン|テレ朝news|日テレNEWS[A-Za-z0-9\s]*|ORICON\s*NEWS|モデルプレス|デイリースポーツ|日刊スポーツ|スポニチ|zakzak|zakⅡ|ねとらぼ|AUTOMATON|IGN\s*Japan|Game\s*Watch|4Gamer|bloomberg\.com|bloomberg|ブルームバーグ|reuters\.com|reuters|ロイター).*$/gi, "");
   t = t.replace(/[\s|｜\-–—]+$/g, "").trim();
   
   if (/^(ニュース|Google\s*ニュース|Google\s*News|Yahoo!\s*ニュース|Yahoo!|ヤフー|トップニュース|主要ニュース|トピックス)$/i.test(t.trim())) {
     return "";
   }
   
-  // 100%確実に出典を付与
+  // 2. 出典メディア名の付与（二重重複の完全防止）
   if (mediaSrc) {
+    // タイトル末尾に既にメディア名またはドメイン名が含まれている場合は「より」のみを付与
+    const cleanTail = t.replace(/[\s|｜\-–—　]+$/, "");
+    if (cleanTail.endsWith(mediaSrc) || (typeof itemOrTitle === "object" && itemOrTitle.source && cleanTail.endsWith(itemOrTitle.source))) {
+      return `${cleanTail}より`;
+    }
     return `${t}（${mediaSrc}より）`;
   }
   return t;
