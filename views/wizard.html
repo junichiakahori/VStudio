@@ -1425,6 +1425,7 @@
                     cardEl.style.display = "block";
                     titleEl.textContent = info.title || `YouTube配信枠: ${info.videoId}`;
 
+                    const privacySelectVal = document.getElementById("wizard-privacy-status")?.value;
                     if (info.isLive) {
                         liveEl.textContent = "🟢 配信中 (Live Now)";
                         liveEl.style.color = "#00e676";
@@ -1434,12 +1435,23 @@
                     } else if (info.status === "channel_autodetect") {
                         liveEl.textContent = "📡 チャンネル自動追従";
                         liveEl.style.color = "#00ffff";
-                    } else if (info.status === "scheduled_private") {
-                        liveEl.textContent = "🔒 予約・非公開枠 (ID設定済)";
-                        liveEl.style.color = "#00d2d3";
+                    } else if (info.status === "scheduled_private" || info.status === "scheduled_ready") {
+                        if (privacySelectVal === "public") {
+                            liveEl.textContent = "🌐 公開予約枠 (ID設定済)";
+                            liveEl.style.color = "#00e676";
+                        } else if (privacySelectVal === "unlisted") {
+                            liveEl.textContent = "🔗 限定公開枠 (ID設定済)";
+                            liveEl.style.color = "#00d2d3";
+                        } else if (privacySelectVal === "private") {
+                            liveEl.textContent = "🔒 非公開枠 (ID設定済)";
+                            liveEl.style.color = "#ffbe76";
+                        } else {
+                            liveEl.textContent = "📅 配信枠設定完了 (ID確認済)";
+                            liveEl.style.color = "#00d2d3";
+                        }
                     } else {
-                        liveEl.textContent = "⚪️ 待機中 / 確認済";
-                        liveEl.style.color = "#aaa";
+                        liveEl.textContent = "📅 配信枠設定完了 (ID確認済)";
+                        liveEl.style.color = "#00d2d3";
                     }
 
                     // 配信予定日時の安全なパース
@@ -1476,7 +1488,7 @@
                         schedEl.style.color = "#00d2d3";
                     } else if (info.status === "scheduled_private") {
                         const currentInputVal = startTimeInput ? startTimeInput.value : "";
-                        schedEl.textContent = currentInputVal ? `⏰ 配信予定: ${formatScheduleDateTime(currentInputVal)}` : "⏰ 配信予定: YouTube Studioにて設定済";
+                        schedEl.textContent = currentInputVal ? `⏰ 配信予定: ${formatScheduleDateTime(currentInputVal)}` : "⏰ 配信予定: 設定時刻にて開始";
                         schedEl.style.color = "#00d2d3";
                     } else {
                         const currentInputVal = startTimeInput ? startTimeInput.value : "";
