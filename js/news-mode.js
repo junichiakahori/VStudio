@@ -170,45 +170,41 @@ function extractMediaSource(itemOrTitle) {
   
   let t = stripHtmlTags(title).trim();
 
-  // 1. タイトル内の括弧 (例: (デイリースポーツ) (毎日新聞) 等)
-  const m = t.match(/[（\(]([^）\)]*(?:新聞|通信|日報|新報|NEWS|スポニチ|デイリー|スポーツ|ORICON|文春|新潮|テレビ|WEB|DIG|編集部|Japan|PR\s*TIMES|PRTIMES|タイムス|NHK|ロイター|AFP|CNN|BBC|Yahoo!|ヤフー)[^）\)]*)[）\)]/i);
+  // 1. RSSの <source> タグ（Googleニュース・Yahoo等の公式配信元名）
+  if (item && item.source && typeof item.source === "string" && item.source.trim()) {
+    const s = item.source.replace(/[\s\-–—]+(?:Google.*)$/i, "").trim();
+    if (s && !/^(ニュース|Google\s*ニュース|主要ニュース|トピックス)$/i.test(s)) return s;
+  }
+
+  // 2. タイトル内の括弧 (例: (デイリースポーツ) (毎日新聞) (読売新聞) 等)
+  const m = t.match(/[（\(]([^）\)]*(?:新聞|通信|日報|新報|NEWS|スポニチ|デイリー|スポーツ|ORICON|文春|新潮|テレビ|WEB|DIG|編集部|Japan|PR\s*TIMES|PRTIMES|タイムス|NHK|ロイター|AFP|CNN|BBC|Yahoo!|ヤフー|Impress|Watch|ナタリー)[^）\)]*)[）\)]/i);
   if (m) {
     let src = m[1].replace(/[\s\-–—]+(?:Yahoo!.*|Google.*)$/i, "").trim();
-    if (src && !/^(ニュース|Google\s*ニュース)$/i.test(src)) return src;
+    if (src && !/^(ニュース|Google\s*ニュース|主要ニュース|トピックス)$/i.test(src)) return src;
   }
 
-  // 2. タイトル末尾のサフィックス (例: - 読売新聞 - Yahoo!ニュース)
-  const m2 = t.match(/[\s|｜\-–—]+([A-Za-z0-9\u4e00-\u9fff\u30a0-\u30ff\s]+(?:のプレスリリース|PR\s*TIMES|PRTIMES|新聞|通信|日報|新報|NEWS|WEB|DIG|テレビ|デイリースポーツ|日刊スポーツ|スポニチ|zakzak|zakⅡ|ねとらぼ|AUTOMATON|IGN\s*Japan|Game\s*Watch|4Gamer|モデルプレス|文春オンライン|デイリー新潮|東洋経済オンライン|ダイヤモンド・オンライン|Yahoo!ニュース|Yahoo!|ヤフー|NHK|ロイター|AFP))[^\-–—|｜]*$/i);
+  // 3. タイトル末尾のサフィックス (例: - 読売新聞, - 朝日新聞デジタル, - NHK NEWS WEB 等)
+  const m2 = t.match(/[\s|｜\-–—]+([A-Za-z0-9\u4e00-\u9fff\u30a0-\u30ff\s]+(?:のプレスリリース|PR\s*TIMES|PRTIMES|新聞[A-Za-z0-9\s]*|通信|日報|新報|NEWS[A-Za-z0-9\s]*|WEB|DIG|テレビ|デイリースポーツ|日刊スポーツ|スポニチ|zakzak|zakⅡ|ねとらぼ|AUTOMATON|IGN[A-Za-z0-9\s]*|Game\s*Watch|4Gamer|モデルプレス|文春オンライン|デイリー新潮|東洋経済オンライン|ダイヤモンド・オンライン|Yahoo!ニュース|Yahoo!|ヤフー|NHK[A-Za-z0-9\s]*|ロイター|AFP|ナタリー|シネマトゥデイ|ファミ通))[^\-–—|｜]*$/i);
   if (m2) {
     let src = m2[1].replace(/[\s\-–—]+(?:Google.*)$/i, "").trim();
-    if (src && !/^(ニュース|Google\s*ニュース)$/i.test(src)) return src;
+    if (src && !/^(ニュース|Google\s*ニュース|主要ニュース|トピックス)$/i.test(src)) return src;
   }
 
-  // 3. RSSの source / publisher フィールド
+  // 4. URLのドメイン逆引き（nhk.or.jp, mainichi.jp, yomiuri.co.jp 等）
   if (item) {
-    if (item.source && typeof item.source === "string" && item.source.trim()) {
-      const s = item.source.replace(/[\s\-–—]+(?:Google.*)$/i, "").trim();
-      if (s && !/^(ニュース|Google\s*ニュース)$/i.test(s)) return s;
-    }
-    if (item.publisher && typeof item.publisher === "string" && item.publisher.trim()) {
-      const p = item.publisher.replace(/[\s\-–—]+(?:Google.*)$/i, "").trim();
-      if (p && !/^(ニュース|Google\s*ニュース)$/i.test(p)) return p;
-    }
-    
-    // 4. URLのドメイン逆引き
     const url = item.link || item.url || "";
     if (url) {
       for (const [dom, name] of Object.entries(DOMAIN_MEDIA_MAP)) {
         if (url.includes(dom)) return name;
       }
     }
-
-    // 5. カテゴリからのフォールバック（出典なしを100%根絶）
-    if (item.categoryName) return `${item.categoryName}ニュース`;
-    if (item.category) return `${item.category}ニュース`;
+    if (item.publisher && typeof item.publisher === "string" && item.publisher.trim()) {
+      const p = item.publisher.replace(/[\s\-–—]+(?:Google.*)$/i, "").trim();
+      if (p && !/^(ニュース|Google\s*ニュース|主要ニュース|トピックス)$/i.test(p)) return p;
+    }
   }
 
-  return "最新ニュース";
+  return "";
 }
 
 function cleanTitleForSpeech(itemOrTitle) {
@@ -426,6 +422,8 @@ async function playNextContinuousNews(isOneOff = false, isFetchOnly = false) {
             const titleNode = node.querySelector("title");
             const descNode = node.querySelector("description");
             const pubDateNode = node.querySelector("pubDate") || node.querySelector("date");
+            const sourceNode = node.querySelector("source");
+            const realSource = sourceNode ? sourceNode.textContent.trim() : "";
 
             let publisherName = "その他";
             if (target.url.includes('yahoo.co.jp')) publisherName = 'Yahoo!';
@@ -438,6 +436,7 @@ async function playNextContinuousNews(isOneOff = false, isFetchOnly = false) {
             return {
               title: titleNode ? titleNode.textContent : "",
               description: stripHtmlTags(descNode ? descNode.textContent : ""),
+              source: realSource,
               link: linkUrl,
               pubDate: pubDateNode ? pubDateNode.textContent : "",
               categoryName: target.categoryName,
@@ -2423,6 +2422,8 @@ ${creditsInstruction}
           const titleNode = node.querySelector("title");
           const descNode = node.querySelector("description");
           const pubDateNode = node.querySelector("pubDate") || node.querySelector("date");
+          const sourceNode = node.querySelector("source");
+          const realSource = sourceNode ? sourceNode.textContent.trim() : "";
           let publisherName = "その他";
           if (target.url.includes('yahoo.co.jp')) publisherName = 'Yahoo!';
           else if (target.url.includes('google.com')) publisherName = 'Google';
@@ -2434,6 +2435,7 @@ ${creditsInstruction}
           return {
             title: titleNode ? titleNode.textContent : "",
             description: stripHtmlTags(descNode ? descNode.textContent : ""),
+            source: realSource,
             link: linkUrl,
             pubDate: pubDateNode ? pubDateNode.textContent : "",
             categoryName: target.categoryName,
