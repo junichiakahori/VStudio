@@ -351,6 +351,7 @@ def validate_news_script_quality(raw_text, title="", article_context=""):
         re.compile(r'(ライブドアニュース|Yahoo!ニュース|NHK|共同通信|時事通信|各社|メディア|新聞|ネットニュース)で(報じ|報道|伝え|掲載)'),
         re.compile(r'^(これ|このニュース|この記事)は.*?(報じられて|報道されて|伝えられて)'),
         re.compile(r'という(ニュース|記事|報道)が(あり|報じられ|伝えられ)ました'),
+        re.compile(r'^(これ|このニュース|この記事|今回)?.*?(について|に関して)(お伝えします|お伝えいたします|お届けします|お送りします|ご紹介します|解説します|見ていきましょう)'),
     ]
     for pat in META_REPORT_PATTERNS:
         if pat.search(raw_text):
@@ -426,101 +427,111 @@ def generate_news_item_script_data(payload, custom_dict=None):
 
     prompt = build_news_prompt(char_desc, title, full_article_content)
     raw_text = None
+    items = None
+    ai_headline_raw = None
     max_retries = 3
 
     for attempt in range(1, max_retries + 1):
         cur_prompt = prompt
         if attempt > 1:
-            cur_prompt += "\n\n【重要・品質修正指示（再生成）】前回の出力は『文数不足（1文のみ）』『〜で報じられています等の空虚なメタ説明』『中身のない同語反復』または『ファクト不一致』により破棄されました。必ず【ニュース内容】に記載されている具体的な事実・背景・詳細データを2〜3文でしっかり解説し、最後に配信者としての感想を1文添えて、全体で3〜4文の充実した台本を作成してください（1文だけや『〜で報じられています』のような薄い文章は厳禁です）。"
-            print(f"[ダブルチェック・品質再生成] 🔄 試行 {attempt}/{max_retries} 回目の原稿生成を実行中... (前回の破棄理由: {reason})", flush=True)
+            cur_prompt += "\n\n【重要・品質修正指示（再生成）】前回の出力は『文数不足（1文のみ）』『〜についてお伝えします等の無駄な前置き』『中身のない同語反復』または『ファクト不一致』により破棄されました。挨拶や前置き（〜についてお伝えします等）は一切言わず、1文目から直接【ニュースの具体的な出来事・経緯・背景】を2〜3文でしっかり解説し、最後に配信者としての感想を1文添えて、全体で3〜4文の充実した台本を作成してください。"
+            print(f"[ダブルチェック・品質再生成] 🔄 試行 {attempt}/{max_retries} 回目の原稿生成を実行中... (前回の破棄理由: {reason if 'reason' in locals() else '品質不足'})", flush=True)
 
         candidate_text = call_llm_backend(provider, cur_prompt, api_key, model_name)
         if not candidate_text:
             continue
 
         is_valid, reason = validate_news_script_quality(candidate_text, title, full_article_content)
-        if is_valid:
-            raw_text = candidate_text
-            if attempt > 1:
-                print(f"[ダブルチェック・品質合格] ✅ 試行 {attempt} 回目で高品質な原稿が生成されました！", flush=True)
-            break
-        else:
+        if not is_valid:
             print(f"[ダブルチェック・不合格判定] ⚠️ {attempt}/{max_retries} 回目の出力を不自然と判定 (理由: {reason}) ➔ 再試行します", flush=True)
-            raw_text = candidate_text  # 最終フォールバック用
+            continue
 
-    if not raw_text:
-        return None
+        clean_text = candidate_text
+        clean_text = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', clean_text, flags=re.MULTILINE).strip()
 
-    clean_text = raw_text
-    clean_text = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', clean_text, flags=re.MULTILINE).strip()
+        headline_match = re.search(r'(?:\[HEADLINE:\s*|【見出し】:\s*)(.*?)(?:\]|\n|$)', candidate_text)
+        if headline_match:
+            ai_headline_raw = headline_match.group(1).strip()
+            ai_headline_raw = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', ai_headline_raw).strip()
+            clean_text = re.sub(r'(?:\[HEADLINE:\s*|【見出し】:\s*).*?(?:\]|\n|$)', '', clean_text).strip()
 
-    ai_headline_raw = None
-    headline_match = re.search(r'(?:\[HEADLINE:\s*|【見出し】:\s*)(.*?)(?:\]|\n|$)', raw_text)
-    if headline_match:
-        ai_headline_raw = headline_match.group(1).strip()
-        ai_headline_raw = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', ai_headline_raw).strip()
-        clean_text = re.sub(r'(?:\[HEADLINE:\s*|【見出し】:\s*).*?(?:\]|\n|$)', '', clean_text).strip()
+        clean_text = clean_text.replace("「", "").replace("」", "").strip()
+        clean_text = re.sub(r'にゃ{2,}', 'にゃ', clean_text)
+        clean_text = re.sub(r'にゃ[か？\?]+にゃ', 'かにゃ', clean_text)
+        clean_text = re.sub(r'のだ{2,}', 'のだ', clean_text)
+        clean_text = re.sub(r'かもしれませんねにゃ([！\s　。！？]|$)', r'かもしれませんね\1', clean_text)
+        clean_text = re.sub(r'ですねにゃ([！\s　。！？]|$)', r'ですね\1', clean_text)
+        clean_text = re.sub(r'ますねにゃ([！\s　。！？]|$)', r'ますね\1', clean_text)
+        clean_text = re.sub(r'ですよねにゃ([！\s　。！？]|$)', r'ですよね\1', clean_text)
+        clean_text = re.sub(r'でしたにゃ([！\s　。！？]|$)', r'でした\1', clean_text)
+        clean_text = re.sub(r'ませんにゃ([！\s　。！？]|$)', r'ません\1', clean_text)
+        clean_text = re.sub(r'にゃね([！\s　。！？]|$)', r'ですね\1', clean_text)
+        clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)ねにゃ([！\s　。！？]|$)', r'\1ですね\2', clean_text)
+        clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)ねのだ([！\s　。！？]|$)', r'\1なのだ\2', clean_text)
+        clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)かなにゃ([！\s　。！？]|$)', r'\1かにゃ\2', clean_text)
+        clean_text = clean_text.replace("使えへん", "使えない").replace("出来へん", "出来ない").replace("分からへん", "分からない").replace("知らへん", "知らない")
+        clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)へん([の|ね|よ|な|にゃ|！|？|。|、]|$)', r'\1ない\2', clean_text)
+        clean_text = re.sub(r'\b[a-z]{3,}な', '大変な', clean_text)
 
-    clean_text = clean_text.replace("「", "").replace("」", "").strip()
-    clean_text = re.sub(r'にゃ{2,}', 'にゃ', clean_text)
-    clean_text = re.sub(r'にゃ[か？\?]+にゃ', 'かにゃ', clean_text)
-    clean_text = re.sub(r'のだ{2,}', 'のだ', clean_text)
-    clean_text = re.sub(r'かもしれませんねにゃ([！\s　。！？]|$)', r'かもしれませんね\1', clean_text)
-    clean_text = re.sub(r'ですねにゃ([！\s　。！？]|$)', r'ですね\1', clean_text)
-    clean_text = re.sub(r'ますねにゃ([！\s　。！？]|$)', r'ますね\1', clean_text)
-    clean_text = re.sub(r'ですよねにゃ([！\s　。！？]|$)', r'ですよね\1', clean_text)
-    clean_text = re.sub(r'でしたにゃ([！\s　。！？]|$)', r'でした\1', clean_text)
-    clean_text = re.sub(r'ませんにゃ([！\s　。！？]|$)', r'ません\1', clean_text)
-    clean_text = re.sub(r'にゃね([！\s　。！？]|$)', r'ですね\1', clean_text)
-    clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)ねにゃ([！\s　。！？]|$)', r'\1ですね\2', clean_text)
-    clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)ねのだ([！\s　。！？]|$)', r'\1なのだ\2', clean_text)
-    clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)かなにゃ([！\s　。！？]|$)', r'\1かにゃ\2', clean_text)
-    clean_text = clean_text.replace("使えへん", "使えない").replace("出来へん", "出来ない").replace("分からへん", "分からない").replace("知らへん", "知らない")
-    clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)へん([の|ね|よ|な|にゃ|！|？|。|、]|$)', r'\1ない\2', clean_text)
-    clean_text = re.sub(r'\b[a-z]{3,}な', '大変な', clean_text)
+        split_sentences = [s.strip() for s in re.split(r'(?<=[。！？\n])|(?<=[!?])(?![A-Za-z0-9])', clean_text) if s.strip() and re.search(r'[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ffA-Za-z0-9]', s)]
 
-    split_sentences = [s.strip() for s in re.split(r'(?<=[。！？\n])|(?<=[!?])(?![A-Za-z0-9])', clean_text) if s.strip() and re.search(r'[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ffA-Za-z0-9]', s)]
+        def is_transition_phrase(txt):
+            cleaned = re.sub(r'[。！？\!\? \s　、]+', '', txt)
+            keywords = [
+                "次のニュースですにゃ", "次のニュースにゃ", "次のニュースです", "次のニュースなのだ", "次のニュース",
+                "続いてのニュースですにゃ", "続いてのニュースにゃ", "続いてのニュースです", "続いてのニュースなのだ", "続いてのニュース",
+                "最初のニュースですにゃ", "最初のニュースにゃ", "最初のニュースです", "最初のニュースなのだ", "最初のニュース",
+                "次の話題ですにゃ", "次の話題にゃ", "次の話題です", "次の話題なのだ", "次の話題",
+                "続いては", "次の記事です", "次の記事にゃ", "続いての記事です", "続いての話題"
+            ]
+            return any(cleaned == kw or cleaned.startswith(kw) for kw in keywords) or (category_name and f"{category_name}のニュース" in cleaned)
 
-    def is_transition_phrase(txt):
-        cleaned = re.sub(r'[。！？\!\? \s　、]+', '', txt)
-        keywords = [
-            "次のニュースですにゃ", "次のニュースにゃ", "次のニュースです", "次のニュースなのだ", "次のニュース",
-            "続いてのニュースですにゃ", "続いてのニュースにゃ", "続いてのニュースです", "続いてのニュースなのだ", "続いてのニュース",
-            "最初のニュースですにゃ", "最初のニュースにゃ", "最初のニュースです", "最初のニュースなのだ", "最初のニュース",
-            "次の話題ですにゃ", "次の話題にゃ", "次の話題です", "次の話題なのだ", "次の話題",
-            "続いては", "次の記事です", "次の記事にゃ", "続いての記事です", "続いての話題"
-        ]
-        return any(cleaned == kw or cleaned.startswith(kw) for kw in keywords) or (category_name and f"{category_name}のニュース" in cleaned)
-
-    deduped_sentences = []
-    seen_transition = False
-    for idx, s in enumerate(split_sentences):
-        if is_transition_phrase(s):
-            if idx > 0 or seen_transition:
+        deduped_sentences = []
+        seen_transition = False
+        for idx, s in enumerate(split_sentences):
+            if is_transition_phrase(s):
+                if idx > 0 or seen_transition:
+                    continue
+                seen_transition = True
+                deduped_sentences.append(s)
                 continue
-            seen_transition = True
+            
+            # 見出し（タイトル）との重複・復唱を自動検知して除去
+            if is_title_duplicate_sentence(s, title):
+                print(f"[見出し重複カット] ✂️ タイトルと重複する文を除去しました: '{s}' (タイトル: '{title}')", flush=True)
+                continue
+
+            if deduped_sentences and s == deduped_sentences[-1]:
+                continue
             deduped_sentences.append(s)
-            continue
-        
-        # 見出し（タイトル）との重複・復唱を自動検知して除去
-        if is_title_duplicate_sentence(s, title):
-            print(f"[見出し重複カット] ✂️ タイトルと重複する文を除去しました: '{s}' (タイトル: '{title}')", flush=True)
+
+        raw_sentences = deduped_sentences if deduped_sentences else split_sentences
+        candidate_items = inspect_and_correct_pronunciation(raw_sentences, full_article_content + " " + title, custom_dict=custom_dict)
+
+        total_chars = sum(len(it["display"]) for it in candidate_items)
+        if len(candidate_items) < 2 or total_chars < 45:
+            reason = f"フィルター適用後の文数・文字数不足 ({len(candidate_items)}文, {total_chars}文字 < 45文字)"
+            print(f"[ダブルチェック・最終文数不足] ⚠️ {attempt}/{max_retries} 回目の最終原稿が不足 (理由: {reason}) ➔ 再試行します", flush=True)
             continue
 
-        if deduped_sentences and s == deduped_sentences[-1]:
-            continue
-        deduped_sentences.append(s)
-    raw_sentences = deduped_sentences if deduped_sentences else split_sentences
-
-    items = inspect_and_correct_pronunciation(raw_sentences, full_article_content + " " + title, custom_dict=custom_dict)
+        # すべて合格！
+        items = candidate_items
+        raw_text = candidate_text
+        if attempt > 1:
+            print(f"[ダブルチェック・品質合格] ✅ 試行 {attempt} 回目で高品質な充実原稿が生成されました！（{len(items)}文, {total_chars}文字）", flush=True)
+        break
 
     if not items:
+        # 万が一リトライを繰り返しても不十分だった場合のフォールバック（タイトル＋要約でしっかり構成）
         fallback_plain = description.replace("「", "").replace("」", "").strip()
         if len(fallback_plain) > 80:
             fallback_plain = fallback_plain[:80] + "…"
-        fallback_display = f"{transition} {title}についてです。{fallback_plain} 今後の展開にも注目ですね。"
-        fallback_speech = normalize_for_tts(fallback_display, custom_dict=custom_dict)
-        items = [{"display": fallback_display, "speech": fallback_speech}]
+        fallback_display1 = f"{title}について、詳細な情報が入っています。"
+        fallback_display2 = f"{fallback_plain} 今後の展開にも注目が集まっています。"
+        items = [
+            {"display": fallback_display1, "speech": normalize_for_tts(fallback_display1, custom_dict=custom_dict)},
+            {"display": fallback_display2, "speech": normalize_for_tts(fallback_display2, custom_dict=custom_dict)}
+        ]
 
     if ai_headline_raw:
         headline_display = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\1', ai_headline_raw)
