@@ -1459,10 +1459,7 @@
                     const startToggle = document.getElementById("wizard-start-schedule-toggle");
 
                     if (parsedDate) {
-                        const schedStr = parsedDate.toLocaleString("ja-JP", {
-                            month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit"
-                        });
-                        schedEl.textContent = `⏰ 配信予定: ${schedStr}`;
+                        schedEl.textContent = `⏰ 配信予定: ${formatScheduleDateTime(parsedDate)}`;
                         schedEl.style.color = "#00d2d3";
 
                         // 入力欄にも自動反映（YYYY-MM-DDTHH:mm）して自動開始をON
@@ -1475,15 +1472,16 @@
                         if (startToggle) startToggle.checked = true;
                     } else if (info.status === "channel_autodetect") {
                         const currentInputVal = startTimeInput ? startTimeInput.value : "";
-                        schedEl.textContent = currentInputVal ? `⏰ 配信予定: ${currentInputVal}` : "⏰ 配信開始時に最新枠を自動取得";
+                        schedEl.textContent = currentInputVal ? `⏰ 配信予定: ${formatScheduleDateTime(currentInputVal)}` : "⏰ 配信開始時に最新枠を自動取得";
                         schedEl.style.color = "#00d2d3";
                     } else if (info.status === "scheduled_private") {
                         const currentInputVal = startTimeInput ? startTimeInput.value : "";
-                        schedEl.textContent = currentInputVal ? `⏰ 配信予定: ${currentInputVal}` : "⏰ 配信予定: YouTube Studioにて設定済";
+                        schedEl.textContent = currentInputVal ? `⏰ 配信予定: ${formatScheduleDateTime(currentInputVal)}` : "⏰ 配信予定: YouTube Studioにて設定済";
                         schedEl.style.color = "#00d2d3";
                     } else {
-                        schedEl.textContent = "⏰ 予定日時: 指定なし (即時開始)";
-                        schedEl.style.color = "var(--text-muted)";
+                        const currentInputVal = startTimeInput ? startTimeInput.value : "";
+                        schedEl.textContent = currentInputVal ? `⏰ 配信予定: ${formatScheduleDateTime(currentInputVal)}` : "⏰ 予定日時: 指定なし (即時開始)";
+                        schedEl.style.color = currentInputVal ? "#00d2d3" : "var(--text-muted)";
                     }
                     const thumbImg = document.getElementById("wizard-yt-thumb-preview");
                     if (thumbImg) {
@@ -1533,8 +1531,7 @@
                 try {
                     const d = new Date(e.target.value);
                     if (!isNaN(d.getTime())) {
-                        const schedStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-                        schedEl.textContent = `⏰ 配信予定: ${schedStr}`;
+                        schedEl.textContent = `⏰ 配信予定: ${formatScheduleDateTime(d)}`;
                         schedEl.style.color = "#00d2d3";
                     }
                 } catch(err) {}
@@ -1654,8 +1651,7 @@
 
             const schedEl = document.getElementById("wizard-yt-schedule");
             if (schedEl) {
-                const schedStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-                schedEl.textContent = `⏰ 配信予定: ${schedStr}`;
+                schedEl.textContent = `⏰ 配信予定: ${formatScheduleDateTime(d)}`;
                 schedEl.style.color = "#00d2d3";
             }
         }
