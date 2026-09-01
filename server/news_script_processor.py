@@ -236,11 +236,9 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
                     break
             
             if has_invented:
-                display_s = "記事では詳細な経緯や今後の情報が詳しく紹介されています。"
-                s = display_s
+                continue
             elif re.search(r'([、\s]|^)(が[0-9]+日|は[0-9]+日|そしては[0-9]+日)', display_s):
-                display_s = "記事では関連する詳細なスケジュールがまとめられています。"
-                s = display_s
+                continue
 
         if article_context and len(display_s) >= 12:
             is_pure_impression = bool(re.search(r'^(これ|このニュース|そう|本当|ボク|私|僕|みんな|皆|視聴者)?.*(楽しみ|嬉しい|うれしい|悲しい|残念|すごい|凄い|驚き|びっくり|注目|期待|応援|注視|和解|複雑|不思議|気になり|気をつ|注意|大切|安心|よかった|良かった)(です|だ|ね|よね|よ|な|と思います|にゃ|のだ|わ).*$', display_s))
@@ -252,9 +250,8 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
                     matched_count = sum(1 for n in meaningful_nouns if n in article_context)
                     match_ratio = matched_count / len(meaningful_nouns)
                     if match_ratio < 0.25:
-                        print(f"[ファクト照合・ハルシネーション遮断] 🚫 元記事と一致しない架空エピソードを検知: '{display_s}' (一致率: {match_ratio:.2f}) ➔ 安全な解説文に置換")
-                        display_s = "記事では詳細な経緯や今後の情報が詳しく紹介されています。"
-                        s = display_s
+                        print(f"[ファクト照合・ハルシネーション遮断] 🚫 元記事と一致しない架空エピソードを検知: '{display_s}' (一致率: {match_ratio:.2f}) ➔ この文を完全破棄")
+                        continue
 
         FRAGMENT_HALLUCINATION_PATTERN = re.compile(
             r'([A-Za-z0-9\u4e00-\u9fff\u30a0-\u30ff]{1,10}[…\.]{2,}'
@@ -263,9 +260,8 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
             r'|(某|某有名|とある)(会社|企業|人物|人|作品|銘柄))'
         )
         if FRAGMENT_HALLUCINATION_PATTERN.search(display_s):
-            print(f"[不完全文字列検知] 🚫 途切れ文字を検知: '{display_s}' ➔ 安全な解説文へ置換")
-            display_s = "記事では対象となった詳細な情報や一覧が紹介されています。"
-            s = display_s
+            print(f"[不完全文字列検知] 🚫 途切れ文字を検知: '{display_s}' ➔ この文を完全破棄")
+            continue
 
         speech_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\2', s)
         speech_s = normalize_for_tts(speech_s, custom_dict=custom_dict)
