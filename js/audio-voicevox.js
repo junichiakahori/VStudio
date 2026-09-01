@@ -181,6 +181,13 @@ async function playNextVoicevox() {
 
   // 2. 音声合成用（読み）は item.original を基本にする
   let speakString = typeof item === "object" && item !== null ? (item.original || item.displayText || String(item)) : String(item);
+
+  // 実質文字（日本語・英数字）が一切含まれていない記号のみの空行（"。" や " " 等）は安全にスキップ
+  if (!/[\u4E00-\u9FFFぁ-んァ-ヶーA-Za-z0-9]/.test(displayString) && !/[\u4E00-\u9FFFぁ-んァ-ヶーA-Za-z0-9]/.test(speakString)) {
+    isVoicevoxPlaying = false;
+    playNextVoicevox();
+    return;
+  }
   if (typeof item === "object" && item !== null && item.promise) {
     currentPlayingIsIdle = item.isIdle || false;
     try {
@@ -300,10 +307,10 @@ async function queueVoicevoxAudio(
     return pt;
   };
 
-  const origSentences = text.split(splitPattern).map(s => s.trim()).filter(s => s.length > 0);
+  const origSentences = text.split(splitPattern).map(s => s.trim()).filter(s => s.length > 0 && /[\u4E00-\u9FFFぁ-んァ-ヶーA-Za-z0-9]/.test(s));
 
   if (preConvertedYomi) {
-    const yomiSentences = preConvertedYomi.split(splitPattern).map(s => s.trim()).filter(s => s.length > 0);
+    const yomiSentences = preConvertedYomi.split(splitPattern).map(s => s.trim()).filter(s => s.length > 0 && /[\u4E00-\u9FFFぁ-んァ-ヶーA-Za-z0-9]/.test(s));
 
     if (origSentences.length > 0 && origSentences.length === yomiSentences.length) {
       // 1対1で文が一致する場合（各文ごとにキューへ投入）
@@ -320,7 +327,7 @@ async function queueVoicevoxAudio(
     } else {
       // 文数が異なる場合でも1文ずつ分割して投入
       const fullProcessed = cleanYomi(preConvertedYomi);
-      const parts = fullProcessed.split(splitPattern).map(s => s.trim()).filter(s => s.length > 0);
+      const parts = fullProcessed.split(splitPattern).map(s => s.trim()).filter(s => s.length > 0 && /[\u4E00-\u9FFFぁ-んァ-ヶーA-Za-z0-9]/.test(s));
       for (let i = 0; i < parts.length; i++) {
         const s = parts[i];
         const disp = origSentences[i] || origSentences[origSentences.length - 1] || text;

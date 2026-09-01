@@ -215,7 +215,7 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
 
     for s in raw_sentences:
         s = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', s).strip()
-        if not s:
+        if not s or not re.search(r'[一-鿿぀-ゟ゠-ヿA-Za-z0-9]', s):
             continue
 
         display_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\1', s)
@@ -461,7 +461,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
     clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)へん([の|ね|よ|な|にゃ|！|？|。|、]|$)', r'\1ない\2', clean_text)
     clean_text = re.sub(r'\b[a-z]{3,}な', '大変な', clean_text)
 
-    split_sentences = [s.strip() for s in re.split(r'(?<=[。！？\n])|(?<=[!?])(?![A-Za-z0-9])', clean_text) if s.strip()]
+    split_sentences = [s.strip() for s in re.split(r'(?<=[。！？\n])|(?<=[!?])(?![A-Za-z0-9])', clean_text) if s.strip() and re.search(r'[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ffA-Za-z0-9]', s)]
 
     def is_transition_phrase(txt):
         cleaned = re.sub(r'[。！？\!\? \s　、]+', '', txt)
