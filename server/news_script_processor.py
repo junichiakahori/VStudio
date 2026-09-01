@@ -533,6 +533,13 @@ def generate_news_item_script_data(payload, custom_dict=None):
         if candidate_items:
             best_candidate_items = candidate_items
 
+                # 7文以上生成された場合は、要約3文 + 感想2〜3文（最大6文）にスマートに制限
+        if len(candidate_items) > 6:
+            # 前半3文（要約） + 後半の直前2〜3文（感想）を抽出して最大6文に収める
+            candidate_items = candidate_items[:3] + candidate_items[-3:]
+            if len(candidate_items) > 6:
+                candidate_items = candidate_items[:6]
+
         total_chars = sum(len(it["display"]) for it in candidate_items)
         if len(candidate_items) < 5 or total_chars < 120:
             if attempt < max_retries:
