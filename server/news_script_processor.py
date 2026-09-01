@@ -257,18 +257,7 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
             elif re.search(r'([、\s]|^)(が[0-9]+日|は[0-9]+日|そしては[0-9]+日)', display_s):
                 continue
 
-        if article_context and len(display_s) >= 12:
-            is_pure_impression = bool(re.search(r'^(これ|このニュース|そう|本当|ボク|私|僕|みんな|皆|視聴者)?.*(楽しみ|嬉しい|うれしい|悲しい|残念|すごい|凄い|驚き|びっくり|注目|期待|応援|注視|和解|複雑|不思議|気になり|気をつ|注意|大切|安心|よかった|良かった)(です|だ|ね|よね|よ|な|と思います|にゃ|のだ|わ).*$', display_s))
-            if not is_pure_impression:
-                nouns = re.findall(r'[\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9]{2,}', display_s)
-                FILTER_TERMS = {'こと', 'よう', 'そう', 'ため', 'ニュース', '記事', '内容', '今回', '発表', '紹介', '情報'}
-                meaningful_nouns = [n for n in nouns if n not in FILTER_TERMS]
-                if len(meaningful_nouns) >= 2:
-                    matched_count = sum(1 for n in meaningful_nouns if n in article_context)
-                    match_ratio = matched_count / len(meaningful_nouns)
-                    if match_ratio < 0.25:
-                        print(f"[ファクト照合・ハルシネーション遮断] 🚫 元記事と一致しない架空エピソードを検知: '{display_s}' (一致率: {match_ratio:.2f}) ➔ この文を完全破棄")
-                        continue
+        # 架空作品名捏造や途切れ文字の検知は実施済み
 
         FRAGMENT_HALLUCINATION_PATTERN = re.compile(
             r'([A-Za-z0-9\u4e00-\u9fff\u30a0-\u30ff]{1,10}[…\.]{2,}'
