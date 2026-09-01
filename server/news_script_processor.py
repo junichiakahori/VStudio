@@ -233,6 +233,60 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
 
     return corrected_items
 
+
+# ── 許可される一般的な英字・固有名詞ホワイトリスト ──
+ALLOWED_ENGLISH_TERMS = {
+    "ai", "sns", "it", "url", "line", "youtube", "x", "ceo", "ev", "apple", "google",
+    "openai", "vivant", "ios", "pc", "tv", "nhk", "bgm", "se", "api", "sdk", "usb",
+    "dx", "sdgs", "chatgpt", "gemini", "claude", "meta", "nvidia", "sony", "nintendo",
+    "switch", "ps5", "xbox", "vr", "ar", "mr", "web", "app", "os", "id", "ip", "voicevox",
+    "live2d", "vts", "obs", "cpu", "gpu", "wi-fi", "wifi", "sim", "esim", "ntt", "kddi", "au",
+    "softbank", "jr", "jra", "jfa", "usj", "tdl", "tdr", "tbs", "fuji", "asahi", "mbs"
+}
+
+def validate_news_script_quality(raw_text, title=""):
+    """
+    生成されたニュース原稿の品質をダブルチェックする。
+    不自然な英語混入、中国語混入、句読点欠落、中身のない同語反復（トートロジー）を検知して不合格理由を返す。
+    合格の場合は (True, "") を返す。
+    """
+    if not raw_text or len(raw_text.strip()) < 20:
+        return False, "テキストが短すぎるか空です"
+
+    # 1. 英語単語の混入チェック
+    english_words = re.findall(r'[a-zA-Z]{3,}', raw_text)
+    invalid_english = []
+    for w in english_words:
+        if w.lower() not in ALLOWED_ENGLISH_TERMS:
+            invalid_english.append(w)
+    if invalid_english:
+        return False, f"不要な英語単語が混入しています: {invalid_english}"
+
+    # 2. 中国語・簡体字チェック
+    lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
+    for l in lines:
+        if is_chinese_sentence(l):
+            return False, f"中国語・簡体字表現が検知されました: '{l}'"
+
+    # 3. トートロジー・中身のない水増し文句チェック
+    TAUTOLOGY_PATTERNS = [
+        re.compile(r'これは一体どういうことなのか説明してみよう'),
+        re.compile(r'(名作映画|人気作品|話題作|新作|商品)ってどんな作品だろうか'),
+        re.compile(r'長年愛され続けている.*のことを指すんだ'),
+        re.compile(r'という配信プラットフォームに'),
+        re.compile(r'どういうことなのか、詳しく見ていきましょうか'),
+    ]
+    for pat in TAUTOLOGY_PATTERNS:
+        if pat.search(raw_text):
+            return False, f"中身のない同語反復・水増し文句が検知されました: '{pat.pattern}'"
+
+    # 4. 句読点（。）の存在チェック
+    has_kuten = any(c in raw_text for c in ['。', '！', '？', '!', '?'])
+    if not has_kuten and len(raw_text) > 40:
+        return False, "文末の句点（。）が完全に欠落しています"
+
+    return True, ""
+
 def generate_news_item_script_data(payload, custom_dict=None):
     """
     ニュース1件分の原稿AI生成、ファクト照合、発音検証、見出し生成を一括処理して返す
@@ -261,7 +315,28 @@ def generate_news_item_script_data(payload, custom_dict=None):
             full_article_content = f"{description}\n【元記事の詳細本文】: {fetched_body}"
 
     prompt = build_news_prompt(char_desc, title, full_article_content)
-    raw_text = call_llm_backend(provider, prompt, api_key, model_name)
+    raw_text = None
+    max_retries = 3
+
+    for attempt in range(1, max_retries + 1):
+        cur_prompt = prompt
+        if attempt > 1:
+            cur_prompt += "\n\n【重要・品質修正指示（再生成）】前回の出力に不自然な英単語（英語）や句読点の欠落、中身のない同語反復が含まれていたため破棄されました。すべて100%自然でスマートな日本語のみで、各文末に必ず句点（。）を付け、ニュースの具体的な事実のみを解説してください。"
+            print(f"[ダブルチェック・品質再生成] 🔄 試行 {attempt}/{max_retries} 回目の原稿生成を実行中...", flush=True)
+
+        candidate_text = call_llm_backend(provider, cur_prompt, api_key, model_name)
+        if not candidate_text:
+            continue
+
+        is_valid, reason = validate_news_script_quality(candidate_text, title)
+        if is_valid:
+            raw_text = candidate_text
+            if attempt > 1:
+                print(f"[ダブルチェック・品質合格] ✅ 試行 {attempt} 回目で高品質な原稿が生成されました！", flush=True)
+            break
+        else:
+            print(f"[ダブルチェック・不合格判定] ⚠️ {attempt}/{max_retries} 回目の出力を不自然と判定 (理由: {reason}) ➔ 再試行します", flush=True)
+            raw_text = candidate_text  # 最終フォールバック用
 
     if not raw_text:
         return None
