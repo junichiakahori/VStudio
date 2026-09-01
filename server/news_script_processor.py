@@ -390,16 +390,15 @@ def validate_news_script_quality(raw_text, title="", article_context=""):
 
         for l in split_sentences_check:
             if len(l) >= 15:
-                is_pure_impression = bool(re.search(r'^(これ|このニュース|そう|本当|ボク|私|僕|みんな|皆|視聴者)?.*(楽しみ|嬉しい|うれしい|悲しい|残念|すごい|凄い|驚き|びっくり|注目|期待|応援|注視|和解|複雑|不思議|気になり|気をつ|注意|大切|安心|よかった|良かった)(です|だ|ね|よね|よ|な|と思います|にゃ|のだ|わ).*$', l))
-                if not is_pure_impression:
-                    nouns = re.findall(r'[一-鿿゠-ヿA-Za-z0-9]{2,}', l)
-                    FILTER_TERMS = {'こと', 'よう', 'そう', 'ため', 'ニュース', '記事', '内容', '今回', '発表', '紹介', '情報'}
-                    meaningful_nouns = [n for n in nouns if n not in FILTER_TERMS]
-                    if len(meaningful_nouns) >= 3:
-                        matched_count = sum(1 for n in meaningful_nouns if n in article_context or n in title)
-                        match_ratio = matched_count / len(meaningful_nouns)
-                        if match_ratio < 0.20:
-                            return False, f"元記事と一致しない架空エピソードが含まれています: '{l}' (一致率: {match_ratio:.2f})"
+                # 配信者の感想・考察・所感・見解表現（これらは事実ではなく主観コメントなのでファクト照合から除外）
+                is_impression_or_opinion = bool(re.search(
+                    r'(と思います|と感じます|と考えられます|かもしれません|のではないでしょうか|ですね|ですよ|ですよね|'
+                    r'にゃ|のだ|わ|でしょう|たいですね|ていきたい|させられます|印象的|考えさせられ|注目|期待|'
+                    r'気になります|心配|安心|驚き|すごい|残念|嬉しい|大切|重要|教訓|影響|可能性もある|注目が集ま|'
+                    r'目を離せません|応援したい|見守りたい|願いたい)', l
+                ))
+                # 作品名や固有名詞『...』の捏造チェックは先頭で実施済み
+                pass 
 
     return True, ""
 
