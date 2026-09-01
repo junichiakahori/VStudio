@@ -429,6 +429,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         popupWindow.center()
         popupWindow.backgroundColor = NSColor(red: 0.05, green: 0.05, blue: 0.07, alpha: 1.0)
         popupWindow.appearance = NSAppearance(named: .darkAqua)
+        popupWindow.isReleasedWhenClosed = false
+        popupWindow.delegate = self
         
         configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
@@ -602,7 +604,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
 
     // MARK: - Window Delegate & App Termination
     func windowWillClose(_ notification: Notification) {
-        NSApp.terminate(nil)
+        guard let closingWindow = notification.object as? NSWindow else { return }
+        if closingWindow == self.window {
+            NSApp.terminate(nil)
+        } else {
+            popupWindows.removeAll { $0.window == closingWindow }
+        }
     }
     
     func applicationWillTerminate(_ notification: Notification) {
