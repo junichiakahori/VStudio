@@ -377,7 +377,7 @@ def validate_news_script_quality(raw_text, title="", article_context=""):
         return False, f"原稿の文数が不足しています ({len(split_sentences_check)}文 < 5文)。出来事の経緯・背景・影響・感想を含む最低5文の深掘り解説が必要です。"
 
     # 不自然な二重語尾チェック
-    if re.search(r'(?:だよですね|だねですね|よねですね|よですね|ねですね)', raw_text):
+    if re.search(r'(?:だよですね|だねですね|よねですね|よですね|ねですね|だなにゃ|だなのだ)', raw_text):
         return False, "不自然な二重語尾（だよですね等）が含まれています"
 
     # 1. 英語単語の混入チェック
@@ -521,6 +521,11 @@ def generate_news_item_script_data(payload, custom_dict=None):
         clean_text = re.sub(r'(?:^|(?<=[。！？\s]))(?:とろろ|トロロ)はにゃ[、,\s　]*', 'とろろとしては、', clean_text)
         clean_text = re.sub(r'(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)(?:なのだ|のだ)[、,\s　]*', 'ずんだもんとしては、', clean_text)
         clean_text = re.sub(r'(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)は(?:なのだ|のだ)[、,\s　]*', 'ずんだもんとしては、', clean_text)
+                # 不自然な崩れ語尾（「だなにゃ」「だなのだ」「だねにゃ」等）の徹底修正
+        clean_text = re.sub(r'だなにゃ([！!？?。、\s　]|$)', r'だにゃ\1', clean_text)
+        clean_text = re.sub(r'だなのだ([！!？?。、\s　]|$)', r'なのだ\1', clean_text)
+        clean_text = re.sub(r'だねにゃ([！!？?。、\s　]|$)', r'ですね\1', clean_text)
+        clean_text = re.sub(r'だねのだ([！!？?。、\s　]|$)', r'なのだ\1', clean_text)
         # 不自然な二重語尾（だよですね、だねですね、よですね等）の徹底修正
         clean_text = re.sub(r'だよですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)
         clean_text = re.sub(r'だねですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)

@@ -311,6 +311,10 @@ async function queueVoicevoxAudio(
 
   // クリーンアップ関数
   const cleanYomi = (t) => {
+    t = t.replace(/だなにゃ([！!？?。、\s　]|$)/g, "だにゃ$1");
+    t = t.replace(/だなのだ([！!？?。、\s　]|$)/g, "なのだ$1");
+    t = t.replace(/だねにゃ([！!？?。、\s　]|$)/g, "ですね$1");
+    t = t.replace(/だねのだ([！!？?。、\s　]|$)/g, "なのだ$1");
     t = t.replace(/(?:^|(?<=[。！？\s]))(?:とろろ|トロロ)にゃ[、,\s　]*/g, "とろろとしては、");
     t = t.replace(/(?:^|(?<=[。！？\s]))(?:とろろ|トロロ)はにゃ[、,\s　]*/g, "とろろとしては、");
     t = t.replace(/(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)(?:なのだ|のだ)[、,\s　]*/g, "ずんだもんとしては、");
@@ -509,6 +513,10 @@ async function playVoicevoxDirectAndWait(displayText, speakText = null) {
   const rawSpeak = speakText || displayText;
   
   const cleanYomi = (t) => {
+    t = t.replace(/だなにゃ([！!？?。、\s　]|$)/g, "だにゃ$1");
+    t = t.replace(/だなのだ([！!？?。、\s　]|$)/g, "なのだ$1");
+    t = t.replace(/だねにゃ([！!？?。、\s　]|$)/g, "ですね$1");
+    t = t.replace(/だねのだ([！!？?。、\s　]|$)/g, "なのだ$1");
     t = t.replace(/(?:^|(?<=[。！？\s]))(?:とろろ|トロロ)にゃ[、,\s　]*/g, "とろろとしては、");
     t = t.replace(/(?:^|(?<=[。！？\s]))(?:とろろ|トロロ)はにゃ[、,\s　]*/g, "とろろとしては、");
     t = t.replace(/(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)(?:なのだ|のだ)[、,\s　]*/g, "ずんだもんとしては、");
