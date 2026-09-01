@@ -137,6 +137,18 @@ def apply_country_prefixes(text):
         )
     return t
 
+def apply_okonau_context_rules(text):
+    """「行う（おこなう）」と「行く（いく）」の同音異義語を文脈から安全に解決"""
+    if not text:
+        return ""
+    t = text
+    t = re.sub(r'([をがにでもはと])行([っいうわえな])', r'\1おこな\2', t)
+    t = re.sub(r'(活動|調査|支援|開発|実験|作業|対応|対策|工事|手続き|点検|研修|指導|投票|開票|審査|試験|発表|配信|運営|管理|処理|実行|実施|施行|開催|避難|提供|販売|製造|修理|変更|修正|開始|終了|停止|中止|延期|再開)行([っいうわえな])', r'\1おこな\2', t)
+    t = re.sub(r'行わ([れせないずぬてたまば])', r'おこなわ\1', t)
+    t = re.sub(r'行い([まてた])', r'おこない\1', t)
+    t = re.sub(r'行う([こと|もの|予定|方針|見込み|よう|際|時|ため|と|が|の|から|に|。|！|？|、]|$)', r'おこなう\1', t)
+    return t
+
 def normalize_for_tts(text, custom_dict=None, log_collector=None):
     """
     TTS用テキストの包括的正規化処理（Wikipedia解決ログも収集）
@@ -152,6 +164,7 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None):
                 t = t.replace(orig, yomi)
 
     t = apply_country_prefixes(t)
+    t = apply_okonau_context_rules(t)
 
     terms = extract_special_terms(t)
     for term in terms:
