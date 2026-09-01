@@ -58,10 +58,17 @@ window.openNewsListPopup = function () {
   }
 };
 
-// ニュース見出しをそのまま読み上げる（HTMLタグ・余白のみ除去）
+// ニュース見出しのスマート整形（メディア名サフィックスや無意味なサイト名の除去）
 function cleanTitleForSpeech(title) {
   if (!title) return "";
-  return stripHtmlTags(String(title)).trim();
+  let t = stripHtmlTags(String(title)).trim();
+  // 末尾のメディア名サフィックスを除去 (例: "〇〇 - Google ニュース" ➔ "〇〇")
+  t = t.replace(/[\s\-–—|｜]+(Google\s*ニュース|Google\s*News|Yahoo!\s*ニュース|Yahoo!\s*JAPAN|NHK\s*NEWS\s*WEB|ITmedia[A-Za-z0-9\s]*|共同通信|時事通信|読売新聞|朝日新聞|毎日新聞|産経新聞|日経新聞|日本経済新聞|TBS\s*NEWS\s*DIG|FNNプライムオンライン|テレ朝news|日テレNEWS[A-Za-z0-9\s]*)$/i, "");
+  // 単なるサイト名・ヘッダー名のみの場合は読み上げスキップ
+  if (/^(ニュース|Google\s*ニュース|Google\s*News|Yahoo!\s*ニュース|トップニュース|主要ニュース|トピックス)$/i.test(t.trim())) {
+    return "";
+  }
+  return t.trim();
 }
 
 function getNewsTransitionPhrase(isFirst = false, isCatChanged = false, catName = "") {

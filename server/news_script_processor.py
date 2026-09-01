@@ -1,3 +1,11 @@
+
+def clean_news_title(title):
+    """ニュースタイトルから末尾のメディア名サフィックスや不要なサイト名を除去"""
+    if not title:
+        return ""
+    t = title.strip()
+    t = re.sub(r'[\s\-–—|｜]+(Google\s*ニュース|Google\s*News|Yahoo!\s*ニュース|Yahoo!\s*JAPAN|NHK\s*NEWS\s*WEB|ITmedia[A-Za-z0-9\s]*|共同通信|時事通信|読売新聞|朝日新聞|毎日新聞|産経新聞|日経新聞|日本経済新聞|TBS\s*NEWS\s*DIG|FNNプライムオンライン|テレ朝news|日テレNEWS[A-Za-z0-9\s]*)$', '', t, flags=re.IGNORECASE).strip()
+    return t
 # -*- coding: utf-8 -*-
 """
 news_script_processor.py
@@ -379,7 +387,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
     """
     ニュース1件分の原稿AI生成、ファクト照合、発音検証、見出し生成を一括処理して返す
     """
-    title = payload.get('title', '').strip()
+    title = clean_news_title(payload.get('title', ''))
     description = payload.get('description', '').strip()
     char_desc = payload.get('charDesc', '').strip()
     category_name = payload.get('categoryName', '').strip()
