@@ -111,6 +111,8 @@ window.openNewsListPopup = function () {
 // ニュース見出しのスマート整形（メディア名サフィックスや無意味なサイト名の除去）
 // 🌐 記事URLのドメインからメディア名（出典）を特定する逆引き辞書
 const DOMAIN_MEDIA_MAP = {
+  "news.yahoo.co.jp": "Yahoo!ニュース",
+  "yahoo.co.jp": "Yahoo!ニュース",
   "nhk.or.jp": "NHK",
   "mainichi.jp": "毎日新聞",
   "yomiuri.co.jp": "読売新聞",
@@ -153,9 +155,7 @@ const DOMAIN_MEDIA_MAP = {
   "businessinsider.jp": "Business Insider",
   "gizmodo.jp": "ギズモード",
   "wired.jp": "WIRED",
-  "engadget.com": "Engadget",
-  "cnet.com": "CNET",
-  "zdnet.com": "ZDNET"
+  "cnet.com": "CNET"
 };
 
 function extractMediaSource(itemOrTitle) {
@@ -170,29 +170,29 @@ function extractMediaSource(itemOrTitle) {
   
   let t = stripHtmlTags(title).trim();
 
-  // 1. タイトル内の括弧 (例: (デイリースポーツ) - Yahoo!ニュース)
-  const m = t.match(/[（\(]([^）\)]*(?:新聞|通信|日報|新報|NEWS|スポニチ|デイリー|スポーツ|ORICON|文春|新潮|テレビ|WEB|DIG|編集部|Japan|PR\s*TIMES|PRTIMES|タイムス)[^）\)]*)[）\)]/i);
+  // 1. タイトル内の括弧 (例: (デイリースポーツ) (毎日新聞) 等)
+  const m = t.match(/[（\(]([^）\)]*(?:新聞|通信|日報|新報|NEWS|スポニチ|デイリー|スポーツ|ORICON|文春|新潮|テレビ|WEB|DIG|編集部|Japan|PR\s*TIMES|PRTIMES|タイムス|NHK|ロイター|AFP|CNN|BBC|Yahoo!|ヤフー)[^）\)]*)[）\)]/i);
   if (m) {
     let src = m[1].replace(/[\s\-–—]+(?:Yahoo!.*|Google.*)$/i, "").trim();
-    if (src && !/^(ニュース|Google\s*ニュース|Yahoo!\s*ニュース)$/i.test(src)) return src;
+    if (src && !/^(ニュース|Google\s*ニュース)$/i.test(src)) return src;
   }
 
-  // 2. タイトル末尾のサフィックス (例: - 読売新聞)
-  const m2 = t.match(/[\s|｜\-–—]+([A-Za-z0-9\u4e00-\u9fff\u30a0-\u30ff\s]+(?:のプレスリリース|PR\s*TIMES|PRTIMES|新聞|通信|日報|新報|NEWS|WEB|DIG|テレビ|デイリースポーツ|日刊スポーツ|スポニチ|zakzak|zakⅡ|ねとらぼ|AUTOMATON|IGN\s*Japan|Game\s*Watch|4Gamer|モデルプレス|文春オンライン|デイリー新潮|東洋経済オンライン|ダイヤモンド・オンライン))[^\-–—|｜]*$/i);
+  // 2. タイトル末尾のサフィックス (例: - 読売新聞 - Yahoo!ニュース)
+  const m2 = t.match(/[\s|｜\-–—]+([A-Za-z0-9\u4e00-\u9fff\u30a0-\u30ff\s]+(?:のプレスリリース|PR\s*TIMES|PRTIMES|新聞|通信|日報|新報|NEWS|WEB|DIG|テレビ|デイリースポーツ|日刊スポーツ|スポニチ|zakzak|zakⅡ|ねとらぼ|AUTOMATON|IGN\s*Japan|Game\s*Watch|4Gamer|モデルプレス|文春オンライン|デイリー新潮|東洋経済オンライン|ダイヤモンド・オンライン|Yahoo!ニュース|Yahoo!|ヤフー|NHK|ロイター|AFP))[^\-–—|｜]*$/i);
   if (m2) {
-    let src = m2[1].replace(/[\s\-–—]+(?:Yahoo!.*|Google.*)$/i, "").trim();
-    if (src && !/^(ニュース|Google\s*ニュース|Yahoo!\s*ニュース)$/i.test(src)) return src;
+    let src = m2[1].replace(/[\s\-–—]+(?:Google.*)$/i, "").trim();
+    if (src && !/^(ニュース|Google\s*ニュース)$/i.test(src)) return src;
   }
 
   // 3. RSSの source / publisher フィールド
   if (item) {
     if (item.source && typeof item.source === "string" && item.source.trim()) {
-      const s = item.source.replace(/[\s\-–—]+(?:Yahoo!.*|Google.*)$/i, "").trim();
-      if (s && !/^(ニュース|Google\s*ニュース|Yahoo!\s*ニュース)$/i.test(s)) return s;
+      const s = item.source.replace(/[\s\-–—]+(?:Google.*)$/i, "").trim();
+      if (s && !/^(ニュース|Google\s*ニュース)$/i.test(s)) return s;
     }
     if (item.publisher && typeof item.publisher === "string" && item.publisher.trim()) {
-      const p = item.publisher.replace(/[\s\-–—]+(?:Yahoo!.*|Google.*)$/i, "").trim();
-      if (p && !/^(ニュース|Google\s*ニュース|Yahoo!\s*ニュース)$/i.test(p)) return p;
+      const p = item.publisher.replace(/[\s\-–—]+(?:Google.*)$/i, "").trim();
+      if (p && !/^(ニュース|Google\s*ニュース)$/i.test(p)) return p;
     }
     
     // 4. URLのドメイン逆引き
@@ -202,9 +202,13 @@ function extractMediaSource(itemOrTitle) {
         if (url.includes(dom)) return name;
       }
     }
+
+    // 5. カテゴリからのフォールバック（出典なしを100%根絶）
+    if (item.categoryName) return `${item.categoryName}ニュース`;
+    if (item.category) return `${item.category}ニュース`;
   }
 
-  return "";
+  return "最新ニュース";
 }
 
 function cleanTitleForSpeech(itemOrTitle) {
@@ -213,7 +217,8 @@ function cleanTitleForSpeech(itemOrTitle) {
   let t = stripHtmlTags(String(title)).trim();
   const mediaSrc = extractMediaSource(itemOrTitle);
   
-  t = t.replace(/[（\(][^）\)]*(?:新聞|通信|日報|新報|NEWS|スポニチ|デイリー|スポーツ|ORICON|文春|新潮|テレビ|WEB|DIG|編集部|Japan|PR|タイムス)[^）\)]*[）\)]/gi, "");
+  // タイトル本体からメディア表記サフィックスを綺麗に除去
+  t = t.replace(/[（\(][^）\)]*(?:新聞|通信|日報|新報|NEWS|スポニチ|デイリー|スポーツ|ORICON|文春|新潮|テレビ|WEB|DIG|編集部|Japan|PR|タイムス|Yahoo!|ヤフー)[^）\)]*[）\)]/gi, "");
   t = t.replace(/[\s|｜\-–—]+(?:[A-Za-z0-9\u4e00-\u9fff\u30a0-\u30ff\s]+のプレスリリース|PR\s*TIMES|PRTIMES|プレスリリース).*$/gi, "");
   t = t.replace(/[\s|｜\-–—]+(?:Google\s*ニュース|Google\s*News|Yahoo!\s*ニュース|Yahoo!\s*JAPAN|Yahoo!|ヤフー|NHK\s*NEWS\s*WEB|ITmedia[A-Za-z0-9\s]*|共同通信|時事通信|読売新聞|朝日新聞|毎日新聞|産経新聞|日経新聞|日本経済新聞|TBS\s*NEWS\s*DIG|FNNプライムオンライン|テレ朝news|日テレNEWS[A-Za-z0-9\s]*|ORICON\s*NEWS|モデルプレス|デイリースポーツ|日刊スポーツ|スポニチ|zakzak|zakⅡ|ねとらぼ|AUTOMATON|IGN\s*Japan|Game\s*Watch|4Gamer.*)$/gi, "");
   t = t.replace(/[\s|｜\-–—]+$/g, "").trim();
@@ -222,6 +227,7 @@ function cleanTitleForSpeech(itemOrTitle) {
     return "";
   }
   
+  // 100%確実に出典を付与
   if (mediaSrc) {
     return `${t}（${mediaSrc}より）`;
   }
