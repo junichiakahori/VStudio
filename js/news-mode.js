@@ -1,3 +1,37 @@
+
+// 🚫 動画視聴前提のダイジェスト記事（Pickup NEWS等）や無意味なサイトヘッダーを除外する判定
+function isInvalidNewsVideoArticle(item) {
+  if (!item || !item.title) return true;
+  const title = item.title.trim();
+  const desc = (item.description || "").trim();
+
+  // 1. タイトル判定
+  const VIDEO_TITLE_PATTERNS = [
+    /【動画】|\[動画\]|\(動画\)/i,
+    /Pickup\s*NEWS|ピックアップニュース/i,
+    /1分でわかる|まるわかり|ダイジェスト/i,
+    /動画で見る|動画ニュース|動画配信/i,
+    /Live配信|ライブ配信|生中継|ライブ中継/i,
+    /^(ニュース|Google\s*ニュース|Yahoo!\s*ニュース|トップニュース|主要ニュース|トピックス)$/i
+  ];
+  for (const pat of VIDEO_TITLE_PATTERNS) {
+    if (pat.test(title)) return true;
+  }
+
+  // 2. 本文（description）判定
+  const VIDEO_DESC_PATTERNS = [
+    /まとめて.*分の動画でお伝えします/i,
+    /動画でお伝えします/i,
+    /動画をご覧ください/i,
+    /データ放送では動画をご覧いただけません/i,
+    /動画をご視聴ください/i
+  ];
+  for (const pat of VIDEO_DESC_PATTERNS) {
+    if (pat.test(desc)) return true;
+  }
+
+  return false;
+}
 let readNewsTitles = new Set(JSON.parse(localStorage.getItem("newsReadTitles") || "[]")); // 既読ニュースのタイトルを保持するセット
 window.readNewsTitles = readNewsTitles;
 try {
@@ -297,10 +331,10 @@ async function playNextContinuousNews(isOneOff = false, isFetchOnly = false) {
         throw new Error("ニュースが見つかりませんでした。");
       }
 
-      // 重複排除（タイトルが同じものは除外）
+      // 動画ダイジェスト記事・ヘッダー行の除外 & 重複排除
       const uniqueItemsMap = new Map();
       allParsedItems.forEach(item => {
-        if (item.title && !uniqueItemsMap.has(item.title)) {
+        if (item.title && !isInvalidNewsVideoArticle(item) && !uniqueItemsMap.has(item.title)) {
           uniqueItemsMap.set(item.title, item);
         }
       });
@@ -2269,7 +2303,13 @@ ${creditsInstruction}
 
     const results = await Promise.all(fetchPromises);
     let allParsedItems = [];
-    results.forEach(items => { allParsedItems = allParsedItems.concat(items); });
+    results.forEach(items => {
+      items.forEach(it => {
+        if (it && it.title && !isInvalidNewsVideoArticle(it)) {
+          allParsedItems.push(it);
+        }
+      });
+    });
 
     // タイトルの正規化（装飾タグやメディア名の除去）
     function normalizeNewsTitle(title) {
