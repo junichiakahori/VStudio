@@ -60,17 +60,28 @@ def lookup_wikipedia_reading(term):
                     continue
                 extract = pdata.get("extract", "")
                 # 括弧内の先頭にあるひらがな/カタカナ読みを抽出（英語併記があっても確実に取得）
-                m = re.search(r'[\(（]\s*([ぁ-んァ-ヶー]+)', extract)
+                m = re.search(r'[\(（]\s*([ぁ-んァ-ヶゔヴー・、\s]+)', extract)
                 if m:
-                    yomi_raw = m.group(1).split("、")[0].split(" ")[0].strip()
+                    raw_bracket = m.group(1).strip()
+                    # 英語や別名表記の手前までを取得
+                    raw_bracket = re.split(r'[,，\t\n]|\s{2,}|(?<=[ぁ-んァ-ヶゔヴー])\s+(?=[A-Za-z])', raw_bracket)[0].strip()
+                    # 読点を整理
+                    yomi_raw = raw_bracket.replace("・", "").replace(" ", "").strip()
                     if yomi_raw and yomi_raw not in INVALID_READINGS:
-                        yomi_hira = "".join(
-                            chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c
-                            for c in yomi_raw
-                        )
-                        if len(yomi_hira) >= 2 and re.match(r'^[ぁ-んー]+$', yomi_hira):
-                            _wiki_reading_cache[term] = (yomi_hira, term)
-                            return yomi_hira, term
+                        # カタカナをひらがなに変換（ヴ・ゔもサポート）
+                        yomi_hira = ""
+                        for c in yomi_raw:
+                            if 0x30A1 <= ord(c) <= 0x30F6:
+                                yomi_hira += chr(ord(c) - 0x60)
+                            elif c == 'ヴ':
+                                yomi_hira += 'ゔ'
+                            else:
+                                yomi_hira += c
+                        
+                        yomi_clean = re.sub(r'[^ぁ-んゔー、]', '', yomi_hira)
+                        if len(yomi_clean.replace("、", "")) >= 2:
+                            _wiki_reading_cache[term] = (yomi_clean, term)
+                            return yomi_clean, term
 
         search_url = f"https://ja.wikipedia.org/w/api.php?action=opensearch&search={urllib.parse.quote(term)}&limit=1&format=json"
         req_s = urllib.request.Request(search_url, headers=headers)
@@ -88,19 +99,19 @@ def lookup_wikipedia_reading(term):
 
 def extract_special_terms(text):
     """
-    発音ミスが起きやすいアルファベット略称・英字混じり固有名詞・『』内の作品名を自動抽出
+    発音ミスが起きやすいアルファベット略称・英字混じり固有名詞・『』や「」内の作品名を自動抽出
     """
     terms = []
-    # 1. 『...』で囲まれた作品名・固有名詞
-    for m in re.finditer(r'『(.*?)』', text):
+    # 1. 『...』および「...」で囲まれた作品名・固有名詞
+    for m in re.finditer(r'[『「](.*?)[』」]', text):
         t = m.group(1).strip()
-        if len(t) >= 2 and len(t) <= 25:
+        if len(t) >= 2 and len(t) <= 25 and not re.match(r'^(ニュース|速報|話題|注目)$', t):
             terms.append(t)
 
-    # 2. 英字略称
-    for m in re.finditer(r'(?<![A-Za-z0-9])[A-Za-z]{2,}(?![A-Za-z0-9])', text):
+    # 2. 英字単語・略称（VIVANT, Ado, YOASOBI等）
+    for m in re.finditer(r'(?<![A-Za-z0-9])[A-Za-z0-9\-]{2,}(?![A-Za-z0-9])', text):
         t = m.group(0)
-        if t.lower() not in {"https", "http", "www", "com", "net", "jp", "org", "co"}:
+        if t.lower() not in {"https", "http", "www", "com", "net", "jp", "org", "co", "html"}:
             terms.append(t)
     return list(dict.fromkeys(terms))
 
