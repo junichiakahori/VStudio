@@ -1386,7 +1386,7 @@
                 const res = await fetch("/get_youtube_video_info", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ videoId: extractedId })
+                    body: JSON.stringify({ url: extractedId, videoId: extractedId })
                 });
                 if (res.ok) {
                     info = await res.json();
@@ -2457,7 +2457,7 @@
             const badge = document.getElementById("yt-oauth-badge");
             const loginBtn = document.getElementById("btn-yt-oauth-login");
             try {
-                const res = await fetch("http://localhost:8001/api/youtube/oauth_status", { cache: "no-store" });
+                const res = await fetch("/api/youtube/oauth_status", { cache: "no-store" });
                 if (res.ok) {
                     const data = await res.json();
                     if (data.authenticated) {
@@ -2495,7 +2495,7 @@
             }
             showYtApiFeedback("🌐 ブラウザでGoogleログイン・アクセス許可を行ってください...", true, true);
             try {
-                const res = await fetch("http://localhost:8001/api/youtube/start_oauth", { method: "POST" });
+                const res = await fetch("/api/youtube/start_oauth", { method: "POST" });
                 const data = await res.json();
                 if (data.success && data.authenticated) {
                     showYtApiFeedback(`✅ Google連携が完了しました！（チャンネル: ${data.channel_title}）`, true);
@@ -2562,7 +2562,7 @@
                     return;
                 }
 
-                const res = await fetch("http://localhost:8001/api/youtube/create_broadcast", {
+                const res = await fetch("/api/youtube/create_broadcast", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -2642,7 +2642,7 @@
             showYtApiFeedback("📝 YouTubeの配信枠情報を更新中...", true, true);
 
             try {
-                const res = await fetch("http://localhost:8001/api/youtube/update_broadcast", {
+                const res = await fetch("/api/youtube/update_broadcast", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -2733,7 +2733,7 @@
             showYtApiFeedback("🖼️ サムネイル画像をYouTubeに送信中...", true, true);
 
             try {
-                const res = await fetch("http://localhost:8001/api/youtube/upload_thumbnail", {
+                const res = await fetch("/api/youtube/upload_thumbnail", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -3037,7 +3037,7 @@
             if (!listContainer) return;
             listContainer.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:20px;">⏳ 配信枠一覧を取得中...</div>';
             try {
-                const res = await fetch("http://localhost:8001/api/youtube/list_broadcasts", { cache: "no-store" });
+                const res = await fetch("/api/youtube/list_broadcasts", { cache: "no-store" });
                 const data = await res.json();
                 if (data.success && Array.isArray(data.items)) {
                     cachedBroadcasts = data.items;

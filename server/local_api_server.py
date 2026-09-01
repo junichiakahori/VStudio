@@ -227,7 +227,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
             # ── RSS・クローラー・ニュース原稿 ──
             if self.path == '/fetch_rss':
-                url = self._read_json().get('url', '')
+                p = self._read_json()
+                url = p.get('url') or p.get('videoId', '')
                 xml_data = fetch_rss_xml(url)
                 self.send_response(200)
                 self.send_header('Content-type', 'application/xml; charset=utf-8')
@@ -247,7 +248,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
             # ── YouTube API 連携 ──
             if self.path == '/get_youtube_video_info':
-                url = self._read_json().get('url', '')
+                p = self._read_json()
+                url = p.get('url') or p.get('videoId', '')
                 return self._send_json(youtube_api_helper.fetch_video_info(url))
 
             if self.path == '/api/youtube/start_oauth':
