@@ -185,9 +185,25 @@ def is_title_duplicate_sentence(sentence, title):
     return False
 
 def is_chinese_sentence(text):
-    """中国語（簡体字・特有構文）混入判定フィルター"""
+    """中国語（簡体字）混入判定フィルター（厳密な簡体字Unicodeのみ）"""
     if not text:
         return False
+    t = text.strip()
+    # 日本語の常用漢字・旧字体・人名用漢字に一切存在しない純粋な中国語簡体字
+    STRICT_SIMPLIFIED = re.compile(r'[这俩们么谁哪几没为发时说着从让给过还话对头点个样现见后买卖听动东车长门问关]')
+    # 簡体字が明確に含まれ、かつひらがなが少ない場合
+    hiragana_count = len(re.findall(r'[ぁ-ん]', t))
+    total_len = len(t)
+
+    # 簡体字トークン
+    if re.search(r'[这俩们么谁哪几没说]', t):
+        return True
+
+    # 句読点とひらがな極少
+    if ('，' in t or '“' in t or '”' in t) and (hiragana_count < 2 or (total_len > 10 and (hiragana_count / total_len) < 0.12)):
+        return True
+
+    return False
     t = text.strip()
     # 簡体字が明確に含まれている場合
     if re.search(r'[这俩们么谁哪几没为发时说着从让给过]', t):
@@ -343,9 +359,10 @@ def validate_news_script_quality(raw_text, title="", article_context=""):
     if not raw_text or len(raw_text.strip()) < 45:
         return False, f"原稿の文字数が少なすぎます ({len(raw_text.strip()) if raw_text else 0}文字 < 45文字)"
 
-    lines = [l.strip() for l in raw_text.splitlines() if l.strip() and re.search(r'[一-鿿぀-ゟ゠-ヿA-Za-z0-9]', l)]
-    if len(lines) < 2:
-        return False, f"原稿の文数が不足しています ({len(lines)}文 < 2文)。具体的な出来事の解説と感想を含む複数文が必要です。"
+    # 改行または句点でセンテンスを分割
+    split_sentences_check = [s.strip() for s in re.split(r'(?<=[。！？\n])|(?<=[!?])(?![A-Za-z0-9])', raw_text) if s.strip() and re.search(r'[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ffA-Za-z0-9]', s)]
+    if len(split_sentences_check) < 2:
+        return False, f"原稿の文数が不足しています ({len(split_sentences_check)}文 < 2文)。具体的な出来事の解説と感想を含む複数文が必要です。"
 
     # 1. 英語単語の混入チェック
     english_words = re.findall(r'[a-zA-Z]{3,}', raw_text)
@@ -357,7 +374,7 @@ def validate_news_script_quality(raw_text, title="", article_context=""):
         return False, f"不要な英語単語が混入しています: {invalid_english}"
 
     # 2. 中国語・簡体字チェック
-    for l in lines:
+    for l in split_sentences_check:
         if is_chinese_sentence(l):
             return False, f"中国語・簡体字表現が検知されました: '{l}'"
 
@@ -399,7 +416,7 @@ def validate_news_script_quality(raw_text, title="", article_context=""):
             if inv_t and inv_t not in article_context and inv_t not in title:
                 return False, f"元記事に存在しない作品名が捏造されています: 『{inv_t}』"
 
-        for l in lines:
+        for l in split_sentences_check:
             if len(l) >= 15:
                 is_pure_impression = bool(re.search(r'^(これ|このニュース|そう|本当|ボク|私|僕|みんな|皆|視聴者)?.*(楽しみ|嬉しい|うれしい|悲しい|残念|すごい|凄い|驚き|びっくり|注目|期待|応援|注視|和解|複雑|不思議|気になり|気をつ|注意|大切|安心|よかった|良かった)(です|だ|ね|よね|よ|な|と思います|にゃ|のだ|わ).*$', l))
                 if not is_pure_impression:
@@ -538,17 +555,17 @@ def generate_news_item_script_data(payload, custom_dict=None):
         break
 
     if not items:
-        # 万が一リトライを繰り返しても不十分だった場合のスマートフォールバック
-        clean_t = re.sub(r'[★【】〈〉\[\]「」『』\s　\(\)（）]', '', title)
-        fallback_display1 = f"{title}に関する最新の動きです。"
-        if description and len(description) >= 20 and not description.endswith("…"):
-            fallback_display2 = f"{description} 関係者の間でも関心が高まっています。"
-        else:
-            fallback_display2 = "今後の詳しい動向や影響についても注目が集まっています。"
-        items = [
-            {"display": fallback_display1, "speech": normalize_for_tts(fallback_display1, custom_dict=custom_dict)},
-            {"display": fallback_display2, "speech": normalize_for_tts(fallback_display2, custom_dict=custom_dict)}
-        ]
+        # 万が一リトライを繰り返しても不十分だった場合は、無意味な定型文を読まずに安全にスキップ
+        print(f"[ニュース生成スキップ] ⚠️ '{title}' の高品質な原稿を生成できなかったため、このニュースをスキップします。")
+        return {
+            "status": "skipped",
+            "url": article_url or "",
+            "headline": {"display": title, "speech": normalize_for_tts(title, custom_dict=custom_dict)},
+            "headline_speech": normalize_for_tts(title, custom_dict=custom_dict),
+            "items": [],
+            "sentences": [],
+            "fullText": ""
+        }
 
     if ai_headline_raw:
         headline_display = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\1', ai_headline_raw)
