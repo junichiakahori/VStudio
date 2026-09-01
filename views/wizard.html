@@ -2556,15 +2556,10 @@
                 } else {
                     const [h, m] = startTimeInputVal.split(":").map(Number);
                     targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
-                    if (targetDate.getTime() <= now.getTime() + 60000) {
-                        // 過去の時刻が入力されている場合は翌日に補正
-                        targetDate.setDate(targetDate.getDate() + 1);
-                    }
                 }
-                if (isNaN(targetDate.getTime()) || targetDate.getTime() <= now.getTime() + 60000) {
-                    targetDate = new Date(now.getTime() + 3 * 60000);
+                if (!isNaN(targetDate.getTime())) {
+                    scheduledStartTime = targetDate.toISOString();
                 }
-                scheduledStartTime = targetDate.toISOString();
             }
 
             const btn = document.getElementById("btn-api-create-broadcast");
@@ -2647,14 +2642,10 @@
                 } else {
                     const [h, m] = startTimeInputVal.split(":").map(Number);
                     targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
-                    if (targetDate.getTime() <= now.getTime() + 60000) {
-                        targetDate.setDate(targetDate.getDate() + 1);
-                    }
                 }
-                if (isNaN(targetDate.getTime()) || targetDate.getTime() <= now.getTime() + 60000) {
-                    targetDate = new Date(now.getTime() + 3 * 60000);
+                if (!isNaN(targetDate.getTime())) {
+                    scheduledStartTime = targetDate.toISOString();
                 }
-                scheduledStartTime = targetDate.toISOString();
             }
 
             const btn = document.getElementById("btn-api-update-broadcast");

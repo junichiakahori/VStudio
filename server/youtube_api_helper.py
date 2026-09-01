@@ -99,13 +99,28 @@ def start_oauth_flow():
 
 def ensure_future_start_time_iso(start_time_iso=None):
     """
-    YouTube API要件に合わせて、配信予約時刻が必ず未来（現在+2分以降）になるよう自動検証＆補正する
+    ユーザーが指定した配信開始時刻を尊重し、ISO-8601 UTC形式に変換して返す。
+    指定時刻が過去であっても、ユーザーの指定を勝手に上書き・補正せずそのまま適用する。
     """
     now_utc = datetime.datetime.now(datetime.timezone.utc)
-    min_future_utc = now_utc + datetime.timedelta(minutes=2)
 
     if not start_time_iso:
-        return (now_utc + datetime.timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        return now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    iso_str = str(start_time_iso).strip()
+    if "T" in iso_str and not (iso_str.endswith("Z") or "+" in iso_str or "-" in iso_str[10:]):
+        iso_str = f"{iso_str}:00+09:00"
+
+    try:
+        dt = datetime.datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=9)))
+        dt_utc = dt.astimezone(datetime.timezone.utc)
+        print(f"[YouTube API] 📅 ユーザー指定の配信予定時刻をそのまま適用: {dt_utc.strftime('%Y-%m-%dT%H:%M:%SZ')} (JST: {dt.strftime('%Y-%m-%d %H:%M:%S')})")
+        return dt_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+    except Exception as e:
+        print(f"[YouTube API] 時刻パースエラー ({e}) ➔ 現在時刻を適用")
+        return now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
 
     iso_str = str(start_time_iso).strip()
     if "T" in iso_str and not (iso_str.endswith("Z") or "+" in iso_str or "-" in iso_str[10:]):
