@@ -1876,14 +1876,7 @@ ${creditsInstruction}
         }
       }
 
-      // ⏩ スキップ指示（品質不足や生成不可）の場合は待機画面に入らず、直ちに次の記事へ進む
-      if (data && data.status === "skipped") {
-        console.log(`[ニュース番組] ⏩ 品質基準または取得制限により安全にスキップ: 「${item.title}」`);
-        readNewsTitles.add(item.title);
-        if (window.readNewsTitles) window.readNewsTitles.add(item.title);
-        try { localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles))); } catch (e) { }
-        return false; // 直ちに次のニュースへ
-      }
+      
 
       if (data && data.status === "ok" && (data.items || data.sentences) && ((data.items && data.items.length > 0) || (data.sentences && data.sentences.length > 0))) {
         // ▼▼▼ AI生成が完全に成功した段階で初めてテロップと日付を表示！ ▼▼▼
