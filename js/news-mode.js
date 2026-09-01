@@ -1876,7 +1876,16 @@ ${creditsInstruction}
         }
       }
 
-      if (data && data.status === "ok" && (data.items || data.sentences)) {
+      // ⏩ スキップ指示（品質不足や生成不可）の場合は待機画面に入らず、直ちに次の記事へ進む
+      if (data && data.status === "skipped") {
+        console.log(`[ニュース番組] ⏩ 品質基準または取得制限により安全にスキップ: 「${item.title}」`);
+        readNewsTitles.add(item.title);
+        if (window.readNewsTitles) window.readNewsTitles.add(item.title);
+        try { localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles))); } catch (e) { }
+        return false; // 直ちに次のニュースへ
+      }
+
+      if (data && data.status === "ok" && (data.items || data.sentences) && ((data.items && data.items.length > 0) || (data.sentences && data.sentences.length > 0))) {
         // ▼▼▼ AI生成が完全に成功した段階で初めてテロップと日付を表示！ ▼▼▼
         if (newsTitleEl) newsTitleEl.textContent = item.title;
         if (newsDescEl) newsDescEl.textContent = plainDesc;
@@ -2005,9 +2014,16 @@ ${creditsInstruction}
         await waitForVoicevoxFinish();
       }
 
-      // 3. API無駄打ち防止バックオフ待機（初回3秒、以降は10秒間隔）
+      // 3. API無駄打ち防止バックオフ待機
       retryFailCount++;
-      const waitTimeMs = (retryFailCount > 2) ? 10000 : 3000;
+      if (retryFailCount >= 3) {
+        console.warn(`[ニュース番組] ⏩ 3回連続で生成不可のため、この記事をスキップして次へ進みます: 「${item.title}」`);
+        readNewsTitles.add(item.title);
+        if (window.readNewsTitles) window.readNewsTitles.add(item.title);
+        try { localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles))); } catch (e) { }
+        return false; // 次のニュースへ進んで配信を継続！
+      }
+      const waitTimeMs = 3000;
       await new Promise(r => setTimeout(r, waitTimeMs));
     }
 
