@@ -16,12 +16,15 @@ def clean_news_description(desc):
     return t
 
 def clean_news_title(title):
-    """ニュースタイトルから末尾のメディア名サフィックスや不要なサイト名を除去"""
+    """ニュースタイトルからPR TIMESやメディア名サフィックス、不要なサイト名を除去"""
     if not title:
         return ""
-    t = title.strip()
-    t = re.sub(r'[\s\-–—|｜]+(Google\s*ニュース|Google\s*News|Yahoo!\s*ニュース|Yahoo!\s*JAPAN|NHK\s*NEWS\s*WEB|ITmedia[A-Za-z0-9\s]*|共同通信|時事通信|読売新聞|朝日新聞|毎日新聞|産経新聞|日経新聞|日本経済新聞|TBS\s*NEWS\s*DIG|FNNプライムオンライン|テレ朝news|日テレNEWS[A-Za-z0-9\s]*)$', '', t, flags=re.IGNORECASE).strip()
-    return t
+    t = str(title).strip()
+    t = re.sub(r'[\s|｜\-–—]+(?:[A-Za-z0-9\u4e00-\u9fff\u30a0-\u30ff\s]+のプレスリリース|PR\s*TIMES|PRTIMES|プレスリリース).*$', '', t, flags=re.IGNORECASE)
+    t = re.sub(r'[\s|｜\-–—]+(?:Google\s*ニュース|Google\s*News|Yahoo!\s*ニュース|Yahoo!\s*JAPAN|NHK\s*NEWS\s*WEB|ITmedia[A-Za-z0-9\s]*|共同通信|時事通信|読売新聞|朝日新聞|毎日新聞|産経新聞|日経新聞|日本経済新聞|TBS\s*NEWS\s*DIG|FNNプライムオンライン|テレ朝news|日テレNEWS[A-Za-z0-9\s]*|ORICON\s*NEWS|モデルプレス|デイリースポーツ|スポニチ|zakzak|zakⅡ|ねとらぼ|AUTOMATON|IGN\s*Japan|Game\s*Watch|4Gamer.*)$', '', t, flags=re.IGNORECASE)
+    t = re.sub(r'^[★【】〈〉\[\]「」『』\s　]+', '', t)
+    t = re.sub(r'[★【】〈〉\[\]「」『』\s　]+$', '', t)
+    return t.strip()
 # -*- coding: utf-8 -*-
 """
 news_script_processor.py
@@ -229,6 +232,16 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
         s = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', s).strip()
         if not s or not re.search(r'[一-鿿぀-ゟ゠-ヿA-Za-z0-9]', s):
             continue
+
+        # 助詞（の、は、が、を、に、で、と、など）から始まる不完全な文の修復
+        s = re.sub(r'^[」』）\)\s　]+', '', s).strip()
+        if re.match(r'^(?:の|は|が|を|に|で|と|から|より|へ|など|等の)', s):
+            if corrected_items:
+                prev_display = corrected_items[-1]["display"]
+                combined = prev_display + " " + s
+                corrected_items[-1]["display"] = combined
+                corrected_items[-1]["speech"] = normalize_for_tts(combined, custom_dict=custom_dict)
+                continue
 
         # 単独の「にゃ！」「なのだ！」など意味のある文でないものはスキップ
         core_chars = re.sub(r'[にゃのだ！!？?。、 \s　]+', '', s)
