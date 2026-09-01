@@ -451,7 +451,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
     for attempt in range(1, max_retries + 1):
         cur_prompt = prompt
         if attempt > 1:
-            cur_prompt += "\n\n【重要・品質修正指示（再生成）】前回の出力は文章量または具体性が不足していました。元記事の情報が短い場合でも、出来事の一般的な背景や原因、今後の見通しや社会への影響、そして配信者としての率直な感想・考察をしっかり深掘りし、必ず【全体で5文以上（目安5〜7文）】の充実した長尺解説台本を作成してください。"
+            cur_prompt += "\n\n【重要・品質修正指示（再生成）】必ず【前半: 記事の要約3文】＋【後半: キャスターとしての感想2〜3文】の【合計5〜6文】で作成してください（1文目から直接解説に入り、後半でたっぷり感想を語ってください）。"
             print(f"[ダブルチェック・品質再生成] 🔄 試行 {attempt}/{max_retries} 回目の原稿生成を実行中...", flush=True)
 
         candidate_text = call_llm_backend(provider, cur_prompt, api_key, model_name)
