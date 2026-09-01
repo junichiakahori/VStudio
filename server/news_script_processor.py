@@ -521,7 +521,10 @@ def generate_news_item_script_data(payload, custom_dict=None):
         clean_text = re.sub(r'(?:^|(?<=[。！？\s]))(?:とろろ|トロロ)はにゃ[、,\s　]*', 'とろろとしては、', clean_text)
         clean_text = re.sub(r'(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)(?:なのだ|のだ)[、,\s　]*', 'ずんだもんとしては、', clean_text)
         clean_text = re.sub(r'(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)は(?:なのだ|のだ)[、,\s　]*', 'ずんだもんとしては、', clean_text)
-                # 不自然な崩れ語尾（「だなにゃ」「だなのだ」「だねにゃ」等）の徹底修正
+                        # 不自然な係り受け（「このニュース聞いて、便利だ」「この話題聞いて、〜」等）の自動修復
+        clean_text = re.sub(r'この(?:ニュース|話題|記事|出来事)聞いて[、,\s　]*本当に便利(?:だにゃ|ですね|だなにゃ)', 'この取り組み、本当に便利そうですね', clean_text)
+        clean_text = re.sub(r'この(?:ニュース|話題|記事|出来事)聞いて[、,\s　]*', 'このニュースを見て、', clean_text)
+        # 不自然な崩れ語尾（「だなにゃ」「だなのだ」「だねにゃ」等）の徹底修正
         clean_text = re.sub(r'だなにゃ([！!？?。、\s　]|$)', r'だにゃ\1', clean_text)
         clean_text = re.sub(r'だなのだ([！!？?。、\s　]|$)', r'なのだ\1', clean_text)
         clean_text = re.sub(r'だねにゃ([！!？?。、\s　]|$)', r'ですね\1', clean_text)
