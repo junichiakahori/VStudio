@@ -137,9 +137,9 @@ def apply_country_prefixes(text):
         )
     return t
 
-def normalize_for_tts(text, custom_dict=None):
+def normalize_for_tts(text, custom_dict=None, log_collector=None):
     """
-    TTS用テキストの包括的正規化処理
+    TTS用テキストの包括的正規化処理（Wikipedia解決ログも収集）
     """
     if not text:
         return ""
@@ -157,7 +157,9 @@ def normalize_for_tts(text, custom_dict=None):
     for term in terms:
         yomi, _ = lookup_wikipedia_reading(term)
         if yomi:
-            print(f"[Wikipedia自動発音解決] '{term}' ➔ '{yomi}'")
+            print(f"[Wikipedia自動発音解決] '{term}' ➔ '{yomi}'", flush=True)
+            if log_collector is not None and isinstance(log_collector, list):
+                log_collector.append({"term": term, "yomi": yomi})
             t = re.sub(rf'(?<![A-Za-z0-9]){re.escape(term)}(?![A-Za-z0-9])', yomi, t)
 
     t = sanitize_speech_text(t)
