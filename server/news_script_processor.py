@@ -408,7 +408,13 @@ def generate_news_item_script_data(payload, custom_dict=None):
     """
     title = clean_news_title(payload.get('title', ''))
     description = clean_news_description(payload.get('description', ''))
+    model_id = (payload.get('modelId', '') or '').lower()
     char_desc = payload.get('charDesc', '').strip()
+    if not char_desc:
+        if 'zunda' in model_id:
+            char_desc = "明るく元気なずんだ妖精のニュースキャスター「ずんだもん」です。語尾は「〜のだ」「〜なのだ」を使います。"
+        else:
+            char_desc = "愛嬌のある白猫のニュースキャスター「とろろ」です。語尾には自然に「〜にゃ」「〜にゃ！」を使います。" 
     category_name = payload.get('categoryName', '').strip()
     transition = payload.get('transition', '').strip()
     article_url = payload.get('url', '').strip()

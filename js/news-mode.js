@@ -1810,12 +1810,18 @@ ${creditsInstruction}
       if (found && found.link) item.link = found.link;
     }
 
+    const isZundaMode = (typeof currentModelId !== "undefined" ? String(currentModelId) : "").includes("zunda");
+    const charDescVal = isZundaMode
+      ? "明るく元気なずんだ妖精のニュースキャスター「ずんだもん」です。語尾は「〜のだ」「〜なのだ」を使います。"
+      : "愛嬌のある白猫のニュースキャスター「とろろ」です。語尾には自然に「〜にゃ」「〜にゃ！」を使います。";
+
     const payload = {
       title: item.title,
       description: plainDesc,
       url: item.link || "",
       categoryName: item.categoryName || "",
       modelId: currentModelId,
+      charDesc: charDescVal,
       isFirst: isFirst,
       isCategoryChanged: isCategoryChanged,
       apiKey: apiKey,
