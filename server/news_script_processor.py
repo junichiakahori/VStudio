@@ -1,4 +1,20 @@
 
+def clean_news_description(desc):
+    """Google News等のRSS descriptionから各社リンクの羅列や新聞社名を除去"""
+    if not desc:
+        return ""
+    t = desc.strip()
+    # HTMLタグの除去
+    t = re.sub(r'<[^>]+>', ' ', t)
+    # メディア名サフィックスの除去
+    t = re.sub(r'[\s\-–—|｜]+(Google\s*ニュース|Google\s*News|Yahoo!\s*ニュース|Yahoo!\s*JAPAN|NHK\s*NEWS\s*WEB|ITmedia[A-Za-z0-9\s]*|共同通信|時事通信|読売新聞|朝日新聞|毎日新聞|産経新聞|日経新聞|日本経済新聞|岩手日報|河北新報|秋田魁新報|山形新聞|福島民報|福島民友|茨城新聞|下野新聞|上毛新聞|埼玉新聞|千葉日報|東京新聞|神奈川新聞|新潟日報|北日本新聞|北國新聞|福井新聞|山梨日日新聞|信濃毎日新聞|岐阜新聞|静岡新聞|中日新聞|伊勢新聞|京都新聞|神戸新聞|奈良新聞|紀伊民報|山陽新聞|中國新聞|日本海新聞|山陰中央新報|山口新聞|徳島新聞|四国新聞|愛媛新聞|高知新聞|西日本新聞|佐賀新聞|長崎新聞|熊本日日新聞|大分合同新聞|宮崎日日新聞|南日本新聞|琉球新報|沖縄タイムス|TBS\s*NEWS\s*DIG|FNNプライムオンライン|テレ朝news|日テレNEWS[A-Za-z0-9\s]*)', ' ', t, flags=re.IGNORECASE)
+    # 連続空白の整理
+    t = re.sub(r'[\s　]+', ' ', t).strip()
+    # もし各社見出しの単なる羅列（複数の文が句点なく並んでいる等）なら破棄
+    if len(re.findall(r'(新聞|通信|日報|新報|NEWS|テレビ)', t)) >= 2:
+        return ""
+    return t
+
 def clean_news_title(title):
     """ニュースタイトルから末尾のメディア名サフィックスや不要なサイト名を除去"""
     if not title:
@@ -403,7 +419,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
     ニュース1件分の原稿AI生成、ファクト照合、発音検証、見出し生成を一括処理して返す
     """
     title = clean_news_title(payload.get('title', ''))
-    description = payload.get('description', '').strip()
+    description = clean_news_description(payload.get('description', ''))
     char_desc = payload.get('charDesc', '').strip()
     category_name = payload.get('categoryName', '').strip()
     transition = payload.get('transition', '').strip()
@@ -522,12 +538,13 @@ def generate_news_item_script_data(payload, custom_dict=None):
         break
 
     if not items:
-        # 万が一リトライを繰り返しても不十分だった場合のフォールバック（タイトル＋要約でしっかり構成）
-        fallback_plain = description.replace("「", "").replace("」", "").strip()
-        if len(fallback_plain) > 80:
-            fallback_plain = fallback_plain[:80] + "…"
-        fallback_display1 = f"{title}について、詳細な情報が入っています。"
-        fallback_display2 = f"{fallback_plain} 今後の展開にも注目が集まっています。"
+        # 万が一リトライを繰り返しても不十分だった場合のスマートフォールバック
+        clean_t = re.sub(r'[★【】〈〉\[\]「」『』\s　\(\)（）]', '', title)
+        fallback_display1 = f"{title}に関する最新の動きです。"
+        if description and len(description) >= 20 and not description.endswith("…"):
+            fallback_display2 = f"{description} 関係者の間でも関心が高まっています。"
+        else:
+            fallback_display2 = "今後の詳しい動向や影響についても注目が集まっています。"
         items = [
             {"display": fallback_display1, "speech": normalize_for_tts(fallback_display1, custom_dict=custom_dict)},
             {"display": fallback_display2, "speech": normalize_for_tts(fallback_display2, custom_dict=custom_dict)}
