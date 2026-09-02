@@ -130,11 +130,16 @@ def log_to_api_file(message):
         pass
 
 def write_browser_console_log(log_message):
-    """日次ローテーション管理付きの安全なログ書き込み"""
-    check_and_rotate_logs()
+    """日付ごとのログファイル (browser_console_YYYY-MM-DD.log) に直接追記管理"""
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    daily_file = os.path.join(BASE_DIR, "logs", f"browser_console_{today_str}.log")
+    main_file = os.path.join(BASE_DIR, "logs", "browser_console.log")
+    
     with _log_lock:
         try:
-            with open(LOG_FILE, 'a', encoding='utf-8') as f:
+            with open(daily_file, 'a', encoding='utf-8') as f:
+                f.write(log_message + '\n')
+            with open(main_file, 'a', encoding='utf-8') as f:
                 f.write(log_message + '\n')
         except Exception as e:
             print(f"[ログ書き込みエラー]: {e}")
