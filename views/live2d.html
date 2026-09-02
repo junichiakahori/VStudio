@@ -37,8 +37,8 @@
                     const lines = stack.split("\n");
                     for (let i = 2; i < lines.length; i++) {
                         const line = lines[i];
-                        if (!line || line.includes("live2d.html")) continue;
-                        // ファイル名、クエリバージョン(?v=X.X)、行番号を抽出 (例: news-mode.js?v=9.4:2085)
+                        if (!line) continue;
+                        if (line.includes("live2d.html") && !line.includes("?v=")) continue;
                         const match = line.match(/([a-zA-Z0-9_\-]+\.(?:js|html)(?:\?[a-zA-Z0-9_=\.\-]+)?(?::\d+)?)/);
                         if (match) {
                             return `[${match[1]}]`;
@@ -243,16 +243,16 @@
     <script src="/js/stream-automation.js?v=9.6"></script>
         <script src="/js/news/news-media-resolver.js?v=1.2"></script>
     <script src="/js/news/news-state-manager.js?v=1.2"></script>
-    <script src="/js/news/news-fetcher.js?v=1.2"></script>
+    <script src="/js/news/news-fetcher.js?v=20.0"></script>
     <script src="/js/news/news-ui-board.js?v=1.2"></script>
-    <script src="/js/news/news-audio-player.js?v=1.3"></script>
+    <script src="/js/news/news-audio-player.js?v=20.0"></script>
     <script src="/js/news/news-list-popup.js?v=1.0"></script>
     <script src="/js/news/news-config-manager.js?v=1.0"></script>
     <script src="/js/news/news-comment-interlude.js?v=1.0"></script>
-    <script src="/js/news-mode.js?v=19.0"></script>
+    <script src="/js/news-mode.js?v=20.0"></script>
     <script src="/js/radio-mode.js?v=9.6"></script>
     <script src="/js/stream-tools.js?v=9.6"></script>
-    <script src="/js/stream-wizard.js?v=10.0"></script>
+    <script src="/js/stream-wizard.js?v=20.0"></script>
     <script src="/js/obs-websocket.js?v=9.6"></script>
     <script src="/js/screen-overlay.js?v=9.6"></script>
     <script src="/js/tracking-camera.js?v=9.6"></script>
