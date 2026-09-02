@@ -19,13 +19,13 @@
   function getTimeBasedClosing(isZunda = false) {
     const hour = new Date().getHours();
     if (isZunda) {
-      if (hour >= 5 && hour < 11) return "今日も一日、元気に頑張るのだ！";
-      if (hour >= 11 && hour < 17) return "午後も良い時間をお過ごしくださいなのだ！";
-      return "明日も良い一日になりますように。おやすみなさいなのだ！";
+      if (hour >= 5 && hour < 11) return "以上、本日の最新ニュースをお届けしたのだ！それでは、今日も一日、元気に頑張るのだ！";
+      if (hour >= 11 && hour < 17) return "以上、この時間の最新ニュースをお伝えしたのだ！午後も良い時間をお過ごしくださいなのだ！";
+      return "以上、本日のニュースをお伝えしたのだ！明日も良い一日になりますように。おやすみなさいなのだ！";
     }
-    if (hour >= 5 && hour < 11) return "今日も素敵な一日をお過ごしください。";
-    if (hour >= 11 && hour < 17) return "それでは、引き続き良い時間をお過ごしください。";
-    return "それでは、明日も良い一日を。おやすみなさい。";
+    if (hour >= 5 && hour < 11) return "以上、本日の最新ニュースをお届けいたしました。それでは、今日も素敵な一日をお過ごしください。";
+    if (hour >= 11 && hour < 17) return "以上、この時間の最新ニュースをお伝えいたしました。それでは、引き続き良い時間をお過ごしください。";
+    return "以上、本日のニュースをお伝えいたしました。それでは、明日も良い一日をお過ごしください。おやすみなさい。";
   }
 
   function getNewsConfig() {
