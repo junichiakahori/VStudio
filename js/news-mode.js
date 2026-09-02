@@ -1,3 +1,37 @@
+// =====================================================================
+// 専任モジュール(js/news/)へのブリッジ・委譲ヘルパー関数
+// =====================================================================
+function playSE(name, vol = null) {
+  if (window.newsAudioPlayer && typeof window.newsAudioPlayer.playSE === "function") {
+    return window.newsAudioPlayer.playSE(name, vol);
+  }
+  return Promise.resolve();
+}
+
+function initNewsSetlist(sortedNews) {
+  if (window.newsUIBoard && typeof window.newsUIBoard.initNewsSetlist === "function") {
+    window.newsUIBoard.initNewsSetlist(sortedNews);
+  }
+}
+
+function showNewsBoard(item, currentIdx, totalCount) {
+  if (window.newsUIBoard && typeof window.newsUIBoard.showNewsBoard === "function") {
+    window.newsUIBoard.showNewsBoard(item, currentIdx, totalCount);
+  }
+}
+
+function hideNewsBoard() {
+  if (window.newsUIBoard && typeof window.newsUIBoard.hideNewsBoard === "function") {
+    window.newsUIBoard.hideNewsBoard();
+  }
+}
+
+function hideNewsSetlist() {
+  if (window.newsUIBoard && typeof window.newsUIBoard.hideNewsSetlist === "function") {
+    window.newsUIBoard.hideNewsSetlist();
+  }
+}
+
 
 // 🚫 動画視聴前提のダイジェスト記事（Pickup NEWS等）や無意味なサイトヘッダーを除外する判定
 function isInvalidNewsVideoArticle(item) {
