@@ -12,6 +12,7 @@ import threading
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG_FILE = os.path.join(BASE_DIR, "logs", "browser_console.log")
+LOG_BACKUP_DIR = os.path.join(BASE_DIR, "logs_backup")
 
 _log_lock = threading.Lock()
 _current_log_date = datetime.date.today().strftime('%Y-%m-%d')
@@ -28,7 +29,9 @@ LOG_FILES_MAP = {
     'vite': 'logs/vite.log',
     'youtube_server': 'logs/youtube_server.log',
     'tiktok_server': 'logs/tiktok_server.log',
-    'browser_console': 'logs/browser_console.log'
+    'browser_console': 'logs/browser_console.log',
+    'native_console': 'logs/native_console.log',
+    'web_console': 'logs/web_console.log'
 }
 
 def clean_old_log_backups(retention_days=RETENTION_DAYS):
@@ -124,21 +127,34 @@ def log_to_api_file(message):
     except Exception:
         pass
 
-def write_browser_console_log(log_message):
-    """logs/browser_console.log (アクティブ) および logs_backup/browser_console_YYYY-MM-DD.log (日次バックアップ) に記録"""
+def write_browser_console_log(log_message, client_type="web"):
+    """
+    ネイティブアプリ (native) と Webブラウザ (web) のログを完全に別ファイルへ分離記録
+    - native -> logs/native_console.log & logs_backup/native_console_YYYY-MM-DD.log
+    - web    -> logs/web_console.log    & logs_backup/web_console_YYYY-MM-DD.log
+    """
     today_str = datetime.date.today().strftime('%Y-%m-%d')
-    active_file = os.path.join(BASE_DIR, "logs", "browser_console.log")
-    backup_file = os.path.join(BASE_DIR, "logs_backup", f"browser_console_{today_str}.log")
+    prefix = "native_console" if client_type == "native" else "web_console"
+    
+    active_file = os.path.join(BASE_DIR, "logs", f"{prefix}.log")
+    backup_file = os.path.join(BASE_DIR, "logs_backup", f"{prefix}_{today_str}.log")
+    legacy_file = os.path.join(BASE_DIR, "logs", "browser_console.log")
     
     if not os.path.exists(LOG_BACKUP_DIR):
         os.makedirs(LOG_BACKUP_DIR, exist_ok=True)
+    if not os.path.exists(os.path.join(BASE_DIR, "logs")):
+        os.makedirs(os.path.join(BASE_DIR, "logs"), exist_ok=True)
 
     with _log_lock:
         try:
+            # 1. クライアント専用ログファイルへの追記
             with open(active_file, 'a', encoding='utf-8') as f:
                 f.write(log_message + '\n')
             with open(backup_file, 'a', encoding='utf-8') as f:
                 f.write(log_message + '\n')
+            # 2. 統合ファイルにも追記
+            with open(legacy_file, 'a', encoding='utf-8') as f:
+                f.write(f"[{client_type.upper()}] {log_message}\n")
         except Exception as e:
             print(f"[ログ書き込みエラー]: {e}")
 

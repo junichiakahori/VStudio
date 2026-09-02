@@ -59,10 +59,11 @@
                     const caller = getCallerSource();
                     const callerTag = caller ? ` ${caller}` : "";
                     const logString = `[${timestamp}]${callerTag} [${level.toUpperCase()}] ${message}`;
+                    const isNative = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nativeHost) || navigator.userAgent.includes("VStudioNative");
                     fetch('/log', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: logString }),
+                        body: JSON.stringify({ message: logString, client: isNative ? "native" : "web" }),
                         keepalive: true
                     }).catch(() => { });
                 } catch (e) { }
