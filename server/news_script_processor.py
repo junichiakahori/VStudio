@@ -466,12 +466,16 @@ def generate_news_item_script_data(payload, custom_dict=None):
     api_key = payload.get('apiKey', '')
     model_name = payload.get('model', '')
 
-    if not article_url:
-        article_url = find_cached_url(title)
-    if not article_url:
-        article_url = search_news_url_by_title(title)
-    if article_url:
-        register_cached_url(title, article_url)
+    # コメント返信やシステムタイトルはニュース記事ではないためURL検索・キャッシュ対象外とする
+    is_special_item = category_name in ["コメント返信", "リスナーコメント"] or title.startswith("コメント返信") or title.startswith("【コメント")
+
+    if not is_special_item:
+        if not article_url:
+            article_url = find_cached_url(title)
+        if not article_url:
+            article_url = search_news_url_by_title(title)
+        if article_url:
+            register_cached_url(title, article_url)
 
     full_article_content = description
     if article_url:
