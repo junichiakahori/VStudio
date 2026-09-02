@@ -54,11 +54,26 @@ def find_cached_url(title):
             return u_v
     return ""
 
+MAX_URL_CACHE_ENTRIES = 3000
+
 def register_cached_url(title, url):
-    """記事タイトルとURLのペアをキャッシュ＆永続化保存"""
-    if title and url:
-        ARTICLE_URL_CACHE[title] = url
-        save_article_url_cache(ARTICLE_URL_CACHE)
+    """記事タイトルとURLのペアをキャッシュ＆永続化保存（上限3000件で自動FIFOローテーション）"""
+    if not title or not url:
+        return
+    # コメント返信等のシステムタイトルは除外
+    if title.startswith("コメント返信") or title.startswith("リスナー") or title.startswith("【コメント"):
+        return
+
+    ARTICLE_URL_CACHE[title] = url
+
+    # 上限を超えたら古いキーから切り詰め (FIFO)
+    if len(ARTICLE_URL_CACHE) > MAX_URL_CACHE_ENTRIES:
+        excess = len(ARTICLE_URL_CACHE) - MAX_URL_CACHE_ENTRIES
+        keys_to_remove = list(ARTICLE_URL_CACHE.keys())[:excess]
+        for k in keys_to_remove:
+            del ARTICLE_URL_CACHE[k]
+
+    save_article_url_cache(ARTICLE_URL_CACHE)
 
 def init_preload_all_rss_urls():
     """サーバー起動時に全カテゴリのRSSからタイトルとURLのマップを即座に事前取得して永続化"""
