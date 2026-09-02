@@ -48,7 +48,19 @@
                 return "";
             }
 
-                        function sendLogToServer(level, args) {
+                                    // 🚨 スクリプト構文エラー・グローバル例外の完全捕捉エンジン
+            window.onerror = function(msg, url, lineNo, columnNo, error) {
+                const file = url ? url.split('/').pop() : 'unknown';
+                const errStr = `[グローバル例外] 💥 ${file}:${lineNo}:${columnNo} -> ${msg}`;
+                sendLogToServer('error', [errStr]);
+                return false;
+            };
+            window.onunhandledrejection = function(event) {
+                const reason = event.reason ? (event.reason.stack || event.reason.message || event.reason) : 'unknown rejection';
+                sendLogToServer('error', [`[未処理Promise拒否] 💥 ${reason}`]);
+            };
+
+            function sendLogToServer(level, args) {
                 try {
                     const message = args.map(arg => {
                         if (arg instanceof Error) return arg.stack || arg.message;
@@ -249,7 +261,7 @@
     <script src="/js/news/news-list-popup.js?v=1.0"></script>
     <script src="/js/news/news-config-manager.js?v=1.0"></script>
     <script src="/js/news/news-comment-interlude.js?v=1.0"></script>
-    <script src="/js/news-mode.js?v=20.0"></script>
+    <script src="/js/news-mode.js?v=20.1"></script>
     <script src="/js/radio-mode.js?v=9.6"></script>
     <script src="/js/stream-tools.js?v=9.6"></script>
     <script src="/js/stream-wizard.js?v=20.0"></script>

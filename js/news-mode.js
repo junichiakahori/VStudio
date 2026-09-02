@@ -1,10 +1,8 @@
-console.log("[news-mode.js] 🌟 スクリプトファイルが正常に実行開始されました (v18.3)");
-// 即時グローバル公開
-window._executeNewsBroadcast = _executeNewsBroadcast;
-window.startNewsBroadcast = _executeNewsBroadcast;
+console.log("[news-mode.js] 🌟 スクリプトファイルが正常に実行開始されました (v20.0)");
+// 安全な遅延バインド
 window.startNewsBroadcast = async function(startIndex = 0, items = null, isFromNewsList = false) {
-  if (typeof _executeNewsBroadcast === "function") {
-    return await _executeNewsBroadcast(startIndex, items, isFromNewsList);
+  if (typeof window._executeNewsBroadcast === "function") {
+    return await window._executeNewsBroadcast(startIndex, items, isFromNewsList);
   }
 };
 
