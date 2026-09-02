@@ -186,9 +186,13 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None):
     for eng_word, kana_yomi in COMMON_ENGLISH_WORDS.items():
         t = re.sub(rf'(?<![A-Za-z0-9]){re.escape(eng_word)}(?![A-Za-z0-9])', kana_yomi, t, flags=re.IGNORECASE)
 
+    # 固有名詞の文脈保護ルール（動詞「探す」と重複する「株探」の誤爆防止）
+    # 送り仮名（し・す・せ・そ・さ・っ）が直後に続く場合は「探す（さがす）」なので置換せず、メディア名「株探」のみ「かぶたん」に置換
+    t = re.sub(r'株探(?![しすせそさっ])', 'かぶたん', t)
+
     if custom_dict and isinstance(custom_dict, dict):
         for orig, yomi in custom_dict.items():
-            if orig and yomi and orig in t:
+            if orig and yomi and orig != "株探" and orig in t:
                 t = t.replace(orig, yomi)
 
     t = apply_country_prefixes(t)
