@@ -1,7 +1,7 @@
 // ==============================================================================
 // 🌐 news-fetcher.js
-// RSSニュースの取得・XMLパース・高精度スマート重複排除・URL逆引き補完モジュール
-// (本番ネイティブアプリ実績 100% 同期完全版)
+// RSSニュースの取得・XMLパース・重複排除・URL逆引き補完モジュール
+// (本番ネイティブアプリ完全一致版)
 // ==============================================================================
 
 window.NEWS_CATEGORIES = window.NEWS_CATEGORIES || {
@@ -30,37 +30,6 @@ window.CATEGORY_NAMES = window.CATEGORY_NAMES || {
   "cat_science": "科学・医療",
   "cat_local": "地域"
 };
-
-function normalizeNewsTitle(title) {
-  if (!title) return "";
-  let clean = title.replace(/\s*-\s*[^-]+$/, "");
-  clean = clean.replace(/（[^）]+）|\([^\)]+\)|【[^】]+】|「[^」]+」|『[^』]+』|［[^］]+］|\[[^\]]+\]/g, "");
-  clean = clean.replace(/[\s　]+/g, " ").trim();
-  return clean.toLowerCase();
-}
-
-function calculateTitleSimilarity(str1, str2) {
-  if (!str1 || !str2) return 0;
-  if (str1 === str2) return 1.0;
-  if (str1.length >= 10 && str2.length >= 10) {
-    if (str1.includes(str2) || str2.includes(str1)) return 0.9;
-  }
-  const getBiGrams = (s) => {
-    const biGrams = new Set();
-    for (let i = 0; i < s.length - 1; i++) {
-      biGrams.add(s.substring(i, i + 2));
-    }
-    return biGrams;
-  };
-  const bg1 = getBiGrams(str1);
-  const bg2 = getBiGrams(str2);
-  if (bg1.size === 0 || bg2.size === 0) return 0;
-  let intersection = 0;
-  for (const g of bg1) {
-    if (bg2.has(g)) intersection++;
-  }
-  return (2.0 * intersection) / (bg1.size + bg2.size);
-}
 
 function extractLinkFromXmlNode(node) {
   let linkUrl = "";
@@ -91,6 +60,42 @@ function stripHtmlTags(html) {
   return (doc.body.textContent || "").trim();
 }
 
+// タイトルの正規化（装飾タグやメディア名の除去）
+function normalizeNewsTitle(title) {
+  if (!title) return "";
+  let t = title.trim();
+  t = t.replace(/^(\[[^\]]+\]|【[^】]+】|〈[^〉]+〉|（[^）]+）|\([^\)]+\))\s*/g, "");
+  t = t.replace(/\s*([（\(][^）\)]*(?:新聞|通信|テレビ|TV|ニュース|News|時事|共同|ロイター|BBC|CNN|産経|朝日|読売|毎日|日経|TBS|NHK|日テレ|テレ朝|フジ)[^）\)]*[）\)]|[-–—|]\s*[^|–—-]+)$/gi, "");
+  t = t.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+  t = t.replace(/[\s\u3000]+/g, " ").trim();
+  return t;
+}
+
+// 2-gram類似度 (Dice係数)
+function calculateTitleSimilarity(str1, str2) {
+  if (!str1 || !str2) return 0;
+  if (str1 === str2) return 1.0;
+  if (str1.length >= 10 && str2.length >= 10) {
+    if (str1.includes(str2) || str2.includes(str1)) return 0.9;
+  }
+  const getBiGrams = (s) => {
+    const biGrams = new Set();
+    for (let i = 0; i < s.length - 1; i++) {
+      biGrams.add(s.substring(i, i + 2));
+    }
+    return biGrams;
+  };
+  const bg1 = getBiGrams(str1);
+  const bg2 = getBiGrams(str2);
+  if (bg1.size === 0 || bg2.size === 0) return 0;
+  let intersection = 0;
+  for (const g of bg1) {
+    if (bg2.has(g)) intersection++;
+  }
+  return (2.0 * intersection) / (bg1.size + bg2.size);
+}
+
+// スマート重複排除
 function smartDeduplicateNewsItems(items) {
   const uniqueList = [];
   let dupCount = 0;
@@ -160,8 +165,6 @@ async function fetchNewsWithOptions(categoryKey = "cat_all", maxPerCategory = In
         const titleNode = node.querySelector("title");
         const descNode = node.querySelector("description");
         const pubDateNode = node.querySelector("pubDate") || node.querySelector("date");
-        const sourceNode = node.querySelector("source");
-        const realSource = sourceNode ? sourceNode.textContent.trim() : "";
         let publisherName = "その他";
         if (target.url.includes('yahoo.co.jp')) publisherName = 'Yahoo!';
         else if (target.url.includes('google.com')) publisherName = 'Google';
@@ -171,9 +174,8 @@ async function fetchNewsWithOptions(categoryKey = "cat_all", maxPerCategory = In
         const linkUrl = extractLinkFromXmlNode(node);
 
         return {
-          title: titleNode ? titleNode.textContent.trim() : "",
+          title: titleNode ? titleNode.textContent : "",
           description: stripHtmlTags(descNode ? descNode.textContent : ""),
-          source: realSource,
           link: linkUrl,
           pubDate: pubDateNode ? pubDateNode.textContent : "",
           categoryName: target.categoryName,
@@ -186,16 +188,17 @@ async function fetchNewsWithOptions(categoryKey = "cat_all", maxPerCategory = In
         return true;
       });
     } catch (e) {
-      console.warn(`[ニュース取得] ${target.url} の取得に失敗:`, e.message);
       return [];
     }
   });
 
-  const allCategoryResults = await Promise.all(fetchPromises);
-  const allParsedItems = allCategoryResults.flat();
+  const results = await Promise.all(fetchPromises);
+  let allParsedItems = [];
+  results.forEach(items => { allParsedItems = allParsedItems.concat(items); });
+
   const uniqueItems = smartDeduplicateNewsItems(allParsedItems);
 
-  // 日時フィルタリング（本番ネイティブアプリ完全一致ロジック）
+  // 日時フィルタリング（日付のみでも日時でも高精度に対応）
   let startTimestamp = -Infinity;
   let endTimestamp = Infinity;
 
