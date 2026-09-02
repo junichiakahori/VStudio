@@ -14,7 +14,7 @@ window.newsBroadcastState = window.newsBroadcastState || {
   lastCategory: "",
   isFromNewsList: false
 };
-var newsBroadcastState = window.newsBroadcastState;
+
 
 // =====================================================================
 // 専任モジュール(js/news/)へのブリッジ・委譲ヘルパー関数
@@ -84,7 +84,7 @@ function isInvalidNewsVideoArticle(item) {
 
   return false;
 }
-let readNewsTitles = new Set(JSON.parse(localStorage.getItem("newsReadTitles") || "[]")); // 既読ニュースのタイトルを保持するセット
+window.readNewsTitles = new Set(JSON.parse(localStorage.getItem("newsReadTitles") || "[]")); // 既読ニュースのタイトルを保持するセット
 window.readNewsTitles = readNewsTitles;
 try {
   const savedNews = localStorage.getItem("latestFetchedNews");

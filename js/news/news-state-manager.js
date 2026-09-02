@@ -6,7 +6,7 @@
 const STORAGE_KEY_BROADCAST_STATE = "vstudio_news_broadcast_state";
 const STORAGE_KEY_READ_TITLES = "vstudio_read_news_titles";
 
-var newsBroadcastState = window.newsBroadcastState = {
+window.newsBroadcastState = {
   isBroadcasting: false,
   isPaused: false,
   currentIndex: 0,
@@ -20,7 +20,7 @@ var newsBroadcastState = window.newsBroadcastState = {
 };
 
 // 既読ニュースのセット
-var readNewsTitles = window.readNewsTitles = new Set();
+window.readNewsTitles = new Set();
 
 function loadReadNewsTitles() {
   try {
