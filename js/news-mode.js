@@ -1218,3 +1218,12 @@ function getNewsConfig() {
       }
     }
   });
+
+
+  // ペンディングされた開始要求を即座に消費
+  if (window._pendingNewsBroadcast) {
+    const p = window._pendingNewsBroadcast;
+    window._pendingNewsBroadcast = null;
+    console.log(`[ニュース番組] 🚀 ロード待機キューから番組を即時自動開始します (startIndex: ${p.startIndex})`);
+    _executeNewsBroadcast(p.startIndex, p.items, p.isFromNewsList);
+  }
