@@ -1,3 +1,10 @@
+// 即時グローバル公開
+window.startNewsBroadcast = async function(startIndex = 0, items = null, isFromNewsList = false) {
+  if (typeof _executeNewsBroadcast === "function") {
+    return await _executeNewsBroadcast(startIndex, items, isFromNewsList);
+  }
+};
+
 // ニュース番組進行ステート
 let newsBroadcastState = {
   isRunning: false,
@@ -647,7 +654,7 @@ function getNewsConfig() {
 
   window.readOneNewsItem = readOneNewsItem;
 
-  async function startNewsBroadcast(startIndex = 0, items = null, isFromNewsList = false) {
+  async function _executeNewsBroadcast(startIndex = 0, items = null, isFromNewsList = false) {
     console.log(`[ニュース番組] 🚀 [STEP 1] startNewsBroadcast 呼び出し検知 (startIndex: ${startIndex}, isFromNewsList: ${isFromNewsList})`);
     try {
       if (newsBroadcastState.isRunning) {
