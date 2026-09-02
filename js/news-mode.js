@@ -874,9 +874,11 @@ function getNewsConfig() {
     }
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initNewsModeButtons);
-  } else {
+  const registerNewsUI = window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn));
+  registerNewsUI("news-mode", () => {
+    initNewsModeButtons();
+  });
+  if (document.getElementById("news-broadcast-start-btn")) {
     initNewsModeButtons();
   }
 
