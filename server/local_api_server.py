@@ -216,8 +216,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             if self.path == '/log':
                 payload = self._read_json()
                 msg = payload.get('message', '')
+                client = payload.get('client', 'web')
                 if msg:
-                    write_browser_console_log(msg)
+                    write_browser_console_log(msg, client_type=client)
                 return self._send_json({"status": "ok"})
 
             if self.path.startswith('/api/log_clear'):
