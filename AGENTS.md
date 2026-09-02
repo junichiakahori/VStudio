@@ -77,3 +77,54 @@
 - **本番配信とテスト環境の完全分離**:
   - **本番配信**: macOS ネイティブアプリ（独立ウィンドウ・OBS安定キャプチャ）で実施。
   - **動作検証・テスト**: Safari 等のブラウザ（`https://localhost:8443/...`）からアクセスして検証・デバッグを行うこと。
+
+## 7. 本番環境（VStudio）と開発環境（VStudio-dev）の完全同期運用ルール
+
+- **開発成果の本番完全同期の徹底**:
+  - 開発・検証（Safari: `http://localhost:8444` / API: `8002`）で修正・リファクタリング・動作確認を行った成果物は、配信時間外の安全な時間帯に **必ず本番環境（`VStudio`）へ漏れなく完全適用・同期** すること。
+  - Gitリポジトリ（`VStudio`）へのコミット・プッシュ時にも、本番と開発の両方のファイル構成に齟齬がないかを常に確認すること。
+
+## 8. フロントエンド JavaScript のイベントバインド・DOM待機ルール
+
+- **DOMContentLoaded および readyState による完全保護（最重要）**:
+  - ボタン（`.onclick` / `.addEventListener`）、トグル、スライダーなどのDOM要素を初期化・バインドする処理は、スクリプト読み込みタイミングによる `null` 参照事故を絶対に防ぐため、必ず以下のパターンで実装すること：
+    ```javascript
+    function initUIComponents() {
+      const btn = document.getElementById("target-btn");
+      if (btn) { btn.onclick = () => { ... }; }
+    }
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initUIComponents);
+    } else {
+      initUIComponents();
+    }
+    ```
+
+## 9. ポップアップ（子ウィンドウ）と親画面（openerWin）の連携ルール
+
+- **子ウィンドウ破棄による非同期タスク中断の防止（WebKit/Safari仕様）**:
+  - ウィザード画面などの子ウィンドウから親ウィンドウ（`openerWin`）の処理（ニュース開始・ラジオ開始等）を実行する場合、子ウィンドウ側で非同期タイマー（`setTimeout`）を持ったまま `window.close()` を呼ぶと、WebKitのガベージコレクションによって非同期処理が強制終了される。
+  - 親画面のアクションをキックする際は、**`window.close()` を呼ぶ直前に親ウィンドウのDOMボタン（`news-broadcast-start-btn` 等）を直接同期クリック（`.click()`）** するか、`localStorage` のポート別シグナル通信を併用して 100% 確実に親側で処理を実行させること。
+
+## 10. Safari Web Audio API（効果音・BGM・音声）の再生制御ルール
+
+- **共通 AudioContext の再利用と試聴テストボタンの常備**:
+  - Safariでは、ユーザーの明示的なインタラクションなしに新しい `<audio>` 要素（HTML5 Audio）を非同期再生すると、Autoplay制限（`NotAllowedError`）で無音になる。
+  - 効果音（SE: チャイム、シーン切り替え音等）の再生には、既に画面起動時にアンロックされている実績のある共通オーディオコンテキスト（`getVoicevoxAudioContext()`）を活用すること。
+  - ウィザードやUIパネルには、ユーザーが事前に音声・チャイムを直接確認できる「試聴テストボタン」を必ず配置し、オーディオエンジンのアクティブ化を保証すること。
+
+## 11. 1ファイル巨大化防止と専任モジュール化ルール（1ファイル 300〜500行以内）
+
+- **単一責任の原則に基づくディレクトリ分割**:
+  - 1つのJavaScriptファイルに数千行を詰め込むモノリシック構成を禁止し、責務ごとに 300〜500行以内の専用モジュールへ分割・管理すること。
+  - **ニュース機能の分割例**:
+    - `js/news/news-fetcher.js`: 20+ RSS取得・XMLパース・重複排除
+    - `js/news/news-media-resolver.js`: メディア名正規化・見出しクリーンアップ
+    - `js/news/news-state-manager.js`: 既読タイトル・進行ステート管理
+    - `js/news/news-ui-board.js`: ニュースボード・アジェンダ描画
+    - `js/news/news-audio-player.js`: SE再生・繋ぎセリフ生成
+    - `js/news/news-list-popup.js`: 別窓一覧ポップアップ
+    - `js/news/news-config-manager.js`: 時刻別挨拶・設定取得
+    - `js/news/news-comment-interlude.js`: コメント挟み込み返信
+    - `js/news-mode.js`: 各モジュールを統括する薄いコントローラー
+
