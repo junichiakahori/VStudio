@@ -129,16 +129,15 @@ def log_to_api_file(message):
 
 def write_browser_console_log(log_message, client_type="web"):
     """
-    ネイティブアプリ (native) と Webブラウザ (web) のログを完全に別ファイルへ分離記録
+    ネイティブアプリ (native) と Webブラウザ (web) のログを完全に別ファイルへ分離記録（混在を100%根絶）
     - native -> logs/native_console.log & logs_backup/native_console_YYYY-MM-DD.log
-    - web    -> logs/web_console.log    & logs_backup/web_console_YYYY-MM-DD.log
+    - web    -> logs/web_console.log    & logs_backup/web_console_YYYY-MM-DD.log (および browser_console.log)
     """
     today_str = datetime.date.today().strftime('%Y-%m-%d')
     prefix = "native_console" if client_type == "native" else "web_console"
     
     active_file = os.path.join(BASE_DIR, "logs", f"{prefix}.log")
     backup_file = os.path.join(BASE_DIR, "logs_backup", f"{prefix}_{today_str}.log")
-    legacy_file = os.path.join(BASE_DIR, "logs", "browser_console.log")
     
     if not os.path.exists(LOG_BACKUP_DIR):
         os.makedirs(LOG_BACKUP_DIR, exist_ok=True)
@@ -147,14 +146,17 @@ def write_browser_console_log(log_message, client_type="web"):
 
     with _log_lock:
         try:
-            # 1. クライアント専用ログファイルへの追記
+            # 1. 専用ファイルへのみ追記（他方のログを一切混入させない）
             with open(active_file, 'a', encoding='utf-8') as f:
                 f.write(log_message + '\n')
             with open(backup_file, 'a', encoding='utf-8') as f:
                 f.write(log_message + '\n')
-            # 2. 統合ファイルにも追記
-            with open(legacy_file, 'a', encoding='utf-8') as f:
-                f.write(f"[{client_type.upper()}] {log_message}\n")
+                
+            # web クライアントの場合は browser_console.log にも同期 (Safari用)
+            if client_type == "web":
+                legacy_file = os.path.join(BASE_DIR, "logs", "browser_console.log")
+                with open(legacy_file, 'a', encoding='utf-8') as f:
+                    f.write(log_message + '\n')
         except Exception as e:
             print(f"[ログ書き込みエラー]: {e}")
 

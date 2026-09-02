@@ -59,11 +59,13 @@
                     const caller = getCallerSource();
                     const callerTag = caller ? ` ${caller}` : "";
                     const logString = `[${timestamp}]${callerTag} [${level.toUpperCase()}] ${message}`;
-                    const isNative = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nativeHost) || navigator.userAgent.includes("VStudioNative");
+                                        // 厳密なクライアント判定: ネイティブアプリ(nativeHost所有または8443ポート) vs Safari/Web(8444ポート等)
+                    const isNative = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nativeHost) || (window.location.port === "8443" && !navigator.userAgent.includes("Safari") && !navigator.userAgent.includes("Chrome"));
+                    const clientType = (window.location.port === "8444" || (!window.webkit?.messageHandlers?.nativeHost && window.location.protocol.startsWith("http"))) ? "web" : "native";
                     fetch('/log', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: logString, client: isNative ? "native" : "web" }),
+                        body: JSON.stringify({ message: logString, client: clientType }),
                         keepalive: true
                     }).catch(() => { });
                 } catch (e) { }
