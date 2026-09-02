@@ -56,6 +56,9 @@ const backendManagerPlugin = () => ({
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
 
       if (req.method === 'OPTIONS') {
         res.statusCode = 204;
@@ -171,6 +174,11 @@ const backendManagerPlugin = () => ({
 export default defineConfig({
   plugins: [backendManagerPlugin()],
   server: {
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    },
     host: 'localhost',
     port: 8443,
     strictPort: true,
