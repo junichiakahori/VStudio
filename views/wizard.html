@@ -3278,6 +3278,22 @@
                         }
                     }
 
+                    // 5. 設定値の詳細ロギング
+                    const modeLabel = (selectedMode === "news") ? "📰 ニュース番組" : (selectedMode === "radio" ? "📻 ラジオ番組" : "💬 雑談配信");
+                    const schedLabel = startToggleVal ? `⏰ 予約タイマー有効 (${startTimeVal || "指定時刻"} に自動開始)` : "⚡ 即時配信スタート";
+                    const endLabel = (endMode === "news_end") ? "📰 全記事読了時に自動終了" : (endMode === "timer" ? "⏳ 時間経過で自動終了" : (endMode === "time" ? "🕒 指定時刻で自動終了" : "手動終了"));
+                    const countText = document.getElementById("news-item-count")?.textContent || "確認中";
+
+                    console.log("[Wizard] ══════════════════════════════════════════");
+                    console.log(`[Wizard] 🚀 配信設定の適用完了 (サマリー)`);
+                    console.log(`[Wizard]  ├─ 配信モード: ${modeLabel}`);
+                    console.log(`[Wizard]  ├─ 開始スケジュール: ${schedLabel}`);
+                    console.log(`[Wizard]  ├─ 終了設定: ${endLabel}`);
+                    console.log(`[Wizard]  ├─ YouTube動画ID: ${ytVal ? cleanId : "(未指定 / スタジオ設定を維持)"}`);
+                    console.log(`[Wizard]  ├─ ニュース記事数: ${countText}`);
+                    console.log(`[Wizard]  └─ アクション: ${startToggleVal ? "⏳ 配信準備中画面へ移行し待機中..." : "🚀 直ちに番組スタート"}`);
+                    console.log("[Wizard] ══════════════════════════════════════════");
+
                     // 5. 配信種別に応じた番組スタート（即時開始の場合のみ直ちに実行、タイマー予約時は待機）
                     console.log("[Wizard] 🔍 配信開始判定: startToggleVal =", startToggleVal, ", selectedMode =", selectedMode);
                     if (!startToggleVal) { // 予約タイマーがOFF（即時開始）の場合のみ直ちにスタート
