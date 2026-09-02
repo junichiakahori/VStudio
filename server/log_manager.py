@@ -52,26 +52,26 @@ def clean_old_log_backups(retention_days=RETENTION_DAYS):
         print(f"[LogCleanup全体エラー]: {e}")
 
 def _rotate_single_log(log_key, file_path, reason_label):
-    """単一ログファイルのローテーション実行"""
+    """単一ログファイルを日付単位 (YYYY-MM-DD) で安全に追記・退避管理"""
     if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
         return
     if not os.path.exists(LOG_BACKUP_DIR):
         os.makedirs(LOG_BACKUP_DIR, exist_ok=True)
         
     date_str = datetime.date.today().strftime('%Y-%m-%d')
-    base_backup_name = f"{log_key}_{date_str}.log"
-    backup_path = os.path.join(LOG_BACKUP_DIR, base_backup_name)
-    
-    if os.path.exists(backup_path):
-        ts_str = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-        backup_path = os.path.join(LOG_BACKUP_DIR, f"{log_key}_{ts_str}.log")
+    backup_path = os.path.join(LOG_BACKUP_DIR, f"{log_key}_{date_str}.log")
         
     try:
-        shutil.copy2(file_path, backup_path)
+        # 既存の日付バックアップがある場合は追記（時間単位の別ファイル乱立を完全防止）
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as src:
+            content = src.read()
+        with open(backup_path, 'a', encoding='utf-8') as dst:
+            dst.write(content)
+            
         with open(file_path, 'w', encoding='utf-8') as f:
-            now_str = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S.000Z')
-            f.write(f"[{now_str}] [SYSTEM] === Log rotated ({reason_label}: {os.path.basename(backup_path)}) ===\n")
-        print(f"[LogRotation] 📦 {log_key} をローテーションしました ({reason_label}) -> {os.path.basename(backup_path)}")
+            now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            f.write(f"[{now_str}] [SYSTEM] === Log initialized for {date_str} ===\n")
+        print(f"[LogRotation] 📦 {log_key} のログを日付単位バックアップ ({os.path.basename(backup_path)}) に保存しました")
     except Exception as e:
         print(f"[LogRotationエラー {log_key}]: {e}")
 
