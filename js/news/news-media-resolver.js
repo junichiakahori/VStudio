@@ -16,7 +16,7 @@ const VIDEO_TITLE_PATTERNS = [
 const VIDEO_DESC_PATTERNS = [
   /動画をご覧ください/i, /動画で詳しく/i, /動画はこちら/i,
   /映像をご覧ください/i, /映像はこちら/i, /YouTubeで見る/i,
-  /配信中/i, /詳しくは動画で/i, /動画ニュース/i
+  /動画配信中/i, /詳しくは動画で/i, /動画ニュース/i
 ];
 
 function isInvalidNewsVideoArticle(title, desc) {
