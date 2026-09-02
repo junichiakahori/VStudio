@@ -1539,18 +1539,60 @@
 
             console.log(`[Wizard] 🔍 番組設定モーダル初期化: openBtn=${!!openBtn}, modal=${!!modal}`);
 
+            function getTimeDefaultOp() {
+                const hour = new Date().getHours();
+                if (hour >= 5 && hour < 11) return "おはようございます。本日の最新ニュースをお届けいたします。";
+                if (hour >= 11 && hour < 17) return "こんにちは。最新のニュースをお伝えいたします。";
+                return "こんばんは。今日の最新ニュースをまとめてお伝えいたします。";
+            }
+            function getTimeDefaultEd() {
+                const hour = new Date().getHours();
+                if (hour >= 5 && hour < 11) return "今日も素敵な一日をお過ごしください。";
+                if (hour >= 11 && hour < 17) return "それでは、引き続き良い時間をお過ごしください。";
+                return "それでは、明日も良い一日を。おやすみなさい。";
+            }
+
             function loadWizardNewsConfig() {
                 try {
-                    if (inTitle) inTitle.value = localStorage.getItem("savedNewsProgTitle") || "";
-                    if (inOp) inOp.value = localStorage.getItem("savedNewsOpGreeting") || "";
-                    if (inEd) inEd.value = localStorage.getItem("savedNewsEdGreeting") || "";
-                    if (inSeOp) inSeOp.checked = localStorage.getItem("savedNewsSeOp") !== "false";
-                    if (inSeTrans) inSeTrans.checked = localStorage.getItem("savedNewsSeTrans") !== "false";
-                    if (inSeEd) inSeEd.checked = localStorage.getItem("savedNewsSeEd") !== "false";
-                    console.log(`[Wizard] 📂 番組設定読み込み完了 (タイトル: "${inTitle ? inTitle.value : ''}")`);
+                    let autoState = {};
+                    try {
+                        autoState = JSON.parse(localStorage.getItem("live2d_studio_auto_ui_state") || "{}");
+                    } catch(e) {}
+
+                    const savedTitle = localStorage.getItem("savedNewsProgTitle") || autoState["news-config-title"] || "今日の最新ニュース";
+                    const savedOp = localStorage.getItem("savedNewsOpGreeting") || autoState["news-config-opening"] || getTimeDefaultOp();
+                    const savedEd = localStorage.getItem("savedNewsEdGreeting") || autoState["news-config-closing"] || getTimeDefaultEd();
+                    
+                    const savedSeOp = localStorage.getItem("savedNewsSeOp") ?? autoState["news-se-op-chime"] ?? true;
+                    const savedSeTrans = localStorage.getItem("savedNewsSeTrans") ?? autoState["news-se-transition"] ?? true;
+                    const savedSeEd = localStorage.getItem("savedNewsSeEd") ?? autoState["news-se-ed-chime"] ?? true;
+
+                    if (inTitle) inTitle.value = savedTitle;
+                    if (inOp) inOp.value = savedOp;
+                    if (inEd) inEd.value = savedEd;
+                    if (inSeOp) inSeOp.checked = String(savedSeOp) !== "false";
+                    if (inSeTrans) inSeTrans.checked = String(savedSeTrans) !== "false";
+                    if (inSeEd) inSeEd.checked = String(savedSeEd) !== "false";
+
+                    console.log(`[Wizard] 📂 番組設定読み込み完了 (タイトル: "${savedTitle}", OP: "${savedOp.slice(0, 15)}...", ED: "${savedEd.slice(0, 15)}...")`);
                 } catch(e) {
                     console.error("[Wizard] ❌ 設定読み込みエラー:", e);
                 }
+            }
+
+            const resetOpBtn = document.getElementById("wns-reset-op-btn");
+            const resetEdBtn = document.getElementById("wns-reset-ed-btn");
+            if (resetOpBtn && inOp) {
+                resetOpBtn.onclick = (e) => {
+                    e.preventDefault();
+                    inOp.value = getTimeDefaultOp();
+                };
+            }
+            if (resetEdBtn && inEd) {
+                resetEdBtn.onclick = (e) => {
+                    e.preventDefault();
+                    inEd.value = getTimeDefaultEd();
+                };
             }
 
             if (openBtn) {
@@ -1583,6 +1625,17 @@
                     if (inSeOp) localStorage.setItem("savedNewsSeOp", seOpVal);
                     if (inSeTrans) localStorage.setItem("savedNewsSeTrans", seTransVal);
                     if (inSeEd) localStorage.setItem("savedNewsSeEd", seEdVal);
+
+                    try {
+                        const autoState = JSON.parse(localStorage.getItem("live2d_studio_auto_ui_state") || "{}");
+                        autoState["news-config-title"] = titleVal;
+                        autoState["news-config-opening"] = opVal;
+                        autoState["news-config-closing"] = edVal;
+                        autoState["news-se-op-chime"] = seOpVal;
+                        autoState["news-se-transition"] = seTransVal;
+                        autoState["news-se-ed-chime"] = seEdVal;
+                        localStorage.setItem("live2d_studio_auto_ui_state", JSON.stringify(autoState));
+                    } catch(e) {}
 
                     console.log(`[Wizard] 💾 番組設定保存完了: タイトル="${titleVal}", OP="${opVal.slice(0, 15)}...", ED="${edVal.slice(0, 15)}..."`);
 
@@ -3589,12 +3642,18 @@
                     <input type="text" id="wns-title" style="width:100%; box-sizing:border-box; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:7px 10px; color:#fff; font-size:0.85rem;" placeholder="例: 今日の最新ニュース">
                 </div>
                 <div>
-                    <label style="font-size:0.75rem; color:var(--text-muted, #aaa); display:block; margin-bottom:4px;">🌅 オープニング挨拶（OP）</label>
-                    <textarea id="wns-op" rows="2" style="width:100%; box-sizing:border-box; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:7px 10px; color:#fff; font-size:0.82rem; resize:vertical;" placeholder="未入力の場合は時間帯に応じた挨拶が自動生成されます"></textarea>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <label style="font-size:0.75rem; color:var(--text-muted, #aaa);">🌅 オープニング挨拶（OP）</label>
+                        <button type="button" id="wns-reset-op-btn" style="background:transparent; border:none; color:#00d2d3; font-size:0.72rem; cursor:pointer; text-decoration:underline;">🕒 時刻連動挨拶をセット</button>
+                    </div>
+                    <textarea id="wns-op" rows="2" style="width:100%; box-sizing:border-box; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:7px 10px; color:#fff; font-size:0.82rem; resize:vertical;" placeholder="例: おはようございます。本日の最新ニュースをお届けいたします。"></textarea>
                 </div>
                 <div>
-                    <label style="font-size:0.75rem; color:var(--text-muted, #aaa); display:block; margin-bottom:4px;">🌙 エンディング挨拶（ED）</label>
-                    <textarea id="wns-ed" rows="2" style="width:100%; box-sizing:border-box; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:7px 10px; color:#fff; font-size:0.82rem; resize:vertical;" placeholder="未入力の場合は時間帯に応じた挨拶が自動生成されます"></textarea>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <label style="font-size:0.75rem; color:var(--text-muted, #aaa);">🌙 エンディング挨拶（ED）</label>
+                        <button type="button" id="wns-reset-ed-btn" style="background:transparent; border:none; color:#00d2d3; font-size:0.72rem; cursor:pointer; text-decoration:underline;">🕒 時刻連動挨拶をセット</button>
+                    </div>
+                    <textarea id="wns-ed" rows="2" style="width:100%; box-sizing:border-box; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:7px 10px; color:#fff; font-size:0.82rem; resize:vertical;" placeholder="例: 今日も素敵な一日をお過ごしください。"></textarea>
                 </div>
                 <div style="background:rgba(255,255,255,0.04); border-radius:8px; padding:10px 12px; border:1px solid rgba(255,255,255,0.08);">
                     <label style="font-size:0.75rem; color:#00d2d3; display:block; margin-bottom:8px; font-weight:bold;">🔔 演出効果音 (SE)</label>
