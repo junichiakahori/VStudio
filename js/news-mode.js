@@ -827,6 +827,36 @@ function getNewsConfig() {
   }
 
   window.startNewsBroadcast = startNewsBroadcast;
+
+  // =====================================================================
+  // ニュース番組 ボタンイベント初期化
+  // =====================================================================
+  function initNewsModeButtons() {
+    const startBtn = document.getElementById("news-broadcast-start-btn");
+    const stopBtn = document.getElementById("news-broadcast-stop-btn");
+    if (startBtn) {
+      startBtn.onclick = () => {
+        const startIdxInput = document.getElementById("news-broadcast-start-index");
+        const idx = startIdxInput ? (parseInt(startIdxInput.value, 10) || 1) - 1 : 0;
+        console.log(`[ニュース番組] 🚀 スタートボタンがクリックされました (開始位置: #${idx + 1})`);
+        startNewsBroadcast(idx);
+      };
+      console.log("[ニュース番組] ✅ news-broadcast-start-btn にクリックイベントをバインド完了");
+    }
+    if (stopBtn) {
+      stopBtn.onclick = () => {
+        console.log("[ニュース番組] ⏹ ストップボタンがクリックされました");
+        stopNewsBroadcast();
+      };
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initNewsModeButtons);
+  } else {
+    initNewsModeButtons();
+  }
+
   window.stopNewsBroadcast = stopNewsBroadcast;
   window.newsBroadcastState = newsBroadcastState;
 
