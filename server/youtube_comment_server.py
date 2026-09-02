@@ -31,9 +31,16 @@ class JSTFormatter(logging.Formatter):
             return dt.strftime(datefmt)
         return dt.strftime('%Y-%m-%d %H:%M:%S')
 
-_log_handler = logging.StreamHandler()
-_log_handler.setFormatter(JSTFormatter('[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
-logging.root.handlers = [_log_handler]
+os.makedirs(os.path.join(BASE_DIR, "logs"), exist_ok=True)
+_log_file_path = os.path.join(BASE_DIR, "logs", "youtube_server.log")
+
+_stream_handler = logging.StreamHandler()
+_stream_handler.setFormatter(JSTFormatter('[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+
+_file_handler = logging.FileHandler(_log_file_path, mode='a', encoding='utf-8')
+_file_handler.setFormatter(JSTFormatter('[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+
+logging.root.handlers = [_stream_handler, _file_handler]
 logging.root.setLevel(logging.INFO)
 
 logging.getLogger("websockets").setLevel(logging.CRITICAL)
