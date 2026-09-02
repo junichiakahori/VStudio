@@ -3011,15 +3011,19 @@
                             if (typeof openerWin.clearIdleTimer === "function") openerWin.clearIdleTimer();
                             console.log("[Wizard] 🚀 親ウィンドウにてニュース番組を即時開始します");
                             
-                            // 1. 親ウィンドウのボタンを同期クリック
+                            // 直接親ウィンドウの startNewsBroadcast を実行
+                            if (typeof openerWin.startNewsBroadcast === "function") {
+                                console.log("[Wizard] 📞 openerWin.startNewsBroadcast() を直接呼び出します");
+                                openerWin.startNewsBroadcast(0);
+                            }
+                            
+                            // DOMボタンもクリック
                             const newsStartBtn = openerWin.document.getElementById("news-broadcast-start-btn");
                             if (newsStartBtn) {
+                                console.log("[Wizard] 🖱️ 親画面の news-broadcast-start-btn をクリックします");
                                 newsStartBtn.click();
-                            } else if (typeof openerWin.startNewsBroadcast === "function") {
-                                openerWin.startNewsBroadcast();
                             }
 
-                            // 2. 念のため localStorage シグナルも送信 (ポート別)
                             try {
                                 const port = openerWin.location.port || "8443";
                                 localStorage.setItem(`startNewsRequest_${port}`, Date.now().toString());
