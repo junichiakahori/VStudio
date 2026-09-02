@@ -123,9 +123,12 @@ def extract_special_terms(text):
     発音ミスが起きやすいアルファベット略称・英字混じり固有名詞・『』や「」内の作品名を自動抽出
     """
     terms = []
-    # 1. 『...』および「...」で囲まれた作品名・固有名詞
+    # 1. 『...』および「...」で囲まれた作品名・固有名詞（既にひらがな・カタカナのみのものは除外）
     for m in re.finditer(r'[『「](.*?)[』」]', text):
         t = m.group(1).strip()
+        # すでにひらがなのみ、またはカタカナのみの場合は読みが確定しているためWikipedia置換しない
+        if re.match(r'^[ぁ-んー]+$', t) or re.match(r'^[ァ-ヴー]+$', t):
+            continue
         if len(t) >= 2 and len(t) <= 25 and not re.match(r'^(ニュース|速報|話題|注目)$', t):
             terms.append(t)
 
