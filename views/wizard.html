@@ -3300,30 +3300,21 @@
                             if (typeof openerWin.clearIdleTimer === "function") openerWin.clearIdleTimer();
                             console.log("[Wizard] 🚀 親ウィンドウにてニュース番組を即時開始します");
                             
-                            // 直接親ウィンドウの startNewsBroadcast を無条件実行
-                            console.log("[Wizard] 📞 openerWin.startNewsBroadcast の型:", typeof openerWin.startNewsBroadcast);
+                            // 親画面の startNewsBroadcast を確実に1回のみ実行 (多重連射防止)
                             try {
-                                if (openerWin.startNewsBroadcast) {
-                                    console.log("[Wizard] 🚀 openerWin.startNewsBroadcast(0) をキックします！");
+                                if (typeof openerWin.startNewsBroadcast === "function") {
+                                    console.log("[Wizard] 🚀 openerWin.startNewsBroadcast(0) を単一実行します！");
                                     openerWin.startNewsBroadcast(0);
                                 } else {
-                                    console.error("[Wizard] ❌ openerWin.startNewsBroadcast が親画面に存在しません！");
+                                    const newsStartBtn = openerWin.document.getElementById("news-broadcast-start-btn");
+                                    if (newsStartBtn) {
+                                        console.log("[Wizard] 🖱️ 親画面の news-broadcast-start-btn をクリックします");
+                                        newsStartBtn.click();
+                                    }
                                 }
                             } catch(err) {
                                 console.error("[Wizard] ❌ startNewsBroadcast 呼び出し例外:", err);
                             }
-                            
-                            // DOMボタンもクリック
-                            const newsStartBtn = openerWin.document.getElementById("news-broadcast-start-btn");
-                            if (newsStartBtn) {
-                                console.log("[Wizard] 🖱️ 親画面の news-broadcast-start-btn をクリックします");
-                                newsStartBtn.click();
-                            }
-
-                            try {
-                                const port = openerWin.location.port || "8443";
-                                localStorage.setItem(`startNewsRequest_${port}`, Date.now().toString());
-                            } catch(e) {}
                         } else if (selectedMode === "radio") {
                             openerWin.currentBroadcastMode = "radio";
                             const radioToggle = openerWin.document.getElementById("ai-radio-mode-toggle");
