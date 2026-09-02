@@ -11,16 +11,39 @@ const checkPort = (port) => {
   });
 };
 
-const killProcessOnPort = (port) => {
+const killProcessOnPort = (port, serverFileName) => {
   return new Promise((resolve) => {
-    exec(`lsof -t -i :${port}`, (err, stdout) => {
+    // 1. スクリプト名が指定されている場合は pkill でピンポイント停止 (最も安全)
+    if (serverFileName) {
+      const baseName = serverFileName.split('/').pop();
+      exec(`pkill -9 -f "python3.*${baseName}"`, () => {
+        resolve();
+      });
+      return;
+    }
+
+    // 2. ポート番号で停止する場合: LISTEN状態のサーバープロセスのみを抽出し、ブラウザ/WebKitを絶対にkillしない
+    exec(`lsof -nP -iTCP:${port} -sTCP:LISTEN`, (err, stdout) => {
       if (!stdout || !stdout.trim()) {
         resolve();
         return;
       }
-      const pids = stdout.trim().split(/\s+/).filter(Boolean);
-      if (pids.length > 0) {
-        exec(`kill -9 ${pids.join(' ')}`, () => resolve());
+      const lines = stdout.trim().split('\n').slice(1);
+      const serverPids = [];
+      lines.forEach(line => {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length >= 2) {
+          const cmd = parts[0].toLowerCase();
+          const pid = parts[1];
+          // Python または Node プロセスのみを安全にkill対象とする
+          if (cmd.includes('python') || cmd.includes('node')) {
+            serverPids.push(pid);
+          }
+        }
+      });
+
+      if (serverPids.length > 0) {
+        exec(`kill -9 ${serverPids.join(' ')}`, () => resolve());
       } else {
         resolve();
       }
@@ -112,7 +135,7 @@ const backendManagerPlugin = () => ({
             }
 
             if (action === 'stop' || action === 'restart') {
-              await killProcessOnPort(config.port);
+              await killProcessOnPort(config.port, config.file);
               addLog(serverName, 'SYSTEM', 'Server stopped.');
             }
 
