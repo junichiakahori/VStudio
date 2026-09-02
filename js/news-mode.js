@@ -1,3 +1,19 @@
+
+  // 🔢 数値入力微調整共通ヘルパー
+  window.adjustNumberInput = function (inputId, delta, minVal = 1, maxVal = Infinity) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    let current = parseInt(input.value, 10);
+    if (isNaN(current)) current = minVal;
+    let next = current + delta;
+    if (next < minVal) next = minVal;
+    if (next > maxVal) next = maxVal;
+    input.value = next;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    console.log(`[UI] 🔢 ${inputId} を ${current} ➔ ${next} に変更しました`);
+  };
+
 console.log("[news-mode.js] 🌟 スクリプトファイルが正常に実行開始されました (v20.0)");
 // 安全な遅延バインド
 window.startNewsBroadcast = async function(startIndex = 0, items = null, isFromNewsList = false) {
