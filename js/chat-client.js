@@ -846,11 +846,18 @@ function initChatClient() {
         }
       };
 
+      window._ytRetryCount = (window._ytRetryCount || 0) + 1;
       youtubeWs.onclose = () => {
         if (window.isYoutubeIntendedConnect) {
-          setYoutubeStatus("YouTube: 再接続中...", "connecting");
+          if (window._ytRetryCount > 3) {
+            console.log("[YouTube WS] ⚠️ 接続が3回失敗したため、再接続ループを停止しました。");
+            stopYoutubeConnection();
+            setYoutubeStatus("YouTube: 未接続 (停止)", "disconnected");
+            return;
+          }
+          setYoutubeStatus(`YouTube: 再接続中 (${window._ytRetryCount}/3)...`, "connecting");
           if (youtubeConnectBtn) {
-            youtubeConnectBtn.textContent = "再接続中";
+            youtubeConnectBtn.textContent = "再接続中 (クリックで中止)";
             youtubeConnectBtn.style.background = "#ff8800";
           }
           clearTimeout(youtubeReconnectTimer);
@@ -858,7 +865,7 @@ function initChatClient() {
             if (window.isYoutubeIntendedConnect) {
               startYoutubeConnection(videoId);
             }
-          }, 3500);
+          }, 4000);
         } else {
           setYoutubeStatus("YouTube: 未接続", "disconnected");
           if (youtubeConnectBtn) {
