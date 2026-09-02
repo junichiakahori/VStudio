@@ -48,7 +48,7 @@
                 return "";
             }
 
-            function sendLogToServer(level, args) {
+                        function sendLogToServer(level, args) {
                 try {
                     const message = args.map(arg => {
                         if (arg instanceof Error) return arg.stack || arg.message;
@@ -58,8 +58,8 @@
                     const timestamp = getJSTTimestamp();
                     const caller = getCallerSource();
                     const callerTag = caller ? ` ${caller}` : "";
-                    const logString = `[${timestamp}]${callerTag} [${level.toUpperCase()}] ${message}`;
-                                                            // ポート番号(8443:本番ネイティブ / 8444:開発Safari)およびWKWebView nativeHostで完全判定
+
+                    // ポート番号(8443:本番ネイティブ / 8444:開発Safari)およびWKWebView nativeHostで完全判定
                     let clientType = "web";
                     if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nativeHost) {
                         clientType = "native";
