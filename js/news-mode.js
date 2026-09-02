@@ -1562,6 +1562,15 @@ ${creditsInstruction}
 
   function playSE(name) {
     return new Promise(async (resolve) => {
+      const seTimeout = setTimeout(() => {
+        console.warn(`[ニュースSE] ⚠️ SE再生タイムアウト (${name}) -> 進行継続`);
+        resolve();
+      }, 3000);
+      const originalResolve = resolve;
+      resolve = () => {
+        clearTimeout(seTimeout);
+        originalResolve();
+      };
       try {
         const ctx = window.voicevoxAudioContext || window.bgmAudioContext || new (window.AudioContext || window.webkitAudioContext)();
         if (!window.voicevoxAudioContext) window.voicevoxAudioContext = ctx;
@@ -2270,6 +2279,7 @@ ${creditsInstruction}
     // OP挨拶（途中再開でない場合のみ再生）
     if (startIndex === 0) {
       if (progressEl) progressEl.textContent = "🎬 オープニング再生中...";
+      console.log("[ニュース番組] 🎬 オープニング挨拶を開始します...");
       if (config.useOpChime) { await playSE("放送開始チャイム"); await new Promise(r => setTimeout(r, 600)); }
       await queueVoicevoxAudio(config.op, true, config.op);
       await waitForVoicevoxFinish();
@@ -2298,6 +2308,7 @@ ${creditsInstruction}
         await new Promise(r => setTimeout(r, 600));
       }
 
+      console.log(`[ニュース番組] 📰 記事 #${i + 1}/${sortedNews.length} 「${item.title}」の読み上げを開始します`);
       const reader = window.readOneNewsItem || readOneNewsItem;
       const success = await reader(item, config, isCategoryChanged, isFirst, nextItem, nextIsCatChanged);
       if (!success && newsBroadcastState.isRunning) {
