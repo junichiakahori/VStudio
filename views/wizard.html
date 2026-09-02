@@ -1288,6 +1288,7 @@
         document.getElementById("btn-quick-today")?.addEventListener("click", () => applyWizardQuickRange("today"));
         document.getElementById("btn-quick-all")?.addEventListener("click", () => applyWizardQuickRange("all"));
 
+        // ウィザード起動時は常に最新の現在時刻を起点にして直近範囲を自動適用
         const savedRange = localStorage.getItem("savedNewsQuickRange") || "12h";
         applyWizardQuickRange(savedRange);
 
