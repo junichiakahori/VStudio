@@ -19,7 +19,9 @@ const VIDEO_DESC_PATTERNS = [
   /動画配信中/i, /詳しくは動画で/i, /動画ニュース/i
 ];
 
-function isInvalidNewsVideoArticle(title, desc) {
+function isInvalidNewsVideoArticle(arg1, arg2) {
+  let title = typeof arg1 === "object" && arg1 !== null ? (arg1.title || "") : (typeof arg1 === "string" ? arg1 : "");
+  let desc = typeof arg1 === "object" && arg1 !== null ? (arg1.description || "") : (typeof arg2 === "string" ? arg2 : "");
   const t = title || "";
   const d = desc || "";
   for (const pat of VIDEO_TITLE_PATTERNS) {

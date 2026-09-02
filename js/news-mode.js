@@ -51,11 +51,18 @@ function hideNewsSetlist() {
 }
 
 
-// 🚫 動画視聴前提のダイジェスト記事（Pickup NEWS等）や無意味なサイトヘッダーを除外する判定
-function isInvalidNewsVideoArticle(item) {
-  if (!item || !item.title) return true;
-  const title = item.title.trim();
-  const desc = (item.description || "").trim();
+// 🚫 動画視聴前提のダイジェスト記事（Pickup NEWS等）や無意味なサイトヘッダーを除外する判定 (ユニバーサル互換)
+function isInvalidNewsVideoArticle(arg1, arg2) {
+  let title = "";
+  let desc = "";
+  if (typeof arg1 === "object" && arg1 !== null) {
+    title = (arg1.title || "").trim();
+    desc = (arg1.description || "").trim();
+  } else {
+    title = (typeof arg1 === "string" ? arg1 : "").trim();
+    desc = (typeof arg2 === "string" ? arg2 : "").trim();
+  }
+  if (!title) return true;
 
   // 1. タイトル判定
   const VIDEO_TITLE_PATTERNS = [
@@ -84,6 +91,7 @@ function isInvalidNewsVideoArticle(item) {
 
   return false;
 }
+window.isInvalidNewsVideoArticle = isInvalidNewsVideoArticle;
 window.readNewsTitles = new Set(JSON.parse(localStorage.getItem("newsReadTitles") || "[]")); // 既読ニュースのタイトルを保持するセット
 window.readNewsTitles = readNewsTitles;
 try {
