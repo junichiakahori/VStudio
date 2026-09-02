@@ -1560,74 +1560,54 @@ ${creditsInstruction}
     return { title, op, ed, useOpChime, useTransition, useEdChime, isZunda };
   }
 
-  function playSE(name) {
-    return new Promise(async (resolve) => {
-      const seTimeout = setTimeout(() => {
-        console.warn(`[ニュースSE] ⚠️ SE再生タイムアウト (${name}) -> 進行継続`);
-        resolve();
-      }, 3000);
-      const originalResolve = resolve;
-      resolve = () => {
-        clearTimeout(seTimeout);
-        originalResolve();
-      };
+    function playSE(name) {
+    return new Promise((resolve) => {
       try {
-        const ctx = window.voicevoxAudioContext || window.bgmAudioContext || new (window.AudioContext || window.webkitAudioContext)();
-        if (!window.voicevoxAudioContext) window.voicevoxAudioContext = ctx;
+        const seVolSlider = document.getElementById("se-volume-slider");
+        const seVol = seVolSlider ? parseInt(seVolSlider.value, 10) / 100 : 0.85;
 
-        if (ctx.state === "suspended") {
-          await ctx.resume().catch(() => { });
-        }
+        const encoded = encodeURIComponent(name);
+        const audio = new Audio(`/se/${encoded}.mp3`);
+        audio.volume = seVol;
 
-        const tryFetch = async (path) => {
-          const res = await fetch(path);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return await res.arrayBuffer();
+        let isEnded = false;
+        const done = () => {
+          if (!isEnded) {
+            isEnded = true;
+            resolve();
+          }
         };
 
-        let arrayBuffer = null;
-        const encoded = encodeURIComponent(name);
-        try {
-          arrayBuffer = await tryFetch(`/se/${encoded}.mp3`);
-        } catch {
-          try {
-            arrayBuffer = await tryFetch(`/se/${encoded}.wav`);
-          } catch (err) {
-            console.warn(`[ニュースSE] 音声ファイルが見つかりません (${name}):`, err);
-            return resolve();
-          }
-        }
-
-        // Web Audio API でデコードして再生
-        ctx.decodeAudioData(arrayBuffer, (audioBuffer) => {
-          const source = ctx.createBufferSource();
-          source.buffer = audioBuffer;
-
-          const seVolSlider = document.getElementById("se-volume-slider");
-          const seVol = seVolSlider ? parseInt(seVolSlider.value, 10) / 100 : 0.85;
-
-          const seGain = ctx.createGain();
-          seGain.gain.value = seVol;
-
-          source.connect(seGain);
-          seGain.connect(ctx.destination);
-
-          source.onended = () => {
-            source.disconnect();
-            seGain.disconnect();
-            resolve();
+        audio.onended = done;
+        audio.onerror = () => {
+          // wav フォールバック
+          const wavAudio = new Audio(`/se/${encoded}.wav`);
+          wavAudio.volume = seVol;
+          wavAudio.onended = done;
+          wavAudio.onerror = () => {
+            console.warn(`[ニュースSE] 音声ファイルが見つかりません (${name})`);
+            done();
           };
+          wavAudio.play().then(() => {
+            console.log(`[ニュースSE] 🔔 効果音を再生中: ${name}`);
+          }).catch(err => {
+            console.warn(`[ニュースSE] 再生エラー (${name}):`, err);
+            done();
+          });
+        };
 
-          // タイムアウト保護（最長5秒で必ずresolveして番組進行がフリーズしないようにする）
-          setTimeout(() => resolve(), Math.min((audioBuffer.duration * 1000) + 500, 5000));
-
-          source.start(0);
-          console.log(`[ニュースSE] 🔊 WebAudio再生開始: ${name}`);
-        }, (decodeErr) => {
-          console.warn(`[ニュースSE] デコード失敗 (${name}):`, decodeErr);
-          resolve();
+        audio.play().then(() => {
+          console.log(`[ニュースSE] 🔔 効果音を再生中: ${name}`);
+        }).catch(err => {
+          console.warn(`[ニュースSE] 再生エラー (${name}):`, err);
+          done();
         });
-      } catch (e) {
+      } catch (err) {
+        console.error(`[ニュースSE] 初期化エラー (${name}):`, err);
+        resolve();
+      }
+    });
+  } catch (e) {
         console.warn(`[ニュースSE] 再生例外 (${name}):`, e);
         resolve();
       }
