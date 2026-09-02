@@ -718,6 +718,19 @@
         const origLog = console.log;
         const origWarn = console.warn;
         const origError = console.error;
+        // 🚨 ウィザード用 グローバル例外・構文エラー完全捕捉エンジン
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            const file = url ? url.split('/').pop() : 'wizard.html';
+            const errStr = `[グローバル例外] 💥 ${file}:${lineNo}:${columnNo} -> ${msg}`;
+            origError.call(console, errStr);
+            forwardLog("error", [errStr]);
+            return false;
+        };
+        window.onunhandledrejection = function(event) {
+            const reason = event.reason ? (event.reason.stack || event.reason.message || event.reason) : 'unknown rejection';
+            origError.call(console, reason);
+            forwardLog("error", [`[未処理Promise拒否] 💥 ${reason}`]);
+        };
         function getWizardScriptVersion(fileName) {
             try {
                 const scripts = document.querySelectorAll("script[src]");
@@ -1506,6 +1519,99 @@
                 modal.style.display = "none";
                 alert("ニュース番組設定を保存しました！");
             };
+        }
+    
+        
+        // ⚙️ ニュース番組設定モーダル制御 (DOMContentLoaded完全保護 & ログ追跡版)
+        function initWizardNewsSettingsModal() {
+            const modal = document.getElementById("wizard-news-settings-modal");
+            const openBtn = document.getElementById("open-news-settings-btn");
+            const closeBtn = document.getElementById("close-wizard-news-settings-btn");
+            const cancelBtn = document.getElementById("cancel-wizard-news-settings-btn");
+            const saveBtn = document.getElementById("save-wizard-news-settings-btn");
+
+            const inTitle = document.getElementById("wns-title");
+            const inOp = document.getElementById("wns-op");
+            const inEd = document.getElementById("wns-ed");
+            const inSeOp = document.getElementById("wns-se-op");
+            const inSeTrans = document.getElementById("wns-se-trans");
+            const inSeEd = document.getElementById("wns-se-ed");
+
+            console.log(`[Wizard] 🔍 番組設定モーダル初期化: openBtn=${!!openBtn}, modal=${!!modal}`);
+
+            function loadWizardNewsConfig() {
+                try {
+                    if (inTitle) inTitle.value = localStorage.getItem("savedNewsProgTitle") || "";
+                    if (inOp) inOp.value = localStorage.getItem("savedNewsOpGreeting") || "";
+                    if (inEd) inEd.value = localStorage.getItem("savedNewsEdGreeting") || "";
+                    if (inSeOp) inSeOp.checked = localStorage.getItem("savedNewsSeOp") !== "false";
+                    if (inSeTrans) inSeTrans.checked = localStorage.getItem("savedNewsSeTrans") !== "false";
+                    if (inSeEd) inSeEd.checked = localStorage.getItem("savedNewsSeEd") !== "false";
+                    console.log(`[Wizard] 📂 番組設定読み込み完了 (タイトル: "${inTitle ? inTitle.value : ''}")`);
+                } catch(e) {
+                    console.error("[Wizard] ❌ 設定読み込みエラー:", e);
+                }
+            }
+
+            if (openBtn) {
+                openBtn.onclick = (e) => {
+                    e.preventDefault();
+                    console.log("[Wizard] ⚙️ 番組設定ボタンがクリックされました！モーダルを表示します");
+                    loadWizardNewsConfig();
+                    if (modal) {
+                        modal.style.display = "flex";
+                    } else {
+                        console.error("[Wizard] ❌ wizard-news-settings-modal 要素が見つかりません！");
+                    }
+                };
+            }
+            if (closeBtn && modal) closeBtn.onclick = () => { modal.style.display = "none"; };
+            if (cancelBtn && modal) cancelBtn.onclick = () => { modal.style.display = "none"; };
+
+            if (saveBtn && modal) {
+                saveBtn.onclick = () => {
+                    const titleVal = inTitle ? inTitle.value.trim() : "";
+                    const opVal = inOp ? inOp.value.trim() : "";
+                    const edVal = inEd ? inEd.value.trim() : "";
+                    const seOpVal = inSeOp ? inSeOp.checked : true;
+                    const seTransVal = inSeTrans ? inSeTrans.checked : true;
+                    const seEdVal = inSeEd ? inSeEd.checked : true;
+
+                    if (inTitle) localStorage.setItem("savedNewsProgTitle", titleVal);
+                    if (inOp) localStorage.setItem("savedNewsOpGreeting", opVal);
+                    if (inEd) localStorage.setItem("savedNewsEdGreeting", edVal);
+                    if (inSeOp) localStorage.setItem("savedNewsSeOp", seOpVal);
+                    if (inSeTrans) localStorage.setItem("savedNewsSeTrans", seTransVal);
+                    if (inSeEd) localStorage.setItem("savedNewsSeEd", seEdVal);
+
+                    console.log(`[Wizard] 💾 番組設定保存完了: タイトル="${titleVal}", OP="${opVal.slice(0, 15)}...", ED="${edVal.slice(0, 15)}..."`);
+
+                    // 親画面にも即時反映
+                    if (openerWin) {
+                        const pTitle = openerWin.document.getElementById("news-config-title");
+                        const pOp = openerWin.document.getElementById("news-config-opening");
+                        const pEd = openerWin.document.getElementById("news-config-closing");
+                        const pSeOp = openerWin.document.getElementById("news-se-op-chime");
+                        const pSeTrans = openerWin.document.getElementById("news-se-transition");
+                        const pSeEd = openerWin.document.getElementById("news-se-ed-chime");
+                        if (pTitle) pTitle.value = titleVal;
+                        if (pOp) pOp.value = opVal;
+                        if (pEd) pEd.value = edVal;
+                        if (pSeOp) pSeOp.checked = seOpVal;
+                        if (pSeTrans) pSeTrans.checked = seTransVal;
+                        if (pSeEd) pSeEd.checked = seEdVal;
+                    }
+
+                    modal.style.display = "none";
+                    alert("ニュース番組設定を保存しました！");
+                };
+            }
+        }
+
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", initWizardNewsSettingsModal);
+        } else {
+            initWizardNewsSettingsModal();
         }
     
         // ニュース一覧別窓ボタン（独立ポップアップ）
