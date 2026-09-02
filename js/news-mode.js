@@ -842,8 +842,8 @@ function getNewsConfig() {
       console.log("[ニュース番組] 🚀 [STEP 11] 全記事読み上げ完了！エンディング挨拶へ移行します");
       if (progressEl) progressEl.textContent = "🏁 エンディング再生中...";
       if (config.useTransition) {
-        await playSE("ロールの閉め");
-        await new Promise(r => setTimeout(r, 500));
+        await playSE("シーン切り替え1");
+        await new Promise(r => setTimeout(r, 300));
       }
       await queueVoicevoxAudio(config.ed, true, config.ed);
       await waitForVoicevoxFinish();
