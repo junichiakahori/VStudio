@@ -325,7 +325,7 @@ async function queueVoicevoxAudio(
     t = t.replace(/(?:^|(?<=[。！？\s]))(?:とろろ|トロロ)はにゃ[、,\s　]*/g, "とろろとしては、");
     t = t.replace(/(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)(?:なのだ|のだ)[、,\s　]*/g, "ずんだもんとしては、");
     t = t.replace(/(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)は(?:なのだ|のだ)[、,\s　]*/g, "ずんだもんとしては、");
-    let pt = t.replace(/[ 　]+/g, "");
+    let pt = t.replace(/(?<![A-Za-z0-9])[ 　]+(?![A-Za-z0-9])/g, "");
     pt = pt.replace(/、+/g, "、");
     pt = pt.replace(/[\u4E00-\u9FFF々ヶ〆〇0-9a-zA-Z]+[（\(]([ぁ-んァ-ヶー]+)[）\)]/g, "$1");
     pt = pt.replace(/[（\(][^）\)]*[）\)]/g, "");
@@ -533,7 +533,7 @@ async function playVoicevoxDirectAndWait(displayText, speakText = null) {
     t = t.replace(/(?:^|(?<=[。！？\s]))(?:とろろ|トロロ)はにゃ[、,\s　]*/g, "とろろとしては、");
     t = t.replace(/(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)(?:なのだ|のだ)[、,\s　]*/g, "ずんだもんとしては、");
     t = t.replace(/(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)は(?:なのだ|のだ)[、,\s　]*/g, "ずんだもんとしては、");
-    let pt = t.replace(/[ 　]+/g, "");
+    let pt = t.replace(/(?<![A-Za-z0-9])[ 　]+(?![A-Za-z0-9])/g, "");
     pt = pt.replace(/、+/g, "、");
     pt = pt.replace(/[\u4E00-\u9FFF々ヶ〆〇0-9a-zA-Z]+[（\(]([ぁ-んァ-ヶー]+)[）\)]/g, "$1");
     pt = pt.replace(/[（\(][^）\)]*[）\)]/g, "");

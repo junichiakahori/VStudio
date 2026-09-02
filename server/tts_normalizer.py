@@ -1,3 +1,19 @@
+
+# 一般的な英単語・略称・ゲームIT用語の発音マップ
+COMMON_ENGLISH_WORDS = {
+    "KEY": "キー", "TO": "トゥー", "COMBAT": "コンバット",
+    "TGS": "ティージーエス", "KTC": "ケーティーシー",
+    "PR": "ピーアール", "TIMES": "タイムズ", "PR TIMES": "ピーアールタイムズ",
+    "NEWS": "ニュース", "LIVE": "ライブ", "GAME": "ゲーム",
+    "RPG": "アールピージー", "FPS": "エフピーエス", "MMO": "エムエムオー",
+    "OPEN": "オープン", "AI": "エーアイ", "VR": "ブイアール", "AR": "エーアール",
+    "ONLINE": "オンライン", "STUDIO": "スタジオ", "UPDATE": "アップデート",
+    "WORLD": "ワールド", "OFFICIAL": "オフィシャル", "SPECIAL": "スペシャル",
+    "SHOW": "ショー", "EVENT": "イベント", "BATTLE": "バトル", "WAR": "ウォー",
+    "STAR": "スター", "MONSTER": "モンスター", "HUNTER": "ハンター",
+    "CHAMPION": "チャンピオン", "LEAGUE": "リーグ", "CUP": "カップ"
+}
+
 # -*- coding: utf-8 -*-
 """
 tts_normalizer.py
@@ -79,6 +95,11 @@ def lookup_wikipedia_reading(term):
                                 yomi_hira += c
                         
                         yomi_clean = re.sub(r'[^ぁ-んゔー、]', '', yomi_hira)
+                        # 英単語に対して異常に長すぎる読み（例: COMBAT -> バリス式列車検知型閉塞装置）は誤読として除外
+                        if re.match(r'^[A-Za-z0-9\s\-_]+$', term) and len(yomi_clean.replace("、", "")) > len(term) * 2.5:
+                            print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi_clean}' は過剰展開のため破棄")
+                            _wiki_reading_cache[term] = (None, None)
+                            return None, None
                         if len(yomi_clean.replace("、", "")) >= 2:
                             _wiki_reading_cache[term] = (yomi_clean, term)
                             return yomi_clean, term
@@ -157,6 +178,10 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None):
         return ""
 
     t = text
+
+    # 0. 一般英単語・ゲームIT用語のカタカナ発音適用
+    for eng_word, kana_yomi in COMMON_ENGLISH_WORDS.items():
+        t = re.sub(rf'(?<![A-Za-z0-9]){re.escape(eng_word)}(?![A-Za-z0-9])', kana_yomi, t, flags=re.IGNORECASE)
 
     if custom_dict and isinstance(custom_dict, dict):
         for orig, yomi in custom_dict.items():
