@@ -1826,6 +1826,7 @@
                         const mi = String(parsedDate.getMinutes()).padStart(2, "0");
                         if (startTimeInput) startTimeInput.value = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
                         if (startToggle) startToggle.checked = true;
+                        if (typeof updateWizardClockDisplay === "function") updateWizardClockDisplay();
                     } else if (info.status === "channel_autodetect") {
                         const currentInputVal = startTimeInput ? startTimeInput.value : "";
                         schedEl.textContent = currentInputVal ? `⏰ 配信予定: ${formatScheduleDateTime(currentInputVal)}` : "⏰ 配信開始時に最新枠を自動取得";
@@ -1977,6 +1978,25 @@
             updateWizardClockDisplay();
         }
 
+        
+        function getWizardScheduledStartTime() {
+            const input = document.getElementById("wizard-start-time");
+            if (input && input.value) {
+                return input.value;
+            }
+            try {
+                const d = (typeof getWizardStartTimeDate === "function") ? getWizardStartTimeDate() : new Date();
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, "0");
+                const dd = String(d.getDate()).padStart(2, "0");
+                const h = String(d.getHours()).padStart(2, "0");
+                const m = String(d.getMinutes()).padStart(2, "0");
+                return `${yyyy}-${mm}-${dd}T${h}:${m}`;
+            } catch(e) {
+                return "";
+            }
+        }
+    
         function updateWizardClockDisplay() {
             const d = getWizardStartTimeDate();
             const now = new Date();
@@ -3192,7 +3212,7 @@
                     // 2. 配信開始スケジュールの適用
                     openerWin.currentBroadcastMode = selectedMode;
                     const startToggleVal = document.getElementById("wizard-start-schedule-toggle")?.checked || false;
-                    const startTimeVal = document.getElementById("wizard-start-time")?.value || "";
+                    const startTimeVal = (typeof getWizardScheduledStartTime === "function") ? getWizardScheduledStartTime() : (document.getElementById("wizard-start-time")?.value || "");
                     const mainSchedToggle = openerWin.document.getElementById("local-schedule-toggle");
                     const mainSchedTime = openerWin.document.getElementById("local-schedule-time");
 
