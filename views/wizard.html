@@ -769,7 +769,17 @@
         function forwardLog(type, args) {
             try {
                 const caller = getWizardCallerSource();
-                const msg = Array.from(args).map(a => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" ");
+                const msg = Array.from(args).map(a => {
+                    if (a instanceof Error) return `${a.name}: ${a.message}
+${a.stack || ''}`;
+                    if (typeof a === "object" && a !== null) {
+                        try {
+                            const str = JSON.stringify(a);
+                            return str === "{}" ? (a.message || a.toString()) : str;
+                        } catch(e) { return String(a); }
+                    }
+                    return String(a);
+                }).join(" ");
                 const clientType = (window.location.port === "8444") ? "SAFARI" : "NATIVE";
                 fetch("/log", {
                     method: "POST",
