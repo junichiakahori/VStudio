@@ -855,6 +855,18 @@ function getNewsConfig() {
       console.log("[ニュース番組] 🎉 番組がすべて正常に完了しました！");
       stopNewsBroadcast();
 
+      // 📰 全記事読了時の自動終了設定（isAutoEndAfterNews）が有効な場合、直ちに配信終了・OBS停止プロセスを起動
+      if (window.isAutoEndAfterNews) {
+        console.log("[ニュース番組] 🏁 全記事読了による自動終了設定が有効です。OBS配信終了プロセスを起動します...");
+        setTimeout(() => {
+          if (typeof window.executeStreamEndProcess === "function") {
+            window.executeStreamEndProcess();
+          } else {
+            console.warn("[ニュース番組] ⚠️ executeStreamEndProcess が見つかりませんでした");
+          }
+        }, 500);
+      }
+
     } catch (broadcastErr) {
       console.error("[ニュース番組] ❌ startNewsBroadcast 内で致命的例外が発生しました:", broadcastErr);
     }
