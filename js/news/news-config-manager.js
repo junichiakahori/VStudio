@@ -10,9 +10,10 @@
       if (hour >= 11 && hour < 17) return `こんにちはなのだ！最新の${title}をお伝えするのだ！`;
       return `こんばんはなのだ！今日の${title}をまとめてチェックするのだ！`;
     }
-    if (hour >= 5 && hour < 11) return `おはようございます。本日の${title}をお届けいたします。`;
-    if (hour >= 11 && hour < 17) return `こんにちは。最新の${title}をお伝えいたします。`;
-    return `こんばんは。今日の${title}をまとめてお伝えいたします。`;
+    const cleanTitle = title.replace(/^(最新の|本日の|今日の)/, "");
+    if (hour >= 5 && hour < 11) return `おはようございます。本日の${cleanTitle}をお届けいたします。`;
+    if (hour >= 11 && hour < 17) return `こんにちは。${title}をお伝えいたします。`;
+    return `こんばんは。${title}をまとめてお伝えいたします。`;
   }
 
   function getTimeBasedClosing(isZunda = false) {
