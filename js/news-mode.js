@@ -1,3 +1,4 @@
+console.log("[news-mode.js] 🌟 スクリプトファイルが正常に実行開始されました (v18.3)");
 // 即時グローバル公開
 window.startNewsBroadcast = async function(startIndex = 0, items = null, isFromNewsList = false) {
   if (typeof _executeNewsBroadcast === "function") {
