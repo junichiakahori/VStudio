@@ -1143,3 +1143,16 @@ function getNewsConfig() {
   };
 
   window.enrichCurrentNewsWithLinks();
+
+  // =====================================================================
+  // ウィザードや子ウィンドウからのポート別開始シグナル監視 (Storage Event)
+  // =====================================================================
+  window.addEventListener("storage", (e) => {
+    const port = window.location.port || "8443";
+    if (e.key === `startNewsRequest_${port}` && e.newValue) {
+      console.log(`[ニュース番組] 📡 Storageシグナル受信 (startNewsRequest_${port}) -> 番組を開始します`);
+      if (typeof window.startNewsBroadcast === "function") {
+        window.startNewsBroadcast(0);
+      }
+    }
+  });

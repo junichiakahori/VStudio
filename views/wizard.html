@@ -2991,7 +2991,8 @@
                     }
 
                     // 5. 配信種別に応じた番組スタート（即時開始の場合のみ直ちに実行）
-                    if (!startToggleVal) {
+                    console.log("[Wizard] 🔍 配信開始判定: startToggleVal =", startToggleVal, ", selectedMode =", selectedMode);
+                    if (true) { // ウィザードの「配信準備完了！スタート」ボタンは常に即時スタートを実行
                         if (window.location.port !== "8444" && typeof openerWin.ensureObsStreamingStarted === "function") {
                             openerWin.ensureObsStreamingStarted().catch(e => console.warn(e));
                         }
