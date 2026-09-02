@@ -761,6 +761,14 @@ function getNewsConfig() {
       }
 
       const config = getNewsConfig();
+      console.log("[ニュース番組] 📰 ==========================================");
+      console.log("[ニュース番組] 🚀 【ニュース番組 放送開始サマリー】");
+      console.log(`[ニュース番組] 📌 読み上げ対象: 全 ${sortedNews.length} 件 (開始位置: #${startIndex + 1})`);
+      console.log(`[ニュース番組] 🎬 OP挨拶: "${config.op}" (チャイム: ${config.useOpChime ? '鳴らす' : 'なし'})`);
+      console.log(`[ニュース番組] 🏁 ED挨拶: "${config.ed}" (チャイム: ${config.useEdChime ? '鳴らす' : 'なし'})`);
+      console.log(`[ニュース番組] 🔄 カテゴリ切り替えSE: ${config.useTransition ? '有効' : '無効'}`);
+      console.log("[ニュース番組] 📰 ==========================================");
+
       console.log(`[ニュース番組] 🚀 [STEP 4] 設定取得完了: タイトル="${config.title}", OP="${config.op}", チャイム=${config.useOpChime}`);
 
       preloadedNewsMap.clear();

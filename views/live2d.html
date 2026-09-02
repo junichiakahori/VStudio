@@ -125,6 +125,24 @@
         };
 
         // =====================================================================
+                // =====================================================================
+        // ニュース番組 最優先グローバルエントリポイント (ウィザード連携用)
+        // =====================================================================
+        window.startNewsBroadcast = function(startIndex = 0, items = null, isFromNewsList = false) {
+            console.log(`[Live2D Main] 🚀 グローバル startNewsBroadcast 受信 (startIndex: ${startIndex})`);
+            if (typeof window._executeNewsBroadcast === "function") {
+                return window._executeNewsBroadcast(startIndex, items, isFromNewsList);
+            }
+            const btn = document.getElementById("news-broadcast-start-btn");
+            if (btn) {
+                console.log("[Live2D Main] 🖱️ news-broadcast-start-btn をクリックして開始します");
+                btn.click();
+            } else {
+                console.warn("[Live2D Main] ⚠️ UIパネル展開待機中... 500ms後に再試行します");
+                setTimeout(() => window.startNewsBroadcast(startIndex, items, isFromNewsList), 500);
+            }
+        };
+
         // UIイベント重複防止＆モジュール登録エンジン
         // =====================================================================
         window._uiLoadedHandlers = window._uiLoadedHandlers || new Map();
@@ -236,7 +254,7 @@
     <script src="/js/news/news-list-popup.js?v=1.0"></script>
     <script src="/js/news/news-config-manager.js?v=1.0"></script>
     <script src="/js/news/news-comment-interlude.js?v=1.0"></script>
-    <script src="/js/news-mode.js?v=18.3"></script>
+    <script src="/js/news-mode.js?v=18.4"></script>
     <script src="/js/radio-mode.js?v=9.6"></script>
     <script src="/js/stream-tools.js?v=9.6"></script>
     <script src="/js/stream-wizard.js?v=10.0"></script>
