@@ -1,0 +1,45 @@
+// =====================================================================
+// news-config-manager.js: キャスター設定・時刻連動挨拶・プロンプト管理
+// =====================================================================
+
+(function() {
+  function getTimeBasedGreeting(isZunda = false, title = "ニュース番組") {
+    const hour = new Date().getHours();
+    if (isZunda) {
+      if (hour >= 5 && hour < 11) return `おはようございますなのだ！本日の${title}をお届けするのだ！`;
+      if (hour >= 11 && hour < 17) return `こんにちはなのだ！最新の${title}をお伝えするのだ！`;
+      return `こんばんはなのだ！今日の${title}をまとめてチェックするのだ！`;
+    }
+    if (hour >= 5 && hour < 11) return `おはようございます。本日の${title}をお届けいたします。`;
+    if (hour >= 11 && hour < 17) return `こんにちは。最新の${title}をお伝えいたします。`;
+    return `こんばんは。今日の${title}をまとめてお伝えいたします。`;
+  }
+
+  function getTimeBasedClosing(isZunda = false) {
+    const hour = new Date().getHours();
+    if (isZunda) {
+      if (hour >= 5 && hour < 11) return "今日も一日、元気に頑張るのだ！";
+      if (hour >= 11 && hour < 17) return "午後も良い時間をお過ごしくださいなのだ！";
+      return "明日も良い一日になりますように。おやすみなさいなのだ！";
+    }
+    if (hour >= 5 && hour < 11) return "今日も素敵な一日をお過ごしください。";
+    if (hour >= 11 && hour < 17) return "それでは、引き続き良い時間をお過ごしください。";
+    return "それでは、明日も良い一日を。おやすみなさい。";
+  }
+
+  function getNewsConfig() {
+    const title = document.getElementById("news-program-title")?.value || "今日の最新ニュース";
+    const op = document.getElementById("news-opening-text")?.value || getTimeBasedGreeting(false, title);
+    const ed = document.getElementById("news-ending-text")?.value || getTimeBasedClosing(false);
+    const useOpChime = document.getElementById("news-se-op-chime")?.checked ?? true;
+    const useTransition = document.getElementById("news-se-transition")?.checked ?? true;
+    const useEdChime = document.getElementById("news-se-ed-chime")?.checked ?? true;
+    return { title, op, ed, useOpChime, useTransition, useEdChime };
+  }
+
+  window.newsConfigManager = {
+    getTimeBasedGreeting,
+    getTimeBasedClosing,
+    getNewsConfig
+  };
+})();
