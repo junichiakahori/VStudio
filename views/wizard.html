@@ -2959,7 +2959,7 @@
 
                     // 5. 配信種別に応じた番組スタート（即時開始の場合のみ直ちに実行）
                     if (!startToggleVal) {
-                        if (typeof openerWin.ensureObsStreamingStarted === "function") {
+                        if (window.location.port !== "8444" && typeof openerWin.ensureObsStreamingStarted === "function") {
                             openerWin.ensureObsStreamingStarted().catch(e => console.warn(e));
                         }
 
@@ -2976,12 +2976,15 @@
                         if (selectedMode === "news") {
                             openerWin.currentBroadcastMode = "news";
                             if (typeof openerWin.clearIdleTimer === "function") openerWin.clearIdleTimer();
-                            if (typeof openerWin.startNewsBroadcast === "function") {
-                                openerWin.startNewsBroadcast();
-                            } else {
-                                const newsStartBtn = openerWin.document.getElementById("news-broadcast-start-btn");
-                                if (newsStartBtn) newsStartBtn.click();
-                            }
+                            console.log("[Wizard] 🚀 親ウィンドウにてニュース番組の開始をキックします");
+                            openerWin.setTimeout(() => {
+                                if (typeof openerWin.startNewsBroadcast === "function") {
+                                    openerWin.startNewsBroadcast();
+                                } else {
+                                    const newsStartBtn = openerWin.document.getElementById("news-broadcast-start-btn");
+                                    if (newsStartBtn) newsStartBtn.click();
+                                }
+                            }, 200);
                         } else if (selectedMode === "radio") {
                             openerWin.currentBroadcastMode = "radio";
                             const radioToggle = openerWin.document.getElementById("ai-radio-mode-toggle");
