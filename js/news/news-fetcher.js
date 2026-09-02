@@ -6,7 +6,7 @@
 
 
 
-const NEWS_CATEGORIES = {
+window.NEWS_CATEGORIES = window.NEWS_CATEGORIES || {
   "cat_top": ["https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja", "https://news.yahoo.co.jp/rss/topics/top-picks.xml", "https://www.nhk.or.jp/rss/news/cat0.xml"],
   "cat_society": ["https://news.google.com/news/rss/headlines/section/topic/NATION?hl=ja&gl=JP&ceid=JP:ja", "https://news.yahoo.co.jp/rss/topics/domestic.xml", "https://www.nhk.or.jp/rss/news/cat1.xml"],
   "cat_world": ["https://news.google.com/news/rss/headlines/section/topic/WORLD?hl=ja&gl=JP&ceid=JP:ja", "https://news.yahoo.co.jp/rss/topics/world.xml", "https://www.nhk.or.jp/rss/news/cat6.xml"],
@@ -19,7 +19,7 @@ const NEWS_CATEGORIES = {
   "cat_local": ["https://news.yahoo.co.jp/rss/topics/local.xml"]
 };
 
-const CATEGORY_NAMES = {
+window.CATEGORY_NAMES = window.CATEGORY_NAMES || {
   "cat_all": "全て（全カテゴリを一括取得）",
   "cat_top": "総合",
   "cat_society": "国内・社会",
