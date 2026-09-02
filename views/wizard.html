@@ -1443,12 +1443,31 @@
             }
         });
 
-        // ニュース一覧別窓ボタン
-        document.getElementById("open-news-list-popup-btn").addEventListener("click", () => {
+        // ニュース一覧別窓ボタン（独立ポップアップ）
+        document.getElementById("open-news-list-popup-btn")?.addEventListener("click", () => {
+            const width = 850;
+            const height = 700;
+            const left = (window.screen.width - width) / 2;
+            const top = (window.screen.height - height) / 2;
+            window.open(
+                "/views/news_list.html",
+                "VStudioNewsListWindow",
+                `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes`
+            );
+        });
+
+        // ニュース番組設定ボタン（親画面の設定モーダルをキックまたは設定ポップアップ）
+        document.getElementById("open-news-settings-btn")?.addEventListener("click", () => {
             if (openerWin) {
-                const btn = openerWin.document.getElementById("news-list-btn");
-                if (btn) btn.click();
+                const btn = openerWin.document.getElementById("news-script-btn");
+                if (btn) {
+                    btn.click();
+                    openerWin.focus();
+                    return;
+                }
             }
+            // 親画面がない場合のフォールバック案内
+            alert("親画面（スタジオ）の「ニュース設定」パネルにて、番組タイトル・OP/ED挨拶・SE設定を詳細にカスタマイズできます。");
         });
 
         document.getElementById("open-idle-settings-btn").addEventListener("click", () => {
