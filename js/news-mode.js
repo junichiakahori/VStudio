@@ -1018,8 +1018,9 @@ function getNewsConfig() {
               </div>
               <div class="resume-text" title="${sorted[firstUnreadIdx].title}">「${titleShort}」</div>
             </div>
-            <div class="resume-actions">
-              <button id="news-quick-resume-btn" class="resume-btn resume-btn-primary">▶ 続きから開始</button>
+            <div class="resume-actions" style="display:flex; gap:6px;">
+              <button id="news-quick-resume-btn" class="resume-btn resume-btn-primary" style="flex:1;">▶ 続きから開始</button>
+              <button id="news-discard-resume-btn" class="resume-btn resume-btn-secondary" style="padding:4px 10px; background:rgba(255,118,117,0.15); border:1px solid rgba(255,118,117,0.4); color:#ff7675;">✕ 破棄</button>
             </div>
           `;
 
@@ -1033,6 +1034,13 @@ function getNewsConfig() {
             if (resumeContainer) resumeContainer.style.display = "none";
             banner.remove();
             await window.startNewsBroadcast(firstUnreadIdx);
+          };
+
+          document.getElementById("news-discard-resume-btn").onclick = () => {
+            if (resumeContainer) resumeContainer.style.display = "none";
+            banner.remove();
+            if (startIdxInput) startIdxInput.value = 1;
+            console.log("[ニュースレジューム] 🗑️ 続きから再開を破棄し、第1件からの開始にリセットしました");
           };
         }
       }
