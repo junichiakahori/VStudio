@@ -32,15 +32,14 @@ LOG_FILES_MAP = {
 }
 
 def clean_old_log_backups(retention_days=RETENTION_DAYS):
-    """logs/ 内の指定日数（デフォルト7日）以上前の日付ログを自動クリーンアップ"""
+    """logs_backup/ 内の指定日数（デフォルト7日）以上前の日付ログを自動クリーンアップ"""
     try:
-        logs_dir = os.path.join(BASE_DIR, "logs")
-        if not os.path.exists(logs_dir):
+        if not os.path.exists(LOG_BACKUP_DIR):
             return
         cutoff_time = time.time() - (retention_days * 86400)
-        for fname in os.listdir(logs_dir):
+        for fname in os.listdir(LOG_BACKUP_DIR):
             if re.search(r'_[0-9]{4}-[0-9]{2}-[0-9]{2}\.log$', fname):
-                fpath = os.path.join(logs_dir, fname)
+                fpath = os.path.join(LOG_BACKUP_DIR, fname)
                 if os.path.isfile(fpath) and os.path.getmtime(fpath) < cutoff_time:
                     os.remove(fpath)
                     print(f"[LogCleanup] 🧹 7日以上前の古い日付ログを削除しました: {fname}")
@@ -126,16 +125,19 @@ def log_to_api_file(message):
         pass
 
 def write_browser_console_log(log_message):
-    """日付ごとのログファイル (browser_console_YYYY-MM-DD.log) に直接追記管理"""
+    """logs/browser_console.log (アクティブ) および logs_backup/browser_console_YYYY-MM-DD.log (日次バックアップ) に記録"""
     today_str = datetime.date.today().strftime('%Y-%m-%d')
-    daily_file = os.path.join(BASE_DIR, "logs", f"browser_console_{today_str}.log")
-    main_file = os.path.join(BASE_DIR, "logs", "browser_console.log")
+    active_file = os.path.join(BASE_DIR, "logs", "browser_console.log")
+    backup_file = os.path.join(BASE_DIR, "logs_backup", f"browser_console_{today_str}.log")
     
+    if not os.path.exists(LOG_BACKUP_DIR):
+        os.makedirs(LOG_BACKUP_DIR, exist_ok=True)
+
     with _log_lock:
         try:
-            with open(daily_file, 'a', encoding='utf-8') as f:
+            with open(active_file, 'a', encoding='utf-8') as f:
                 f.write(log_message + '\n')
-            with open(main_file, 'a', encoding='utf-8') as f:
+            with open(backup_file, 'a', encoding='utf-8') as f:
                 f.write(log_message + '\n')
         except Exception as e:
             print(f"[ログ書き込みエラー]: {e}")
