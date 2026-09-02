@@ -61,7 +61,15 @@ window.newsListPopup = null;
 
 // 📰 記事一覧を別ウィンドウ（ポップアップ）で開く共通関数（配信中も何度でも確実に起動）
 // openNewsListPopup, updateNewsListPopup, clearNewsReadFlags は js/news/news-list-popup.js に完全移管済み
-// getTimeBasedGreeting, getTimeBasedClosing, getNewsConfig は js/news/news-config-manager.js に完全移管済み
+function getNewsConfig() {
+  if (window.newsConfigManager && typeof window.newsConfigManager.getNewsConfig === "function") {
+    return window.newsConfigManager.getNewsConfig();
+  }
+  const title = document.getElementById("news-program-title")?.value || "今日の最新ニュース";
+  const op = document.getElementById("news-opening-text")?.value || "本日の最新ニュースをお届けいたします。";
+  const ed = document.getElementById("news-ending-text")?.value || "以上、本日のニュースでした。";
+  return { title, op, ed, useOpChime: true, useTransition: true, useEdChime: true };
+}
   function initNewsSetlist(newsList) {
     const setlistBoard = document.getElementById("news-setlist-board");
     const listEl = document.getElementById("setlist-category-list");
@@ -668,7 +676,8 @@ window.newsListPopup = null;
     const obsStreamToggle = document.getElementById("news-obs-auto-stream-toggle");
     const isObsStreamEnabled = obsStreamToggle ? obsStreamToggle.checked : false;
 
-    if (!isMidwayStart && isObsStreamEnabled && typeof window.ensureObsStreamingStarted === "function") {
+    const isDevSafari = (window.location.port === "8444");
+    if (!isMidwayStart && isObsStreamEnabled && !isDevSafari && typeof window.ensureObsStreamingStarted === "function") {
       if (progressEl) progressEl.textContent = "📡 OBS配信接続を確認中...";
       await window.ensureObsStreamingStarted((msg) => {
         if (progressEl) progressEl.textContent = `📡 ${msg}`;
