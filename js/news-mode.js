@@ -871,8 +871,12 @@ function getNewsConfig() {
       console.log("[ニュース番組] 🎉 番組がすべて正常に完了しました！");
       stopNewsBroadcast();
 
-      // 📰 全記事読了時の自動終了設定（isAutoEndAfterNews）が有効な場合、直ちに配信終了・OBS停止プロセスを起動
-      if (window.isAutoEndAfterNews) {
+      // 📰 全記事読了時の自動終了設定（isAutoEndAfterNews または DOM設定）が有効な場合、直ちに配信終了・OBS停止プロセスを起動
+      const mainEndModeEl = document.getElementById("main-stream-end-mode");
+      const isNewsEndMode = (window.isAutoEndAfterNews === true) || (mainEndModeEl && mainEndModeEl.value === "news_end");
+      console.log(`[ニュース番組] 🏁 番組終了判定: isAutoEndAfterNews=${window.isAutoEndAfterNews}, DOM=${mainEndModeEl?.value} ➔ 自動終了=${isNewsEndMode}`);
+
+      if (isNewsEndMode) {
         console.log("[ニュース番組] 🏁 全記事読了による自動終了設定が有効です。OBS配信終了プロセスを起動します...");
         setTimeout(() => {
           if (typeof window.executeStreamEndProcess === "function") {

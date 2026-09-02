@@ -483,5 +483,10 @@ window.executeStreamEndProcess = executeStreamEndProcess;
         }
       });
     }
+
+    // 🚀 初期ロード時にも選択値から即座に isAutoEndAfterNews を初期化
+    if (mainEndMode.value === "news_end") {
+      window.isAutoEndAfterNews = true;
+    }
   }
 });
