@@ -3009,15 +3009,21 @@
                         if (selectedMode === "news") {
                             openerWin.currentBroadcastMode = "news";
                             if (typeof openerWin.clearIdleTimer === "function") openerWin.clearIdleTimer();
-                            console.log("[Wizard] 🚀 親ウィンドウにてニュース番組の開始をキックします");
-                            openerWin.setTimeout(() => {
-                                if (typeof openerWin.startNewsBroadcast === "function") {
-                                    openerWin.startNewsBroadcast();
-                                } else {
-                                    const newsStartBtn = openerWin.document.getElementById("news-broadcast-start-btn");
-                                    if (newsStartBtn) newsStartBtn.click();
-                                }
-                            }, 200);
+                            console.log("[Wizard] 🚀 親ウィンドウにてニュース番組を即時開始します");
+                            
+                            // 1. 親ウィンドウのボタンを同期クリック
+                            const newsStartBtn = openerWin.document.getElementById("news-broadcast-start-btn");
+                            if (newsStartBtn) {
+                                newsStartBtn.click();
+                            } else if (typeof openerWin.startNewsBroadcast === "function") {
+                                openerWin.startNewsBroadcast();
+                            }
+
+                            // 2. 念のため localStorage シグナルも送信 (ポート別)
+                            try {
+                                const port = openerWin.location.port || "8443";
+                                localStorage.setItem(`startNewsRequest_${port}`, Date.now().toString());
+                            } catch(e) {}
                         } else if (selectedMode === "radio") {
                             openerWin.currentBroadcastMode = "radio";
                             const radioToggle = openerWin.document.getElementById("ai-radio-mode-toggle");
