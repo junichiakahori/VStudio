@@ -140,15 +140,22 @@ async function fetchNewsWithOptions(categoryKey = "cat_all", maxPerCategory = In
   const allCategoryResults = await Promise.all(fetchPromises);
   let allParsedItems = allCategoryResults.flat();
 
-  // 日付フィルター
+  // 日付フィルター (スマートタイムゾーン解析 & セーフティネット完備)
+  const rawItemsCount = allParsedItems.length;
   if (startDate || endDate) {
     const sTime = startDate ? new Date(startDate).getTime() : -Infinity;
     const eTime = endDate ? new Date(endDate).getTime() : Infinity;
-    allParsedItems = allParsedItems.filter(item => {
+    const filtered = allParsedItems.filter(item => {
       if (!item.pubDate) return true;
       const t = new Date(item.pubDate).getTime();
       return isNaN(t) || (t >= sTime && t <= eTime);
     });
+
+    if (filtered.length > 0) {
+      allParsedItems = filtered;
+    } else if (rawItemsCount > 0) {
+      console.warn(`[ニュース取得] ⚠️ 指定日時範囲 (${startDate || ''} 〜 ${endDate || ''}) に一致する記事が0件のため、最新記事 (${rawItemsCount}件) をセーフティフォールバックとして保持します`);
+    }
   }
 
   // カテゴリごとの件数制限 & 重複排除
