@@ -1443,6 +1443,71 @@
             }
         });
 
+        
+        // ⚙️ ニュース番組設定モーダル制御
+        const modal = document.getElementById("wizard-news-settings-modal");
+        const openBtn = document.getElementById("open-news-settings-btn");
+        const closeBtn = document.getElementById("close-wizard-news-settings-btn");
+        const cancelBtn = document.getElementById("cancel-wizard-news-settings-btn");
+        const saveBtn = document.getElementById("save-wizard-news-settings-btn");
+
+        const inTitle = document.getElementById("wns-title");
+        const inOp = document.getElementById("wns-op");
+        const inEd = document.getElementById("wns-ed");
+        const inSeOp = document.getElementById("wns-se-op");
+        const inSeTrans = document.getElementById("wns-se-trans");
+        const inSeEd = document.getElementById("wns-se-ed");
+
+        function loadWizardNewsConfig() {
+            try {
+                if (inTitle) inTitle.value = localStorage.getItem("savedNewsProgTitle") || "";
+                if (inOp) inOp.value = localStorage.getItem("savedNewsOpGreeting") || "";
+                if (inEd) inEd.value = localStorage.getItem("savedNewsEdGreeting") || "";
+                if (inSeOp) inSeOp.checked = localStorage.getItem("savedNewsSeOp") !== "false";
+                if (inSeTrans) inSeTrans.checked = localStorage.getItem("savedNewsSeTrans") !== "false";
+                if (inSeEd) inSeEd.checked = localStorage.getItem("savedNewsSeEd") !== "false";
+            } catch(e) {}
+        }
+
+        if (openBtn && modal) {
+            openBtn.onclick = () => {
+                loadWizardNewsConfig();
+                modal.style.display = "flex";
+            };
+        }
+        if (closeBtn && modal) closeBtn.onclick = () => { modal.style.display = "none"; };
+        if (cancelBtn && modal) cancelBtn.onclick = () => { modal.style.display = "none"; };
+
+        if (saveBtn && modal) {
+            saveBtn.onclick = () => {
+                if (inTitle) localStorage.setItem("savedNewsProgTitle", inTitle.value.trim());
+                if (inOp) localStorage.setItem("savedNewsOpGreeting", inOp.value.trim());
+                if (inEd) localStorage.setItem("savedNewsEdGreeting", inEd.value.trim());
+                if (inSeOp) localStorage.setItem("savedNewsSeOp", inSeOp.checked);
+                if (inSeTrans) localStorage.setItem("savedNewsSeTrans", inSeTrans.checked);
+                if (inSeEd) localStorage.setItem("savedNewsSeEd", inSeEd.checked);
+
+                // 親画面にも即時反映
+                if (openerWin) {
+                    const pTitle = openerWin.document.getElementById("news-config-title");
+                    const pOp = openerWin.document.getElementById("news-config-opening");
+                    const pEd = openerWin.document.getElementById("news-config-closing");
+                    const pSeOp = openerWin.document.getElementById("news-se-op-chime");
+                    const pSeTrans = openerWin.document.getElementById("news-se-transition");
+                    const pSeEd = openerWin.document.getElementById("news-se-ed-chime");
+                    if (pTitle && inTitle) pTitle.value = inTitle.value.trim();
+                    if (pOp && inOp) pOp.value = inOp.value.trim();
+                    if (pEd && inEd) pEd.value = inEd.value.trim();
+                    if (pSeOp && inSeOp) pSeOp.checked = inSeOp.checked;
+                    if (pSeTrans && inSeTrans) pSeTrans.checked = inSeTrans.checked;
+                    if (pSeEd && inSeEd) pSeEd.checked = inSeEd.checked;
+                }
+
+                modal.style.display = "none";
+                alert("ニュース番組設定を保存しました！");
+            };
+        }
+    
         // ニュース一覧別窓ボタン（独立ポップアップ）
         document.getElementById("open-news-list-popup-btn")?.addEventListener("click", () => {
             const width = 850;
@@ -1456,19 +1521,7 @@
             );
         });
 
-        // ニュース番組設定ボタン（親画面の設定モーダルをキックまたは設定ポップアップ）
-        document.getElementById("open-news-settings-btn")?.addEventListener("click", () => {
-            if (openerWin) {
-                const btn = openerWin.document.getElementById("news-script-btn");
-                if (btn) {
-                    btn.click();
-                    openerWin.focus();
-                    return;
-                }
-            }
-            // 親画面がない場合のフォールバック案内
-            alert("親画面（スタジオ）の「ニュース設定」パネルにて、番組タイトル・OP/ED挨拶・SE設定を詳細にカスタマイズできます。");
-        });
+        
 
         document.getElementById("open-idle-settings-btn").addEventListener("click", () => {
             if (openerWin) {
@@ -3414,5 +3467,50 @@
             } catch (e) {}
         });
     </script>
+
+    <!-- ⚙️ ウィザード内 ニュース番組設定モーダル -->
+    <div id="wizard-news-settings-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); backdrop-filter:blur(8px); z-index:9999; justify-content:center; align-items:center; padding:15px;">
+        <div style="background:linear-gradient(135deg, #141824 0%, #0d1017 100%); border:1px solid rgba(0,210,211,0.5); border-radius:12px; width:100%; max-width:480px; box-shadow:0 12px 40px rgba(0,0,0,0.8), 0 0 20px rgba(0,210,211,0.2); overflow:hidden; display:flex; flex-direction:column; animation:modalFadeIn 0.25s ease;">
+            <div style="padding:14px 18px; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center; background:rgba(0,210,211,0.08);">
+                <div style="font-weight:bold; font-size:0.95rem; color:#00ffff; display:flex; align-items:center; gap:8px;">
+                    <span>⚙️</span> ニュース番組設定・挨拶カスタマイズ
+                </div>
+                <button id="close-wizard-news-settings-btn" style="background:transparent; border:none; color:#aaa; font-size:1.2rem; cursor:pointer; padding:0 4px; line-height:1;">✕</button>
+            </div>
+            <div style="padding:16px 18px; display:flex; flex-direction:column; gap:12px; max-height:70vh; overflow-y:auto;">
+                <div>
+                    <label style="font-size:0.75rem; color:var(--text-muted, #aaa); display:block; margin-bottom:4px;">🏷️ 番組タイトル</label>
+                    <input type="text" id="wns-title" style="width:100%; box-sizing:border-box; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:7px 10px; color:#fff; font-size:0.85rem;" placeholder="例: 今日の最新ニュース">
+                </div>
+                <div>
+                    <label style="font-size:0.75rem; color:var(--text-muted, #aaa); display:block; margin-bottom:4px;">🌅 オープニング挨拶（OP）</label>
+                    <textarea id="wns-op" rows="2" style="width:100%; box-sizing:border-box; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:7px 10px; color:#fff; font-size:0.82rem; resize:vertical;" placeholder="未入力の場合は時間帯に応じた挨拶が自動生成されます"></textarea>
+                </div>
+                <div>
+                    <label style="font-size:0.75rem; color:var(--text-muted, #aaa); display:block; margin-bottom:4px;">🌙 エンディング挨拶（ED）</label>
+                    <textarea id="wns-ed" rows="2" style="width:100%; box-sizing:border-box; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:7px 10px; color:#fff; font-size:0.82rem; resize:vertical;" placeholder="未入力の場合は時間帯に応じた挨拶が自動生成されます"></textarea>
+                </div>
+                <div style="background:rgba(255,255,255,0.04); border-radius:8px; padding:10px 12px; border:1px solid rgba(255,255,255,0.08);">
+                    <label style="font-size:0.75rem; color:#00d2d3; display:block; margin-bottom:8px; font-weight:bold;">🔔 演出効果音 (SE)</label>
+                    <div style="display:flex; flex-direction:column; gap:6px; font-size:0.8rem;">
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                            <input type="checkbox" id="wns-se-op" checked> 放送開始チャイム（OP挨拶の直後）
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                            <input type="checkbox" id="wns-se-trans" checked> シーン切り替え音（各ニュース間）
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                            <input type="checkbox" id="wns-se-ed" checked> 放送終了チャイム（ED挨拶の直後）
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div style="padding:12px 18px; border-top:1px solid rgba(255,255,255,0.1); display:flex; justify-content:flex-end; gap:8px; background:rgba(0,0,0,0.2);">
+                <button id="cancel-wizard-news-settings-btn" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; padding:6px 14px; border-radius:6px; font-size:0.8rem; cursor:pointer;">キャンセル</button>
+                <button id="save-wizard-news-settings-btn" style="background:#00d2d3; border:none; color:#000; font-weight:bold; padding:6px 16px; border-radius:6px; font-size:0.8rem; cursor:pointer;">💾 設定を保存</button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
