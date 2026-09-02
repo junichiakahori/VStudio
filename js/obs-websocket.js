@@ -212,17 +212,35 @@ window.ensureObsStreamingStopped = async function () {
   }
 
   if (typeof isObsWsConnected !== "undefined" && isObsWsConnected && typeof obsWsClient !== "undefined" && obsWsClient) {
-    console.log("[OBS] Sending StopStream command to OBS...");
+    // 1. まず現在のOBS配信状態を確認
     try {
-      await obsWsClient.call("StopStream");
+      const status = await obsWsClient.call("GetStreamStatus").catch(e => null);
+      if (status) {
+        console.log(`[OBS] 📊 現在のOBS配信状態: outputActive = ${status.outputActive}, outputReconnecting = ${status.outputReconnecting}, outputTimecode = ${status.outputTimecode}`);
+        if (!status.outputActive && !status.outputReconnecting) {
+          console.log("[OBS] ℹ️ OBSは現在配信中でないため（既に停止状態）、StopStream送信をスキップしました。");
+          window.isObsStreaming = false;
+          return true;
+        }
+      }
+    } catch (statusErr) {}
+
+    // 2. 配信中であれば StopStream コマンドを送信
+    console.log("[OBS] ⏹ Sending StopStream command to OBS...");
+    try {
+      const res = await obsWsClient.call("StopStream");
       window.isObsStreaming = false;
-      console.log("[OBS] ✅ OBS配信を正常に停止しました！");
+      console.log("[OBS] ✅ OBS配信停止コマンド (StopStream) の送信に成功しました！", res);
       return true;
     } catch (err) {
-      console.warn("[OBS] StopStream呼び出しエラー (既に停止している可能性があります):", err);
+      const errMsg = err?.message || err?.error || String(err);
+      const errCode = err?.code || "";
+      console.warn(`[OBS] ⚠️ StopStream呼び出し結果 (Code: ${errCode}): ${errMsg}`);
       window.isObsStreaming = false;
       return false;
     }
+  } else {
+    console.warn("[OBS] ⚠️ OBS WebSocket未接続のため、StopStreamコマンドを送信できませんでした。");
   }
   return false;
 };
