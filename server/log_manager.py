@@ -12,7 +12,6 @@ import threading
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG_FILE = os.path.join(BASE_DIR, "logs", "browser_console.log")
-LOG_BACKUP_DIR = os.path.join(BASE_DIR, "logs_backup")
 
 _log_lock = threading.Lock()
 _current_log_date = datetime.date.today().strftime('%Y-%m-%d')
@@ -33,23 +32,20 @@ LOG_FILES_MAP = {
 }
 
 def clean_old_log_backups(retention_days=RETENTION_DAYS):
-    """logs_backup/ 内の指定日数（デフォルト7日）以上前のバックアップを自動クリーンアップ"""
+    """logs/ 内の指定日数（デフォルト7日）以上前の日付ログを自動クリーンアップ"""
     try:
-        if not os.path.exists(LOG_BACKUP_DIR):
+        logs_dir = os.path.join(BASE_DIR, "logs")
+        if not os.path.exists(logs_dir):
             return
         cutoff_time = time.time() - (retention_days * 86400)
-        for fname in os.listdir(LOG_BACKUP_DIR):
-            if not fname.endswith(".log"):
-                continue
-            file_path = os.path.join(LOG_BACKUP_DIR, fname)
-            try:
-                if os.path.isfile(file_path) and os.path.getmtime(file_path) < cutoff_time:
-                    os.remove(file_path)
-                    print(f"[LogCleanup] 🧹 7日以上前の古いログバックアップを削除しました: {fname}")
-            except Exception as fe:
-                print(f"[LogCleanupエラー]: {fe}")
+        for fname in os.listdir(logs_dir):
+            if re.search(r'_[0-9]{4}-[0-9]{2}-[0-9]{2}\.log$', fname):
+                fpath = os.path.join(logs_dir, fname)
+                if os.path.isfile(fpath) and os.path.getmtime(fpath) < cutoff_time:
+                    os.remove(fpath)
+                    print(f"[LogCleanup] 🧹 7日以上前の古い日付ログを削除しました: {fname}")
     except Exception as e:
-        print(f"[LogCleanup全体エラー]: {e}")
+        print(f"[LogCleanupエラー]: {e}")
 
 def _rotate_single_log(log_key, file_path, reason_label):
     """単一ログファイルを日付単位 (YYYY-MM-DD) で安全に追記・退避管理"""
