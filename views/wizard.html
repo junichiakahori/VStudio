@@ -714,10 +714,27 @@
     </div>
 
     <script>
-                // 親画面・サーバーログへの転送パイプライン (バージョン・行番号付き)
+                // 親画面・サーバーログへの転送パイプライン (バージョン完全解決版)
         const origLog = console.log;
         const origWarn = console.warn;
         const origError = console.error;
+        function getWizardScriptVersion(fileName) {
+            try {
+                const scripts = document.querySelectorAll("script[src]");
+                for (let i = 0; i < scripts.length; i++) {
+                    const src = scripts[i].getAttribute("src") || "";
+                    if (src.includes(fileName)) {
+                        const vMatch = src.match(/\?v=([a-zA-Z0-9_\.\-]+)/);
+                        if (vMatch) return `?v=${vMatch[1]}`;
+                    }
+                }
+                if (fileName.includes("wizard.html")) {
+                    const vMatch = window.location.href.match(/\?v=([a-zA-Z0-9_\.\-]+)/);
+                    if (vMatch) return `?v=${vMatch[1]}`;
+                }
+            } catch(e) {}
+            return "";
+        }
         function getWizardCallerSource() {
             try {
                 const stack = (new Error()).stack || "";
@@ -725,13 +742,16 @@
                 for (let i = 2; i < lines.length; i++) {
                     const line = lines[i];
                     if (!line || line.includes("forwardLog") || line.includes("getWizardCallerSource")) continue;
-                    const match = line.match(/([a-zA-Z0-9_\-]+\.(?:js|html)(?:\?[a-zA-Z0-9_=\.\-]+)?(?::\d+)?)/);
+                    const match = line.match(/([a-zA-Z0-9_\-]+\.(?:js|html))(?::(\d+))?/);
                     if (match) {
-                        return `[${match[1]}]`;
+                        const fileName = match[1];
+                        const lineNo = match[2] ? `:${match[2]}` : "";
+                        const ver = getWizardScriptVersion(fileName);
+                        return `[${fileName}${ver}${lineNo}]`;
                     }
                 }
             } catch (e) { }
-            return "[wizard.html]";
+            return "[wizard.html?v=20.3]";
         }
         function forwardLog(type, args) {
             try {
