@@ -128,3 +128,29 @@
     - `js/news/news-comment-interlude.js`: コメント挟み込み返信
     - `js/news-mode.js`: 各モジュールを統括する薄いコントローラー
 
+## 12. フロントエンド設計・モジュール分割・正規表現の再発防止ルール（最重要）
+
+- **WebKit / Safari 特有のグローバル変数重複・シャドウイング構文エラーの完全防止**:
+  - 非モジュールスクリプト（`<script src="...">`）環境では、同一グローバルスコープまたは `window` プロパティと同名の変数を `let` や `const` で重複宣言すると、WebKit（Safari）エンジンでは `SyntaxError: Can't create duplicate variable that shadows a global property` が発生し、**スクリプト全体が1文字も実行されずに即死・破棄** される。
+  - モジュール間を跨ぐ共有変数や設定定数は、ローカルの `let`/`const` 宣言を避け、必ず `window.xxx = window.xxx || ...;` 形式で定義・参照すること。
+
+- **関数シグネチャ・インターフェースのユニバーサル互換設計**:
+  - 複数モジュールや旧コードから呼び出される共通関数（例: `isInvalidNewsVideoArticle`）を切り出す際は、引数の型（オブジェクト `{title, description}` 渡し vs 個別引数 `(title, desc)` 渡し）の不一致による事故を絶対に防ぐため、以下のユニバーサル互換パターンで実装すること：
+    ```javascript
+    function isInvalidNewsVideoArticle(arg1, arg2) {
+      let title = typeof arg1 === "object" && arg1 !== null ? (arg1.title || "") : (typeof arg1 === "string" ? arg1 : "");
+      let desc = typeof arg1 === "object" && arg1 !== null ? (arg1.description || "") : (typeof arg2 === "string" ? arg2 : "");
+      if (!title) return true;
+      ...
+    }
+    ```
+
+- **過剰・広範な正規表現によるデータ全滅（誤爆除外）の絶対禁止**:
+  - ニュース記事やコメントの除外フィルターに、`/配信中/i` や `/動画/i` などの一般的すぎる単語を単独で登録してはならない（本文内の「〜より配信中」等の通常メタ情報にヒットして全件0件になる事故を招く）。
+  - 除外正規表現は必ず `/【動画】/i`, `/動画配信中/i`, `/動画をご覧ください/i` のように、文脈が限定された確実なパターンのみを指定すること。
+
+- **推測回答の禁止と実データ・実ログによる検証の徹底**:
+  - 不具合が発生した際は、推測や仮説のみでユーザーに回答・対応することを厳禁とする。必ず `logs/browser_console.log` の実ログ、実際のAPIレスポンス、実際のデータを通した単体・結合テストを実行し、100% 事実を確認した上で回答・修正を行うこと。
+
+- **ブラウザスタックトレースのクエリ欠落仕様への対応**:
+  - ブラウザの `(new Error()).stack` は、ファイルパスから `?v=X.X` を削ぎ落として出力する仕様であるため、バージョンログ追跡には DOM の `script[src]` からクエリを自動逆引き結合するエンジン（`getScriptVersion`）を維持すること。
