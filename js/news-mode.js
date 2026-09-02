@@ -1,3 +1,13 @@
+// ニュース番組進行ステート
+let newsBroadcastState = {
+  isRunning: false,
+  currentIndex: 0,
+  totalCount: 0,
+  lastCategory: "",
+  isFromNewsList: false
+};
+window.newsBroadcastState = newsBroadcastState;
+
 // =====================================================================
 // 専任モジュール(js/news/)へのブリッジ・委譲ヘルパー関数
 // =====================================================================
@@ -827,6 +837,19 @@ function getNewsConfig() {
   }
 
   window.startNewsBroadcast = startNewsBroadcast;
+  function stopNewsBroadcast() {
+    newsBroadcastState.isRunning = false;
+    if (typeof window.stopVoicevoxPlayback === "function") {
+      window.stopVoicevoxPlayback();
+    }
+    const startBtn = document.getElementById("news-broadcast-start-btn");
+    const stopBtn = document.getElementById("news-broadcast-stop-btn");
+    const progressEl = document.getElementById("news-broadcast-progress");
+    if (startBtn) startBtn.style.display = "block";
+    if (stopBtn) stopBtn.style.display = "none";
+    if (progressEl) progressEl.textContent = "⏹ 番組を停止しました";
+    console.log("[ニュース番組] ⏹ 番組を停止しました。");
+  }
 
   // =====================================================================
   // ニュース番組 ボタンイベント初期化
@@ -860,19 +883,7 @@ function getNewsConfig() {
   window.stopNewsBroadcast = stopNewsBroadcast;
   window.newsBroadcastState = newsBroadcastState;
 
-  // ボタンイベント
-  const newsBroadcastStartBtn = document.getElementById("news-broadcast-start-btn");
-  const newsBroadcastStopBtn = document.getElementById("news-broadcast-stop-btn");
-  if (newsBroadcastStartBtn) {
-    newsBroadcastStartBtn.onclick = () => {
-      const startIdxInput = document.getElementById("news-broadcast-start-index");
-      const idx = startIdxInput ? (parseInt(startIdxInput.value, 10) || 1) - 1 : 0;
-      startNewsBroadcast(Math.max(0, idx));
-    };
-  }
-  if (newsBroadcastStopBtn) {
-    newsBroadcastStopBtn.onclick = () => stopNewsBroadcast();
-  }
+  
 
   // カテゴリ・件数・日付範囲指定によるニュース取得
 // fetchNewsWithOptions は js/news/news-fetcher.js に完全委譲済み
