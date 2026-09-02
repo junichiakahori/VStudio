@@ -6,15 +6,15 @@ window.startNewsBroadcast = async function(startIndex = 0, items = null, isFromN
   }
 };
 
-// ニュース番組進行ステート
-let newsBroadcastState = {
+// ニュース番組進行ステート (グローバル共有)
+window.newsBroadcastState = window.newsBroadcastState || {
   isRunning: false,
   currentIndex: 0,
   totalCount: 0,
   lastCategory: "",
   isFromNewsList: false
 };
-window.newsBroadcastState = newsBroadcastState;
+var newsBroadcastState = window.newsBroadcastState;
 
 // =====================================================================
 // 専任モジュール(js/news/)へのブリッジ・委譲ヘルパー関数
