@@ -53,8 +53,9 @@
   }
 
   function getNewsTransitionPhrase(isFirst, isCatChanged, catName) {
+    // 1件目はOP挨拶直後のため、クドい繋ぎセリフを挟まず直接見出しへ
     if (isFirst) {
-      return "それでは、最初のニュースです。";
+      return "";
     }
     if (isCatChanged && catName) {
       const phrases = [
@@ -65,13 +66,14 @@
       return phrases[Math.floor(Math.random() * phrases.length)];
     }
     const generalPhrases = [
-      "次のニュースです。",
-      "続いての話題です。",
-      "変わりまして、次のニュースです。",
-      "さて、続いてはこちらの話題です。"
+      "続いてのニュースです。",
+      "変わりまして、次の話題です。",
+      "続いてはこちらのニュースです。"
     ];
     return generalPhrases[Math.floor(Math.random() * generalPhrases.length)];
   }
+
+  window.getNewsTransitionPhrase = getNewsTransitionPhrase;
 
   window.newsAudioPlayer = {
     playSE,
