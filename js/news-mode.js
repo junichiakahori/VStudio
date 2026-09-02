@@ -638,220 +638,192 @@ function getNewsConfig() {
   window.readOneNewsItem = readOneNewsItem;
 
   async function startNewsBroadcast(startIndex = 0, items = null, isFromNewsList = false) {
-    if (newsBroadcastState.isRunning) {
-      console.log(`[ニュース番組] 指定位置(#${startIndex + 1})から再開するため、現在の番組を安全に切り替えます...`);
-      newsBroadcastState.isRunning = false;
-      if (typeof window.stopVoicevoxPlayback === "function") {
-        window.stopVoicevoxPlayback();
+    console.log(`[ニュース番組] 🚀 [STEP 1] startNewsBroadcast 呼び出し検知 (startIndex: ${startIndex}, isFromNewsList: ${isFromNewsList})`);
+    try {
+      if (newsBroadcastState.isRunning) {
+        console.log(`[ニュース番組] 🚀 [STEP 1.1] 既存番組を安全に切り替えます (再開位置: #${startIndex + 1})`);
+        newsBroadcastState.isRunning = false;
+        if (typeof window.stopVoicevoxPlayback === "function") {
+          window.stopVoicevoxPlayback();
+        }
+        await new Promise(r => setTimeout(r, 400));
       }
-      await new Promise(r => setTimeout(r, 400));
-    }
 
-    const startBtn = document.getElementById("news-broadcast-start-btn");
-    const stopBtn = document.getElementById("news-broadcast-stop-btn");
-    const progressEl = document.getElementById("news-broadcast-progress");
+      const startBtn = document.getElementById("news-broadcast-start-btn");
+      const stopBtn = document.getElementById("news-broadcast-stop-btn");
+      const progressEl = document.getElementById("news-broadcast-progress");
 
-    // ニュースが取得されていなければ先に取得
-    if (!window.latestFetchedNews || window.latestFetchedNews.length === 0) {
-      if (progressEl) { progressEl.style.display = "block"; progressEl.textContent = "⬇️ ニュースを取得中..."; }
-      const fetchOnlyBtn = document.getElementById("news-fetch-only-btn");
-      if (fetchOnlyBtn) fetchOnlyBtn.click();
-      await new Promise(r => setTimeout(r, 3000));
-    }
-
-    const allNews = window.latestFetchedNews || [];
-    if (allNews.length === 0) {
-      alert("ニュース記事がありません。先に「⬇️ ニュースを取得」してください。");
-      return;
-    }
-
-    // カテゴリ順 ＆ カテゴリ内は時系列順（古い順）にソート
-    const CATEGORY_ORDER = ["cat_top", "cat_society", "cat_world", "cat_business", "cat_politics", "cat_entertainment", "cat_sports", "cat_tech", "cat_science", "cat_local"];
-    const sortedNews = [...allNews].sort((a, b) => {
-      const ai = CATEGORY_ORDER.indexOf(a.categoryKey || "cat_top");
-      const bi = CATEGORY_ORDER.indexOf(b.categoryKey || "cat_top");
-      const catDiff = (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-      if (catDiff !== 0) return catDiff;
-      const dateA = new Date(a.pubDate || 0).getTime();
-      const dateB = new Date(b.pubDate || 0).getTime();
-      return dateA - dateB; // カテゴリ内は古い順（時系列昇順: 朝➔夜）
-    });
-
-    const isMidwayStart = (startIndex > 0);
-    newsBroadcastState = { isRunning: true, currentIndex: startIndex, totalCount: sortedNews.length, lastCategory: "", isFromNewsList: !!isFromNewsList };
-    if (startBtn) startBtn.style.display = "none";
-    if (stopBtn) stopBtn.style.display = "block";
-    if (progressEl) progressEl.style.display = "block";
-
-    const startIdxInput = document.getElementById("news-broadcast-start-index");
-    if (startIdxInput) startIdxInput.value = startIndex + 1;
-
-    if (typeof clearIdleTimer === "function") clearIdleTimer();
-
-    // 番組開始時にセットリストボードを初期化・表示
-    initNewsSetlist(sortedNews);
-
-    // 途中から開始した場合は、それ以前の記事をすべて既読フラグに反映して保存
-    if (startIndex > 0) {
-      for (let k = 0; k < startIndex; k++) {
-        if (sortedNews[k]) readNewsTitles.add(sortedNews[k].title);
+      // ニュースが取得されていなければ先に取得
+      if (!window.latestFetchedNews || window.latestFetchedNews.length === 0) {
+        console.log("[ニュース番組] 🚀 [STEP 2.0] ニュース未取得のため自動取得をトリガーします...");
+        if (progressEl) { progressEl.style.display = "block"; progressEl.textContent = "⬇️ ニュースを取得中..."; }
+        const fetchOnlyBtn = document.getElementById("news-fetch-only-btn");
+        if (fetchOnlyBtn) fetchOnlyBtn.click();
+        await new Promise(r => setTimeout(r, 3000));
       }
-      try {
-        localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles)));
-      } catch (e) { }
-    }
 
-    // 番組開始時にコメント履歴とコメント数を初期化（途中再開でない場合のみクリア）
-    if (startIndex === 0 && typeof window.clearAllComments === "function") {
-      window.clearAllComments();
-    }
+      const allNews = window.latestFetchedNews || [];
+      console.log(`[ニュース番組] 🚀 [STEP 2.1] 保持ニュース記事の確認: 合計 ${allNews.length} 件`);
+      if (allNews.length === 0) {
+        console.warn("[ニュース番組] ⚠️ [STEP 2.2] ニュース記事が0件のため番組を開始できません");
+        alert("ニュース記事がありません。先に「⬇️ ニュースを取得」してください。");
+        return;
+      }
 
-    // OBS配信状態の確認（「OBS配信も同時にスタートする」トグルがON、かつ第1件目からの新規スタートの場合のみ実行）
-    const obsStreamToggle = document.getElementById("news-obs-auto-stream-toggle");
-    const isObsStreamEnabled = obsStreamToggle ? obsStreamToggle.checked : false;
-
-    const isDevSafari = (window.location.port === "8444");
-    if (!isMidwayStart && isObsStreamEnabled && !isDevSafari && typeof window.ensureObsStreamingStarted === "function") {
-      if (progressEl) progressEl.textContent = "📡 OBS配信接続を確認中...";
-      await window.ensureObsStreamingStarted((msg) => {
-        if (progressEl) progressEl.textContent = `📡 ${msg}`;
+      // カテゴリ順 ＆ カテゴリ内は時系列順（古い順）にソート
+      const CATEGORY_ORDER = ["cat_top", "cat_society", "cat_world", "cat_business", "cat_politics", "cat_entertainment", "cat_sports", "cat_tech", "cat_science", "cat_local"];
+      const sortedNews = [...allNews].sort((a, b) => {
+        const ai = CATEGORY_ORDER.indexOf(a.categoryKey || "cat_top");
+        const bi = CATEGORY_ORDER.indexOf(b.categoryKey || "cat_top");
+        const catDiff = (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+        if (catDiff !== 0) return catDiff;
+        const dateA = new Date(a.pubDate || 0).getTime();
+        const dateB = new Date(b.pubDate || 0).getTime();
+        return dateA - dateB;
       });
-    } else {
-      if (isMidwayStart) {
-        console.log("[ニュース番組] 途中レジューム・個別再生のため、OBS WebSocket配信制御はスキップします。");
-      } else {
-        console.log("[ニュース番組] OBS自動配信連携はOFFのため、OBS配信開始をスキップしてローカルで番組を進行します。");
-      }
-    }
 
-    // YouTube接続の自動確認（未接続なら保存済みの動画ID/チャンネルへ自動接続して統計・コメントを取得開始）
-    if (typeof window.startYoutubeConnection === "function") {
-      const isConnected = window.youtubeWs && window.youtubeWs.readyState === WebSocket.OPEN;
-      if (!isConnected) {
-        const savedYt = localStorage.getItem("savedYoutubeVideoId") || localStorage.getItem("savedYoutubeChannel") || "@drone.akahori";
-        if (savedYt) {
-          console.log(`[ニュース番組] YouTubeコメント＆統計サーバーへ自動接続します: ${savedYt}`);
-          window.startYoutubeConnection(savedYt);
+      const isMidwayStart = (startIndex > 0);
+      newsBroadcastState = { isRunning: true, currentIndex: startIndex, totalCount: sortedNews.length, lastCategory: "", isFromNewsList: !!isFromNewsList };
+      if (startBtn) startBtn.style.display = "none";
+      if (stopBtn) stopBtn.style.display = "block";
+      if (progressEl) progressEl.style.display = "block";
+
+      const startIdxInput = document.getElementById("news-broadcast-start-index");
+      if (startIdxInput) startIdxInput.value = startIndex + 1;
+
+      if (typeof clearIdleTimer === "function") clearIdleTimer();
+
+      // 番組開始時にセットリストボードを初期化・表示
+      console.log("[ニュース番組] 🚀 [STEP 2.3] セットリストボード初期化描画");
+      initNewsSetlist(sortedNews);
+
+      // 途中から開始した場合は、それ以前の記事をすべて既読フラグに反映して保存
+      if (startIndex > 0) {
+        for (let k = 0; k < startIndex; k++) {
+          if (sortedNews[k]) readNewsTitles.add(sortedNews[k].title);
+        }
+        try {
+          localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles)));
+        } catch (e) { }
+      }
+
+      // 番組開始時にコメント履歴とコメント数を初期化（途中再開でない場合のみクリア）
+      if (startIndex === 0 && typeof window.clearAllComments === "function") {
+        window.clearAllComments();
+      }
+
+      // OBS配信状態の確認
+      const obsStreamToggle = document.getElementById("news-obs-auto-stream-toggle");
+      const isObsStreamEnabled = obsStreamToggle ? obsStreamToggle.checked : false;
+      const isDevSafari = (window.location.port === "8444");
+
+      console.log(`[ニュース番組] 🚀 [STEP 3] OBS連携チェック (isObsStreamEnabled: ${isObsStreamEnabled}, isDevSafari: ${isDevSafari})`);
+      if (!isMidwayStart && isObsStreamEnabled && !isDevSafari && typeof window.ensureObsStreamingStarted === "function") {
+        if (progressEl) progressEl.textContent = "📡 OBS配信接続を確認中...";
+        await window.ensureObsStreamingStarted((msg) => {
+          if (progressEl) progressEl.textContent = `📡 ${msg}`;
+        });
+      }
+
+      // YouTube接続の自動確認
+      if (typeof window.startYoutubeConnection === "function") {
+        const isConnected = window.youtubeWs && window.youtubeWs.readyState === WebSocket.OPEN;
+        if (!isConnected) {
+          const savedYt = localStorage.getItem("savedYoutubeVideoId") || localStorage.getItem("savedYoutubeChannel") || "@drone.akahori";
+          if (savedYt) {
+            console.log(`[ニュース番組] YouTubeコメント＆統計サーバーへ接続: ${savedYt}`);
+            window.startYoutubeConnection(savedYt);
+          }
         }
       }
-    }
 
-    if (!newsBroadcastState.isRunning) return;
+      if (!newsBroadcastState.isRunning) {
+        console.warn("[ニュース番組] ⚠️ 番組フラグが停止状態のため中断します");
+        return;
+      }
 
-    const config = getNewsConfig();
+      const config = getNewsConfig();
+      console.log(`[ニュース番組] 🚀 [STEP 4] 設定取得完了: タイトル="${config.title}", OP="${config.op}", チャイム=${config.useOpChime}`);
 
-    preloadedNewsMap.clear();
-    if (startIndex < sortedNews.length) triggerNewsPrefetch(sortedNews[startIndex], startIndex === 0, false);
-    if (startIndex + 1 < sortedNews.length) triggerNewsPrefetch(sortedNews[startIndex + 1], false, (sortedNews[startIndex + 1].categoryKey || "") !== (sortedNews[startIndex].categoryKey || ""));
+      preloadedNewsMap.clear();
+      if (startIndex < sortedNews.length) triggerNewsPrefetch(sortedNews[startIndex], startIndex === 0, false);
+      if (startIndex + 1 < sortedNews.length) triggerNewsPrefetch(sortedNews[startIndex + 1], false, (sortedNews[startIndex + 1].categoryKey || "") !== (sortedNews[startIndex].categoryKey || ""));
 
-    // OP挨拶（途中再開でない場合のみ再生）
-    if (startIndex === 0) {
-      if (progressEl) progressEl.textContent = "🎬 オープニング再生中...";
-      console.log("[ニュース番組] 🎬 オープニング挨拶を開始します...");
-      if (config.useOpChime) { await playSE("放送開始チャイム"); await new Promise(r => setTimeout(r, 600)); }
-      await queueVoicevoxAudio(config.op, true, config.op);
+      // OP挨拶（途中再開でない場合のみ再生）
+      if (startIndex === 0) {
+        if (progressEl) progressEl.textContent = "🎬 オープニング再生中...";
+        console.log("[ニュース番組] 🚀 [STEP 5] オープニングチャイム再生中...");
+        if (config.useOpChime) { 
+          await playSE("放送開始チャイム"); 
+          await new Promise(r => setTimeout(r, 600)); 
+        }
+        console.log(`[ニュース番組] 🚀 [STEP 6] オープニング音声キュー投入: "${config.op}"`);
+        await queueVoicevoxAudio(config.op, true, config.op);
+        console.log("[ニュース番組] 🚀 [STEP 7] オープニング音声終了待機中 (waitForVoicevoxFinish)...");
+        await waitForVoicevoxFinish();
+        console.log("[ニュース番組] 🚀 [STEP 8] オープニング挨拶完了！記事ループへ入ります");
+        if (!newsBroadcastState.isRunning) return;
+      }
+
+      // ニュースループ
+      for (let i = startIndex; i < sortedNews.length; i++) {
+        if (!newsBroadcastState.isRunning) break;
+        const item = sortedNews[i];
+        const isFirst = (i === 0);
+        const isCategoryChanged = (i > 0) && (item.categoryKey || "") !== newsBroadcastState.lastCategory;
+
+        newsBroadcastState.currentIndex = i + 1;
+        newsBroadcastState.lastCategory = item.categoryKey || "";
+
+        if (startIdxInput) startIdxInput.value = i + 1;
+
+        const nextItem = (i + 1 < sortedNews.length) ? sortedNews[i + 1] : null;
+        const nextIsCatChanged = nextItem ? ((nextItem.categoryKey || "") !== (item.categoryKey || "")) : false;
+
+        if (isCategoryChanged && config.useTransition) {
+          console.log(`[ニュース番組] 🚀 [STEP 9] カテゴリ切り替え検知: [${item.categoryName || item.categoryKey}] シーン切り替えSE再生`);
+          await playSE("シーン切り替え1");
+          await new Promise(r => setTimeout(r, 600));
+        }
+
+        console.log(`[ニュース番組] 🚀 [STEP 10] 記事 #${i + 1}/${sortedNews.length} 「${item.title}」の読み上げを開始します`);
+        const reader = window.readOneNewsItem || readOneNewsItem;
+        const success = await reader(item, config, isCategoryChanged, isFirst, nextItem, nextIsCatChanged);
+        if (!success && newsBroadcastState.isRunning) {
+          console.warn(`[ニュース番組] 記事(#${i + 1})の読み上げが未完了のため、スキップせず同じ記事を再試行します。`);
+          i--;
+          await new Promise(r => setTimeout(r, 2000));
+          continue;
+        }
+        if (!newsBroadcastState.isRunning) break;
+      }
+
+      if (!newsBroadcastState.isRunning) {
+        if (startBtn) startBtn.style.display = "block";
+        if (stopBtn) stopBtn.style.display = "none";
+        return;
+      }
+
+      // ED挨拶
+      console.log("[ニュース番組] 🚀 [STEP 11] 全記事読み上げ完了！エンディング挨拶へ移行します");
+      if (progressEl) progressEl.textContent = "🏁 エンディング再生中...";
+      if (config.useTransition) {
+        await playSE("ロールの閉め");
+        await new Promise(r => setTimeout(r, 500));
+      }
+      await queueVoicevoxAudio(config.ed, true, config.ed);
       await waitForVoicevoxFinish();
-      if (!newsBroadcastState.isRunning) return;
-    }
-
-    // ニュースループ
-    for (let i = startIndex; i < sortedNews.length; i++) {
-      if (!newsBroadcastState.isRunning) break;
-      const item = sortedNews[i];
-      const isFirst = (i === 0);
-      const isCategoryChanged = (i > 0) && (item.categoryKey || "") !== newsBroadcastState.lastCategory;
-
-      newsBroadcastState.currentIndex = i + 1;
-      newsBroadcastState.lastCategory = item.categoryKey || "";
-
-      if (startIdxInput) startIdxInput.value = i + 1;
-
-      const nextItem = (i + 1 < sortedNews.length) ? sortedNews[i + 1] : null;
-      const nextIsCatChanged = nextItem ? ((nextItem.categoryKey || "") !== (item.categoryKey || "")) : false;
-
-      // カテゴリが切り替わった時（2カテゴリ目以降の最初）にシーン切り替えSEを確実に鳴らす
-      if (isCategoryChanged && config.useTransition) {
-        console.log(`[ニュース番組] カテゴリ切り替え検知: [${item.categoryName || item.categoryKey}] シーン切り替えSEを再生します`);
-        await playSE("シーン切り替え1");
+      if (config.useEdChime) {
+        await playSE("放送終了チャイム");
         await new Promise(r => setTimeout(r, 600));
       }
 
-      console.log(`[ニュース番組] 📰 記事 #${i + 1}/${sortedNews.length} 「${item.title}」の読み上げを開始します`);
-      const reader = window.readOneNewsItem || readOneNewsItem;
-      const success = await reader(item, config, isCategoryChanged, isFirst, nextItem, nextIsCatChanged);
-      if (!success && newsBroadcastState.isRunning) {
-        console.warn(`[ニュース番組] 記事(#${i + 1})の読み上げが未完了のため、スキップせず同じ記事を再試行します。`);
-        i--;
-        await new Promise(r => setTimeout(r, 2000));
-        continue;
-      }
-      if (!newsBroadcastState.isRunning) break;
-    }
+      console.log("[ニュース番組] 🎉 番組がすべて正常に完了しました！");
+      stopNewsBroadcast();
 
-    if (!newsBroadcastState.isRunning) {
-      if (startBtn) startBtn.style.display = "block";
-      if (stopBtn) stopBtn.style.display = "none";
-      if (progressEl) progressEl.textContent = "⏹ 番組を停止しました";
-      return;
+    } catch (broadcastErr) {
+      console.error("[ニュース番組] ❌ startNewsBroadcast 内で致命的例外が発生しました:", broadcastErr);
     }
-
-    // ED挨拶
-    if (progressEl) progressEl.textContent = "🏁 エンディング再生中...";
-    
-    // EDの各文を直接VOICEVOX再生し、最後の1文字が鳴り終わるまで1文ずつ確実に待機
-    const edSentences = config.ed.split(/(?<=[。！？\n])/g).map(s => s.trim()).filter(s => s.length > 0);
-    for (const edSentence of edSentences) {
-      if (!newsBroadcastState.isRunning) break;
-      if (typeof window.playVoicevoxDirectAndWait === "function") {
-        await window.playVoicevoxDirectAndWait(edSentence, edSentence);
-      } else {
-        await queueVoicevoxAudio(edSentence, true, edSentence);
-        await waitForVoicevoxFinish();
-      }
-      await new Promise(r => setTimeout(r, 400));
-    }
-    await new Promise(r => setTimeout(r, 800)); // 全セリフ完了後の息継ぎ余白
-
-    // EDチャイム再生（セリフが完全に全部喋り終わってから初めて鳴らす）
-    if (config.useEdChime) {
-      await playSE("放送終了チャイム");
-      await new Promise(r => setTimeout(r, 4800)); // チャイムがしっかり鳴り響いて静まるまで待機
-    }
-
-    // 番組終了（セットリスト完了状態に更新＆レジューム一時状態を完全消去）
-    finishNewsSetlist(sortedNews.length);
-    newsBroadcastState.isRunning = false;
-    try { localStorage.removeItem("newsActiveState"); } catch (e) { }
-    if (startBtn) startBtn.style.display = "block";
-    if (stopBtn) stopBtn.style.display = "none";
-    if (progressEl) progressEl.textContent = `✅ 番組終了（全${sortedNews.length}件を読み終えました）`;
-    console.log("[ニュース番組] 全件放送完了！");
-
-    // ニュース終了時自動終了が有効な場合は配信終了プロセスを実行
-    const mainEndModeEl = document.getElementById("main-stream-end-mode");
-    const isAutoEndNews = (typeof window.isAutoEndAfterNews === "undefined") || window.isAutoEndAfterNews === true || (mainEndModeEl && mainEndModeEl.value === "news_end");
-    const endToggle = document.getElementById("stream-end-toggle");
-    
-    if ((isAutoEndNews || (endToggle && endToggle.checked)) && typeof window.executeStreamEndProcess === "function") {
-      console.log("[ニュース番組] 🏁 ニュース全件読み終わりによる配信終了プロセスを開始します");
-      window.executeStreamEndProcess();
-    } else {
-      console.log("[ニュース番組] 自動終了が無効（耐久・手動停止モード）のため、配信を継続します（待機状態）");
-    }
-  }
-
-  function stopNewsBroadcast() {
-    newsBroadcastState.isRunning = false;
-    if (typeof window.stopVoicevoxPlayback === "function") {
-      window.stopVoicevoxPlayback();
-    }
-    const startBtn = document.getElementById("news-broadcast-start-btn");
-    const stopBtn = document.getElementById("news-broadcast-stop-btn");
-    const progressEl = document.getElementById("news-broadcast-progress");
-    if (startBtn) startBtn.style.display = "block";
-    if (stopBtn) stopBtn.style.display = "none";
-    if (progressEl) progressEl.textContent = "⏹ 番組を停止しました";
-    console.log("[ニュース番組] 番組を停止しました。");
   }
 
   window.startNewsBroadcast = startNewsBroadcast;
