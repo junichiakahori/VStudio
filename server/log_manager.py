@@ -132,17 +132,23 @@ def write_browser_console_log(log_message, client_type="web"):
     logs/browser_console.log (メインログ) に [NATIVE]/[SAFARI] タグ付きで全ログを確実に常時追記し、
     同時に専用ログ (native_console.log / web_console.log) および logs_backup/ にも保存
     """
-    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    now = datetime.datetime.now()
+    today_str = now.strftime('%Y-%m-%d')
     client_lower = str(client_type).lower() if client_type else "web"
     is_native = ("native" in client_lower) or ("[🖥️ NATIVE]" in log_message) or ("[🧭 NATIVE]" in log_message)
     prefix = "native_console" if is_native else "web_console"
     
+    # タイムスタンプ [YYYY-MM-DD HH:MM:SS.mmm] が未付与の場合は自動補完
+    formatted_msg = log_message
+    if not (log_message.startswith("[20") or (log_message.startswith("[") and len(log_message) > 20 and log_message[5] == "-")):
+        timestamp_str = now.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        formatted_msg = f"[{timestamp_str}] {log_message}"
+
     main_log_file = os.path.join(BASE_DIR, "logs", "browser_console.log")
     active_client_file = os.path.join(BASE_DIR, "logs", f"{prefix}.log")
     backup_file = os.path.join(BASE_DIR, "logs_backup", f"browser_console_{today_str}.log")
     backup_client_file = os.path.join(BASE_DIR, "logs_backup", f"{prefix}_{today_str}.log")
 
-    
     if not os.path.exists(LOG_BACKUP_DIR):
         os.makedirs(LOG_BACKUP_DIR, exist_ok=True)
     if not os.path.exists(os.path.join(BASE_DIR, "logs")):
@@ -152,17 +158,18 @@ def write_browser_console_log(log_message, client_type="web"):
         try:
             # 1. logs/browser_console.log (メイン) に常に全ログを残す
             with open(main_log_file, 'a', encoding='utf-8') as f:
-                f.write(log_message + '\n')
+                f.write(formatted_msg + '\n')
             # 2. logs_backup/browser_console_YYYY-MM-DD.log にも日次保存
             with open(backup_file, 'a', encoding='utf-8') as f:
-                f.write(log_message + '\n')
+                f.write(formatted_msg + '\n')
             # 3. 各専用ファイルにも保存
             with open(active_client_file, 'a', encoding='utf-8') as f:
-                f.write(log_message + '\n')
+                f.write(formatted_msg + '\n')
             with open(backup_client_file, 'a', encoding='utf-8') as f:
-                f.write(log_message + '\n')
+                f.write(formatted_msg + '\n')
         except Exception as e:
             print(f"[ログ書き込みエラー]: {e}")
+
 
 def read_log_file(name, lines=200):
     """指定されたログファイルを末尾から指定行取得"""

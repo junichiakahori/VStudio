@@ -83,13 +83,19 @@
       }
 
       const clientTag = (clientType === "native") ? "[🖥️ NATIVE]" : "[🧭 SAFARI]";
+      
+      const now = new Date();
+      const pad = (n, z = 2) => String(n).padStart(z, "0");
+      const timeStr = `[${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}.${pad(now.getMilliseconds(), 3)}]`;
+
       fetch("/log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: `${clientTag} ${caller} [${type.toUpperCase()}] ${msg}`, client: clientType })
+        body: JSON.stringify({ message: `${timeStr} ${clientTag} ${caller} [${type.toUpperCase()}] ${msg}`, client: clientType })
       }).catch(() => {});
     } catch(e) {}
   }
+
 
 
   console.log = function(...args) { origLog.apply(console, args); forwardLog("log", args); };
