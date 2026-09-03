@@ -274,23 +274,10 @@ async function playNextVoicevox() {
       window.voicevoxGainNode.gain.cancelScheduledValues(ctx.currentTime);
       window.voicevoxGainNode.gain.setValueAtTime(targetVol, ctx.currentTime);
     }
-
-    const expectedDurationMs = Math.max(2500, Math.round(((audioBuffer && audioBuffer.duration) ? audioBuffer.duration * 1000 : 4000) + 1500));
-    let playbackWatchdog = setTimeout(() => {
-      console.warn(`[VOICEVOX] ⚠️ 再生監視タイマー（${expectedDurationMs}ms）が作動しました。キューを安全に進行します`);
-      if (currentVoicevoxSource) {
-        try { currentVoicevoxSource.stop(); } catch(e){}
-        try { currentVoicevoxSource.disconnect(); } catch(e){}
-        currentVoicevoxSource = null;
-      }
-      isVoicevoxPlaying = false;
-      playNextVoicevox();
-    }, expectedDurationMs);
-
-
+    currentVoicevoxSource.connect(window.voicevoxGainNode);
 
     currentVoicevoxSource.onended = () => {
-      clearTimeout(playbackWatchdog);
+
       if (currentVoicevoxSource) currentVoicevoxSource.disconnect();
       currentVoicevoxSource = null;
       isVoicevoxPlaying = false;
@@ -316,6 +303,7 @@ async function playNextVoicevox() {
       }
     };
     currentVoicevoxSource.start(0);
+
   } catch (e) {
     console.error("VOICEVOX Error:", e);
     currentPlayingDisplayText = "";
