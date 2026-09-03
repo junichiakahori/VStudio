@@ -412,7 +412,10 @@
                     if (window.opener && !window.opener.closed) {
                         window.opener.latestFetchedNews = best.list;
                     }
-                    logDiag(`${best.desc} を採用しました (先頭: ${best.list[0]?.title?.substring(0, 20)}...)`);
+                    if (window._lastLoggedCandidateDesc !== best.desc) {
+                        window._lastLoggedCandidateDesc = best.desc;
+                        console.log(`[記事一覧POPUP] ${best.desc} を採用しました`);
+                    }
                     return best.list;
                 }
                 logDiag("ニュースデータが存在しません (0件)", "warn");
