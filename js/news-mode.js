@@ -263,10 +263,15 @@ function getNewsConfig() {
     }
   }
 
-  const preloadedNewsMap = new Map();
+  const preloadedNewsMap = new Map(); // value: { promise, abort }
 
   function triggerNewsPrefetch(item, isFirst = false, isCategoryChanged = false) {
     if (!item || !item.title || preloadedNewsMap.has(item.title)) return;
+    // 先読みが既に1件進行中なら新規先読みを開始しない（Ollama多重並列防止）
+    if (preloadedNewsMap.size >= 1) {
+      console.log(`[ニュース先読み] ⏸ 先読み処理が進行中のためスキップ (${item.title.substring(0, 20)}...)`);
+      return;
+    }
     const apiKeyInput = document.getElementById("ai-api-key");
     const providerSelect = document.getElementById("ai-provider-select");
     const modelInput = document.getElementById("ai-model-input");
@@ -341,7 +346,8 @@ function getNewsConfig() {
       }
     })();
 
-    preloadedNewsMap.set(item.title, promise);
+    // {promise, abort} ペアを保存することで、タイムアウト時に幽霊リクエストをキャンセル可能にする
+    preloadedNewsMap.set(item.title, { promise, abort: () => controller.abort() });
   }
 
 
@@ -511,20 +517,21 @@ function getNewsConfig() {
       let data = null;
 
       // 1. 先読み（プリフェッチ）キャッシュが存在する場合は即時活用（待ち時間ゼロ！）
+      //    ※ 先読み進行中でも同じ promise をそのまま待ち、二重送信を完全排除する
       if (preloadedNewsMap.has(item.title)) {
+        const cached = preloadedNewsMap.get(item.title);
+        preloadedNewsMap.delete(item.title);
         try {
-          const cachedPromise = preloadedNewsMap.get(item.title);
-          preloadedNewsMap.delete(item.title);
-          // 先読みが15秒以上スタックしている場合はタイムアウトして通常取得へ移行
-          data = await Promise.race([
-            cachedPromise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error("先読みタイムアウト")), 40000)) // 40秒で諦めて通常フェッチへ切り替え
-          ]);
+          data = await cached.promise; // 先読みが完了するまでここで待つ（最大180秒）
           if (data && data.status === "ok") {
             console.log(`[ニュース番組] ⚡ 先読みキャッシュから即時再生開始:「${item.title.substring(0, 20)}...」`);
+          } else {
+            data = null; // null / エラーの場合は下の通常フェッチへ移行
           }
         } catch (e) {
-          console.warn("[ニュース番組] 先読みキャッシュ待機タイムアウトまたはエラー ➔ 通常取得へ移行:", e && e.message ? e.message : e);
+          // 先読みが失敗した場合のみ Ollama を解放してから通常フェッチへ移行
+          if (typeof cached.abort === "function") cached.abort();
+          console.warn("[ニュース番組] 先読みキャッシュエラー ➔ 通常取得へ移行:", e && e.message ? e.message : e);
           data = null;
         }
       }
