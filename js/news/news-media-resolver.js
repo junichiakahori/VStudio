@@ -167,33 +167,6 @@ function cleanTitleForSpeech(itemOrTitle) {
   return t;
 }
 
-function getNewsTransitionPhrase(index, total) {
-  if (index === 0) {
-    const openings = [
-      "それでは、最初のニュースです。",
-      "まずは、こちらのニュースからお伝えします。",
-      "最初の話題はこちらですにゃ。",
-      "では、注目の最新ニュースから見ていきましょう。"
-    ];
-    return openings[Math.floor(Math.random() * openings.length)];
-  } else if (index === total - 1) {
-    const closings = [
-      "続いて、本日最後のニュースです。",
-      "最後にお伝えするニュースはこちらです。",
-      "締めくくりの話題はこちらですにゃ。"
-    ];
-    return closings[Math.floor(Math.random() * closings.length)];
-  } else {
-    const transitions = [
-      "続いてのニュースです。",
-      "次の話題に移りますにゃ。",
-      "続いてはこちらのニュースです。",
-      "さて、次のニュースをお伝えします。"
-    ];
-    return transitions[Math.floor(Math.random() * transitions.length)];
-  }
-}
-
 // グローバル互換
 if (typeof window !== "undefined") {
   window.isInvalidNewsVideoArticle = isInvalidNewsVideoArticle;
@@ -201,5 +174,5 @@ if (typeof window !== "undefined") {
   window.DOMAIN_MEDIA_MAP = DOMAIN_MEDIA_MAP;
   window.extractMediaSource = extractMediaSource;
   window.cleanTitleForSpeech = cleanTitleForSpeech;
-  window.getNewsTransitionPhrase = getNewsTransitionPhrase;
 }
+

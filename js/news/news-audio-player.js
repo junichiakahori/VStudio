@@ -53,12 +53,16 @@
   }
 
   function getNewsTransitionPhrase(isFirst, isCatChanged, catName) {
-    // 1件目はOP挨拶直後のため、クドい繋ぎセリフを挟まず直接見出しへ
-    if (isFirst) {
-      return "";
-    }
     let phrase = "";
-    if (isCatChanged && catName) {
+    if (isFirst) {
+      const firstPhrases = [
+        "それでは、最初のニュースです。",
+        "まずは、最初のニュースをお伝えします。",
+        "最初の話題はこちらです。",
+        "では、注目の最初のニュースから見ていきましょう。"
+      ];
+      phrase = firstPhrases[Math.floor(Math.random() * firstPhrases.length)];
+    } else if (isCatChanged && catName) {
       const phrases = [
         `続いては、${catName}のニュースです。`,
         `変わりまして、${catName}の話題をお届けします。`,
@@ -74,6 +78,7 @@
       ];
       phrase = generalPhrases[Math.floor(Math.random() * generalPhrases.length)];
     }
+
 
     // 🐱 現在のアバターモデル（とろろ/ずんだもん/ヒヨリ等）の口調を適用
     const currentModelId = window.currentModelId || localStorage.getItem("selectedModel") || "tororo";
