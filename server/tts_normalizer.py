@@ -241,10 +241,11 @@ def extract_special_terms(text):
             terms.append(t)
 
 
-    # 4. 敬称・肩書が付いた人名候補（河野俊嗣さん、菅原選手、高市総理など）
-    for m in re.finditer(r'[\u4e00-\u9fa5]{2,4}(?=(?:さん|氏|選手|知事|首相|大臣|総理|議員|社長|会長|監督|コーチ|容疑者|被告))', text):
+    # 4. 敬称・肩書が付いた人名候補（3〜4文字のフルネーム優先: 角田裕毅選手、高市早苗総理など）
+    # ※ 2文字の短い姓（角田、三島、白石等）は単体でWikipedia検索すると同名地名（角田市等）と衝突して誤読を招くため除外
+    for m in re.finditer(r'[\u4e00-\u9fa5]{3,4}(?=(?:さん|氏|選手|知事|首相|大臣|総理|議員|社長|会長|監督|コーチ|容疑者|被告))', text):
         t = m.group(0)
-        if t not in {"日本", "東京", "大阪", "政府", "警察", "会社", "代表", "関係"}:
+        if t not in {"日本代表", "警察当局", "関係機関", "政府関係", "会社関係"}:
             terms.append(t)
 
     return list(dict.fromkeys(terms))
@@ -398,7 +399,8 @@ def apply_okonau_context_rules(text):
 
 def normalize_for_tts(text, custom_dict=None, log_collector=None):
     """
-    TTS用テキストの包括的正規化処理（文脈解決 -> 辞書 -> 英語マップ -> Wikipedia動的解決 -> pykakasi汎用かな化）
+    TTS用テキストの包括的正規化処理（文脈解決 -> 辞書 -> 英語マップ -> Wikipedia動的解決 -> サニタイズ）
+    ※ 漢字の形態素解析・アクセント分割はVOICEVOX (OpenJTalk) 本来の文脈解析エンジンに委ね、機械的ひらがな化による誤読破壊を防止
     """
     if not text:
         return ""
@@ -429,9 +431,13 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None):
     t = apply_country_prefixes(t)
     t = apply_okonau_context_rules(t)
 
-    # 7. 特殊固有名詞のWikipedia動的解決
+    # 7. 特殊固有名詞のWikipedia動的解決（フルネーム優先・文脈姓連動）
     terms = extract_special_terms(t)
-    for term in terms:
+    # 長い固有名詞（フルネーム等）を優先して解決し、その姓の読みを文脈マップに蓄積
+    terms_sorted = sorted(terms, key=lambda x: len(x), reverse=True)
+    derived_surnames = {}
+
+    for term in terms_sorted:
         yomi, _ = lookup_wikipedia_reading(term)
         if yomi:
             print(f"[Wikipedia自動発音解決] '{term}' ➔ '{yomi}'", flush=True)
@@ -439,11 +445,22 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None):
                 log_collector.append({"term": term, "yomi": yomi})
             t = re.sub(rf'(?<![A-Za-z0-9]){re.escape(term)}(?![A-Za-z0-9])', yomi, t)
 
-    # 8. 残存漢字の高品質ひらがな変換（pykakasi による形態素解析ベース一括解決）
-    # 複合語（安定性、透明感、確実性、持続性、多様性等）のVOICEVOX形態素誤分割を恒久・汎用的に解決
-    t = convert_remaining_kanji_to_hiragana(t)
+            # 4文字の人名漢字（例: 角田裕毅 -> つのだゆうき）の場合、姓2文字（角田 -> つのだ）の文脈を導出
+            if len(term) == 4 and re.match(r'^[\u4e00-\u9fa5]{4}$', term) and len(yomi) >= 4:
+                surname_kanji = term[:2]
+                # 読みの前半（姓の読み）を概算または形態素から安全に派生
+                # 例: つのだ(3) + ゆうき(3) = 6 -> 前半3文字
+                half_len = len(yomi) // 2
+                if len(yomi) % 2 != 0:
+                    half_len = (len(yomi) + 1) // 2
+                surname_yomi = yomi[:half_len]
+                derived_surnames[surname_kanji] = surname_yomi
 
-    # 9. サニタイズ
+    # 派生した姓の文脈を、敬称・肩書が付いた単独姓（角田選手、角田氏等）へ安全に適用
+    for s_kanji, s_yomi in derived_surnames.items():
+        t = re.sub(rf'{re.escape(s_kanji)}(?=(?:さん|氏|選手|知事|首相|大臣|総理|議員|社長|会長|監督|コーチ))', s_yomi, t)
+
+    # 8. サニタイズ
     t = sanitize_speech_text(t)
     return t
 

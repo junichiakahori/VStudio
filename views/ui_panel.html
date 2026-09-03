@@ -1105,10 +1105,10 @@
                     オンにすると、記事を連続で読み上げます。指定時刻に自動終了が設定されている場合、終了1分前に自動で締めの挨拶を行います。</p>
             </div>
             <div class="control-group" style="margin-top:10px; display:flex; gap:10px;">
-                <button class="btn" id="news-list-btn"
+                <button class="btn" id="news-list-btn" onclick="window.openNewsListPopup && window.openNewsListPopup()"
                     style="flex:1; background:rgba(0,0,0,0.3); color:var(--text-primary); padding:0.5rem; border-radius:6px; border:1px solid var(--border-neon); cursor:pointer; font-size:0.75rem;">📋
                     取得したニュース一覧を確認</button>
-                <button class="btn" id="news-clear-read-btn"
+                <button class="btn" id="news-clear-read-btn" onclick="window.clearNewsReadFlags && window.clearNewsReadFlags()"
                     style="flex:1; background:rgba(255,0,0,0.2); color:var(--text-primary); padding:0.5rem; border-radius:6px; border:1px solid #ff7675; cursor:pointer; font-size:0.75rem;">🗑️
                     既読フラグをクリア</button>
             </div>
