@@ -338,8 +338,8 @@
     </div>
 
     <!-- ニュース取得＆メディア正規化モジュール -->
-    <script src="/js/news/news-media-resolver.js?v=21.4"></script>
-    <script src="/js/news/news-fetcher.js?v=21.3"></script>
+    <script src="/js/news/news-media-resolver.js?v=21.5"></script>
+    <script src="/js/news/news-fetcher.js?v=21.4"></script>
 
     <script>
         const CATEGORY_NAMES = {
@@ -573,6 +573,23 @@
         // 初期化 & 定期更新（別ウィンドウの変更を自動同期）
         renderNewsList();
         setInterval(renderNewsList, 2500);
+
+        // 古い158件キャッシュの自動修復（起動時に最新260+件を即時自律取得）
+        (async function autoHealNews() {
+            const current = getSortedNews();
+            if (!current || current.length < 200) {
+                logDiag(`⚠️ 保持ニュースが${current.length}件のため、自動で最新ニュース(260+件)を取得します...`);
+                try {
+                    if (typeof window.fetchNewsWithOptions === "function") {
+                        const fresh = await window.fetchNewsWithOptions("cat_all", Infinity);
+                        logDiag(`🎉 自動修復完了: 全 ${fresh.length} 件を取得しました`);
+                        renderNewsList();
+                    }
+                } catch (e) {
+                    logDiag(`自動修復エラー: ${e.message}`, "warn");
+                }
+            }
+        })();
     </script>
 </body>
 </html>
