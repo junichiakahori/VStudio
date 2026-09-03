@@ -587,14 +587,23 @@ async def send_history(websocket):
 
 async def fetch_stats(video_id):
     global youtube_api_client, current_video_id
+_youtube_quota_exceeded_until = 0
+
+async def fetch_live_stats_loop(video_id):
+    """
+    配信中の同時接続者数・高評価数・チャンネル登録者数を定期更新するループタスク
+    """
+    global current_video_id, current_stats, _youtube_quota_exceeded_until
+    
     try:
         while current_video_id == video_id:
             viewers = ""
             subscribers = ""
             likes = ""
 
-            # 1. YouTube Data API が利用可能な場合（同時接続数・累計再生数・チャンネル登録者数・高評価数）
-            if youtube_api_client:
+            # 1. YouTube Data API が利用可能な場合（クォータ制限中は無駄な通信をスキップ）
+            now_ts = time.time()
+            if youtube_api_client and now_ts >= _youtube_quota_exceeded_until:
                 try:
                     req = youtube_api_client.videos().list(
                         part="liveStreamingDetails,statistics,snippet",
@@ -625,7 +634,12 @@ async def fetch_stats(video_id):
                                 if "subscriberCount" in ch_stats:
                                     subscribers = f"{int(ch_stats['subscriberCount']):,}"
                 except Exception as e:
-                    logging.warning(f"YouTube Data API fetch stats failed: {e}")
+                    err_str = str(e)
+                    if "quotaExceeded" in err_str or "403" in err_str:
+                        _youtube_quota_exceeded_until = now_ts + 1800  # 30分間APIリクエストを停止
+                        logging.info("ℹ️ [YouTube API] 1日のクォータ上限に達したため、API通信を一時休止しスクレイピングフォールバックへ自動移行します（コメント取得・番組進行は正常継続）")
+                    else:
+                        logging.warning(f"YouTube Data API fetch stats failed: {e}")
 
             # 2. スクレイピングによる抽出（フォールバック）
             if not viewers or not subscribers or not likes:
@@ -634,6 +648,7 @@ async def fetch_stats(video_id):
                     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                     "Accept-Language": "ja,en-US;q=0.9,en;q=0.8"
                 }
+
                 try:
                     html = await asyncio.to_thread(lambda: requests.get(url, headers=headers, timeout=8).text)
                     
