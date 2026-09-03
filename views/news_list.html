@@ -377,23 +377,39 @@
 
         function getFetchedNews() {
             try {
+                let openerNews = [];
                 if (window.opener && !window.opener.closed) {
                     if (window.opener.newsBroadcastState && window.opener.newsBroadcastState.newsList && window.opener.newsBroadcastState.newsList.length > 0) {
-                        const list = window.opener.newsBroadcastState.newsList;
-                        logDiag(`親画面の進行中リスト (newsBroadcastState.newsList) から ${list.length} 件を取得しました (先頭: ${list[0]?.title?.substring(0, 20)}...)`);
-                        return list;
-                    }
-                    if (window.opener.latestFetchedNews && window.opener.latestFetchedNews.length > 0) {
-                        const list = window.opener.latestFetchedNews;
-                        logDiag(`親画面の保持リスト (latestFetchedNews) から ${list.length} 件を取得しました (先頭: ${list[0]?.title?.substring(0, 20)}...)`);
-                        return list;
+                        openerNews = window.opener.newsBroadcastState.newsList;
+                    } else if (window.opener.latestFetchedNews && window.opener.latestFetchedNews.length > 0) {
+                        openerNews = window.opener.latestFetchedNews;
                     }
                 }
+
+                let localNews = [];
                 const saved = localStorage.getItem("latestFetchedNews");
                 if (saved) {
-                    const parsed = JSON.parse(saved);
-                    logDiag(`localStorage (latestFetchedNews) から ${parsed.length} 件を取得しました (先頭: ${parsed[0]?.title?.substring(0, 20)}...)`);
-                    return parsed;
+                    try { localNews = JSON.parse(saved); } catch (e) { }
+                }
+
+                // より件数の多い（最新・完全な）方を採用
+                let chosen = [];
+                let sourceDesc = "";
+                if (openerNews.length >= localNews.length && openerNews.length > 0) {
+                    chosen = openerNews;
+                    sourceDesc = `親画面 (${openerNews.length}件)`;
+                } else if (localNews.length > 0) {
+                    chosen = localNews;
+                    sourceDesc = `localStorage (${localNews.length}件)`;
+                    // 親画面側にも最新データを書き戻して完全同期
+                    if (window.opener && !window.opener.closed) {
+                        window.opener.latestFetchedNews = localNews;
+                    }
+                }
+
+                if (chosen.length > 0) {
+                    logDiag(`${sourceDesc} からニュースを取得しました (先頭: ${chosen[0]?.title?.substring(0, 20)}...)`);
+                    return chosen;
                 }
                 logDiag("親画面およびlocalStorageにニュースデータが存在しません (0件)", "warn");
             } catch (e) {
