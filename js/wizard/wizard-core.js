@@ -274,26 +274,71 @@
       setTimeout(() => { if (btn) btn.textContent = "🔔 チャイム試聴"; }, 2500);
     });
 
-    document.getElementById("voice-test-btn")?.addEventListener("click", () => {
-      if (window.openerWin && typeof window.openerWin.queueVoicevoxAudio === "function") {
-        const charId = window.openerWin.currentModelId || "";
-        const msg = charId.includes("zunda")
-          ? "マイクとボイスのテストなのだ！準備万端なのだ！"
-          : "音声のテスト発声です。正常に出力されています。";
-        window.openerWin.queueVoicevoxAudio(msg, true).catch(e => console.warn(e));
-      } else {
-        if (typeof window.showWizardToast === "function") {
-          window.showWizardToast("ℹ️ 親画面（スタジオ）と連携して音声を出力します。", true);
+    document.getElementById("voice-test-btn")?.addEventListener("click", async () => {
+      const btn = document.getElementById("voice-test-btn");
+      if (btn) btn.textContent = "🔊 再生中...";
+      if (typeof window.showWizardToast === "function") {
+        window.showWizardToast("🗣️ 音声テストを再生中...");
+      }
+
+      const msg = "音声のテスト発声です。正常に出力されていますにゃ。";
+      let played = false;
+
+      // 1. 親ウィンドウでの再生を試みる
+      try {
+        if (window.openerWin && typeof window.openerWin.queueVoicevoxAudio === "function") {
+          if (typeof window.openerWin.getVoicevoxAudioContext === "function") {
+            const opCtx = window.openerWin.getVoicevoxAudioContext();
+            if (opCtx && opCtx.state === "suspended") opCtx.resume().catch(()=>{});
+          }
+          const charId = window.openerWin.currentModelId || "";
+          const customMsg = charId.includes("zunda")
+            ? "マイクとボイスのテストなのだ！準備万端なのだ！"
+            : msg;
+          window.openerWin.queueVoicevoxAudio(customMsg, true).catch(e => console.warn(e));
+          played = true;
+        }
+      } catch (e) {
+        console.warn("[Wizard] 親画面での音声テスト再生エラー:", e);
+      }
+
+      // 2. 親画面で再生できない、または直接ウィザード側でも音声を鳴らすフォールバック
+      if (!played) {
+        try {
+          const synthRes = await fetch("/api/voicevox/synthesize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: msg, speakerId: 1 })
+          });
+          if (synthRes.ok) {
+            const buf = await synthRes.arrayBuffer();
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            if (ctx.state === "suspended") await ctx.resume();
+            const audioBuf = await ctx.decodeAudioData(buf);
+            const src = ctx.createBufferSource();
+            src.buffer = audioBuf;
+            src.connect(ctx.destination);
+            src.start(0);
+          }
+        } catch (err) {
+          console.warn("[Wizard] ウィザード直接音声テストエラー:", err);
         }
       }
+
+      setTimeout(() => { if (btn) btn.textContent = "🔊 音声テスト"; }, 3500);
     });
 
     document.getElementById("bgm-test-btn")?.addEventListener("click", () => {
+      const btn = document.getElementById("bgm-test-btn");
+      if (typeof window.showWizardToast === "function") {
+        window.showWizardToast("🎵 BGMの再生状態を切り替えます...");
+      }
       if (window.openerWin) {
         const playBtn = window.openerWin.document.getElementById("bgm-play-btn");
         if (playBtn) playBtn.click();
       }
     });
+
 
     // ナビゲーションボタン
     document.getElementById("nav-prev-btn")?.addEventListener("click", () => {
