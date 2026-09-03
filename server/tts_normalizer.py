@@ -12,8 +12,23 @@ TECH_ACRONYMS = {
     "NFT": "エヌエフティー", "Web3": "ウェブスリー", "WEB3": "ウェブスリー",
     "TGS": "ティージーエス", "KTC": "ケーティーシー", "PR": "ピーアール",
     "RPG": "アールピージー", "FPS": "エフピーエス", "MMO": "エムエムオー",
-    "AI": "エーアイ", "VR": "ブイアール", "AR": "エーアール"
+    "AI": "エーアイ", "VR": "ブイアール", "AR": "エーアール",
+    # ── 国際機関・政党・金融・軍事略語（Wikipedia呼び出しをゼロにする静的解決） ──
+    "AfD": "えーふぇーでー", "NATO": "なとー", "EU": "いーゆー",
+    "IMF": "あいえむえふ", "WHO": "だぶりゅーえいちおー", "UN": "ゆーえぬ",
+    "WTO": "だぶりゅーてぃーおー", "OECD": "おーいーしーでぃー",
+    "G7": "じーせぶん", "G20": "じーにじゅう", "G8": "じーえいと",
+    "GDP": "じーでぃーぴー", "CPI": "しーぴーあい", "FRB": "えふあーるびー",
+    "FBI": "えふびーあい", "CIA": "しーあいえー", "NSA": "えぬえすえー",
+    "IDF": "あいでぃーえふ", "WTI": "だぶりゅーてぃーあい", "OPEC": "おーぺっく",
+    "IPO": "あいぴーおー", "SDGs": "えすでぃーじーず", "ESG": "いーえすじー",
+    "IAEA": "あいえーいーえー", "ASEAN": "あせあん", "BRICS": "ぶりっくす",
+    "Hamas": "はます", "HAMAS": "はます", "ISIS": "あいしす", "ISIL": "あいしる",
+    "APEC": "えーぺっく", "ODA": "おーでぃーえー", "NGO": "えぬじーおー", "NPO": "えぬぴーおー",
+    "M&A": "えむあんどえー", "FX": "えふえっくす", "ETF": "いーてぃーえふ",
+    "GDP": "じーでぃーぴー", "BOJ": "にちぎん",
 }
+
 
 # ── 日本語文中でカタカナ語として定着している英単語マップ（Case-insensitive） ──
 COMMON_ENGLISH_WORDS = {
@@ -155,11 +170,33 @@ def lookup_wikipedia_reading(term):
                 exact_title = s_res[1][0]
                 # カッコ付き曖昧さ回避（例: VIVANT (テレビドラマ)）のみ許可
                 clean_title = re.sub(r'[\(（].*?[\)）]', '', exact_title).strip()
-                if clean_title == term:
-                    yomi, _ = lookup_wikipedia_reading(exact_title)
-                    if yomi:
-                        _wiki_reading_cache[term] = (yomi, term)
-                        return yomi, term
+                if clean_title == term and exact_title not in _wiki_reading_cache:
+                    # 再帰呈止: exact_titleのextractsを直接インライン取得（lookup_wikipedia_reading再呼び出し禁止）
+                    try:
+                        ext2_url = (
+                            "https://ja.wikipedia.org/w/api.php"
+                            "?action=query&prop=extracts&exintro=true&exsentences=2"
+                            "&explaintext=true&titles={}&redirects=1&format=json"
+                        ).format(urllib.parse.quote(exact_title))
+                        req2 = urllib.request.Request(ext2_url, headers=headers)
+                        with urllib.request.urlopen(req2, timeout=_WIKI_TIMEOUT, context=ctx) as r2:
+                            pages2 = json.loads(r2.read().decode("utf-8")).get("query", {}).get("pages", {})
+                            for pid2, pdata2 in pages2.items():
+                                if pid2 == "-1":
+                                    continue
+                                extract2 = pdata2.get("extract", "")
+                                m2 = re.search(r'[\(（]\s*([\u3041-\u3096\u30a1-\u30f6\u3094\u30f4\u30fc\u30fb\u3001\s,\uff0c/\uff0f]+)', extract2)
+                                if m2:
+                                    raw2 = re.split(r'[\u3001,\uff0c\t\n/\uff0f|\uff5c]|\s{2,}', m2.group(1).strip())[0].strip()
+                                    y2 = raw2.replace('\u30fb', '').replace(' ', '')
+                                    y2h = ''.join([chr(ord(c) - 0x60) if 0x30a1 <= ord(c) <= 0x30f6 else c for c in y2])
+                                    y2c = re.sub(r'[^\u3041-\u3096\u3094\u30fc]', '', y2h)
+                                    y2c = re.sub(r'(\u3044\u3093\u304f|\u3053\u30fc\u307d\u308c\u30fc\u3057\u3087\u3093|\u304b\u3076\u3057\u304d\u304c\u3044\u3057\u3083)$', '', y2c)
+                                    if len(y2c) >= 2 and y2c not in INVALID_READINGS:
+                                        _wiki_reading_cache[term] = (y2c, term)
+                                        return y2c, term
+                    except Exception:
+                        pass
 
         # ── 3. Wikipedia 全文スニペット検索 (単独記事がない「株探」や名字「小籔」等の固有名詞対応) ──
         sr_url = f"https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(term)}&format=json"
