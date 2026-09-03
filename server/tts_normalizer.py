@@ -408,6 +408,19 @@ def apply_age_and_counter_rules(text):
     t = re.sub(r'(\d+)とし([以前後の代未ぐら未]|いじょう|いか|みまん|ぜんご|$)', r'\1さい\2', t)
     return t
 
+def apply_special_reading_fixes(text):
+    """単漢字誤変換による誤読の修復（気象予報士/弁護士/消防士等の「士」が「さむらい」になるバグを「し」に修復）"""
+    if not text:
+        return ""
+    t = text
+    # 資格・役職・人名の「士（し）」が誤って「さむらい」に変換された場合の修復
+    t = re.sub(r'(気象予報|弁護|消防|宇宙飛行|看護|保育|公認会計|税理|司法書|社労|建築|機関|操縦|兵|武|博士|修士|学|代協|璃|騎士)さむらい', r'\1し', t)
+    t = re.sub(r'([ぁ-んァ-ヶ])よほうさむらい', r'\1よほうし', t)
+    t = re.sub(r'([ぁ-んァ-ヶ])ごさむらい', r'\1ごし', t)
+    t = re.sub(r'([ぁ-んァ-ヶ])ぼうさむらい', r'\1ぼうし', t)
+    t = re.sub(r'([ぁ-んァ-ヶ])こうさむらい', r'\1こうし', t)
+    return t
+
 def normalize_for_tts(text, custom_dict=None, log_collector=None):
     """
     TTS用テキストの包括的正規化処理（文脈解決 -> 辞書 -> 英語マップ -> Wikipedia動的解決 -> サニタイズ）
@@ -418,8 +431,9 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None):
 
     t = text
 
-    # 0. 年齢・助数詞の誤読・誤ルビ修復
+    # 0. 年齢・助数詞および単漢字誤変換（気象予報士 ➔ さむらい）の修復
     t = apply_age_and_counter_rules(t)
+    t = apply_special_reading_fixes(t)
 
     # 1. 文脈考慮型のIT発音解決（映画『IT』 vs 英語代名詞 it vs 情報技術 大文字IT）
     t = apply_it_context_rules(t)
