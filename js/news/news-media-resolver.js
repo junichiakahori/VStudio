@@ -33,12 +33,12 @@ function isInvalidNewsVideoArticle(arg1, arg2) {
   return false;
 }
 
-function stripHtmlTags(html) {
+window.stripHtmlTags = window.stripHtmlTags || function(html) {
   if (!html) return "";
   const clean = html.replace(/<[^>]*>/g, "");
   const doc = new DOMParser().parseFromString(clean, "text/html");
   return doc.body.textContent || "";
-}
+};
 
 // 🌐 記事URLのドメインからメディア名（出典）を特定する逆引き辞書
 const DOMAIN_MEDIA_MAP = {

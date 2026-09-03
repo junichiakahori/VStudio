@@ -549,14 +549,16 @@
                 btn.disabled = true;
                 btn.innerHTML = "⏳ 取得中...";
             }
-            logDiag("🔄 更新ボタンが押行されました。最新ニュースを取得します...");
+            logDiag("🔄 更新ボタンが押されました。全カテゴリの最新ニュースを取得します...");
             try {
-                if (typeof fetchLatestNews === "function") {
-                    const freshItems = await fetchLatestNews();
+                if (typeof window.fetchNewsWithOptions === "function") {
+                    const freshItems = await window.fetchNewsWithOptions("cat_all", Infinity);
                     logDiag(`✅ 最新ニュースの取得が完了しました: 全 ${freshItems.length} 件`);
-                } else if (window.opener && typeof window.opener.fetchLatestNews === "function") {
-                    const freshItems = await window.opener.fetchLatestNews();
-                    logDiag(`✅ 親画面経由で最新ニュースを取得しました: 全 ${freshItems.length} 件`);
+                } else if (typeof fetchNewsWithOptions === "function") {
+                    const freshItems = await fetchNewsWithOptions("cat_all", Infinity);
+                    logDiag(`✅ 最新ニュースの取得が完了しました: 全 ${freshItems.length} 件`);
+                } else {
+                    logDiag("fetchNewsWithOptionsが見つかりません", "warn");
                 }
             } catch (err) {
                 logDiag(`ニュース取得エラー: ${err.message}`, "warn");

@@ -54,11 +54,11 @@ function extractLinkFromXmlNode(node) {
   return linkUrl;
 }
 
-function stripHtmlTags(html) {
+window.stripHtmlTags = window.stripHtmlTags || function(html) {
   if (!html) return "";
   const doc = new DOMParser().parseFromString(html, 'text/html');
   return (doc.body.textContent || "").trim();
-}
+};
 
 // タイトルの正規化（装飾タグやメディア名の除去）
 function normalizeNewsTitle(title) {
