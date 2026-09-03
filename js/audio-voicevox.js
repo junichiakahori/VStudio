@@ -254,35 +254,36 @@ async function playNextVoicevox() {
 
     const volSlider = document.getElementById("voicevox-volume-slider");
     const savedVol = localStorage.getItem("savedVoicevoxVolume");
-    let targetVol = volSlider ? (parseFloat(volSlider.value) / 100.0) : (savedVol ? (parseFloat(savedVol) / 100.0) : 1.0);
+    let targetVol = 1.0;
+    if (volSlider && !isNaN(parseFloat(volSlider.value))) {
+      targetVol = parseFloat(volSlider.value) / 100.0;
+    } else if (savedVol && !isNaN(parseFloat(savedVol))) {
+      targetVol = parseFloat(savedVol) / 100.0;
+    }
     if (isNaN(targetVol) || targetVol <= 0) targetVol = 1.0;
 
     const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
     currentVoicevoxSource = ctx.createBufferSource();
     currentVoicevoxSource.buffer = audioBuffer;
 
-
     if (!window.voicevoxAnalyser) {
       window.voicevoxAnalyser = ctx.createAnalyser();
       window.voicevoxAnalyser.fftSize = 256;
+      window.voicevoxAnalyser.connect(ctx.destination);
     }
 
-    if (!window.voicevoxGainNode) {
-      window.voicevoxGainNode = ctx.createGain();
-      window.voicevoxGainNode.gain.setValueAtTime(targetVol, ctx.currentTime);
-      window.voicevoxGainNode.connect(window.voicevoxAnalyser);
-      window.voicevoxAnalyser.connect(ctx.destination);
-    } else {
-      window.voicevoxGainNode.gain.cancelScheduledValues(ctx.currentTime);
-      window.voicevoxGainNode.gain.setValueAtTime(targetVol, ctx.currentTime);
-    }
-    currentVoicevoxSource.connect(window.voicevoxGainNode);
+    const gainNode = ctx.createGain();
+    gainNode.gain.setValueAtTime(targetVol, ctx.currentTime);
+    currentVoicevoxSource.connect(gainNode);
+    gainNode.connect(window.voicevoxAnalyser);
+    gainNode.connect(ctx.destination); // 確実な直結出力
 
     currentVoicevoxSource.onended = () => {
-
-      if (currentVoicevoxSource) currentVoicevoxSource.disconnect();
+      try { currentVoicevoxSource.disconnect(); } catch(e){}
+      try { gainNode.disconnect(); } catch(e){}
       currentVoicevoxSource = null;
       isVoicevoxPlaying = false;
+
 
       if (voicevoxAudioQueue.length === 0) {
         hideSubtitles();
