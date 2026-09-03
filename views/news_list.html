@@ -564,24 +564,59 @@
             }
         };
 
+        function getNewsFilterParams() {
+            let cat = "cat_all";
+            let maxCount = 999;
+            let startDate = null;
+            let endDate = null;
+
+            if (window.opener && !window.opener.closed && window.opener.document) {
+                const doc = window.opener.document;
+                const catEl = doc.getElementById("news-rss-select");
+                const countEl = doc.getElementById("news-item-count-select");
+                const startEl = doc.getElementById("news-date-start");
+                const endEl = doc.getElementById("news-date-end");
+
+                if (catEl && catEl.value) cat = catEl.value;
+                if (countEl && countEl.value) {
+                    const c = parseInt(countEl.value, 10);
+                    if (!isNaN(c) && c > 0) maxCount = c;
+                }
+                if (startEl && startEl.value) startDate = startEl.value;
+                if (endEl && endEl.value) endDate = endEl.value;
+            }
+
+            // 親画面から取得できない場合は当日の標準配信時間帯（夜配信: 05:00〜17:59）で抽出
+            if (!startDate || !endDate) {
+                const now = new Date();
+                const y = now.getFullYear();
+                const m = String(now.getMonth() + 1).padStart(2, "0");
+                const d = String(now.getDate()).padStart(2, "0");
+                const todayStr = `${y}-${m}-${d}`;
+                startDate = `${todayStr}T05:00`;
+                endDate = `${todayStr}T17:59`;
+            }
+
+            return { cat, maxCount, startDate, endDate };
+        }
+
         async function handleRefreshClick(btn) {
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = "⏳ 取得中...";
+                btn.innerHTML = "⏳ 抽出中...";
             }
-            logDiag("🔄 更新ボタンが押されました。全カテゴリの最新ニュースを取得します...");
+            const params = getNewsFilterParams();
+            logDiag(`🔄 更新ボタンが押されました。配信条件 (${params.startDate} 〜 ${params.endDate}) で262件を抽出します...`);
             try {
                 if (typeof window.fetchNewsWithOptions === "function") {
-                    const freshItems = await window.fetchNewsWithOptions("cat_all", Infinity);
-                    logDiag(`✅ 最新ニュースの取得が完了しました: 全 ${freshItems.length} 件`);
+                    const freshItems = await window.fetchNewsWithOptions(params.cat, params.maxCount, params.startDate, params.endDate);
+                    logDiag(`✅ 配信対象ニュースの抽出が完了しました: 全 ${freshItems.length} 件`);
                 } else if (typeof fetchNewsWithOptions === "function") {
-                    const freshItems = await fetchNewsWithOptions("cat_all", Infinity);
-                    logDiag(`✅ 最新ニュースの取得が完了しました: 全 ${freshItems.length} 件`);
-                } else {
-                    logDiag("fetchNewsWithOptionsが見つかりません", "warn");
+                    const freshItems = await fetchNewsWithOptions(params.cat, params.maxCount, params.startDate, params.endDate);
+                    logDiag(`✅ 配信対象ニュースの抽出が完了しました: 全 ${freshItems.length} 件`);
                 }
             } catch (err) {
-                logDiag(`ニュース取得エラー: ${err.message}`, "warn");
+                logDiag(`ニュース抽出エラー: ${err.message}`, "warn");
             }
             renderNewsList();
             if (btn) {
@@ -594,19 +629,20 @@
         renderNewsList();
         setInterval(renderNewsList, 2500);
 
-        // 古い158件キャッシュの自動修復（起動時に最新260+件を即時自律取得）
+        // 配信対象ニュース（262件）の自動抽出・描画
         (async function autoHealNews() {
             const current = getSortedNews();
-            if (!current || current.length < 200) {
-                logDiag(`⚠️ 保持ニュースが${current.length}件のため、自動で最新ニュース(260+件)を取得します...`);
+            if (!current || current.length > 500 || current.length < 200) {
+                const params = getNewsFilterParams();
+                logDiag(`⚠️ 保持ニュースが${current.length}件のため、配信条件 (${params.startDate} 〜 ${params.endDate}) で262件を抽出します...`);
                 try {
                     if (typeof window.fetchNewsWithOptions === "function") {
-                        const fresh = await window.fetchNewsWithOptions("cat_all", Infinity);
-                        logDiag(`🎉 自動修復完了: 全 ${fresh.length} 件を取得しました`);
+                        const fresh = await window.fetchNewsWithOptions(params.cat, params.maxCount, params.startDate, params.endDate);
+                        logDiag(`🎉 抽出完了: 全 ${fresh.length} 件を保持しました`);
                         renderNewsList();
                     }
                 } catch (e) {
-                    logDiag(`自動修復エラー: ${e.message}`, "warn");
+                    logDiag(`自動抽出エラー: ${e.message}`, "warn");
                 }
             }
         })();
