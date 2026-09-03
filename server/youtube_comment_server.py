@@ -591,10 +591,6 @@ async def send_history(websocket):
         except websockets.exceptions.ConnectionClosed:
             break
 
-async def fetch_stats(video_id):
-    global youtube_api_client, current_video_id
-
-
 async def fetch_live_stats_loop(video_id):
     """
     配信中の同時接続者数・高評価数・チャンネル登録者数を定期更新するループタスク
@@ -1023,7 +1019,7 @@ async def start_youtube_client(video_id_or_channel: str, websocket):
 
     chat_task = asyncio.create_task(fetch_chat())
     global stats_task
-    stats_task = asyncio.create_task(fetch_stats(video_id))
+    stats_task = asyncio.create_task(fetch_live_stats_loop(video_id))
 
 async def stop_youtube_client(broadcast=True):
     global chat_task, stats_task, current_video_id, chat
