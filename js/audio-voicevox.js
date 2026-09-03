@@ -147,6 +147,7 @@ async function fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal
             signal: directCtrl.signal
           }
         );
+
         clearTimeout(directTId);
         if (directSynthRes.ok) {
           return await directSynthRes.arrayBuffer();
@@ -154,7 +155,12 @@ async function fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal
       } catch (directErr) {
         clearTimeout(directTId);
       }
+    }
+    return null;
   })();
+
+
+
 
   voicevoxAudioBufferCache.set(cacheKey, promise);
 
@@ -262,9 +268,19 @@ async function playNextVoicevox() {
       window.voicevoxGainNode.gain.setValueAtTime(targetVol, ctx.currentTime);
     }
 
-    currentVoicevoxSource.connect(window.voicevoxGainNode);
+    let playbackWatchdog = setTimeout(() => {
+      console.warn("[VOICEVOX] ⚠️ 再生タイムアウト監視（40秒）が作動しました。キューを強制進行します");
+      if (currentVoicevoxSource) {
+        try { currentVoicevoxSource.stop(); } catch(e){}
+        try { currentVoicevoxSource.disconnect(); } catch(e){}
+        currentVoicevoxSource = null;
+      }
+      isVoicevoxPlaying = false;
+      playNextVoicevox();
+    }, 40000);
 
     currentVoicevoxSource.onended = () => {
+      clearTimeout(playbackWatchdog);
       if (currentVoicevoxSource) currentVoicevoxSource.disconnect();
       currentVoicevoxSource = null;
       isVoicevoxPlaying = false;
@@ -293,9 +309,11 @@ async function playNextVoicevox() {
   } catch (e) {
     console.error("VOICEVOX Error:", e);
     currentPlayingDisplayText = "";
+    isVoicevoxPlaying = false;
     hideSubtitles();
     playNextVoicevox();
   }
+
 }
 
 window.playNextVoicevox = playNextVoicevox;
