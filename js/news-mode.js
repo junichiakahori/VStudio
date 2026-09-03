@@ -14,7 +14,7 @@
     console.log(`[UI] 🔢 ${inputId} を ${current} ➔ ${next} に変更しました`);
   };
 
-console.log("[news-mode.js] 🌟 スクリプトファイルが正常に実行開始されました (v20.0)");
+console.log("[news-mode.js] 🌟 スクリプトファイルが正常に実行開始されました (v22.16)");
 // 安全な遅延バインド
 window.startNewsBroadcast = async function(startIndex = 0, items = null, isFromNewsList = false) {
   if (typeof window._executeNewsBroadcast === "function") {
