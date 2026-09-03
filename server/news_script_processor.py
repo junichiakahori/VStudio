@@ -419,9 +419,14 @@ def validate_news_script_quality(raw_text, title="", article_context=""):
     return True, ""
 
 
+_SCRIPT_CACHE_LOCK = threading.Lock()
+_NEWS_SCRIPT_CACHE = {}
+_INFLIGHT_EVENTS = {}
+
 def generate_news_item_script_data(payload, custom_dict=None):
     """
     ニュース1件分の原稿AI生成、ファクト照合、発音検証、見出し生成を一括処理して返す
+    （同一記事タイトルのインフライト重複実行防止＆サーバーキャッシュ完備）
     """
     title = clean_news_title(payload.get('title', ''))
     description = clean_news_description(payload.get('description', ''))
@@ -447,6 +452,31 @@ def generate_news_item_script_data(payload, custom_dict=None):
     idx_str = f"#{article_idx}/{total_cnt}" if (article_idx and total_cnt) else (f"#{article_idx}" if article_idx else "")
     short_title = title[:16] + "..." if len(title) > 16 else title
     tag = f"[ニュースAI {idx_str} {short_title}]" if idx_str else f"[ニュースAI {short_title}]"
+
+    # 1. すでに生成完了済みのキャッシュが存在する場合は即時返却（Ollama重複呼び出しゼロ）
+    cache_key = f"{model_id}_{provider}_{title}"
+    if not is_special_item:
+        with _SCRIPT_CACHE_LOCK:
+            if cache_key in _NEWS_SCRIPT_CACHE:
+                print(f"{tag} ⚡ サーバーキャッシュから即時返却 (重複処理を完全スキップ)", flush=True)
+                return _NEWS_SCRIPT_CACHE[cache_key]
+
+        # 2. 別スレッドで同一タイトルが現在生成中の場合、重複実行せず完了を待機して同じ結果を共有
+        my_event = None
+        with _SCRIPT_CACHE_LOCK:
+            if cache_key in _INFLIGHT_EVENTS:
+                in_event = _INFLIGHT_EVENTS[cache_key]
+            else:
+                my_event = threading.Event()
+                _INFLIGHT_EVENTS[cache_key] = my_event
+                in_event = None
+
+        if in_event is not None:
+            print(f"{tag} ⏳ 同一記事の生成が先行実行中のため待機し、結果を共有します...", flush=True)
+            in_event.wait(timeout=60)
+            with _SCRIPT_CACHE_LOCK:
+                if cache_key in _NEWS_SCRIPT_CACHE:
+                    return _NEWS_SCRIPT_CACHE[cache_key]
 
     print(f"{tag} 📥 原稿生成リクエスト受信 (AI: {provider}/{model_name or 'default'})", flush=True)
 
@@ -697,7 +727,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
     total_speech_chars = sum(len(it.get('speech', '')) for it in (items or []))
     print(f"{tag} ✅ 原稿生成完了！ (計 {len(items or [])}文, {total_speech_chars}文字)", flush=True)
 
-    return {
+    result_data = {
         "status": "ok",
         "url": article_url or "",
         "headline": {
@@ -709,4 +739,16 @@ def generate_news_item_script_data(payload, custom_dict=None):
         "sentences": [it["display"] for it in items],
         "fullText": "\n".join([it["display"] for it in items])
     }
+
+    if not is_special_item:
+        with _SCRIPT_CACHE_LOCK:
+            _NEWS_SCRIPT_CACHE[cache_key] = result_data
+            if len(_NEWS_SCRIPT_CACHE) > 100:
+                oldest_k = next(iter(_NEWS_SCRIPT_CACHE))
+                del _NEWS_SCRIPT_CACHE[oldest_k]
+            if cache_key in _INFLIGHT_EVENTS:
+                _INFLIGHT_EVENTS[cache_key].set()
+                del _INFLIGHT_EVENTS[cache_key]
+
+    return result_data
 
