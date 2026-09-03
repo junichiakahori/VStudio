@@ -324,7 +324,7 @@
             <button class="action-btn jump-btn" id="jump-to-current-btn" onclick="scrollToPlayingNews(true)">
                 🎯 放送中へジャンプ
             </button>
-            <button class="action-btn" id="refresh-btn" onclick="location.reload()">
+            <button class="action-btn" id="refresh-btn" onclick="handleRefreshClick(this)">
                 🔄 更新
             </button>
         </div>
@@ -336,6 +336,10 @@
             <div class="empty-title">ニュースを読み込んでいます...</div>
         </div>
     </div>
+
+    <!-- ニュース取得＆メディア正規化モジュール -->
+    <script src="/js/news/news-media-resolver.js?v=21.4"></script>
+    <script src="/js/news/news-fetcher.js?v=21.3"></script>
 
     <script>
         const CATEGORY_NAMES = {
@@ -539,6 +543,30 @@
                 window.scrollTo({ top: 0, behavior: smooth ? "smooth" : "auto" });
             }
         };
+
+        async function handleRefreshClick(btn) {
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = "⏳ 取得中...";
+            }
+            logDiag("🔄 更新ボタンが押行されました。最新ニュースを取得します...");
+            try {
+                if (typeof fetchLatestNews === "function") {
+                    const freshItems = await fetchLatestNews();
+                    logDiag(`✅ 最新ニュースの取得が完了しました: 全 ${freshItems.length} 件`);
+                } else if (window.opener && typeof window.opener.fetchLatestNews === "function") {
+                    const freshItems = await window.opener.fetchLatestNews();
+                    logDiag(`✅ 親画面経由で最新ニュースを取得しました: 全 ${freshItems.length} 件`);
+                }
+            } catch (err) {
+                logDiag(`ニュース取得エラー: ${err.message}`, "warn");
+            }
+            renderNewsList();
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = "🔄 更新";
+            }
+        }
 
         // 初期化 & 定期更新（別ウィンドウの変更を自動同期）
         renderNewsList();
