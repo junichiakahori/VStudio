@@ -350,44 +350,23 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
 
     return corrected_items
 
-
-# ── 許可される一般的な英字・固有名詞ホワイトリスト ──
-ALLOWED_ENGLISH_TERMS = {
-    "ai", "sns", "it", "url", "line", "youtube", "x", "ceo", "ev", "apple", "google",
-    "openai", "vivant", "ios", "pc", "tv", "nhk", "bgm", "se", "api", "sdk", "usb",
-    "dx", "sdgs", "chatgpt", "gemini", "claude", "meta", "nvidia", "sony", "nintendo",
-    "switch", "ps5", "xbox", "vr", "ar", "mr", "web", "app", "os", "id", "ip", "voicevox",
-    "live2d", "vts", "obs", "cpu", "gpu", "wi-fi", "wifi", "sim", "esim", "ntt", "kddi", "au",
-    "softbank", "jr", "jra", "jfa", "usj", "tdl", "tdr", "tbs", "fuji", "asahi", "mbs"
-}
-
 def validate_news_script_quality(raw_text, title="", article_context=""):
     """
     生成されたニュース原稿の品質をダブルチェックする。
-    不自然な英語混入、中国語混入、句読点欠落、中身のない同語反復（トートロジー）、
-    報道メタ説明のみのスカスカ原稿、文数不足、および元記事にない架空エピソードを検知して不合格理由を返す。
-    合格の場合は (True, "") を返す。
     """
     if not raw_text or len(raw_text.strip()) < 120:
         return False, f"原稿の文字数が少なすぎます ({len(raw_text.strip()) if raw_text else 0}文字 < 120文字)"
 
-    # 改行または句点でセンテンスを分割
     split_sentences_check = split_sentences_safely(raw_text)
     if len(split_sentences_check) < 5:
-        return False, f"原稿の文数が不足しています ({len(split_sentences_check)}文 < 5文)。出来事の経緯・背景・影響・感想を含む最低5文の深掘り解説が必要です。"
+        return False, f"原稿の文数が不足しています ({len(split_sentences_check)}文 < 5文)。"
 
-    # 不自然な二重語尾チェック
     if re.search(r'(?:だよですね|だねですね|よねですね|よですね|ねですね|だなにゃ|だなのだ)', raw_text):
-        return False, "不自然な二重語尾（だよですね等）が含まれています"
+        return False, "不自然な二重語尾が含まれています"
 
-    # 1. 英語単語の混入チェック
-    english_words = re.findall(r'[a-zA-Z]{3,}', raw_text)
-    invalid_english = []
-    for w in english_words:
-        if w.lower() not in ALLOWED_ENGLISH_TERMS:
-            invalid_english.append(w)
-    if invalid_english:
-        return False, f"不要な英語単語が混入しています: {invalid_english}"
+    # 1. 連続した長文英文フレーズの混入チェック（※単体の英単語や略称はTTS正規化で安全に処理）
+    if re.search(r'[a-zA-Z]{2,}\s+[a-zA-Z]{2,}\s+[a-zA-Z]{2,}', raw_text):
+        return False, "長文の英文フレーズが混入しています"
 
     # 2. 中国語・簡体字チェック
     for l in split_sentences_check:
@@ -432,19 +411,8 @@ def validate_news_script_quality(raw_text, title="", article_context=""):
             if inv_t and inv_t not in article_context and inv_t not in title:
                 return False, f"元記事に存在しない作品名が捏造されています: 『{inv_t}』"
 
-        for l in split_sentences_check:
-            if len(l) >= 15:
-                # 配信者の感想・考察・所感・見解表現（これらは事実ではなく主観コメントなのでファクト照合から除外）
-                is_impression_or_opinion = bool(re.search(
-                    r'(と思います|と感じます|と考えられます|かもしれません|のではないでしょうか|ですね|ですよ|ですよね|'
-                    r'にゃ|のだ|わ|でしょう|たいですね|ていきたい|させられます|印象的|考えさせられ|注目|期待|'
-                    r'気になります|心配|安心|驚き|すごい|残念|嬉しい|大切|重要|教訓|影響|可能性もある|注目が集ま|'
-                    r'目を離せません|応援したい|見守りたい|願いたい)', l
-                ))
-                # 作品名や固有名詞『...』の捏造チェックは先頭で実施済み
-                pass 
-
     return True, ""
+
 
 def generate_news_item_script_data(payload, custom_dict=None):
     """
@@ -503,12 +471,6 @@ def generate_news_item_script_data(payload, custom_dict=None):
 
         best_candidate_text = candidate_text
 
-        # 粗チェック
-        is_valid, reason = validate_news_script_quality(candidate_text, title, full_article_content)
-        if not is_valid and attempt < max_retries:
-            print(f"[ダブルチェック・不合格判定] ⚠️ {attempt}/{max_retries} 回目の出力を不自然と判定 (理由: {reason}) ➔ 再試行します", flush=True)
-            continue
-
         # パース・重複除去・発音検証を通して items を作成
         clean_text = candidate_text
         clean_text = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', clean_text, flags=re.MULTILINE).strip()
@@ -520,21 +482,18 @@ def generate_news_item_script_data(payload, custom_dict=None):
             clean_text = re.sub(r'(?:\[HEADLINE:\s*|【見出し】:\s*).*?(?:\]|\n|$)', '', clean_text).strip()
 
         clean_text = clean_text.replace("「", "").replace("」", "").strip()
-                # 不自然な名乗り・導入語尾（「とろろにゃ、」「とろろはにゃ、」等）を「とろろとしては、」に正規化
+        # 不自然な名乗り・導入語尾を正規化
         clean_text = re.sub(r'(?:^|(?<=[。！？\s]))(?:とろろ|トロロ)にゃ[、,\s　]*', 'とろろとしては、', clean_text)
         clean_text = re.sub(r'(?:^|(?<=[。！？\s]))(?:とろろ|トロロ)はにゃ[、,\s　]*', 'とろろとしては、', clean_text)
         clean_text = re.sub(r'(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)(?:なのだ|のだ)[、,\s　]*', 'ずんだもんとしては、', clean_text)
         clean_text = re.sub(r'(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)は(?:なのだ|のだ)[、,\s　]*', 'ずんだもんとしては、', clean_text)
-                        # キャスターとしてのクドい前置き（「このニュースを見て」「このニュース聞いて」等）を完全除去し、直接スマートに所感を述べるよう整形
         clean_text = re.sub(r'この(?:ニュース|話題|記事|出来事)(?:を|は)?(?:見て|聞いて|知って|読んで)[、,\s　]*本当に便利(?:だにゃ|ですね|だなにゃ|だ)', 'この取り組み、本当に便利だにゃ', clean_text)
         clean_text = re.sub(r'この(?:ニュース|話題|記事|出来事)(?:を|は)?(?:見て|聞いて|知って|読んで)[、,\s　]*', '', clean_text)
         clean_text = re.sub(r'この(?:ニュース|話題|記事|出来事)[、,\s　]+(?=[ぁ-んァ-ヶ一-鿿])', '', clean_text)
-        # 不自然な崩れ語尾（「だなにゃ」「だなのだ」「だねにゃ」等）の徹底修正
         clean_text = re.sub(r'だなにゃ([！!？?。、\s　]|$)', r'だにゃ\1', clean_text)
         clean_text = re.sub(r'だなのだ([！!？?。、\s　]|$)', r'なのだ\1', clean_text)
         clean_text = re.sub(r'だねにゃ([！!？?。、\s　]|$)', r'ですね\1', clean_text)
         clean_text = re.sub(r'だねのだ([！!？?。、\s　]|$)', r'なのだ\1', clean_text)
-        # 不自然な二重語尾（だよですね、だねですね、よですね等）の徹底修正
         clean_text = re.sub(r'だよですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)
         clean_text = re.sub(r'だねですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)
         clean_text = re.sub(r'よねですね([！!？?。、\s　]|$)', r'ですよね\1', clean_text)
@@ -558,7 +517,6 @@ def generate_news_item_script_data(payload, custom_dict=None):
         clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)かなにゃ([！\s　。！？]|$)', r'\1かにゃ\2', clean_text)
         clean_text = clean_text.replace("使えへん", "使えない").replace("出来へん", "出来ない").replace("分からへん", "分からない").replace("知らへん", "知らない")
         clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)へん([の|ね|よ|な|にゃ|！|？|。|、]|$)', r'\1ない\2', clean_text)
-        clean_text = re.sub(r'\b[a-z]{3,}な', '大変な', clean_text)
 
         split_sentences = split_sentences_safely(clean_text)
 
@@ -597,9 +555,14 @@ def generate_news_item_script_data(payload, custom_dict=None):
         if candidate_items:
             best_candidate_items = candidate_items
 
-                # 7文以上生成された場合は、要約3文 + 感想2〜3文（最大6文）にスマートに制限
+        # 粗チェック
+        is_valid, reason = validate_news_script_quality(candidate_text, title, full_article_content)
+        if not is_valid and attempt < max_retries:
+            print(f"[ダブルチェック・不合格判定] ⚠️ {attempt}/{max_retries} 回目の出力を不自然と判定 (理由: {reason}) ➔ 再試行します", flush=True)
+            continue
+
+        # 7文以上生成された場合は、要約3文 + 感想2〜3文（最大6文）にスマートに制限
         if len(candidate_items) > 6:
-            # 前半3文（要約） + 後半の直前2〜3文（感想）を抽出して最大6文に収める
             candidate_items = candidate_items[:3] + candidate_items[-3:]
             if len(candidate_items) > 6:
                 candidate_items = candidate_items[:6]
@@ -619,15 +582,19 @@ def generate_news_item_script_data(payload, custom_dict=None):
         break
 
     # 万が一リトライを繰り返しても5文に満たなかった場合は、スキップせずに最良の候補を活かして確実に5文以上の台本として仕上げる
-    if not items and best_candidate_items:
-        items = best_candidate_items
+    if not items:
+        if not best_candidate_items and description:
+            desc_s = split_sentences_safely(description)
+            best_candidate_items = inspect_and_correct_pronunciation(desc_s, description, custom_dict=custom_dict)
+            
+        items = best_candidate_items if best_candidate_items else []
         is_zunda_mode = 'zunda' in model_id
         tail_ending = "なのだ！" if is_zunda_mode else "にゃ！"
-        tail_opinion = "なのだ。" if is_zunda_mode else "にゃ。"
         
-        # 不足している文を自然な感想・考察で補って5文にする
         while len(items) < 5:
-            if len(items) == 1:
+            if len(items) == 0:
+                comp_txt = f"{title}についてのニュースですにゃ。"
+            elif len(items) == 1:
                 comp_txt = f"この出来事は、今後の展開や関連する動きからも目が離せない状況ですね。"
             elif len(items) == 2:
                 comp_txt = f"関係者や専門家の間でも、様々な意見や反響が広がっているようです。"
@@ -663,3 +630,4 @@ def generate_news_item_script_data(payload, custom_dict=None):
         "sentences": [it["display"] for it in items],
         "fullText": "\n".join([it["display"] for it in items])
     }
+
