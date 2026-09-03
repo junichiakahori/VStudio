@@ -12,7 +12,7 @@
 
   const currentHour = new Date().getHours();
   const autoDefaultSlot = currentHour >= 4 && currentHour < 12 ? "morning" : "evening";
-  let activeStreamSlot = localStorage.getItem("savedStreamSlot") || autoDefaultSlot;
+  let activeStreamSlot = autoDefaultSlot;
   window.activeStreamSlot = activeStreamSlot;
 
   const jpNames = { hiyori: "ひより", akari: "あかり", hijiki: "ひじき", tororo: "とろろ", wanko: "わんこ" };

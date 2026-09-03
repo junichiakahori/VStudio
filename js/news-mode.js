@@ -281,6 +281,13 @@ function getNewsConfig() {
       if (found && found.link) item.link = found.link;
     }
 
+    const itemIdx = (window.latestFetchedNews && window.latestFetchedNews.length > 0)
+      ? window.latestFetchedNews.findIndex(x => x.title === item.title) + 1
+      : null;
+    const totalCnt = (window.latestFetchedNews && window.latestFetchedNews.length > 0)
+      ? window.latestFetchedNews.length
+      : (typeof newsBroadcastState !== "undefined" ? newsBroadcastState.totalCount : null);
+
     const payload = {
       title: item.title,
       description: plainDesc,
@@ -291,12 +298,14 @@ function getNewsConfig() {
       isCategoryChanged: isCategoryChanged,
       apiKey: apiKey,
       provider: provider,
-      modelName: modelName
+      modelName: modelName,
+      articleIndex: itemIdx,
+      totalArticles: totalCnt
     };
 
     const promise = (async () => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 90000);
+      const timeoutId = setTimeout(() => controller.abort(), 180000); // 先読みは180秒まで待機
       try {
 
 
@@ -489,7 +498,9 @@ function getNewsConfig() {
       isCategoryChanged: isCategoryChanged,
       apiKey: apiKey,
       provider: provider,
-      modelName: modelName
+      modelName: modelName,
+      articleIndex: newsBroadcastState.currentIndex,
+      totalArticles: newsBroadcastState.totalCount
     };
 
     let hasAnnouncedOutage = false;
@@ -506,7 +517,7 @@ function getNewsConfig() {
           // 先読みが15秒以上スタックしている場合はタイムアウトして通常取得へ移行
           data = await Promise.race([
             cachedPromise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error("先読みタイムアウト")), 85000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error("先読みタイムアウト")), 40000)) // 40秒で諦めて通常フェッチへ切り替え
           ]);
           if (data && data.status === "ok") {
             console.log(`[ニュース番組] ⚡ 先読みキャッシュから即時再生開始:「${item.title.substring(0, 20)}...」`);
@@ -525,8 +536,9 @@ function getNewsConfig() {
 
         let res = null;
         if (apiKey || provider === "ollama") {
+          console.log(`[ニュース進行] ⏳ [記事 #${newsBroadcastState.currentIndex}/${newsBroadcastState.totalCount}] AI原稿生成リクエスト送信中... 「${item.title.substring(0, 25)}...」 (${provider}: ${modelName})`);
           const fetchCtrl = new AbortController();
-          const fetchTimeout = setTimeout(() => fetchCtrl.abort(), 90000);
+          const fetchTimeout = setTimeout(() => fetchCtrl.abort(), 180000); // 通常フェッチは最大180秒待機（Ollama重負荷対応）
           try {
             res = await fetch("/api/news/generate_item_script", {
               method: "POST",
@@ -535,8 +547,6 @@ function getNewsConfig() {
               signal: fetchCtrl.signal
             });
             clearTimeout(fetchTimeout);
-
-
           } catch (netErr) {
             clearTimeout(fetchTimeout);
             console.warn("[ニュース番組] 通信エラー検知 (Local API / Network):", netErr && netErr.message ? netErr.message : netErr);
@@ -552,11 +562,11 @@ function getNewsConfig() {
         }
       }
 
-
-      
-
       if (data && data.status === "ok" && (data.items || data.sentences) && ((data.items && data.items.length > 0) || (data.sentences && data.sentences.length > 0))) {
-        // ▼▼▼ AI生成が完全に成功した段階で初めてテロップと日付を表示！ ▼▼▼
+        if (hasAnnouncedOutage) {
+          console.log(`[ニュース復旧] 🎉 AI原稿の準備が完了しました！待機画面を解除してニュース読み上げを再開します: 「${item.title.substring(0, 25)}...」`);
+        }
+        hasAnnouncedOutage = false;
         if (newsTitleEl) newsTitleEl.textContent = item.title;
         if (newsDescEl) newsDescEl.textContent = plainDesc;
         if (newsBoardEl) newsBoardEl.classList.add("active");
@@ -840,6 +850,7 @@ function getNewsConfig() {
       }
 
       // ニュースループ
+      const articleRetryCounter = {}; // 記事タイトルごとの外側リトライ回数（無限ループ防止）
       for (let i = startIndex; i < sortedNews.length; i++) {
         if (!newsBroadcastState.isRunning) break;
         const item = sortedNews[i];
@@ -864,10 +875,21 @@ function getNewsConfig() {
         const reader = window.readOneNewsItem || readOneNewsItem;
         const success = await reader(item, config, isCategoryChanged, isFirst, nextItem, nextIsCatChanged);
         if (!success && newsBroadcastState.isRunning) {
-          console.warn(`[ニュース番組] 記事(#${i + 1})の読み上げが未完了のため、スキップせず同じ記事を再試行します。`);
-          i--;
-          await new Promise(r => setTimeout(r, 2000));
-          continue;
+          const retryKey = item.title;
+          articleRetryCounter[retryKey] = (articleRetryCounter[retryKey] || 0) + 1;
+          if (articleRetryCounter[retryKey] <= 2) {
+            console.warn(`[ニュース番組] ⚠️ 記事(#${i + 1})の読み上げが未完了 → 外側再試行 ${articleRetryCounter[retryKey]}/2 回目: 「${item.title.substring(0, 25)}」`);
+            i--;
+            await new Promise(r => setTimeout(r, 2000));
+            continue;
+          } else {
+            console.warn(`[ニュース番組] ⏭️ 記事(#${i + 1})を外側再試行上限(2回)超過のためスキップします: 「${item.title.substring(0, 25)}」`);
+            delete articleRetryCounter[retryKey];
+            // 次の記事へ進む（i++ は for ループが行う）
+          }
+        } else {
+          // 成功した記事のカウンタをリセット（後続で同タイトルが来た場合のクリーン化）
+          delete articleRetryCounter[item.title];
         }
         if (!newsBroadcastState.isRunning) break;
       }

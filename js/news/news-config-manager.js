@@ -16,7 +16,11 @@
 
   function getTimeSlotKey(hour = null) {
     const h = (hour !== null) ? hour : new Date().getHours();
-    if (h >= 5 && h < 11) return "morning";
+    const explicitSlot = window.activeStreamSlot || window.wizardActiveSlot;
+    if (explicitSlot === "morning" && (h >= 4 && h < 14)) return "morning";
+    if (explicitSlot === "evening" || explicitSlot === "night") return "night";
+
+    if (h >= 4 && h < 11) return "morning";
     if (h >= 11 && h < 17) return "day";
     return "night";
   }
@@ -96,9 +100,7 @@
       if (slot === "morning") {
         return `本日のニュースは以上になりますにゃ。AITuberの「${name}」がお伝えしました。今日も素敵な一日をお過ごしくださいにゃ！`;
       }
-      if (slot === "day") {
-        return `本日のニュースは以上になりますにゃ。AITuberの「${name}」がお伝えしました。午後も良い時間をお過ごしくださいにゃ！`;
-      }
+      if (slot === "day") return `本日のニュースは以上になりますにゃ。AITuberの「${name}」がお伝えしました。午後も良い時間をお過ごしくださいにゃ！`;
       return `本日のニュースは以上になりますにゃ。AITuberの「${name}」がお伝えしました。明日も良い一日をお過ごしくださいにゃ！おやすみなさいにゃ。`;
     }
 
@@ -120,8 +122,31 @@
     const title = document.getElementById("news-config-title")?.value || document.getElementById("news-program-title")?.value || "今日の最新ニュース";
     const opVal = document.getElementById("news-config-opening")?.value || document.getElementById("news-opening-text")?.value;
     const edVal = document.getElementById("news-config-closing")?.value || document.getElementById("news-ending-text")?.value;
-    const op = (opVal && opVal.trim()) ? opVal.trim() : getTimeBasedGreeting(modelId, title);
-    const ed = (edVal && edVal.trim()) ? edVal.trim() : getTimeBasedClosing(modelId);
+
+    const currentSlot = getTimeSlotKey();
+    let op = (opVal && opVal.trim()) ? opVal.trim() : "";
+    let ed = (edVal && edVal.trim()) ? edVal.trim() : "";
+
+    // 夜(17時〜翌4時)なのに古い「こんにちは」や「おはよう」が残っている場合は時間帯連動挨拶で上書き
+    if (!op || (currentSlot === "night" && (op.includes("こんにちは") || op.includes("おはよう")))) {
+      op = getTimeBasedGreeting(modelId, title, currentSlot);
+    }
+    // 朝(4時〜11時)なのに「こんばんは」「こんにちは」が残っている場合も上書き
+    if (!op || (currentSlot === "morning" && (op.includes("こんばんは") || op.includes("こんにちは")))) {
+      op = getTimeBasedGreeting(modelId, title, currentSlot);
+    }
+    // 昼(11時〜17時)なのに「おはよう」「こんばんは」が残っている場合も上書き
+    if (!op || (currentSlot === "day" && (op.includes("おはよう") || op.includes("こんばんは")))) {
+      op = getTimeBasedGreeting(modelId, title, currentSlot);
+    }
+
+    if (!ed || (currentSlot === "night" && (ed.includes("午後も良い") || ed.includes("今日も素敵な一日") || ed.includes("良い１日") || ed.includes("良い一日")))) {
+      ed = getTimeBasedClosing(modelId, currentSlot);
+    }
+    if (!ed || (currentSlot === "morning" && (ed.includes("おやすみなさい") || ed.includes("明日も良い一日")))) {
+      ed = getTimeBasedClosing(modelId, currentSlot);
+    }
+
     const useOpChime = document.getElementById("news-se-op-chime")?.checked ?? true;
     const useTransition = document.getElementById("news-se-transition")?.checked ?? true;
     const useEdChime = document.getElementById("news-se-ed-chime")?.checked ?? true;

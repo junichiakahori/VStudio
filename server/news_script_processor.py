@@ -437,19 +437,33 @@ def generate_news_item_script_data(payload, custom_dict=None):
     # コメント返信やシステムタイトルはニュース記事ではないためURL検索・キャッシュ対象外とする
     is_special_item = category_name in ["コメント返信", "リスナーコメント"] or title.startswith("コメント返信") or title.startswith("【コメント")
 
+    article_idx = payload.get('articleIndex')
+    total_cnt = payload.get('totalArticles')
+    idx_str = f"#{article_idx}/{total_cnt}" if (article_idx and total_cnt) else (f"#{article_idx}" if article_idx else "")
+    short_title = title[:16] + "..." if len(title) > 16 else title
+    tag = f"[ニュースAI {idx_str} {short_title}]" if idx_str else f"[ニュースAI {short_title}]"
+
+    print(f"{tag} 📥 原稿生成リクエスト受信 (AI: {provider}/{model_name or 'default'})", flush=True)
+
     if not is_special_item:
         if not article_url:
             article_url = find_cached_url(title)
         if not article_url:
+            print(f"{tag} 🔍 記事URLを検索中...", flush=True)
             article_url = search_news_url_by_title(title)
         if article_url:
             register_cached_url(title, article_url)
+            print(f"{tag} 🔗 記事URL特定: {article_url}", flush=True)
 
     full_article_content = description
     if article_url:
+        print(f"{tag} 🌐 記事本文をスクレイピング取得中...", flush=True)
         fetched_body = fetch_article_body(article_url)
         if fetched_body and len(fetched_body) > 30:
             full_article_content = f"{description}\n【元記事の詳細本文】: {fetched_body}"
+            print(f"{tag} 📄 記事本文取得完了 ({len(fetched_body)}文字) ➔ プロンプト注入", flush=True)
+        else:
+            print(f"{tag} ℹ️ 本文取得スキップ (RSS概要を活用)", flush=True)
 
     prompt = build_news_prompt(char_desc, title, full_article_content)
     raw_text = None
@@ -463,11 +477,16 @@ def generate_news_item_script_data(payload, custom_dict=None):
         cur_prompt = prompt
         if attempt > 1:
             cur_prompt += "\n\n【重要・品質修正指示（再生成）】必ず【前半: 記事の要約3文】＋【後半: キャスターとしての感想2〜3文】の【合計5〜6文】で作成してください（1文目から直接解説に入り、後半でたっぷり感想を語ってください）。"
-            print(f"[ダブルチェック・品質再生成] 🔄 試行 {attempt}/{max_retries} 回目の原稿生成を実行中...", flush=True)
+            print(f"{tag} 🔄 [試行 {attempt}/{max_retries}] ダブルチェック再生成を実行中...", flush=True)
+        else:
+            print(f"{tag} 🤖 [試行 1/{max_retries}] LLMへ原稿生成リクエスト送信中...", flush=True)
 
         candidate_text = call_llm_backend(provider, cur_prompt, api_key, model_name)
         if not candidate_text:
+            print(f"{tag} ⚠️ [試行 {attempt}/{max_retries}] LLM応答なし", flush=True)
             continue
+
+        print(f"{tag} 📩 [試行 {attempt}/{max_retries}] LLM応答受信 ({len(candidate_text)}文字) ➔ 発音・ファクト照合中...", flush=True)
 
         best_candidate_text = candidate_text
 
@@ -562,7 +581,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
                 continue
             
             if is_title_duplicate_sentence(s, title):
-                print(f"[見出し重複カット] ✂️ タイトルと重複する文を除去しました: '{s}' (タイトル: '{title}')", flush=True)
+                print(f"{tag} ✂️ タイトル重複文を除去: '{s}'", flush=True)
                 continue
 
             if deduped_sentences and s == deduped_sentences[-1]:
@@ -578,7 +597,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
         # 粗チェック
         is_valid, reason = validate_news_script_quality(candidate_text, title, full_article_content)
         if not is_valid and attempt < max_retries:
-            print(f"[ダブルチェック・不合格判定] ⚠️ {attempt}/{max_retries} 回目の出力を不自然と判定 (理由: {reason}) ➔ 再試行します", flush=True)
+            print(f"{tag} ⚠️ [試行 {attempt}/{max_retries}] 出力を不自然と判定 (理由: {reason}) ➔ 再試行します", flush=True)
             continue
 
         # 7文以上生成された場合は、要約3文 + 感想2〜3文（最大6文）にスマートに制限
@@ -591,14 +610,14 @@ def generate_news_item_script_data(payload, custom_dict=None):
         if len(candidate_items) < 5 or total_chars < 120:
             if attempt < max_retries:
                 reason = f"フィルター適用後の文数・文字数不足 ({len(candidate_items)}文, {total_chars}文字 < 120文字)"
-                print(f"[ダブルチェック・文数不足] ⚠️ {attempt}/{max_retries} 回目の原稿が不足 (理由: {reason}) ➔ 再試行します", flush=True)
+                print(f"{tag} ⚠️ [試行 {attempt}/{max_retries}] 原稿不足 (理由: {reason}) ➔ 再試行します", flush=True)
                 continue
 
         # 5文以上合格！
         items = candidate_items
         raw_text = candidate_text
         if attempt > 1:
-            print(f"[ダブルチェック・品質合格] ✅ 試行 {attempt} 回目で高品質な深掘り原稿が生成されました！（{len(items)}文, {total_chars}文字）", flush=True)
+            print(f"{tag} ✅ 試行 {attempt} 回目で高品質な深掘り原稿が生成されました！（{len(items)}文, {total_chars}文字）", flush=True)
         break
 
     # 万が一リトライを繰り返しても5文に満たなかった場合は、スキップせずに最良の候補を活かして確実に5文以上の台本として仕上げる
@@ -637,6 +656,9 @@ def generate_news_item_script_data(payload, custom_dict=None):
     else:
         headline_display = title.replace("「", "").replace("」", "").strip()
         headline_speech = normalize_for_tts(headline_display, custom_dict=custom_dict)
+
+    total_speech_chars = sum(len(it.get('speech', '')) for it in (items or []))
+    print(f"{tag} ✅ 原稿生成完了！ (計 {len(items or [])}文, {total_speech_chars}文字)", flush=True)
 
     return {
         "status": "ok",

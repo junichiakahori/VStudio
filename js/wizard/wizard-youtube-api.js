@@ -5,9 +5,11 @@
 (function() {
   window.wizardActiveSlot = "morning"; // 'morning' | 'evening'
 
+  let titlePatternIndex = 0;
+
   const GREETING_DEFAULTS = {
-    morning: "おはようございます！AIキャスターの「とろろ」がお届けする朝のニュース配信へようこそ！☀️\n今日も最新の注目トピックスをわかりやすくお伝えします。",
-    evening: "こんばんは！AIキャスターの「とろろ」がお届けする夜のニュースまとめ配信へようこそ！🌙\n今日一日の重要な動きや話題のニュースをぎゅっと凝縮してお届けします。",
+    morning: "おはとろ〜！バーチャルキャスターのとろろがお送りする朝の最新ニュース生配信！\n出勤・通学前にサクッと今日の重要トピックをチェックしちゃいましょう☀️",
+    evening: "こんとろ〜！バーチャルキャスターのとろろがお送りする夜の総まとめニュース生配信！\n一日の終わりに今日の重要トピックをまるごとおさらいしちゃいます🌙",
     radio: "みなさん、ラジオ配信へようこそ！AIパーソナリティの「とろろ」です！📻\nリラックスしながら楽しんでいってくださいね。",
     chat: "みなさん、雑談配信へようこそ！AI VTuberの「とろろ」です！✨\nコメントでたくさんお話ししましょう！"
   };
@@ -46,10 +48,14 @@
   }
   window.showYtApiFeedback = showYtApiFeedback;
 
-  function generateStreamReservationMetadata(forceUpdate = false) {
+  function generateStreamReservationMetadata(forceUpdate = false, cyclePattern = false) {
     const titleInput = getTitleInputElement();
     const descInput = getDescInputElement();
     if (!titleInput || !descInput) return;
+
+    if (cyclePattern) {
+      titlePatternIndex++;
+    }
 
     const scheduledTime = typeof window.getWizardScheduledStartTime === "function" ? window.getWizardScheduledStartTime() : "";
     let targetDate = new Date();
@@ -70,58 +76,75 @@
 
     if (window.selectedMode === "news") {
       const newsItems = (window.openerWin && window.openerWin.latestFetchedNews) ? window.openerWin.latestFetchedNews : [];
-      let headlineStr = "";
-      if (newsItems.length > 0) {
-        const topHeadlines = newsItems.slice(0, 3).map(n => n.title.replace(/【.*?】/g, "").trim()).filter(Boolean);
-        if (topHeadlines.length > 0) {
-          headlineStr = ` | ${topHeadlines.join(" / ")}`;
-        }
-      }
+      const totalNewsCount = newsItems.length > 0 ? newsItems.length : 250;
 
-      if (isMorning) {
-        defaultTitle = `【朝ニュース】${dateStr} 最新ニュースダイジェスト【AITuber ${charName}】${headlineStr}`;
-      } else {
-        defaultTitle = `【夜ニュース】${dateStr} 今日の重要ニュースまとめ【AITuber ${charName}】${headlineStr}`;
-      }
+      // いつもの定番タイトルパターン（サイコロで切り替え可能）
+      const morningPatterns = [
+        `【${dateStr} 朝の最新ニュース速報】出勤・通学前にサクッとチェック！☀️【AITuber生放送】`,
+        `【${dateStr} 朝の生放送】今日の最新ニュース速報＆注目トピックまとめ！☀️【${charName} / AITuber】`,
+        `【${dateStr} 朝ニュース】今日の重要トピックをサクッとおさらい！☀️【AITuber ${charName}】`
+      ];
 
-      const greetingTemplate = isMorning
+      const eveningPatterns = [
+        `【${dateStr} 夜の最新ニュース総ざらい】今日1日の重要トピックまとめ！🌙【AITuber生放送】`,
+        `【${dateStr} 夜の生放送】今日1日の重要ニュースを総ざらい！今夜のまとめ生配信🌙【${charName} / AITuber】`,
+        `【${dateStr} 夜ニュース】一日の終わりに今日の重要トピック総まとめ！🌙【AITuber ${charName}】`
+      ];
+
+      const patterns = isMorning ? morningPatterns : eveningPatterns;
+      defaultTitle = patterns[titlePatternIndex % patterns.length];
+
+      let greetingTemplate = (isMorning
         ? (localStorage.getItem("savedGreeting_news_morning") || GREETING_DEFAULTS.morning)
-        : (localStorage.getItem("savedGreeting_news_evening") || GREETING_DEFAULTS.evening);
+        : (localStorage.getItem("savedGreeting_news_evening") || GREETING_DEFAULTS.evening)).trim();
 
-      let newsListSection = "";
-      if (newsItems.length > 0) {
-        const lines = newsItems.map((item, idx) => {
-          const cat = item.categoryName ? `[${item.categoryName}] ` : "";
-          const link = item.link ? `\n   🔗 ${item.link}` : "";
-          return `📌 ${idx + 1}. ${cat}${item.title}${link}`;
-        });
-        newsListSection = `\n━━━━━━━━━━━━━━━━━━━━\n📰 本日の配信ラインナップ\n━━━━━━━━━━━━━━━━━━━━\n${lines.join("\n\n")}\n`;
-      } else {
-        newsListSection = `\n━━━━━━━━━━━━━━━━━━━━\n📰 本日の配信ラインナップ\n━━━━━━━━━━━━━━━━━━━━\n※ 配信開始までに最新ニュースを自動編成してお届けします。\n`;
+      const headerLabel = isMorning ? "本日の注目ニュース：" : "今回の振り返り項目：";
+
+      // 挨拶文内に見出しが含まれていない場合のみ見出しを追加（2重防止）
+      if (!greetingTemplate.includes("注目ニュース") && !greetingTemplate.includes("振り返り項目")) {
+        greetingTemplate += `\n\n${headerLabel}`;
       }
 
-      defaultDesc = `${greetingTemplate}\n${newsListSection}
-━━━━━━━━━━━━━━━━━━━━
-⏰ タイムスケジュール
-━━━━━━━━━━━━━━━━━━━━
-・オープニング挨拶
-・最新トピックス紹介
-・エンディング・次回予告
+      let newsListLines = "";
+      if (newsItems.length > 0) {
+        const topNews = newsItems.slice(0, 15).map(item => {
+          const media = item.mediaName ? ` - ${item.mediaName}` : "";
+          return `・${item.title}${media}`;
+        });
+        newsListLines = `${topNews.join("\n")}\n...他 全${totalNewsCount}件`;
+      } else {
+        newsListLines = `・最新の重要ニューストピックスをピックアップ\n...他 多数`;
+      }
 
-━━━━━━━━━━━━━━━━━━━━
-💡 この配信について
-━━━━━━━━━━━━━━━━━━━━
-完全自律型 AI VTuber によるライブ配信システム「VStudio」から自動配信しています。
-最新のLLM・音声合成技術を駆使して、リアルタイムな情報をお届けします。
+      defaultDesc = `${greetingTemplate}
+${newsListLines}
 
-#AITuber #ニュース #VTuber #Live2D #AIニュース`;
+忙しいあなたも、これを見れば今日のニュースがバッチリわかる！今日も楽しくおしゃべりしながら見ていってね！
+
+◆オリジナルハッシュタグ
+#${charName}ニュース #${charName}生放送 #今日の気になる
+
+◆X（旧Twitter）はこちら！
+https://x.com/drone_akahori
+
+◆クレジット表記
+・Live2Dモデル: 「${charName}」© Live2D Inc. (Live2D Creative Studio サンプルモデル)
+・VOICE：VOICEVOX ずんだもん
+・BGM：ドローン赤堀 - Nukadaki
+・配信背景：喫茶あかほり ミクスタカフェ
+
+◆配信のルール・お願い
+・話題に出ていない他の配信者さんの名前を出すのは控えてね！
+・他の配信者さんの枠で${charName}の名前を出す「伝書鳩行為」もNGだよ！
+・荒らしやスパムを見かけても、反応せずにブロック＆スルーのご協力をお願いします。
+みんなで楽しく居心地の良い配信にしようね！チャンネル登録と高評価もよろしくお願いします！`;
 
     } else if (window.selectedMode === "radio") {
       defaultTitle = `【作業用ラジオ】${dateStr} まったりAIラジオ配信【AITuber ${charName}】`;
       const greetingTemplate = localStorage.getItem("savedGreeting_radio") || GREETING_DEFAULTS.radio;
       defaultDesc = `${greetingTemplate}\n\n作業やお休みの前のお供にどうぞ！\n#AITuber #ラジオ #作業用BGM`;
     } else {
-      defaultTitle = `【雑談配信】${dateStr} AIとおしゃべりしよう！【AITuber ${charName}】`;
+      defaultTitle = `【雑談生放送】${dateStr} AIとおしゃべりしよう！【AITuber ${charName}】`;
       const greetingTemplate = localStorage.getItem("savedGreeting_chat") || GREETING_DEFAULTS.chat;
       defaultDesc = `${greetingTemplate}\n\nコメントどしどしお待ちしています！\n#AITuber #雑談 #Live2D`;
     }
@@ -137,10 +160,38 @@
   window.updateSuggestedMetadata = generateStreamReservationMetadata;
 
   function updateStep4Inputs() {
+    // 1. 配信者ID / チャンネル名 (ハンドル) の復元
+    const channelInput = document.getElementById("wizard-yt-channel");
+    if (channelInput && !channelInput.value) {
+      const savedChan = (window.openerWin && window.openerWin.localStorage.getItem("savedYoutubeChannel")) ||
+                        localStorage.getItem("savedYoutubeChannel") ||
+                        (window.openerWin && window.openerWin.localStorage.getItem("savedYoutubeId")) ||
+                        localStorage.getItem("savedYoutubeId") ||
+                        "@drone.akahori";
+      if (savedChan.startsWith("@") || (savedChan.length !== 11 && !savedChan.includes("watch?v="))) {
+        channelInput.value = savedChan;
+      } else {
+        channelInput.value = "@drone.akahori";
+      }
+    }
+
+    // 2. 個別の配信枠・動画ID (Video ID) の復元
     const ytInput = document.getElementById("wizard-yt-input");
-    if (ytInput && !ytInput.value && window.openerWin) {
-      const mainYt = window.openerWin.document.getElementById("youtube-video-input");
-      if (mainYt && mainYt.value) ytInput.value = mainYt.value;
+    if (ytInput && !ytInput.value) {
+      const savedVid = (window.openerWin && window.openerWin.localStorage.getItem("savedYoutubeVideoId")) ||
+                       localStorage.getItem("savedYoutubeVideoId") || "";
+      const mainYt = window.openerWin?.document?.getElementById("youtube-video-input");
+      const mainVal = (mainYt?.value || "").trim();
+
+      if (savedVid && savedVid.length === 11 && !savedVid.startsWith("@")) {
+        ytInput.value = savedVid;
+      } else if (mainVal && mainVal.length === 11 && !mainVal.startsWith("@")) {
+        ytInput.value = mainVal;
+      } else if (mainVal.includes("watch?v=")) {
+        const m = mainVal.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+        if (m) ytInput.value = m[1];
+      }
+      updateYtInputDot();
     }
 
     const obsToggle = document.getElementById("wizard-obs-stream-toggle");
@@ -161,8 +212,13 @@
       if (mainSchedTime && mainSchedTime.value) schedTime.value = mainSchedTime.value;
     }
 
-    const activeSlot = (window.openerWin && window.openerWin.activeStreamSlot) ? window.openerWin.activeStreamSlot : (localStorage.getItem("savedStreamSlot") || "morning");
-    window.wizardActiveSlot = activeSlot;
+    if (!window.wizardActiveSlot) {
+      const currentHour = new Date().getHours();
+      const autoSlot = (currentHour >= 4 && currentHour < 12) ? "morning" : "evening";
+      const activeSlot = (window.openerWin && window.openerWin.activeStreamSlot) ? window.openerWin.activeStreamSlot : autoSlot;
+      window.wizardActiveSlot = activeSlot;
+    }
+    const activeSlot = window.wizardActiveSlot;
     const morningBtn = document.getElementById("wizard-slot-morning-btn");
     const eveningBtn = document.getElementById("wizard-slot-evening-btn");
 
@@ -247,6 +303,29 @@
   let cachedBroadcasts = [];
   let activeBroadcastFilter = "all";
 
+  function updateYtInputDot() {
+    const ytInput = document.getElementById("wizard-yt-input");
+    const dot = document.getElementById("wizard-yt-input-dot");
+    if (!dot) return;
+    const val = (ytInput?.value || "").trim();
+    if (val.length >= 11) {
+      dot.textContent = "🟢";
+    } else {
+      dot.textContent = "🔴";
+    }
+  }
+  window.updateYtInputDot = updateYtInputDot;
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   window.openBroadcastPickerModal = function() {
     const m = document.getElementById("modal-broadcast-picker");
     if (m) m.style.display = "flex";
@@ -264,15 +343,18 @@
     listContainer.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:20px;">⏳ 配信枠一覧を取得中...</div>';
     try {
       const res = await fetch("/api/youtube/list_broadcasts", { cache: "no-store" });
+      if (!res.ok) {
+        throw new Error(`サーバー応答エラー (HTTP ${res.status})`);
+      }
       const data = await res.json();
       if (data.success && Array.isArray(data.items)) {
         cachedBroadcasts = data.items;
         renderBroadcastList();
       } else {
-        listContainer.innerHTML = `<div style="color:#ff7675; font-size:0.8rem; text-align:center; padding:20px;">⚠️ 取得エラー: ${data.error || "未認証です。「🔑 Google連携」を行ってください。"}</div>`;
+        listContainer.innerHTML = `<div style="color:#ff7675; font-size:0.8rem; text-align:center; padding:20px;">⚠️ 取得エラー: ${escapeHtml(data.error || "未認証です。「🔑 Google連携」を行ってください。")}</div>`;
       }
     } catch (err) {
-      listContainer.innerHTML = `<div style="color:#ff7675; font-size:0.8rem; text-align:center; padding:20px;">❌ 通信エラー: ${err.message}</div>`;
+      listContainer.innerHTML = `<div style="color:#ff7675; font-size:0.8rem; text-align:center; padding:20px;">❌ 通信エラー: ${escapeHtml(err.message)}</div>`;
     }
   }
 
@@ -283,6 +365,9 @@
 
     const filtered = cachedBroadcasts.filter(item => {
       if (activeBroadcastFilter === "all") return true;
+      if (activeBroadcastFilter === "upcoming") {
+        return ["ready", "created", "upcoming"].includes(item.lifeCycleStatus);
+      }
       return item.lifeCycleStatus === activeBroadcastFilter;
     });
 
@@ -297,38 +382,43 @@
       card.onmouseenter = () => { card.style.background = "rgba(0,210,211,0.1)"; card.style.borderColor = "#00d2d3"; };
       card.onmouseleave = () => { card.style.background = "rgba(255,255,255,0.04)"; card.style.borderColor = "rgba(255,255,255,0.1)"; };
 
-      const thumbUrl = item.thumbnails?.medium?.url || item.thumbnails?.default?.url || "";
-      const thumbHtml = thumbUrl ? `<img src="${thumbUrl}" style="width:96px; height:54px; object-fit:cover; border-radius:4px; flex-shrink:0;">` : '<div style="width:96px; height:54px; background:#222; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.7rem; color:#666; flex-shrink:0;">No Image</div>';
+      const thumbUrl = item.thumbnail || item.thumbnails?.medium?.url || item.thumbnails?.default?.url || "";
+      const thumbHtml = thumbUrl ? `<img src="${escapeHtml(thumbUrl)}" style="width:96px; height:54px; object-fit:cover; border-radius:4px; flex-shrink:0;">` : '<div style="width:96px; height:54px; background:#222; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:0.7rem; color:#666; flex-shrink:0;">No Image</div>';
 
       let statusBadge = "";
-      if (item.lifeCycleStatus === "ready" || item.lifeCycleStatus === "created") {
+      if (item.lifeCycleStatus === "ready" || item.lifeCycleStatus === "created" || item.lifeCycleStatus === "upcoming") {
         statusBadge = '<span style="background:rgba(0,210,211,0.2); color:#00ffff; font-size:0.65rem; padding:2px 6px; border-radius:4px;">📅 予約枠</span>';
       } else if (item.lifeCycleStatus === "live") {
         statusBadge = '<span style="background:rgba(255,71,87,0.2); color:#ff4757; font-size:0.65rem; padding:2px 6px; border-radius:4px; font-weight:bold;">🔴 配信中</span>';
       } else {
-        statusBadge = `<span style="background:rgba(255,255,255,0.1); color:#aaa; font-size:0.65rem; padding:2px 6px; border-radius:4px;">${item.lifeCycleStatus}</span>`;
+        statusBadge = `<span style="background:rgba(255,255,255,0.1); color:#aaa; font-size:0.65rem; padding:2px 6px; border-radius:4px;">${escapeHtml(item.lifeCycleStatus || "")}</span>`;
       }
 
       let schedTimeStr = item.scheduledStartTime ? (typeof window.formatScheduleDateTime === "function" ? window.formatScheduleDateTime(item.scheduledStartTime) : item.scheduledStartTime) : "日時未定";
+      const safeTitle = escapeHtml(item.title || "無題の配信");
+      const safeId = escapeHtml(item.id || "");
 
       card.innerHTML = `
         ${thumbHtml}
         <div style="flex:1; min-width:0;">
           <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
             ${statusBadge}
-            <span style="font-size:0.7rem; color:var(--text-muted);">⏰ ${schedTimeStr}</span>
+            <span style="font-size:0.7rem; color:var(--text-muted);">⏰ ${escapeHtml(schedTimeStr)}</span>
           </div>
-          <div style="font-weight:bold; font-size:0.85rem; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${item.title}">${item.title}</div>
-          <div style="font-size:0.7rem; color:#888; font-family:monospace; margin-top:2px;">ID: ${item.id}</div>
+          <div style="font-weight:bold; font-size:0.85rem; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${safeTitle}">${safeTitle}</div>
+          <div style="font-size:0.7rem; color:#888; font-family:monospace; margin-top:2px;">ID: ${safeId}</div>
         </div>
-        <button style="background:linear-gradient(135deg, #0984e3, #00cec9); border:none; color:#fff; font-size:0.75rem; font-weight:bold; padding:6px 12px; border-radius:6px; cursor:pointer; flex-shrink:0;">この枠を選択</button>
+        <button type="button" style="background:linear-gradient(135deg, #0984e3, #00cec9); border:none; color:#fff; font-size:0.75rem; font-weight:bold; padding:6px 12px; border-radius:6px; cursor:pointer; flex-shrink:0;">この枠を選択</button>
       `;
 
       card.addEventListener("click", () => {
         const ytInput = document.getElementById("wizard-yt-input");
         const titleInput = getTitleInputElement();
         const descInput = getDescInputElement();
-        if (ytInput) ytInput.value = item.id;
+        if (ytInput) {
+          ytInput.value = item.id;
+          updateYtInputDot();
+        }
         if (titleInput && item.title) titleInput.value = item.title;
         if (descInput && item.description) descInput.value = item.description;
 
@@ -408,17 +498,23 @@
       showYtApiFeedback("✅ 冒頭挨拶テンプレートを保存し、説明欄を更新しました！", true);
     });
 
-    // スロット切り替えボタン
+    // スロット切り替えボタン (朝・夜)
     document.getElementById("wizard-slot-morning-btn")?.addEventListener("click", () => {
       window.wizardActiveSlot = "morning";
+      localStorage.setItem("savedStreamSlot", "morning");
+      if (window.openerWin) window.openerWin.activeStreamSlot = "morning";
+      generateStreamReservationMetadata(true);
       updateStep4Inputs();
     });
     document.getElementById("wizard-slot-evening-btn")?.addEventListener("click", () => {
       window.wizardActiveSlot = "evening";
+      localStorage.setItem("savedStreamSlot", "evening");
+      if (window.openerWin) window.openerWin.activeStreamSlot = "evening";
+      generateStreamReservationMetadata(true);
       updateStep4Inputs();
     });
 
-    // 枠一覧選択モーダル開閉
+    // 枠一覧選択モーダル開閉 & フィルター
     const openPickerBtn = document.getElementById("wizard-yt-select-modal-btn") || document.getElementById("wizard-btn-open-picker");
     openPickerBtn?.addEventListener("click", () => {
       window.openBroadcastPickerModal();
@@ -426,9 +522,38 @@
     document.getElementById("btn-close-broadcast-picker")?.addEventListener("click", () => {
       window.closeBroadcastPickerModal();
     });
+    document.getElementById("btn-refresh-broadcasts")?.addEventListener("click", () => {
+      loadAndRenderBroadcasts();
+    });
     document.getElementById("btn-refresh-broadcast-picker")?.addEventListener("click", () => {
       loadAndRenderBroadcasts();
     });
+
+    const filterAllBtn = document.getElementById("filter-all-broadcasts");
+    const filterUpBtn = document.getElementById("filter-upcoming-broadcasts");
+    if (filterAllBtn && filterUpBtn) {
+      filterAllBtn.addEventListener("click", () => {
+        filterAllBtn.style.background = "rgba(0,210,211,0.2)";
+        filterAllBtn.style.border = "1px solid #00d2d3";
+        filterAllBtn.style.color = "#00d2d3";
+        filterUpBtn.style.background = "rgba(255,255,255,0.05)";
+        filterUpBtn.style.border = "1px solid rgba(255,255,255,0.2)";
+        filterUpBtn.style.color = "#aaa";
+        activeBroadcastFilter = "all";
+        renderBroadcastList();
+      });
+      filterUpBtn.addEventListener("click", () => {
+        filterUpBtn.style.background = "rgba(0,210,211,0.2)";
+        filterUpBtn.style.border = "1px solid #00d2d3";
+        filterUpBtn.style.color = "#00d2d3";
+        filterAllBtn.style.background = "rgba(255,255,255,0.05)";
+        filterAllBtn.style.border = "1px solid rgba(255,255,255,0.2)";
+        filterAllBtn.style.color = "#aaa";
+        activeBroadcastFilter = "upcoming";
+        renderBroadcastList();
+      });
+    }
+
     document.querySelectorAll(".broadcast-filter-tab").forEach(tab => {
       tab.addEventListener("click", () => {
         document.querySelectorAll(".broadcast-filter-tab").forEach(t => {
@@ -443,6 +568,23 @@
         renderBroadcastList();
       });
     });
+
+    // チャンネル名の入力監視 & 保存
+    const channelInputEl = document.getElementById("wizard-yt-channel");
+    channelInputEl?.addEventListener("input", () => {
+      const val = channelInputEl.value.trim();
+      if (val) {
+        localStorage.setItem("savedYoutubeChannel", val);
+        if (window.openerWin) window.openerWin.localStorage.setItem("savedYoutubeChannel", val);
+      }
+    });
+
+    // 枠IDの入力監視
+    const ytInputEl = document.getElementById("wizard-yt-input");
+    ytInputEl?.addEventListener("input", () => {
+      updateYtInputDot();
+    });
+    updateYtInputDot();
 
     // Google連携
     const authBtn = document.getElementById("btn-yt-oauth-login") || document.getElementById("wizard-btn-yt-auth");
@@ -602,17 +744,27 @@
 
       let base64 = "";
       try {
-        if (window.openerWin && window.openerWin.newsThumbnailGenerator && typeof window.openerWin.newsThumbnailGenerator.generateThumbnailBase64 === "function") {
-          base64 = await window.openerWin.newsThumbnailGenerator.generateThumbnailBase64();
+        // 1. 親画面のサムネイルプレビューCanvas
+        if (window.openerWin && window.openerWin.document) {
+          const thumbCanvas = window.openerWin.document.getElementById("thumb-preview-canvas") ||
+                              window.openerWin.document.getElementById("news-thumb-canvas");
+          if (thumbCanvas && typeof thumbCanvas.toDataURL === "function") {
+            base64 = thumbCanvas.toDataURL("image/png");
+          }
         }
-        if (!base64 && window.openerWin && window.openerWin.document) {
-          const thumbCanvas = window.openerWin.document.getElementById("news-thumb-canvas");
-          if (thumbCanvas) base64 = thumbCanvas.toDataURL("image/png");
+        // 2. localStorage に保存されている最新サムネイル画像
+        if (!base64 || base64.length < 100) {
+          base64 = (window.openerWin && window.openerWin.localStorage.getItem("savedThumb_latestDataUrl")) ||
+                   localStorage.getItem("savedThumb_latestDataUrl") || "";
+        }
+        // 3. サムネイルジェネレータ
+        if (!base64 && window.openerWin && window.openerWin.newsThumbnailGenerator && typeof window.openerWin.newsThumbnailGenerator.generateThumbnailBase64 === "function") {
+          base64 = await window.openerWin.newsThumbnailGenerator.generateThumbnailBase64();
         }
       } catch(e) {}
 
       if (!base64) {
-        showYtApiFeedback("⚠️ サムネイル画像を自動生成できませんでした。「🎨 サムネイルを編集」ボタンを押してご確認ください。", false);
+        showYtApiFeedback("⚠️ サムネイル画像がまだ作成されていません。「🎨 サムネイルを編集」ボタンを押してサムネイルを作成してください。", false);
         thumbBtn.disabled = false;
         thumbBtn.textContent = origText;
         return;
@@ -642,15 +794,32 @@
     // サムネイルエディタモーダルを開く
     const editThumbBtn = document.getElementById("btn-wizard-open-thumb-editor") || document.getElementById("wizard-btn-edit-thumb");
     editThumbBtn?.addEventListener("click", () => {
-      if (window.openerWin && typeof window.openerWin.openNewsThumbnailModal === "function") {
-        window.openerWin.openNewsThumbnailModal();
-        window.openerWin.focus();
+      const titleVal = getTitleInputElement()?.value || "";
+      if (window.openerWin) {
+        // 親画面の配信タイトル入力欄にタイトルを同期
+        const mainTitleInput = window.openerWin.document.getElementById("stream-title");
+        if (mainTitleInput && titleVal) {
+          mainTitleInput.value = titleVal;
+        }
+        if (typeof window.openerWin.openThumbnailEditorModal === "function") {
+          window.openerWin.openThumbnailEditorModal();
+          window.openerWin.focus();
+          showYtApiFeedback("🎨 メイン画面でサムネイルエディタを開きました！", true);
+        } else if (typeof window.openerWin.openNewsThumbnailModal === "function") {
+          window.openerWin.openNewsThumbnailModal();
+          window.openerWin.focus();
+          showYtApiFeedback("🎨 メイン画面でサムネイルエディタを開きました！", true);
+        } else {
+          showYtApiFeedback("⚠️ メイン画面でサムネイルエディタが見つかりませんでした。", false);
+        }
+      } else {
+        showYtApiFeedback("⚠️ 親ウィンドウ（スタジオ画面）との通信が切断されています。", false);
       }
     });
 
     // メタデータ再生成ボタン
     document.getElementById("btn-regen-title")?.addEventListener("click", () => {
-      generateStreamReservationMetadata(true);
+      generateStreamReservationMetadata(true, true);
       if (typeof window.showWizardToast === "function") {
         window.showWizardToast("🎲 配信タイトルを再生成しました", true);
       }
@@ -704,7 +873,10 @@
         const data = await res.json();
         if (data.success && data.video_id) {
           const ytInput = document.getElementById("wizard-yt-input");
-          if (ytInput) ytInput.value = data.video_id;
+          if (ytInput) {
+            ytInput.value = data.video_id;
+            updateYtInputDot();
+          }
           const statusEl = document.getElementById("wizard-yt-live-status");
           if (statusEl) {
             statusEl.textContent = `🟢 検出成功: ${data.title || data.video_id}`;

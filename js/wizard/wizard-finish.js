@@ -15,7 +15,9 @@
         if (openerWin && !openerWin.closed) {
           const titleVal = document.getElementById("wizard-suggested-title")?.value || document.getElementById("wizard-yt-title")?.value || "";
           const descVal = document.getElementById("wizard-suggested-desc")?.value || document.getElementById("wizard-yt-desc")?.value || "";
-          const wizardActiveSlot = window.wizardActiveSlot || "morning";
+          const currentHour = new Date().getHours();
+          const autoSlot = (currentHour >= 4 && currentHour < 12) ? "morning" : "evening";
+          const wizardActiveSlot = window.wizardActiveSlot || autoSlot;
 
 
           const mainTitle = openerWin.document.getElementById("stream-title");

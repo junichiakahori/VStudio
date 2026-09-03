@@ -43,6 +43,27 @@ PORT = 8001
 # ── データファイルパス定義 ──
 DATA_FILE = os.path.join(BASE_DIR, "data", "custom_idle_phrases.json")
 HIRAGANA_FILE = os.path.join(BASE_DIR, "data", "hiragana_data.json")
+
+# ── ニュース原稿サーバーキャッシュ（重複リクエスト防止・10分保持・最大200件）──
+NEWS_SCRIPT_CACHE = {}  # { title_key: (result_dict, expire_timestamp) }
+NEWS_SCRIPT_CACHE_TTL = 600  # 10分
+NEWS_SCRIPT_CACHE_MAX = 200
+
+def _get_news_script_cache(title: str):
+    if title in NEWS_SCRIPT_CACHE:
+        result, expire = NEWS_SCRIPT_CACHE[title]
+        if time.time() < expire:
+            return result
+        else:
+            del NEWS_SCRIPT_CACHE[title]
+    return None
+
+def _set_news_script_cache(title: str, result: dict):
+    if len(NEWS_SCRIPT_CACHE) >= NEWS_SCRIPT_CACHE_MAX:
+        # 最も古いエントリを1件削除
+        oldest_key = min(NEWS_SCRIPT_CACHE, key=lambda k: NEWS_SCRIPT_CACHE[k][1])
+        del NEWS_SCRIPT_CACHE[oldest_key]
+    NEWS_SCRIPT_CACHE[title] = (result, time.time() + NEWS_SCRIPT_CACHE_TTL)
 DICT_FILE = os.path.join(BASE_DIR, "dict", "hiragana_dict.json")
 CUSTOM_DICT_FILE = os.path.join(BASE_DIR, "dict", "custom_dict.json")
 RADIO_SCRIPT_FILE = os.path.join(BASE_DIR, "data", "radio_script.txt")
@@ -190,6 +211,13 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 return self._send_json({"success": False, "error": str(e)}, status=500)
 
+        if self.path.startswith('/api/youtube/detect_live'):
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            channel = params.get('channel', [''])[0]
+            res = youtube_api_helper.detect_channel_live(channel)
+            return self._send_json(res)
+
         # ── 静的ファイル配信 ──
         super().do_GET()
 
@@ -285,10 +313,20 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
             if self.path == '/api/news/generate_item_script':
                 payload = self._read_json()
+                cache_title = payload.get('title', '').strip()
+                is_special = payload.get('categoryName', '') in ["コメント返信", "リスナーコメント"]
+                cached = None if is_special else _get_news_script_cache(cache_title)
+                if cached:
+                    tag_str = cache_title[:16] + ("..." if len(cache_title) > 16 else "")
+                    print(f"[ニュースAI {tag_str}] ⚡ サーバーキャッシュから即時返却 (重複処理を完全スキップ)", flush=True)
+                    return self._send_json(cached)
                 res = generate_news_item_script_data(payload, custom_dict=load_json(CUSTOM_DICT_FILE))
                 if not res:
                     return self._send_error("AI generation failed. Switching to standby.", status=500)
+                if not is_special:
+                    _set_news_script_cache(cache_title, res)
                 return self._send_json(res)
+
 
             # ── YouTube API 連携 ──
             if self.path == '/get_youtube_video_info':
