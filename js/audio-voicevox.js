@@ -268,8 +268,9 @@ async function playNextVoicevox() {
       window.voicevoxGainNode.gain.setValueAtTime(targetVol, ctx.currentTime);
     }
 
+    const expectedDurationMs = Math.max(3000, Math.round(((audioBuffer && audioBuffer.duration) ? audioBuffer.duration * 1000 : 5000) + 2000));
     let playbackWatchdog = setTimeout(() => {
-      console.warn("[VOICEVOX] ⚠️ 再生タイムアウト監視（40秒）が作動しました。キューを強制進行します");
+      console.warn(`[VOICEVOX] ⚠️ 再生監視タイマー（${expectedDurationMs}ms）が作動しました。キューを安全に進行します`);
       if (currentVoicevoxSource) {
         try { currentVoicevoxSource.stop(); } catch(e){}
         try { currentVoicevoxSource.disconnect(); } catch(e){}
@@ -277,7 +278,8 @@ async function playNextVoicevox() {
       }
       isVoicevoxPlaying = false;
       playNextVoicevox();
-    }, 40000);
+    }, expectedDurationMs);
+
 
     currentVoicevoxSource.onended = () => {
       clearTimeout(playbackWatchdog);
