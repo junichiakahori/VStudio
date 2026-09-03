@@ -295,13 +295,17 @@ function getNewsConfig() {
     };
 
     const promise = (async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
       try {
         console.log(`[ニュース先読み] 🚀 次の記事「${item.title.substring(0, 20)}...」🔗 ${item.link || 'URLなし'} を先行生成中...`);
         const res = await fetch("/api/news/generate_item_script", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
         if (!res.ok) throw new Error("HTTP " + res.status);
         const data = await res.json();
         if (data && data.status === "ok") {
@@ -319,13 +323,15 @@ function getNewsConfig() {
         }
         return null;
       } catch (e) {
-        console.warn(`[ニュース先読み] 先行生成スキップ (${item.title}):`, e);
+        clearTimeout(timeoutId);
+        console.warn(`[ニュース先読み] 先行生成スキップ (${item.title}):`, e && e.message ? e.message : e);
         return null;
       }
     })();
 
     preloadedNewsMap.set(item.title, promise);
   }
+
 
   window.triggerNewsPrefetch = triggerNewsPrefetch;
 
@@ -493,17 +499,23 @@ function getNewsConfig() {
       // 1. 先読み（プリフェッチ）キャッシュが存在する場合は即時活用（待ち時間ゼロ！）
       if (preloadedNewsMap.has(item.title)) {
         try {
-          data = await preloadedNewsMap.get(item.title);
+          const cachedPromise = preloadedNewsMap.get(item.title);
           preloadedNewsMap.delete(item.title);
+          // 先読みが15秒以上スタックしている場合はタイムアウトして通常取得へ移行
+          data = await Promise.race([
+            cachedPromise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error("先読みタイムアウト")), 15000))
+          ]);
           if (data && data.status === "ok") {
             console.log(`[ニュース番組] ⚡ 先読みキャッシュから即時再生開始:「${item.title.substring(0, 20)}...」`);
           }
         } catch (e) {
+          console.warn("[ニュース番組] 先読みキャッシュ待機タイムアウトまたはエラー ➔ 通常取得へ移行:", e && e.message ? e.message : e);
           data = null;
         }
       }
 
-      // 2. キャッシュにない場合は通常フェッチ
+      // 2. キャッシュにない場合は通常フェッチ（25秒タイムアウト付き）
       if (!data) {
         if (!apiKey && provider !== "ollama") {
           console.warn("[ニュース番組] ⚠️ APIキーが未設定です。復旧待機画面に移行します...");
@@ -511,14 +523,19 @@ function getNewsConfig() {
 
         let res = null;
         if (apiKey || provider === "ollama") {
+          const fetchCtrl = new AbortController();
+          const fetchTimeout = setTimeout(() => fetchCtrl.abort(), 25000);
           try {
             res = await fetch("/api/news/generate_item_script", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload)
+              body: JSON.stringify(payload),
+              signal: fetchCtrl.signal
             });
+            clearTimeout(fetchTimeout);
           } catch (netErr) {
-            console.warn("[ニュース番組] 通信エラー検知 (Local API / Network):", netErr);
+            clearTimeout(fetchTimeout);
+            console.warn("[ニュース番組] 通信エラー検知 (Local API / Network):", netErr && netErr.message ? netErr.message : netErr);
           }
         }
 
@@ -530,6 +547,7 @@ function getNewsConfig() {
           }
         }
       }
+
 
       
 
