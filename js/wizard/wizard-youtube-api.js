@@ -194,7 +194,7 @@
     if (!statusBadge) return;
 
     try {
-      const res = await fetch("/api/youtube/auth_status", { cache: "no-store" });
+      const res = await fetch("/api/youtube/oauth_status", { cache: "no-store" });
       const data = await res.json();
       if (data.authenticated) {
         statusBadge.textContent = "🟢 連携済み";
@@ -207,6 +207,10 @@
           authBtn.textContent = "🔑 再連携 (別アカウント)";
           authBtn.style.background = "rgba(255,255,255,0.08)";
         }
+      } else if (data.quota_exceeded) {
+        statusBadge.textContent = "🟡 クォータ上限待機中 (自動回復)";
+        statusBadge.style.color = "#ffeaa7";
+        if (channelNameEl) channelNameEl.style.display = "none";
       } else {
         statusBadge.textContent = "🔴 未連携";
         statusBadge.style.color = "#ff7675";
@@ -221,6 +225,8 @@
       statusBadge.style.color = "var(--text-muted)";
     }
   }
+  window.checkYtApiAuthStatus = checkYtApiAuthStatus;
+
 
   // 配信枠一覧から選択モーダル ロジック
   let cachedBroadcasts = [];
@@ -666,7 +672,11 @@
         btn.disabled = false;
       }
     });
+
+    // 初期認証状態チェック
+    checkYtApiAuthStatus();
   }
+
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initYouTubeAPIHandlers);

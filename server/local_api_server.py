@@ -171,7 +171,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             '/news_script_config': lambda: self._send_json(load_json(NEWS_SCRIPT_CONFIG_FILE)),
             '/api/news/get_all_urls': lambda: self._send_json(get_all_cached_urls()),
             '/api/youtube/oauth_status': lambda: self._send_json(youtube_api_helper.get_oauth_status()),
+            '/api/youtube/auth_status': lambda: self._send_json(youtube_api_helper.get_oauth_status()),
         }
+
 
         if self.path in GET_ROUTES:
             return GET_ROUTES[self.path]()
@@ -294,23 +296,35 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 url = p.get('url') or p.get('videoId', '')
                 return self._send_json(youtube_api_helper.fetch_video_info(url))
 
-            if self.path == '/api/youtube/start_oauth':
+            if self.path in ('/api/youtube/start_oauth', '/api/youtube/auth'):
                 return self._send_json({"success": True, **youtube_api_helper.start_oauth_flow()})
 
             if self.path == '/api/youtube/create_broadcast':
                 p = self._read_json()
-                res = youtube_api_helper.create_live_broadcast(p.get('title', ''), p.get('description', ''), p.get('scheduledStartTime'), p.get('privacyStatus', 'public'))
+                title = p.get('title', '')
+                desc = p.get('description', '')
+                sched = p.get('scheduledStartTime') or p.get('scheduled_start_time')
+                privacy = p.get('privacyStatus') or p.get('privacy_status', 'public')
+                res = youtube_api_helper.create_live_broadcast(title, desc, sched, privacy)
                 return self._send_json({"success": True, **res})
 
             if self.path == '/api/youtube/update_broadcast':
                 p = self._read_json()
-                res = youtube_api_helper.update_live_broadcast(p.get('videoId', ''), p.get('title'), p.get('description'), p.get('scheduledStartTime'), p.get('privacyStatus'))
-                return self._send_json({"success": True, "videoId": p.get('videoId'), "data": res})
+                vid = p.get('videoId') or p.get('video_id', '')
+                title = p.get('title')
+                desc = p.get('description')
+                sched = p.get('scheduledStartTime') or p.get('scheduled_start_time')
+                privacy = p.get('privacyStatus') or p.get('privacy_status')
+                res = youtube_api_helper.update_live_broadcast(vid, title, desc, sched, privacy)
+                return self._send_json({"success": True, "videoId": vid, "data": res})
 
-            if self.path == '/api/youtube/upload_thumbnail':
+            if self.path in ('/api/youtube/upload_thumbnail', '/api/youtube/set_thumbnail'):
                 p = self._read_json()
-                res = youtube_api_helper.upload_thumbnail(p.get('videoId', ''), p.get('imageData', ''))
-                return self._send_json({"success": True, "videoId": p.get('videoId'), "data": res})
+                vid = p.get('videoId') or p.get('video_id', '')
+                img = p.get('imageData') or p.get('image_base64', '')
+                res = youtube_api_helper.upload_thumbnail(vid, img)
+                return self._send_json({"success": True, "videoId": vid, "data": res})
+
 
             # ── VOICEVOX 音声合成 ──
             if self.path == '/api/voicevox/synthesize':
