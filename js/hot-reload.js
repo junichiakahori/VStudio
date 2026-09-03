@@ -126,17 +126,14 @@
         }
       }
 
-      // 進行中ニュースの最新リスト(262件)をlocalStorageへ強制同期
-      if (window.newsBroadcastState && window.newsBroadcastState.newsList && window.newsBroadcastState.newsList.length > 0) {
-        try {
-          localStorage.setItem("latestFetchedNews", JSON.stringify(window.newsBroadcastState.newsList));
-          console.log(`[HotReload] 📰 進行中ニュース (${window.newsBroadcastState.newsList.length}件) をlocalStorageへ完全同期しました`);
-        } catch (e) { }
-      } else if (window.latestFetchedNews && window.latestFetchedNews.length > 0) {
-        try {
-          localStorage.setItem("latestFetchedNews", JSON.stringify(window.latestFetchedNews));
-          console.log(`[HotReload] 📰 保持ニュース (${window.latestFetchedNews.length}件) をlocalStorageへ完全同期しました`);
-        } catch (e) { }
+      // 最新ニュース全件(260+件)を再取得して親画面メモリとlocalStorageを完全復元
+      if (typeof window.fetchNewsWithOptions === "function") {
+        window.fetchNewsWithOptions("cat_all", Infinity).then(fresh => {
+          console.log(`[HotReload] 📰 最新ニュース全件 (${fresh.length}件) を再取得・同期完了しました`);
+          if (window.newsListWindow && !window.newsListWindow.closed && typeof window.newsListWindow.renderNewsList === "function") {
+            window.newsListWindow.renderNewsList();
+          }
+        }).catch(() => { });
       }
 
       if (showToast) {
