@@ -40,7 +40,11 @@ _file_handler = logging.FileHandler(_log_file_path, mode='a', encoding='utf-8')
 _file_handler.setFormatter(JSTFormatter('[%(asctime)s] [TikTok WS] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
 
 
-logging.root.handlers = [_stream_handler, _file_handler]
+_handlers = [_stream_handler]
+if sys.stdout.isatty():
+    _handlers.append(_file_handler)
+
+logging.root.handlers = _handlers
 logging.root.setLevel(logging.INFO)
 
 logging.getLogger("websockets").setLevel(logging.CRITICAL)
