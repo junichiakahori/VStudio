@@ -505,14 +505,29 @@ def generate_news_item_script_data(payload, custom_dict=None):
 
     # コメント返信や特殊アナウンスはニュース台本（5文構成）ではなく1〜2文の返答専用として直接生成
     if is_special_item:
-        prompt = description if description else f"あなたは{char_desc}。{title}に対して親しみやすく1〜2文で返答してください。"
+        m_nick = re.search(r'コメント返信:\s*(.+?)さん', title)
+        nickname = m_nick.group(1) if m_nick else "リスナー"
+        m_c = re.search(r'[「『](.*?)[」』]', description)
+        comment_text = m_c.group(1) if m_c else description.replace("さんのコメント", "").replace("に対して1〜2文で返信してください。", "").strip()
+
+        prompt = (
+            f"あなたは{char_desc}\n"
+            f"リスナーの「{nickname}」さんから『{comment_text}』というコメントをいただきました。\n"
+            "キャスターとして、このコメントに対して1〜2文で親しみやすく自然に返信してください（20〜40文字程度）。\n"
+            "※自己紹介やシステムメッセージ、画面名などは含めず、コメントに対する親身な返答セリフのみを出力してください。"
+        )
+
         candidate_text = call_llm_backend(provider, prompt, api_key, model_name)
         clean_text = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', candidate_text or '').strip()
         clean_text = clean_text.replace("「", "").replace("」", "").strip()
+
+        # システム定型文や画面遷移文の誤出力ガード
+        if any(bad in clean_text for bad in ["画面へ移動", "Virtual Studio", "Live2D Virtual", "VStudio -"]):
+            clean_text = f"{nickname}さん、コメントありがとうございますにゃ！"
         
         split_s = split_sentences_safely(clean_text)
         if not split_s:
-            split_s = [clean_text] if clean_text else ["コメントありがとうございますにゃ！"]
+            split_s = [clean_text] if clean_text else [f"{nickname}さん、コメントありがとうございますにゃ！"]
         
         items = []
         for s in split_s[:2]:

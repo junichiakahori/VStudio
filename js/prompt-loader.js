@@ -11,13 +11,16 @@
 
     loadPromise = (async () => {
       try {
-        const res = await fetch(`/prompts.json?t=${Date.now()}`);
+        let res = await fetch(`/data/prompts.json?t=${Date.now()}`);
+        if (!res.ok) {
+          res = await fetch(`/prompts.json?t=${Date.now()}`);
+        }
         if (res.ok) {
           promptsData = await res.json();
           return promptsData;
         }
       } catch (err) {
-        console.warn("[PromptLoader] Failed to load /prompts.json, trying fallback", err);
+        console.warn("[PromptLoader] Failed to load /data/prompts.json, trying fallback", err);
       }
       return {};
     })();
