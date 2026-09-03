@@ -518,6 +518,26 @@ def generate_news_item_script_data(payload, custom_dict=None):
         clean_text = clean_text.replace("使えへん", "使えない").replace("出来へん", "出来ない").replace("分からへん", "分からない").replace("知らへん", "知らない")
         clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)へん([の|ね|よ|な|にゃ|！|？|。|、]|$)', r'\1ない\2', clean_text)
 
+        # 不自然な英単語動詞・形容詞の混入を自然な日本語へ自動補正（strengthening ➔ 上昇・強含み 等）
+        ENGLISH_FINANCIAL_REPLACEMENTS = [
+            (r'\bstrengthening\b', '上昇'),
+            (r'\bweakening\b', '下落'),
+            (r'\brally(?:ing)?\b', '反発'),
+            (r'\bsurg(?:e|ing)\b', '急上昇'),
+            (r'\bdrop(?:ping)?\b', '下落'),
+            (r'\bloss(?:es)?\b', '損失'),
+            (r'\bgain(?:s|ing)?\b', '上昇'),
+            (r'\brising\b', '上昇'),
+            (r'\bfalling\b', '下落'),
+            (r'\bdeclin(?:e|ing)\b', '下落'),
+            (r'\bgrowth\b', '成長'),
+            (r'\bhigh(?:er)?\b', '高値'),
+            (r'\blow(?:er)?\b', '安値'),
+        ]
+        for eng_pat, jpn_rep in ENGLISH_FINANCIAL_REPLACEMENTS:
+            clean_text = re.sub(eng_pat, jpn_rep, clean_text, flags=re.IGNORECASE)
+
+
         split_sentences = split_sentences_safely(clean_text)
 
         def is_transition_phrase(txt):
