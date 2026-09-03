@@ -705,6 +705,8 @@ async def fetch_live_stats_loop(video_id):
             if not likes:
                 likes = "-"
 
+            logging.info(f"📊 [YouTube Live 統計] 👁️ 視聴者数/再生数: {viewers} | 👍 高評価: {likes} | 👤 登録者数: {subscribers} (動画ID: {video_id})")
+
             await broadcast_to_clients({
                 "type": "stats",
                 "videoId": video_id,

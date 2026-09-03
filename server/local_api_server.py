@@ -19,6 +19,36 @@ import time
 import datetime
 import urllib.parse
 
+# ── ログ自動二重書き込み機構（TeeLogger: stdout/stderrを常にlogs/api_server.logへ同期書き込み）──
+class TeeLogger:
+    def __init__(self, filepath, stream):
+        self.filepath = filepath
+        self.stream = stream
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+    def write(self, data):
+        try:
+            self.stream.write(data)
+            self.stream.flush()
+        except Exception:
+            pass
+        try:
+            with open(self.filepath, "a", encoding="utf-8") as f:
+                f.write(data)
+                f.flush()
+        except Exception:
+            pass
+
+    def flush(self):
+        try:
+            self.stream.flush()
+        except Exception:
+            pass
+
+API_LOG_FILE = os.path.join(BASE_DIR, "logs", "api_server.log")
+sys.stdout = TeeLogger(API_LOG_FILE, sys.stdout)
+sys.stderr = TeeLogger(API_LOG_FILE, sys.stderr)
+
 
 from server.log_manager import (
     start_log_rotation_scheduler,
