@@ -1,27 +1,30 @@
 # -*- coding: utf-8 -*-
-"""
-news_crawler.py
-ニュース元記事URLの検索・リダイレクト解決・事前キャッシュ・本文スクレイピングモジュール
-"""
-
 import os
-import re
 import json
-import ssl
+import re
 import urllib.request
 import urllib.parse
+import ssl
 import threading
+import datetime
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ARTICLE_URLS_FILE = os.path.join(BASE_DIR, "data", "article_urls.json")
 
 _cache_lock = threading.Lock()
 
+def _get_active_dates():
+    today = datetime.date.today()
+    yesterday = today - datetime.timedelta(days=1)
+    return today.strftime('%Y-%m-%d'), yesterday.strftime('%Y-%m-%d')
+
 def load_article_url_cache():
     if os.path.exists(ARTICLE_URLS_FILE):
         try:
             with open(ARTICLE_URLS_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
         except Exception:
             pass
     return {}
@@ -37,41 +40,49 @@ def save_article_url_cache(cache):
 ARTICLE_URL_CACHE = load_article_url_cache()
 
 def get_all_cached_urls():
-    """現在の全URLキャッシュマップを取得"""
+    """現在の全URLキャッシュマップ（当日＋前日を統合したフラット辞書）を取得"""
     global ARTICLE_URL_CACHE
     if not ARTICLE_URL_CACHE:
         ARTICLE_URL_CACHE = load_article_url_cache()
-    return ARTICLE_URL_CACHE
+    today_str, yest_str = _get_active_dates()
+    combined = {}
+    if yest_str in ARTICLE_URL_CACHE and isinstance(ARTICLE_URL_CACHE[yest_str], dict):
+        combined.update(ARTICLE_URL_CACHE[yest_str])
+    if today_str in ARTICLE_URL_CACHE and isinstance(ARTICLE_URL_CACHE[today_str], dict):
+        combined.update(ARTICLE_URL_CACHE[today_str])
+    return combined
 
 def find_cached_url(title):
-    """タイトルまたは部分一致からキャッシュされたURLを取得"""
+    """タイトルまたは部分一致からキャッシュされたURLを取得（当日＋前日を優先検索）"""
     if not title:
         return ""
-    if title in ARTICLE_URL_CACHE:
-        return ARTICLE_URL_CACHE[title]
-    for t_k, u_v in ARTICLE_URL_CACHE.items():
+    all_urls = get_all_cached_urls()
+    if title in all_urls:
+        return all_urls[title]
+    for t_k, u_v in all_urls.items():
         if t_k and (t_k[:10] in title or title[:10] in t_k or t_k in title or title in t_k):
             return u_v
     return ""
 
-MAX_URL_CACHE_ENTRIES = 3000
-
 def register_cached_url(title, url):
-    """記事タイトルとURLのペアをキャッシュ＆永続化保存（上限3000件で自動FIFOローテーション）"""
+    """記事タイトルとURLのペアを当日の日付キーにキャッシュ＆古い日付を自動消去"""
     if not title or not url:
         return
     # コメント返信等のシステムタイトルは除外
     if title.startswith("コメント返信") or title.startswith("リスナー") or title.startswith("【コメント"):
         return
 
-    ARTICLE_URL_CACHE[title] = url
+    today_str, yest_str = _get_active_dates()
+    if today_str not in ARTICLE_URL_CACHE or not isinstance(ARTICLE_URL_CACHE[today_str], dict):
+        ARTICLE_URL_CACHE[today_str] = {}
 
-    # 上限を超えたら古いキーから切り詰め (FIFO)
-    if len(ARTICLE_URL_CACHE) > MAX_URL_CACHE_ENTRIES:
-        excess = len(ARTICLE_URL_CACHE) - MAX_URL_CACHE_ENTRIES
-        keys_to_remove = list(ARTICLE_URL_CACHE.keys())[:excess]
-        for k in keys_to_remove:
-            del ARTICLE_URL_CACHE[k]
+    ARTICLE_URL_CACHE[today_str][title] = url
+
+    # 2日以上前の古い日付ブロックを全自動で破棄 (日次クリーンアップ)
+    valid_dates = {today_str, yest_str}
+    keys_to_del = [d for d in list(ARTICLE_URL_CACHE.keys()) if d not in valid_dates]
+    for old_d in keys_to_del:
+        del ARTICLE_URL_CACHE[old_d]
 
     save_article_url_cache(ARTICLE_URL_CACHE)
 

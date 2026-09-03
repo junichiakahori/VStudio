@@ -57,6 +57,53 @@ import base64
 # ----------------------------------------------------
 # YouTube チャンネル表示名（DisplayName）キャッシュ＆自動解決
 # ----------------------------------------------------
+
+# ----------------------------------------------------
+# YouTube 絵文字ショートコード自動復元テーブル
+# ----------------------------------------------------
+COMMON_EMOJI_SHORTCODES = {
+    ':front_facing_baby_chick:': '🐥',
+    ':baby_chick:': '🐤',
+    ':hatching_chick:': '🐣',
+    ':sparkles:': '✨',
+    ':star:': '⭐',
+    ':star2:': '🌟',
+    ':heart:': '❤️',
+    ':sparkling_heart:': '💖',
+    ':two_hearts:': '💕',
+    ':heart_eyes:': '😍',
+    ':thumbsup:': '👍',
+    ':thumbs_up:': '👍',
+    ':+1:': '👍',
+    ':clap:': '👏',
+    ':tada:': '🎉',
+    ':partying_face:': '🥳',
+    ':cat:': '🐱',
+    ':cat2:': '🐈',
+    ':heart_eyes_cat:': '😻',
+    ':paw_prints:': '🐾',
+    ':fire:': '🔥',
+    ':hundred_points:': '💯',
+    ':100:': '💯',
+    ':smile:': '😄',
+    ':laughing:': '😆',
+    ':joy:': '😂',
+    ':sob:': '😭',
+    ':pray:': '🙏',
+    ':raised_hands:': '🙌'
+}
+
+def decode_youtube_emojis(message: str) -> str:
+    if not message or ':' not in message:
+        return message
+    res = message
+    for code, em in COMMON_EMOJI_SHORTCODES.items():
+        if code in res:
+            res = res.replace(code, em)
+    return res
+
+from server.listener_crm import record_listener_comment
+
 USER_CACHE_FILE = os.path.join(BASE_DIR, "dict", "youtube_user_cache.json")
 _user_name_cache = {}
 
@@ -909,11 +956,24 @@ async def start_youtube_client(video_id_or_channel: str, websocket):
                             if len(comment_history) > 100: comment_history.pop(0)
                             await broadcast_to_clients(msg)
                         
+                        clean_msg = decode_youtube_emojis(c.message)
+                        crm_info = record_listener_comment(
+                            platform="youtube",
+                            user_id=getattr(c.author, 'channelId', None) or author_disp,
+                            display_name=author_disp,
+                            handle=getattr(c.author, 'name', '') if str(getattr(c.author, 'name', '')).startswith('@') else '',
+                            comment=clean_msg,
+                            stream_id=current_video_id,
+                            is_superchat=(c.amountValue > 0),
+                            amount=c.amountString
+                        )
                         msg = {
                             "type": "comment",
                             "nickname": author_disp,
-                            "comment": c.message,
-                            "iconUrl": c.author.imageUrl
+                            "comment": clean_msg,
+                            "iconUrl": c.author.imageUrl,
+                            "isFirstTime": crm_info.get("isFirstTime", False),
+                            "visitDaysCount": crm_info.get("visitDaysCount", 1)
                         }
                         comment_history.append(msg)
                         if len(comment_history) > 100: comment_history.pop(0)
