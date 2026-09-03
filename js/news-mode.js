@@ -296,8 +296,9 @@ function getNewsConfig() {
 
     const promise = (async () => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 50000);
+      const timeoutId = setTimeout(() => controller.abort(), 90000);
       try {
+
 
         console.log(`[ニュース先読み] 🚀 次の記事「${item.title.substring(0, 20)}...」🔗 ${item.link || 'URLなし'} を先行生成中...`);
         const res = await fetch("/api/news/generate_item_script", {
@@ -505,7 +506,7 @@ function getNewsConfig() {
           // 先読みが15秒以上スタックしている場合はタイムアウトして通常取得へ移行
           data = await Promise.race([
             cachedPromise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error("先読みタイムアウト")), 45000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error("先読みタイムアウト")), 85000))
           ]);
           if (data && data.status === "ok") {
             console.log(`[ニュース番組] ⚡ 先読みキャッシュから即時再生開始:「${item.title.substring(0, 20)}...」`);
@@ -516,7 +517,7 @@ function getNewsConfig() {
         }
       }
 
-      // 2. キャッシュにない場合は通常フェッチ（50秒タイムアウト付き）
+      // 2. キャッシュにない場合は通常フェッチ（90秒タイムアウト付き）
       if (!data) {
         if (!apiKey && provider !== "ollama") {
           console.warn("[ニュース番組] ⚠️ APIキーが未設定です。復旧待機画面に移行します...");
@@ -525,7 +526,7 @@ function getNewsConfig() {
         let res = null;
         if (apiKey || provider === "ollama") {
           const fetchCtrl = new AbortController();
-          const fetchTimeout = setTimeout(() => fetchCtrl.abort(), 50000);
+          const fetchTimeout = setTimeout(() => fetchCtrl.abort(), 90000);
           try {
             res = await fetch("/api/news/generate_item_script", {
               method: "POST",
@@ -534,6 +535,7 @@ function getNewsConfig() {
               signal: fetchCtrl.signal
             });
             clearTimeout(fetchTimeout);
+
 
           } catch (netErr) {
             clearTimeout(fetchTimeout);
