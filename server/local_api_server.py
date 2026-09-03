@@ -18,38 +18,46 @@ import glob
 import time
 import datetime
 import urllib.parse
+import threading
 
 # ── ログ自動二重書き込み機構（TeeLogger: stdout/stderrを常にlogs/api_server.logへ同期書き込み）──
 class TeeLogger:
+    """標準出力・エラー出力をコンソールとログファイルの両方に安全に出力（二重書き込み完全防止＆スレッドセーフ）"""
     def __init__(self, filepath, stream):
-        self.filepath = filepath
+        self.filepath = os.path.abspath(filepath)
         self.stream = stream
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        # 既に同じファイルへリダイレクトされている場合は二重書き込みを抑止
-        self.is_redirected_to_same_file = False
+        self._lock = threading.Lock()
+        os.makedirs(os.path.dirname(self.filepath), exist_ok=True)
+        
+        # すでにシェルリダイレクト (>> logs/api_server.log) されている場合はファイル直接追記を無効化
+        self.is_redirected = False
         try:
             if hasattr(stream, 'fileno'):
                 stream_stat = os.fstat(stream.fileno())
-                if os.path.exists(filepath):
-                    file_stat = os.stat(filepath)
+                if os.path.exists(self.filepath):
+                    file_stat = os.stat(self.filepath)
                     if stream_stat.st_ino == file_stat.st_ino and stream_stat.st_dev == file_stat.st_dev:
-                        self.is_redirected_to_same_file = True
+                        self.is_redirected = True
+            if hasattr(stream, 'isatty') and not stream.isatty():
+                # 非端末（パイプ・リダイレクト）の場合も二重出力を防止
+                self.is_redirected = True
         except Exception:
             pass
 
     def write(self, data):
-        try:
-            self.stream.write(data)
-            self.stream.flush()
-        except Exception:
-            pass
-        if not self.is_redirected_to_same_file:
+        with self._lock:
             try:
-                with open(self.filepath, "a", encoding="utf-8") as f:
-                    f.write(data)
-                    f.flush()
+                self.stream.write(data)
+                self.stream.flush()
             except Exception:
                 pass
+            if not self.is_redirected:
+                try:
+                    with open(self.filepath, "a", encoding="utf-8") as f:
+                        f.write(data)
+                        f.flush()
+                except Exception:
+                    pass
 
     def flush(self):
         try:
