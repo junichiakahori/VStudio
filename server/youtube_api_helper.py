@@ -349,34 +349,48 @@ def upload_thumbnail(video_id, image_data):
     return req.execute()
 
 def list_my_broadcasts(max_results=15):
-    """自身のチャンネルの配信枠（upcoming/active/all）一覧を取得"""
+    """自身のチャンネルの配信枠（upcoming/active/all）一覧を取得（自動リトライ付き）"""
+    global _cached_youtube_client
     service = get_authenticated_service()
     if not service:
         raise ValueError("YouTube API未認証です。Googleアカウント連携を行ってください。")
 
-    req = service.liveBroadcasts().list(
-        part="id,snippet,status,contentDetails",
-        mine=True,
-        maxResults=max_results
-    )
-    res = req.execute()
-    items = []
-    for item in res.get("items", []):
-        snippet = item.get("snippet", {})
-        status = item.get("status", {})
-        thumbnails = snippet.get("thumbnails", {})
-        thumb_url = thumbnails.get("medium", {}).get("url") or thumbnails.get("default", {}).get("url") or f"https://i.ytimg.com/vi/{item.get('id')}/hqdefault.jpg"
-        items.append({
-            "id": item.get("id"),
-            "title": snippet.get("title", "無題の配信"),
-            "description": snippet.get("description", ""),
-            "scheduledStartTime": snippet.get("scheduledStartTime"),
-            "lifeCycleStatus": status.get("lifeCycleStatus"),
-            "privacyStatus": status.get("privacyStatus"),
-            "thumbnail": thumb_url,
-            "url": f"https://www.youtube.com/watch?v={item.get('id')}"
-        })
-    return items
+    last_err = None
+    for attempt in range(3):
+        try:
+            req = service.liveBroadcasts().list(
+                part="id,snippet,status,contentDetails",
+                mine=True,
+                maxResults=max_results
+            )
+            res = req.execute(num_retries=2)
+            items = []
+            for item in res.get("items", []):
+                snippet = item.get("snippet", {})
+                status = item.get("status", {})
+                thumbnails = snippet.get("thumbnails", {})
+                thumb_url = thumbnails.get("medium", {}).get("url") or thumbnails.get("default", {}).get("url") or f"https://i.ytimg.com/vi/{item.get('id')}/hqdefault.jpg"
+                items.append({
+                    "id": item.get("id"),
+                    "title": snippet.get("title", "無題の配信"),
+                    "description": snippet.get("description", ""),
+                    "scheduledStartTime": snippet.get("scheduledStartTime"),
+                    "lifeCycleStatus": status.get("lifeCycleStatus"),
+                    "privacyStatus": status.get("privacyStatus"),
+                    "thumbnail": thumb_url,
+                    "url": f"https://www.youtube.com/watch?v={item.get('id')}"
+                })
+            return items
+        except Exception as e:
+            last_err = e
+            logging.warning(f"[YouTube API] list_my_broadcasts attempt {attempt + 1} failed: {e}")
+            _cached_youtube_client = None
+            service = get_authenticated_service()
+            time.sleep(0.5)
+
+    if last_err:
+        raise last_err
+    return []
 
 
 def fetch_video_info(raw_input):
@@ -405,8 +419,12 @@ def fetch_video_info(raw_input):
 
     if video_id.startswith("http"):
         target_url = video_id
-    else:
+    elif video_id.startswith("@"):
+        target_url = f"https://www.youtube.com/{video_id}/live"
+    elif len(video_id) == 11:
         target_url = f"https://www.youtube.com/watch?v={video_id}"
+    else:
+        target_url = f"https://www.youtube.com/@{video_id.lstrip('@')}/live"
 
     req = urllib.request.Request(
         target_url,
@@ -462,3 +480,54 @@ def fetch_video_info(raw_input):
         "isLive": is_live,
         "status": status
     }
+
+
+def detect_channel_live(channel_val):
+    """チャンネル名・ハンドル名から現在配信中または予約中のライブ枠を自動検出"""
+    channel_val = (channel_val or "").strip()
+    if not channel_val:
+        return {"success": False, "message": "チャンネル名またはハンドル名を入力してください"}
+
+    # 1. 自身のOAuth認証がある場合は、APIから直近の upcoming / live 枠を高速検索
+    try:
+        broadcasts = list_my_broadcasts(max_results=5)
+        # 現在配信中
+        for b in broadcasts:
+            if b.get("lifeCycleStatus") in ["live", "ready", "testStarting", "liveStarting"]:
+                return {
+                    "success": True,
+                    "video_id": b["id"],
+                    "title": b.get("title", ""),
+                    "status": b.get("lifeCycleStatus"),
+                    "scheduledStartTime": b.get("scheduledStartTime")
+                }
+        # 予約枠
+        for b in broadcasts:
+            if b.get("lifeCycleStatus") in ["upcoming", "created"]:
+                return {
+                    "success": True,
+                    "video_id": b["id"],
+                    "title": b.get("title", ""),
+                    "status": b.get("lifeCycleStatus"),
+                    "scheduledStartTime": b.get("scheduledStartTime")
+                }
+    except Exception as e:
+        logging.warning(f"[YouTube detect_live] OAuth list check skipped: {e}")
+
+    # 2. 公開Webページ (/live) からスクレイピング検出
+    try:
+        info = fetch_video_info(channel_val)
+        vid = info.get("videoId")
+        if vid and len(vid) == 11 and not vid.startswith("@"):
+            return {
+                "success": True,
+                "video_id": vid,
+                "title": info.get("title", ""),
+                "status": info.get("status"),
+                "scheduledStartTime": info.get("scheduledStartTime")
+            }
+    except Exception as e:
+        logging.warning(f"[YouTube detect_live] Scraping detection failed: {e}")
+
+    return {"success": False, "message": "現在配信中または予約中の枠が見つかりませんでした"}
+
