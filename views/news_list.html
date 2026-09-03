@@ -377,6 +377,10 @@
 
         function getFetchedNews() {
             try {
+                // 1. 自分自身のメモリ
+                let selfNews = (window.latestFetchedNews && window.latestFetchedNews.length > 0) ? window.latestFetchedNews : [];
+
+                // 2. 親画面のメモリ
                 let openerNews = [];
                 if (window.opener && !window.opener.closed) {
                     if (window.opener.newsBroadcastState && window.opener.newsBroadcastState.newsList && window.opener.newsBroadcastState.newsList.length > 0) {
@@ -386,32 +390,32 @@
                     }
                 }
 
+                // 3. localStorage
                 let localNews = [];
                 const saved = localStorage.getItem("latestFetchedNews");
                 if (saved) {
                     try { localNews = JSON.parse(saved); } catch (e) { }
                 }
 
-                // より件数の多い（最新・完全な）方を採用
-                let chosen = [];
-                let sourceDesc = "";
-                if (openerNews.length >= localNews.length && openerNews.length > 0) {
-                    chosen = openerNews;
-                    sourceDesc = `親画面 (${openerNews.length}件)`;
-                } else if (localNews.length > 0) {
-                    chosen = localNews;
-                    sourceDesc = `localStorage (${localNews.length}件)`;
-                    // 親画面側にも最新データを書き戻して完全同期
-                    if (window.opener && !window.opener.closed) {
-                        window.opener.latestFetchedNews = localNews;
-                    }
-                }
+                // 全候補の中で最も件数の多い（最新・完全な）リストを無条件で最優先採用
+                let candidates = [
+                    { list: selfNews, desc: `自身のメモリ (${selfNews.length}件)` },
+                    { list: openerNews, desc: `親画面 (${openerNews.length}件)` },
+                    { list: localNews, desc: `localStorage (${localNews.length}件)` }
+                ];
+                candidates.sort((a, b) => b.list.length - a.list.length);
 
-                if (chosen.length > 0) {
-                    logDiag(`${sourceDesc} からニュースを取得しました (先頭: ${chosen[0]?.title?.substring(0, 20)}...)`);
-                    return chosen;
+                let best = candidates[0];
+                if (best.list.length > 0) {
+                    // 親画面と自身のメモリを最新リストで完全同期
+                    window.latestFetchedNews = best.list;
+                    if (window.opener && !window.opener.closed) {
+                        window.opener.latestFetchedNews = best.list;
+                    }
+                    logDiag(`${best.desc} を採用しました (先頭: ${best.list[0]?.title?.substring(0, 20)}...)`);
+                    return best.list;
                 }
-                logDiag("親画面およびlocalStorageにニュースデータが存在しません (0件)", "warn");
+                logDiag("ニュースデータが存在しません (0件)", "warn");
             } catch (e) {
                 logDiag(`ニュースデータ取得エラー: ${e.message}`, "warn");
             }
