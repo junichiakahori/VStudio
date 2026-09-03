@@ -16,7 +16,9 @@ import json
 import os
 import glob
 import time
+import datetime
 import urllib.parse
+
 
 from server.log_manager import (
     start_log_rotation_scheduler,
@@ -31,7 +33,7 @@ from server.news_crawler import (
     fetch_rss_xml
 )
 from server.news_script_processor import generate_news_item_script_data
-from server.tts_normalizer import convert_remaining_kanji_to_hiragana
+from server.tts_normalizer import convert_remaining_kanji_to_hiragana, resolve_text_readings
 from server.voicevox_client import synthesize_voicevox_backend, clean_kana_for_display
 import server.youtube_api_helper as youtube_api_helper
 
@@ -91,9 +93,24 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, X-Voicevox-Kana, X-Voicevox-Clean-Kana')
         super().end_headers()
 
+    def log_message(self, format, *args):
+        # ログ転送 (/log) はノイズになるため除外、それ以外のAPIリクエストを統一フォーマットで出力
+        if self.path == '/log' and args and '200' in str(args[1] if len(args) > 1 else ''):
+            return
+        now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        level = "INFO"
+        if args and len(args) >= 2:
+            code = str(args[1])
+            if code.startswith('4') or code.startswith('5'):
+                level = "ERROR"
+        msg = format % args
+        sys.stderr.write(f"[{now_str}] [Local API] [{level}] {msg}\n")
+        sys.stderr.flush()
+
     def do_OPTIONS(self):
         self.send_response(200)
         self.end_headers()
+
 
     def _send_json(self, data, status=200):
         self.send_response(status)
@@ -206,6 +223,20 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 body_text = self._read_body().decode('utf-8')
                 save_text(SAVE_ROUTES_TEXT[self.path], body_text)
                 return self._send_json({"status": "ok"})
+
+            # ── TTS 読み方動的解決 (Wikipedia / Web検索 / 辞書) ──
+            if self.path == '/api/tts/resolve_reading':
+                payload = self._read_json()
+                text = payload.get('text', '').strip()
+                if not text:
+                    return self._send_json({"status": "ok", "resolved_text": "", "applied": False})
+                resolved = resolve_text_readings(text, custom_dict=load_json(CUSTOM_DICT_FILE))
+                return self._send_json({
+                    "status": "ok",
+                    "original": text,
+                    "resolved_text": resolved,
+                    "applied": (resolved != text)
+                })
 
             # ── 残存漢字の一括ひらがな変換 ──
             if self.path == '/convert_remaining_kanji':

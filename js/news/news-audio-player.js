@@ -57,20 +57,35 @@
     if (isFirst) {
       return "";
     }
+    let phrase = "";
     if (isCatChanged && catName) {
       const phrases = [
         `続いては、${catName}のニュースです。`,
         `変わりまして、${catName}の話題をお届けします。`,
         `次のトピックス、${catName}です。`
       ];
-      return phrases[Math.floor(Math.random() * phrases.length)];
+      phrase = phrases[Math.floor(Math.random() * phrases.length)];
+    } else {
+      const generalPhrases = [
+        "続いてのニュースです。",
+        "変わりまして、次の話題です。",
+        "続いてはこちらのニュースです。",
+        "次のニュースをお伝えします。"
+      ];
+      phrase = generalPhrases[Math.floor(Math.random() * generalPhrases.length)];
     }
-    const generalPhrases = [
-      "続いてのニュースです。",
-      "変わりまして、次の話題です。",
-      "続いてはこちらのニュースです。"
-    ];
-    return generalPhrases[Math.floor(Math.random() * generalPhrases.length)];
+
+    // 🐱 現在のアバターモデル（とろろ/ずんだもん/ヒヨリ等）の口調を適用
+    const currentModelId = window.currentModelId || localStorage.getItem("selectedModel") || "tororo";
+    if (window.aiFeatures && typeof window.aiFeatures.adjustIdlePhraseForModel === "function") {
+      phrase = window.aiFeatures.adjustIdlePhraseForModel(phrase, currentModelId);
+    } else if (currentModelId === "tororo" || currentModelId === "hijiki") {
+      phrase = phrase.replace(/です([。！!]|$)/, "ですにゃ$1").replace(/ます([。！!]|$)/, "ますにゃ$1");
+    } else if (currentModelId === "zundamon") {
+      phrase = phrase.replace(/です([。！!]|$)/, "なのだ$1").replace(/ます([。！!]|$)/, "るのだ$1");
+    }
+
+    return phrase;
   }
 
   window.getNewsTransitionPhrase = getNewsTransitionPhrase;

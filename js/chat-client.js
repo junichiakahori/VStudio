@@ -15,17 +15,20 @@ function initChatClient() {
     platform,
     isGift = false,
     iconUrl = "",
+    allowDuplicate = false
   ) {
-    // サーバーから送られてきた履歴の重複表示・二重カウントを防ぐ
-    const checkRange = commentHistory.slice(-50);
-    const isDuplicate = checkRange.some(
-      (c) =>
-        c.nickname === nickname &&
-        c.comment === comment &&
-        c.platform === platform,
-    );
+    // サーバーから送られてきた履歴の重複表示・二重カウントを防ぐ（テストコメント時はスキップ）
+    if (!allowDuplicate) {
+      const checkRange = commentHistory.slice(-50);
+      const isDuplicate = checkRange.some(
+        (c) =>
+          c.nickname === nickname &&
+          c.comment === comment &&
+          c.platform === platform,
+      );
 
-    if (isDuplicate) return;
+      if (isDuplicate) return;
+    }
 
     commentHistory.push({ nickname, comment, platform, isGift, iconUrl });
     if (commentHistory.length > 100) {
@@ -1451,7 +1454,7 @@ function initChatClient() {
 
     console.log(`[テストコメント送信] 💬 テストコメントを送信: 「${txt}」`);
     if (typeof addCommentToViewer === "function") {
-      addCommentToViewer("テスト", txt, "youtube", false, "");
+      addCommentToViewer("テスト", txt, "youtube", false, "", true);
     }
     handleIncomingComment("テスト", txt);
   };

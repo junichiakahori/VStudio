@@ -173,15 +173,42 @@ export function applyCustomHiraganaDict(text) {
 export async function convertToHiraganaWithAI(text) {
     if (!text || !text.trim()) return text;
 
-    // 1. キャッシュが存在する場合は即座に返却（0ms）
-    const cacheKey = text.trim();
+    let currentText = text.trim();
+
+    // 🌐 1. サーバー側 Wikipedia / Web検索 / 辞書による動的読み解決 (最優先)
+    try {
+        const resolveRes = await fetch('/api/tts/resolve_reading', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: currentText })
+        });
+        if (resolveRes.ok) {
+            const resolveData = await resolveRes.json();
+            if (resolveData && resolveData.resolved_text) {
+                if (resolveData.applied) {
+                    console.log(`[動的読み解決] 🎯 "${currentText}" ➔ "${resolveData.resolved_text}"`);
+                }
+                currentText = resolveData.resolved_text;
+            }
+        }
+    } catch(e) {
+        console.warn("[動的読み解決] 通信エラー:", e);
+    }
+
+    // すでにひらがな・カタカナ・記号のみであればLLM不要で即時返却
+    if (/^[ぁ-んァ-ヶー\s、。！？!?,.…〜〜\d]+$/.test(currentText)) {
+        if (!window.aiHiraganaCache) window.aiHiraganaCache = {};
+        window.aiHiraganaCache[text.trim()] = currentText;
+        return currentText;
+    }
+
+    // 2. キャッシュが存在する場合は返却
+    const cacheKey = currentText;
     if (window.aiHiraganaCache && window.aiHiraganaCache[cacheKey]) {
         return window.aiHiraganaCache[cacheKey];
     }
 
-    const dictApplied = text;
-
-    // 2. AI設定の取得
+    // 3. AI設定の取得
     const aiHiraganaToggle = document.getElementById('ai-hiragana-toggle');
     const isAiHiraganaEnabled = aiHiraganaToggle ? aiHiraganaToggle.checked : true;
     const aiApiKeyInput = document.getElementById('ai-api-key');
@@ -189,9 +216,9 @@ export async function convertToHiraganaWithAI(text) {
     const providerSelect = document.getElementById('ai-provider-select');
     const provider = (providerSelect ? providerSelect.value : '') || localStorage.getItem('savedAiProvider') || 'ollama';
 
-    // AIが利用できない場合は原文をそのまま返却
+    // AIが利用できない場合は解決済みテキストをそのまま返却
     if (!isAiHiraganaEnabled || (!apiKey && provider !== 'ollama')) {
-        return text;
+        return currentText;
     }
 
     try {
@@ -220,7 +247,7 @@ export async function convertToHiraganaWithAI(text) {
                     model: targetModel,
                     messages: [
                         { role: 'system', content: systemPrompt },
-                        { role: 'user', content: `以下のテキストの発音校正を行ってください:\n${text}` }
+                        { role: 'user', content: `以下のテキストの発音校正を行ってください:\n${currentText}` }
                     ],
                     stream: false,
                     options: {
@@ -236,10 +263,10 @@ export async function convertToHiraganaWithAI(text) {
         } else {
             let prompt = "";
             if (typeof window.PromptLoader !== "undefined" && typeof window.PromptLoader.getFormattedPrompt === "function") {
-                prompt = await window.PromptLoader.getFormattedPrompt("ai_hiragana_gemini", { text });
+                prompt = await window.PromptLoader.getFormattedPrompt("ai_hiragana_gemini", { text: currentText });
             }
             if (!prompt) {
-                prompt = `テキスト: ${text}\n校正後:`;
+                prompt = `テキスト: ${currentText}\n校正後:`;
             }
             result = await callAI(prompt, apiKey, provider, false, 200);
         }

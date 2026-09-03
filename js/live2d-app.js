@@ -4,9 +4,9 @@ import {
   NORMAL_LONG_STORIES,
   ZUNDA_LONG_STORIES,
 } from "./idle_phrases.js";
-import * as aiFeaturesModule from "./ai_features.js?v=9.6";
+import * as aiFeaturesModule from "./ai_features.js?v=9.8";
 import "./ui_features.js?v=9.6"; // HMR tracking: UI event rebinding without full reload
-import "./server-manager.js?v=9.6"; // Backend Server Manager
+import "./server-manager.js?v=9.8"; // Backend Server Manager
 import "./settings-backup.js?v=9.6"; // Settings export/import
 
 window.aiFeatures = aiFeaturesModule;

@@ -357,11 +357,13 @@ function getNewsConfig() {
     // 一人称置換設定を反映
     const idleFirstPerson = document.getElementById("idle-first-person");
     const fp = idleFirstPerson ? idleFirstPerson.value : "";
-    if (fp) {
-      intro = intro.replace(/わたくし|わたし|あたし|私(?![一-龠々])|ぼく|僕(?![一-龠々])|おれ|俺(?![一-龠々])|うち/g, fp);
+    // 🗣️ コメント本文の動的読み解決（肩甲骨 -> けんこうこつ 等）
+    let speakIntro = intro;
+    if (aiFeatures && typeof aiFeatures.convertToHiraganaWithAI === "function") {
+      speakIntro = await aiFeatures.convertToHiraganaWithAI(intro);
     }
 
-    await queueVoicevoxAudio(intro, true);
+    await queueVoicevoxAudio(intro, true, speakIntro);
 
     // 2. AIによるキャスター風の返信生成
     const isAiReplyEnabled = document.getElementById("ai-reply-toggle")?.checked;

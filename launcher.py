@@ -16,15 +16,16 @@ BACKUP_DIR.mkdir(exist_ok=True)
 
 LAUNCHER_LOG = LOG_DIR / "launcher.log"
 
-def log(msg):
+def log(msg, level="INFO"):
     ts = time.strftime("%Y-%m-%d %H:%M:%S")
-    formatted = f"[{ts}] {msg}"
+    formatted = f"[{ts}] [Launcher] [{level}] {msg}"
     print(formatted)
     try:
         with open(LAUNCHER_LOG, "a", encoding="utf-8") as f:
             f.write(formatted + "\n")
     except Exception:
         pass
+
 
 def notify(title, message):
     try:
@@ -123,21 +124,22 @@ def archive_and_cleanup_logs():
         except Exception:
             pass
 
-    # 2. 既存のログファイルを logs_backup/ に退避
-    for log_name in ["api_server.log", "youtube_server.log", "tiktok_server.log", "vite.log", "launcher.log", "browser_console.log"]:
+    # 2. 既存のログファイルを logs_backup/ に日付単位 (YYYY-MM-DD) で安全に追記退避
+    for log_name in ["api_server.log", "youtube_server.log", "tiktok_server.log", "vite.log", "launcher.log", "browser_console.log", "native_console.log", "web_console.log"]:
         src = LOG_DIR / log_name
         if src.exists() and src.stat().st_size > 0:
             stem = src.stem
             target_name = f"{stem}_{today_str}.log"
             target_path = BACKUP_DIR / target_name
-            if target_path.exists():
-                target_name = f"{stem}_{ts_str}.log"
-                target_path = BACKUP_DIR / target_name
             try:
-                shutil.copy2(src, target_path)
-                log(f"📦 Archived previous log: {log_name} -> logs_backup/{target_name}")
+                with open(src, "r", encoding="utf-8", errors="ignore") as f_src:
+                    content = f_src.read()
+                with open(target_path, "a", encoding="utf-8") as f_dst:
+                    f_dst.write(content)
+                log(f"📦 Archived previous log (Appended): {log_name} -> logs_backup/{target_name}")
             except Exception as e:
                 log(f"Failed to archive {log_name}: {e}")
+
 
 def start_services(open_browser=True):
     global processes

@@ -133,12 +133,15 @@ def write_browser_console_log(log_message, client_type="web"):
     同時に専用ログ (native_console.log / web_console.log) および logs_backup/ にも保存
     """
     today_str = datetime.date.today().strftime('%Y-%m-%d')
-    prefix = "native_console" if client_type == "native" else "web_console"
+    client_lower = str(client_type).lower() if client_type else "web"
+    is_native = ("native" in client_lower) or ("[🖥️ NATIVE]" in log_message) or ("[🧭 NATIVE]" in log_message)
+    prefix = "native_console" if is_native else "web_console"
     
     main_log_file = os.path.join(BASE_DIR, "logs", "browser_console.log")
     active_client_file = os.path.join(BASE_DIR, "logs", f"{prefix}.log")
     backup_file = os.path.join(BASE_DIR, "logs_backup", f"browser_console_{today_str}.log")
     backup_client_file = os.path.join(BASE_DIR, "logs_backup", f"{prefix}_{today_str}.log")
+
     
     if not os.path.exists(LOG_BACKUP_DIR):
         os.makedirs(LOG_BACKUP_DIR, exist_ok=True)

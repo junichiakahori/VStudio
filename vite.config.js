@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 import { spawn, exec } from 'child_process';
 import net from 'net';
+import fs from 'fs';
+import path from 'path';
 
 const checkPort = (port) => {
   return new Promise((resolve) => {
@@ -13,49 +15,56 @@ const checkPort = (port) => {
 
 const killProcessOnPort = (port, serverFileName) => {
   return new Promise((resolve) => {
-    // 1. スクリプト名が指定されている場合は pkill でピンポイント停止 (最も安全)
+    // 1. スクリプト名によるピンポイント停止（Python/python3/絶対パス・相対パス全てに対応）
     if (serverFileName) {
       const baseName = serverFileName.split('/').pop();
-      exec(`pkill -9 -f "python3.*${baseName}"`, () => {
-        resolve();
+      exec(`pkill -9 -f "${baseName}"`, () => {
+        // ポート側も念のためチェックしてクリーンアップ
+        cleanupPort(port, resolve);
       });
       return;
     }
 
-    // 2. ポート番号で停止する場合: LISTEN状態のサーバープロセスのみを抽出し、ブラウザ/WebKitを絶対にkillしない
-    exec(`lsof -nP -iTCP:${port} -sTCP:LISTEN`, (err, stdout) => {
-      if (!stdout || !stdout.trim()) {
-        resolve();
-        return;
-      }
-      const lines = stdout.trim().split('\n').slice(1);
-      const serverPids = [];
-      lines.forEach(line => {
-        const parts = line.trim().split(/\s+/);
-        if (parts.length >= 2) {
-          const cmd = parts[0].toLowerCase();
-          const pid = parts[1];
-          // Python または Node プロセスのみを安全にkill対象とする
-          if (cmd.includes('python') || cmd.includes('node')) {
-            serverPids.push(pid);
-          }
-        }
-      });
-
-      if (serverPids.length > 0) {
-        exec(`kill -9 ${serverPids.join(' ')}`, () => resolve());
-      } else {
-        resolve();
-      }
-    });
+    cleanupPort(port, resolve);
   });
 };
 
-const scriptMap = {
-  'local_api_server': { file: 'server/local_api_server.py', port: 8001 },
-  'youtube_comment_server': { file: 'server/youtube_comment_server.py', port: 8768 },
-  'tiktok_comment_server': { file: 'server/tiktok_comment_server.py', port: 8767 }
+const cleanupPort = (port, resolve) => {
+  // 2. ポート番号で停止する場合: LISTEN状態のサーバープロセスのみを抽出し、ブラウザ/WebKitを絶対にkillしない
+  exec(`lsof -nP -iTCP:${port} -sTCP:LISTEN`, (err, stdout) => {
+    if (!stdout || !stdout.trim()) {
+      resolve();
+      return;
+    }
+    const lines = stdout.trim().split('\n').slice(1);
+    const serverPids = [];
+    lines.forEach(line => {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        const cmd = parts[0].toLowerCase();
+        const pid = parts[1];
+        // Python または Node プロセスのみを安全にkill対象とする
+        if (cmd.includes('python') || cmd.includes('node')) {
+          serverPids.push(pid);
+        }
+      }
+    });
+
+    if (serverPids.length > 0) {
+      exec(`kill -9 ${serverPids.join(' ')}`, () => resolve());
+    } else {
+      resolve();
+    }
+  });
 };
+
+
+const scriptMap = {
+  'local_api_server': { file: 'server/local_api_server.py', port: 8001, logFile: 'logs/api_server.log' },
+  'youtube_comment_server': { file: 'server/youtube_comment_server.py', port: 8768, logFile: 'logs/youtube_server.log' },
+  'tiktok_comment_server': { file: 'server/tiktok_comment_server.py', port: 8767, logFile: 'logs/tiktok_server.log' }
+};
+
 
 const serverLogs = {
   'local_api_server': [],
@@ -115,7 +124,30 @@ const backendManagerPlugin = () => ({
           const parts = url.pathname.split('/');
           if (parts.length === 5 && parts[4] === 'logs') {
             const serverName = parts[3];
-            res.end(JSON.stringify({ logs: serverLogs[serverName] || [] }));
+            let combinedLogs = [...(serverLogs[serverName] || [])];
+            
+            // 実ログファイルが存在する場合は末尾50行を取得してマージ
+            const config = scriptMap[serverName];
+            if (config && config.logFile) {
+              const fullLogPath = path.resolve(process.cwd(), config.logFile);
+              if (fs.existsSync(fullLogPath)) {
+                try {
+                  const fileContent = fs.readFileSync(fullLogPath, 'utf-8');
+                  const lines = fileContent.split('\n').filter(Boolean);
+                  const recentLines = lines.slice(-50);
+                  if (combinedLogs.length === 0) {
+                    combinedLogs = recentLines;
+                  } else {
+                    // 重複を避けてマージ
+                    combinedLogs = Array.from(new Set([...combinedLogs, ...recentLines])).slice(-60);
+                  }
+                } catch (err) {
+                  // read error fallback
+                }
+              }
+            }
+
+            res.end(JSON.stringify({ logs: combinedLogs }));
             return;
           }
         }

@@ -34,10 +34,11 @@ os.makedirs(os.path.join(BASE_DIR, "logs"), exist_ok=True)
 _log_file_path = os.path.join(BASE_DIR, "logs", "tiktok_server.log")
 
 _stream_handler = logging.StreamHandler()
-_stream_handler.setFormatter(JSTFormatter('[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+_stream_handler.setFormatter(JSTFormatter('[%(asctime)s] [TikTok WS] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
 
 _file_handler = logging.FileHandler(_log_file_path, mode='a', encoding='utf-8')
-_file_handler.setFormatter(JSTFormatter('[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+_file_handler.setFormatter(JSTFormatter('[%(asctime)s] [TikTok WS] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+
 
 logging.root.handlers = [_stream_handler, _file_handler]
 logging.root.setLevel(logging.INFO)
