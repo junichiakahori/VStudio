@@ -20,13 +20,15 @@ import datetime
 import urllib.parse
 import threading
 
-# ── ログ自動二重書き込み機構（TeeLogger: stdout/stderrを常にlogs/api_server.logへ同期書き込み）──
+# ── ログ自動二重書き込み機構（TeeLogger: stdout/stderrを常にlogs/api_server.logへ統一フォーマットで同期書き込み）──
 class TeeLogger:
-    """標準出力・エラー出力をコンソールとログファイルの両方に安全に出力（二重書き込み完全防止＆スレッドセーフ）"""
-    def __init__(self, filepath, stream):
+    """標準出力・エラー出力をコンソールとログファイルの両方に安全に出力（統一ログフォーマット徹底＆スレッドセーフ）"""
+    def __init__(self, filepath, stream, default_level="INFO"):
         self.filepath = os.path.abspath(filepath)
         self.stream = stream
+        self.default_level = default_level
         self._lock = threading.Lock()
+        self._buffer = ""
         os.makedirs(os.path.dirname(self.filepath), exist_ok=True)
         
         # すでにシェルリダイレクト (>> logs/api_server.log) されている場合はファイル直接追記を無効化
@@ -44,30 +46,70 @@ class TeeLogger:
         except Exception:
             pass
 
+    def _format_line(self, line):
+        line = line.rstrip('\r\n')
+        if not line:
+            return ""
+        # 既に [YYYY-MM-DD HH:MM:SS] [MODULE] [LEVEL] 形式になっている場合はそのまま
+        if re.match(r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]', line):
+            return line + "\n"
+        
+        now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        level = self.default_level
+        if any(kw in line for kw in ["⚠️", "WARN", "警告", "Timeout", "タイムアウト"]):
+            level = "WARN"
+        elif any(kw in line for kw in ["🚫", "ERROR", "エラー", "失敗", "Exception"]):
+            level = "ERROR"
+        
+        return f"[{now_str}] [Local API] [{level}] {line}\n"
+
     def write(self, data):
         with self._lock:
+            self._buffer += data
+            while '\n' in self._buffer:
+                line, self._buffer = self._buffer.split('\n', 1)
+                formatted = self._format_line(line)
+                if not formatted:
+                    continue
+                try:
+                    self.stream.write(formatted)
+                    self.stream.flush()
+                except Exception:
+                    pass
+                if not self.is_redirected:
+                    try:
+                        with open(self.filepath, "a", encoding="utf-8") as f:
+                            f.write(formatted)
+                            f.flush()
+                    except Exception:
+                        pass
+
+    def flush(self):
+        with self._lock:
+            if self._buffer.strip():
+                formatted = self._format_line(self._buffer)
+                self._buffer = ""
+                if formatted:
+                    try:
+                        self.stream.write(formatted)
+                        self.stream.flush()
+                    except Exception:
+                        pass
+                    if not self.is_redirected:
+                        try:
+                            with open(self.filepath, "a", encoding="utf-8") as f:
+                                f.write(formatted)
+                                f.flush()
+                        except Exception:
+                            pass
             try:
-                self.stream.write(data)
                 self.stream.flush()
             except Exception:
                 pass
-            if not self.is_redirected:
-                try:
-                    with open(self.filepath, "a", encoding="utf-8") as f:
-                        f.write(data)
-                        f.flush()
-                except Exception:
-                    pass
-
-    def flush(self):
-        try:
-            self.stream.flush()
-        except Exception:
-            pass
 
 API_LOG_FILE = os.path.join(BASE_DIR, "logs", "api_server.log")
-sys.stdout = TeeLogger(API_LOG_FILE, sys.stdout)
-sys.stderr = TeeLogger(API_LOG_FILE, sys.stderr)
+sys.stdout = TeeLogger(API_LOG_FILE, sys.stdout, default_level="INFO")
+sys.stderr = TeeLogger(API_LOG_FILE, sys.stderr, default_level="INFO")
 
 
 from server.log_manager import (
