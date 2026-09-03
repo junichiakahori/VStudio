@@ -3,11 +3,13 @@ import urllib.request
 import re
 import os
 import io
+import time
 import json
 import base64
 import pickle
 import logging
 import datetime
+
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
@@ -19,10 +21,14 @@ TOKEN_PATH = os.path.join(BASE_DIR, 'config', 'token.pickle')
 CLIENT_SECRET_PATH = os.path.join(BASE_DIR, 'config', 'client_secret.json')
 
 _cached_youtube_client = None
+_quota_exceeded_until = 0
 
 def get_authenticated_service(force_reauth=False):
     """OAuth認証を行いYouTube APIクライアントを返す（エラー時はNone）"""
-    global _cached_youtube_client
+    global _cached_youtube_client, _quota_exceeded_until
+    if time.time() < _quota_exceeded_until:
+        return None
+
     if _cached_youtube_client and not force_reauth:
         return _cached_youtube_client
 
@@ -54,7 +60,17 @@ def get_authenticated_service(force_reauth=False):
 
 def get_oauth_status():
     """現在のOAuth認証状態およびチャンネル名を取得"""
+    global _quota_exceeded_until
     has_secret = os.path.exists(CLIENT_SECRET_PATH)
+    if time.time() < _quota_exceeded_until:
+        return {
+            "authenticated": False,
+            "has_client_secret": has_secret,
+            "channel_title": "",
+            "channel_id": "",
+            "quota_exceeded": True
+        }
+
     service = get_authenticated_service()
     if not service:
         return {
@@ -74,13 +90,19 @@ def get_oauth_status():
                 "channel_id": item["id"]
             }
     except Exception as e:
-        logging.warning(f"[YouTube OAuth] Channels fetch failed: {e}")
+        err_str = str(e)
+        if "quotaExceeded" in err_str or "quota" in err_str.lower():
+            _quota_exceeded_until = time.time() + 1800
+            logging.info("[YouTube OAuth] YouTube Data APIの1日クォータ上限に達したため、APIリクエストを30分間一時休止します")
+        else:
+            logging.warning(f"[YouTube OAuth] Channels fetch failed: {e}")
     return {
         "authenticated": False,
         "has_client_secret": has_secret,
         "channel_title": "",
         "channel_id": ""
     }
+
 
 def start_oauth_flow():
     """ブラウザを開いてGoogle OAuth認証を実行し、token.pickleを保存"""
