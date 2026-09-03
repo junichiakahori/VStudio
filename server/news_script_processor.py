@@ -472,6 +472,36 @@ def generate_news_item_script_data(payload, custom_dict=None):
         else:
             print(f"{tag} ℹ️ 本文取得スキップ (RSS概要を活用)", flush=True)
 
+    # コメント返信や特殊アナウンスはニュース台本（5文構成）ではなく1〜2文の返答専用として直接生成
+    if is_special_item:
+        prompt = description if description else f"あなたは{char_desc}。{title}に対して親しみやすく1〜2文で返答してください。"
+        candidate_text = call_llm_backend(provider, prompt, api_key, model_name)
+        clean_text = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', candidate_text or '').strip()
+        clean_text = clean_text.replace("「", "").replace("」", "").strip()
+        
+        split_s = split_sentences_safely(clean_text)
+        if not split_s:
+            split_s = [clean_text] if clean_text else ["コメントありがとうございますにゃ！"]
+        
+        items = []
+        for s in split_s[:2]:
+            disp = sanitize_speech_text(s)
+            items.append({
+                "display": disp,
+                "speech": normalize_for_tts(disp, custom_dict=custom_dict)
+            })
+        total_speech_chars = sum(len(it.get('speech', '')) for it in items)
+        print(f"{tag} ✅ コメント返信生成完了！ (計 {len(items)}文, {total_speech_chars}文字)", flush=True)
+        return {
+            "status": "ok",
+            "url": "",
+            "headline": { "display": title, "speech": title },
+            "headline_speech": title,
+            "fullText": " ".join([it["display"] for it in items]),
+            "items": items,
+            "sentences": [it["display"] for it in items]
+        }
+
     prompt = build_news_prompt(char_desc, title, full_article_content)
     raw_text = None
     items = None
