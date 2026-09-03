@@ -12,6 +12,11 @@
         try {
           if (!window.newsListWindow.closed && window.newsListWindow.document) {
             window.newsListWindow.focus();
+            if (typeof window.newsListWindow.renderNewsList === "function") {
+              window.newsListWindow.renderNewsList();
+            } else {
+              window.newsListWindow.location.reload();
+            }
             return;
           }
         } catch (e) {
