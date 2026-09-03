@@ -397,6 +397,17 @@ def apply_okonau_context_rules(text):
     t = re.sub(r'行う([こと|もの|予定|方針|見込み|よう|際|時|ため|と|が|の|から|に|。|！|？|、]|$)', r'おこなう\1', t)
     return t
 
+def apply_age_and_counter_rules(text):
+    """年齢・助数詞に対する誤読・誤ルビの修復（75歳(とし) ➔ 75歳、75とし以上 ➔ 75さい以上）"""
+    if not text:
+        return ""
+    t = text
+    # 1. 年齢の漢字に対する誤ったルビ表記（例: 75歳（とし）、75才（75とし））を破棄して漢字単体に正規化（OpenJTalkに任せる）
+    t = re.sub(r'(\d+)(?:歳|才)[（\(].*?[）\)]', r'\1歳', t)
+    # 2. 「\d+とし」の形で誤変換された年齢の読みを「\d+さい」に修復
+    t = re.sub(r'(\d+)とし([以前後の代未ぐら未]|$)', r'\1さい\2', t)
+    return t
+
 def normalize_for_tts(text, custom_dict=None, log_collector=None):
     """
     TTS用テキストの包括的正規化処理（文脈解決 -> 辞書 -> 英語マップ -> Wikipedia動的解決 -> サニタイズ）
@@ -406,6 +417,9 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None):
         return ""
 
     t = text
+
+    # 0. 年齢・助数詞の誤読・誤ルビ修復
+    t = apply_age_and_counter_rules(t)
 
     # 1. 文脈考慮型のIT発音解決（映画『IT』 vs 英語代名詞 it vs 情報技術 大文字IT）
     t = apply_it_context_rules(t)

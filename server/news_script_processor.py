@@ -281,7 +281,9 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
         if len(core_chars) < 2:
             continue
 
-        display_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\1', s)
+        display_s = re.sub(r'(\d+)(?:歳|才)[（\(].*?[）\)]', r'\1歳', s)
+        s = re.sub(r'(\d+)(?:歳|才)[（\(].*?[）\)]', r'\1歳', s)
+        display_s = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\1', display_s)
         display_s = display_s.replace("（", "").replace("）", "").replace("(", "").replace(")", "").strip()
         display_s = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)のかた([たち|がた|も|は|が|に|へ|で|を|、|。|！|？\s]|$)', r'\1の方\2', display_s)
         display_s = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)なかた([たち|がた|も|は|が|に|へ|で|を|、|。|！|？\s]|$)', r'\1な方\2', display_s)
