@@ -870,6 +870,13 @@ function getNewsConfig() {
         const isFirst = (i === 0);
         const isCategoryChanged = (i > 0) && (item.categoryKey || "") !== newsBroadcastState.lastCategory;
 
+        // 放送中の最新記事リストを常に親メモリとlocalStorageへ同期（別窓表示やホットリロード対策）
+        window.latestFetchedNews = sortedNews;
+        newsBroadcastState.newsList = sortedNews;
+        try {
+          localStorage.setItem("latestFetchedNews", JSON.stringify(sortedNews));
+        } catch (e) { }
+
         newsBroadcastState.currentIndex = i + 1;
         newsBroadcastState.lastCategory = item.categoryKey || "";
 
