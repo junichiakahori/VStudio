@@ -95,12 +95,11 @@ def lookup_wikipedia_reading(term):
                     continue
                 extract = pdata.get("extract", "")
                 # 括弧内の先頭にあるひらがな/カタカナ読みを抽出（英語併記があっても確実に取得）
-                m = re.search(r'[\(（]\s*([ぁ-んァ-ヶゔヴー・、\s]+)', extract)
+                m = re.search(r'[\(（]\s*([ぁ-んァ-ヶゔヴー・、\s,，/／]+)', extract)
                 if m:
                     raw_bracket = m.group(1).strip()
-                    # 英語や別名表記の手前までを取得
-                    raw_bracket = re.split(r'[,，\t\n]|\s{2,}|(?<=[ぁ-んァ-ヶゔヴー])\s+(?=[A-Za-z])', raw_bracket)[0].strip()
-                    # 読点を整理
+                    # 読点（、）、カンマ（，,）、スラッシュ等で分割し、先頭の1つの代表読みのみを取得（異読の全結合を完全防止）
+                    raw_bracket = re.split(r'[、,，\t\n/／|｜]|\s{2,}|(?<=[ぁ-んァ-ヶゔヴー])\s+(?=[A-Za-z])', raw_bracket)[0].strip()
                     yomi_raw = raw_bracket.replace("・", "").replace(" ", "").strip()
                     if yomi_raw and yomi_raw not in INVALID_READINGS:
                         # カタカナをひらがなに変換（ヴ・ゔもサポート）
@@ -112,6 +111,7 @@ def lookup_wikipedia_reading(term):
                                 yomi_hira += 'ゔ'
                             else:
                                 yomi_hira += c
+
                         
                         yomi_clean = re.sub(r'[^ぁ-んゔー]', '', yomi_hira)
                         # 法人格接尾語（いんく、こーぽれーしょん、かぶしきがいしゃ等）を安全にカット
