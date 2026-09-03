@@ -358,19 +358,43 @@
             return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
         }
 
+        function logDiag(msg, level = "info") {
+            const fullMsg = `[記事一覧POPUP] ${msg}`;
+            if (level === "warn") console.warn(fullMsg);
+            else console.log(fullMsg);
+            try {
+                fetch("/log", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ level: level, message: fullMsg })
+                }).catch(() => {});
+            } catch (e) {}
+        }
+
         function getFetchedNews() {
             try {
                 if (window.opener && !window.opener.closed) {
                     if (window.opener.newsBroadcastState && window.opener.newsBroadcastState.newsList && window.opener.newsBroadcastState.newsList.length > 0) {
-                        return window.opener.newsBroadcastState.newsList;
+                        const list = window.opener.newsBroadcastState.newsList;
+                        logDiag(`親画面の進行中リスト (newsBroadcastState.newsList) から ${list.length} 件を取得しました (先頭: ${list[0]?.title?.substring(0, 20)}...)`);
+                        return list;
                     }
                     if (window.opener.latestFetchedNews && window.opener.latestFetchedNews.length > 0) {
-                        return window.opener.latestFetchedNews;
+                        const list = window.opener.latestFetchedNews;
+                        logDiag(`親画面の保持リスト (latestFetchedNews) から ${list.length} 件を取得しました (先頭: ${list[0]?.title?.substring(0, 20)}...)`);
+                        return list;
                     }
                 }
                 const saved = localStorage.getItem("latestFetchedNews");
-                if (saved) return JSON.parse(saved);
-            } catch (e) {}
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    logDiag(`localStorage (latestFetchedNews) から ${parsed.length} 件を取得しました (先頭: ${parsed[0]?.title?.substring(0, 20)}...)`);
+                    return parsed;
+                }
+                logDiag("親画面およびlocalStorageにニュースデータが存在しません (0件)", "warn");
+            } catch (e) {
+                logDiag(`ニュースデータ取得エラー: ${e.message}`, "warn");
+            }
             return [];
         }
 

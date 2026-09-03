@@ -20,6 +20,14 @@
     "js/chat-ui.js",
     "js/chat-client.js",
     "js/stream-automation.js",
+    "js/news/news-fetcher.js",
+    "js/news/news-media-resolver.js",
+    "js/news/news-state-manager.js",
+    "js/news/news-ui-board.js",
+    "js/news/news-audio-player.js",
+    "js/news/news-list-popup.js",
+    "js/news/news-config-manager.js",
+    "js/news/news-comment-interlude.js",
     "js/news-mode.js",
     "js/radio-mode.js",
     "js/stream-tools.js",
@@ -116,6 +124,19 @@
           console.log("[HotReload] YouTube WebSocket接続を最新バックエンドに再同期します...");
           window.startYoutubeConnection(savedId);
         }
+      }
+
+      // 進行中ニュースの最新リスト(262件)をlocalStorageへ強制同期
+      if (window.newsBroadcastState && window.newsBroadcastState.newsList && window.newsBroadcastState.newsList.length > 0) {
+        try {
+          localStorage.setItem("latestFetchedNews", JSON.stringify(window.newsBroadcastState.newsList));
+          console.log(`[HotReload] 📰 進行中ニュース (${window.newsBroadcastState.newsList.length}件) をlocalStorageへ完全同期しました`);
+        } catch (e) { }
+      } else if (window.latestFetchedNews && window.latestFetchedNews.length > 0) {
+        try {
+          localStorage.setItem("latestFetchedNews", JSON.stringify(window.latestFetchedNews));
+          console.log(`[HotReload] 📰 保持ニュース (${window.latestFetchedNews.length}件) をlocalStorageへ完全同期しました`);
+        } catch (e) { }
       }
 
       if (showToast) {
