@@ -113,19 +113,29 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
 
     def _send_json(self, data, status=200):
-        self.send_response(status)
-        self.send_header('Content-type', 'application/json; charset=utf-8')
-        self.end_headers()
-        self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
+        try:
+            self.send_response(status)
+            self.send_header('Content-type', 'application/json; charset=utf-8')
+            self.end_headers()
+            self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass
 
     def _send_text(self, text, content_type='text/plain; charset=utf-8', status=200):
-        self.send_response(status)
-        self.send_header('Content-type', content_type)
-        self.end_headers()
-        self.wfile.write(text.encode('utf-8'))
+        try:
+            self.send_response(status)
+            self.send_header('Content-type', content_type)
+            self.end_headers()
+            self.wfile.write(text.encode('utf-8'))
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass
 
     def _send_error(self, message, status=500):
-        self._send_json({"error": str(message)}, status=status)
+        try:
+            self._send_json({"error": str(message)}, status=status)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass
+
 
     def _read_body(self):
         length = int(self.headers.get('Content-Length', 0))
@@ -330,8 +340,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
             self.send_response(404)
             self.end_headers()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass
         except Exception as e:
             self._send_error(e, status=500)
+
 
 
 def run():

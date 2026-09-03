@@ -5,6 +5,7 @@ VStudio ログ管理・日次/サイズ別自動ローテーション・クリ�
 """
 
 import os
+import re
 import time
 import datetime
 import shutil
