@@ -616,10 +616,11 @@ async def fetch_live_stats_loop(video_id):
                         item = res["items"][0]
                         stats = item.get("statistics", {})
                         lsd = item.get("liveStreamingDetails", {})
-                        if "viewCount" in stats:
-                            viewers = f"{int(stats['viewCount']):,}"
-                        elif "concurrentViewers" in lsd:
+                        # ライブ配信中はconcurrentViewers（同接）を優先（viewCountは0になる場合があるため）
+                        if "concurrentViewers" in lsd:
                             viewers = f"{int(lsd['concurrentViewers']):,}"
+                        elif "viewCount" in stats and int(stats.get('viewCount', 0)) > 0:
+                            viewers = f"{int(stats['viewCount']):,}"
                         
                         if "likeCount" in stats:
                             likes = f"{int(stats['likeCount']):,}"
