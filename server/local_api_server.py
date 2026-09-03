@@ -32,7 +32,7 @@ class TeeLogger:
         self._buffer = ""
         os.makedirs(os.path.dirname(self.filepath), exist_ok=True)
         
-        # すでにシェルリダイレクト (>> logs/api_server.log) されている場合はファイル直接追記を無効化
+        # 物理的に同一ログファイルへシェルリダイレクト (>> logs/api_server.log) されている場合のみファイル直接追記を無効化（二重書き込み防止）
         self.is_redirected = False
         try:
             if hasattr(stream, 'fileno'):
@@ -41,9 +41,6 @@ class TeeLogger:
                     file_stat = os.stat(self.filepath)
                     if stream_stat.st_ino == file_stat.st_ino and stream_stat.st_dev == file_stat.st_dev:
                         self.is_redirected = True
-            if hasattr(stream, 'isatty') and not stream.isatty():
-                # 非端末（パイプ・リダイレクト）の場合も二重出力を防止
-                self.is_redirected = True
         except Exception:
             pass
 
