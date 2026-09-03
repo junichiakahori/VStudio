@@ -597,10 +597,16 @@ function getNewsConfig() {
         // セットリストボードの進行目印を更新
         updateNewsSetlistProgress(item.categoryKey || "cat_top", newsBroadcastState.currentIndex, newsBroadcastState.totalCount);
 
-        // 記事読み上げ開始時に即座に既読フラグを記録・保存
+        // 記事読み上げ開始時に現在放送中タイトルと既読フラグを記録・保存
         readNewsTitles.add(item.title);
         window.readNewsTitles = readNewsTitles;
-        try { localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles))); } catch (e) { }
+        try {
+          localStorage.setItem("currentPlayingNewsTitle", item.title);
+          localStorage.setItem("newsReadTitles", JSON.stringify(Array.from(readNewsTitles)));
+        } catch (e) { }
+        if (typeof window.updateNewsListPopup === "function") {
+          window.updateNewsListPopup();
+        }
 
         // 🎙️ ① システムによる定型繋ぎセリフを発話
         const isFirstItem = isFirst || (newsBroadcastState.currentIndex === 1);
@@ -759,8 +765,14 @@ function getNewsConfig() {
         return dateA - dateB;
       });
 
+      // 保持ニュースを最新ソート済みリストで同期・永続化
+      window.latestFetchedNews = sortedNews;
+      try {
+        localStorage.setItem("latestFetchedNews", JSON.stringify(sortedNews));
+      } catch (e) { }
+
       const isMidwayStart = (startIndex > 0);
-      newsBroadcastState = { isRunning: true, currentIndex: startIndex, totalCount: sortedNews.length, lastCategory: "", isFromNewsList: !!isFromNewsList };
+      newsBroadcastState = { isRunning: true, currentIndex: startIndex, totalCount: sortedNews.length, lastCategory: "", isFromNewsList: !!isFromNewsList, newsList: sortedNews };
       if (startBtn) startBtn.style.display = "none";
       if (stopBtn) stopBtn.style.display = "block";
       if (progressEl) progressEl.style.display = "block";
