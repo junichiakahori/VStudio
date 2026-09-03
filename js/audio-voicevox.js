@@ -249,6 +249,8 @@ async function playNextVoicevox() {
         console.warn("[VOICEVOX] Resume error:", e);
       }
     }
+    console.log(`[VOICEVOX WebAudio] Context State: ${ctx.state} | SampleRate: ${ctx.sampleRate}Hz | Destination: OK`);
+
 
     const volSlider = document.getElementById("voicevox-volume-slider");
     const savedVol = localStorage.getItem("savedVoicevoxVolume");
