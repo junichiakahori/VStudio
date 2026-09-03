@@ -25,6 +25,17 @@ class TeeLogger:
         self.filepath = filepath
         self.stream = stream
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        # 既に同じファイルへリダイレクトされている場合は二重書き込みを抑止
+        self.is_redirected_to_same_file = False
+        try:
+            if hasattr(stream, 'fileno'):
+                stream_stat = os.fstat(stream.fileno())
+                if os.path.exists(filepath):
+                    file_stat = os.stat(filepath)
+                    if stream_stat.st_ino == file_stat.st_ino and stream_stat.st_dev == file_stat.st_dev:
+                        self.is_redirected_to_same_file = True
+        except Exception:
+            pass
 
     def write(self, data):
         try:
@@ -32,12 +43,13 @@ class TeeLogger:
             self.stream.flush()
         except Exception:
             pass
-        try:
-            with open(self.filepath, "a", encoding="utf-8") as f:
-                f.write(data)
-                f.flush()
-        except Exception:
-            pass
+        if not self.is_redirected_to_same_file:
+            try:
+                with open(self.filepath, "a", encoding="utf-8") as f:
+                    f.write(data)
+                    f.flush()
+            except Exception:
+                pass
 
     def flush(self):
         try:
