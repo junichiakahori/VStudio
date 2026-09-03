@@ -404,8 +404,8 @@ def apply_age_and_counter_rules(text):
     t = text
     # 1. 年齢の漢字に対する誤ったルビ表記（例: 75歳（とし）、75才（75とし））を破棄して漢字単体に正規化（OpenJTalkに任せる）
     t = re.sub(r'(\d+)(?:歳|才)[（\(].*?[）\)]', r'\1歳', t)
-    # 2. 「\d+とし」の形で誤変換された年齢の読みを「\d+さい」に修復
-    t = re.sub(r'(\d+)とし([以前後の代未ぐら未]|$)', r'\1さい\2', t)
+    # 2. 「\d+とし」の形で誤変換された年齢の読みを「\d+さい」に修復（漢字・ひらがな両対応）
+    t = re.sub(r'(\d+)とし([以前後の代未ぐら未]|いじょう|いか|みまん|ぜんご|$)', r'\1さい\2', t)
     return t
 
 def normalize_for_tts(text, custom_dict=None, log_collector=None):
