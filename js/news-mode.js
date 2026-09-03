@@ -108,18 +108,19 @@ function isInvalidNewsVideoArticle(arg1, arg2) {
   return false;
 }
 window.isInvalidNewsVideoArticle = isInvalidNewsVideoArticle;
-window.readNewsTitles = new Set(JSON.parse(localStorage.getItem("newsReadTitles") || "[]")); // 既読ニュースのタイトルを保持するセット
-window.readNewsTitles = readNewsTitles;
-try {
-  const savedNews = localStorage.getItem("latestFetchedNews");
-  if (savedNews) {
-    window.latestFetchedNews = JSON.parse(savedNews);
+// 既読ニュースのタイトルを保持するセット
+window.readNewsTitles = window.readNewsTitles || new Set(JSON.parse(localStorage.getItem("newsReadTitles") || "[]"));
+
+// 既存の window.latestFetchedNews が存在する場合は保護し、空の場合のみ localStorage から復元
+if (!window.latestFetchedNews || window.latestFetchedNews.length === 0) {
+  try {
+    const savedNews = localStorage.getItem("latestFetchedNews");
+    if (savedNews) {
+      window.latestFetchedNews = JSON.parse(savedNews);
+    }
+  } catch (e) {
+    window.latestFetchedNews = [];
   }
-} catch (e) { }
-try {
-  window.latestFetchedNews = JSON.parse(localStorage.getItem("latestFetchedNews") || "[]");
-} catch (e) {
-  window.latestFetchedNews = [];
 }
 
 // HTMLタグ・実体参照（&lt;, &gt;, <ol>, <a> 等）を安全かつ完全に除去して平文にする共通関数

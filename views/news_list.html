@@ -360,8 +360,13 @@
 
         function getFetchedNews() {
             try {
-                if (window.opener && !window.opener.closed && window.opener.latestFetchedNews && window.opener.latestFetchedNews.length > 0) {
-                    return window.opener.latestFetchedNews;
+                if (window.opener && !window.opener.closed) {
+                    if (window.opener.newsBroadcastState && window.opener.newsBroadcastState.newsList && window.opener.newsBroadcastState.newsList.length > 0) {
+                        return window.opener.newsBroadcastState.newsList;
+                    }
+                    if (window.opener.latestFetchedNews && window.opener.latestFetchedNews.length > 0) {
+                        return window.opener.latestFetchedNews;
+                    }
                 }
                 const saved = localStorage.getItem("latestFetchedNews");
                 if (saved) return JSON.parse(saved);
