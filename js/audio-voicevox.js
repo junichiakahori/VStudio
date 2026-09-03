@@ -255,47 +255,10 @@ async function playNextVoicevox() {
     let targetVol = volSlider ? (parseFloat(volSlider.value) / 100.0) : (savedVol ? (parseFloat(savedVol) / 100.0) : 1.0);
     if (isNaN(targetVol) || targetVol <= 0) targetVol = 1.0;
 
-    // もし AudioContext が suspended のままの場合は HTML5 Audio 要素で再生フォールバック
-    if (ctx.state === "suspended") {
-      console.warn("[VOICEVOX] ⚠️ AudioContext が suspended のため HTML5 Audio で再生します");
-      const blob = new Blob([arrayBuffer], { type: "audio/wav" });
-      const blobUrl = URL.createObjectURL(blob);
-      const audioEl = new Audio(blobUrl);
-      audioEl.volume = Math.min(1.0, Math.max(0.0, targetVol));
-      
-      let watchdog = setTimeout(() => {
-        try { audioEl.pause(); } catch(e){}
-        URL.revokeObjectURL(blobUrl);
-        isVoicevoxPlaying = false;
-        playNextVoicevox();
-      }, 15000);
-
-      audioEl.onended = () => {
-        clearTimeout(watchdog);
-        URL.revokeObjectURL(blobUrl);
-        isVoicevoxPlaying = false;
-        if (voicevoxAudioQueue.length === 0) hideSubtitles();
-        playNextVoicevox();
-      };
-      audioEl.onerror = () => {
-        clearTimeout(watchdog);
-        URL.revokeObjectURL(blobUrl);
-        isVoicevoxPlaying = false;
-        playNextVoicevox();
-      };
-      await audioEl.play().catch((e) => {
-        console.error("[VOICEVOX] HTML5 Audio play error:", e);
-        clearTimeout(watchdog);
-        URL.revokeObjectURL(blobUrl);
-        isVoicevoxPlaying = false;
-        playNextVoicevox();
-      });
-      return;
-    }
-
     const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
     currentVoicevoxSource = ctx.createBufferSource();
     currentVoicevoxSource.buffer = audioBuffer;
+
 
     if (!window.voicevoxAnalyser) {
       window.voicevoxAnalyser = ctx.createAnalyser();
