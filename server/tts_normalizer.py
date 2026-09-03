@@ -93,9 +93,18 @@ def lookup_wikipedia_reading(term):
             for pid, pdata in pages.items():
                 if pid == "-1":
                     continue
+                page_title = pdata.get("title", "")
+                # リダイレクト先タイトルが検索語と全く無関係な上位概念（例: 震度3 -> 気象庁震度階級）の場合は破棄
+                clean_pt = re.sub(r'[\(（].*?[\)）]', '', page_title).strip()
+                if term not in clean_pt and clean_pt not in term:
+                    # アルファベットの大文字小文字違いを除き、乖離したリダイレクトは採用しない
+                    if term.lower() != clean_pt.lower():
+                        continue
+
                 extract = pdata.get("extract", "")
                 # 括弧内の先頭にあるひらがな/カタカナ読みを抽出（英語併記があっても確実に取得）
                 m = re.search(r'[\(（]\s*([ぁ-んァ-ヶゔヴー・、\s,，/／]+)', extract)
+
                 if m:
                     raw_bracket = m.group(1).strip()
                     # 読点（、）、カンマ（，,）、スラッシュ等で分割し、先頭の1つの代表読みのみを取得（異読の全結合を完全防止）
@@ -222,10 +231,13 @@ def extract_special_terms(text):
             terms.append(t)
 
     # 3. 漢字/英字＋数字の固有名詞（日向坂46, 乃木坂46, 櫻坂46, AKB48, SKE48等）
+    # ※ 震度、気温、階数、丁目、号線、回数、順位などの一般的な単位・数量表現は完全除外
+    UNIT_COUNTER_PATTERN = r'^(?:第?\d+|昭和\d+|平成\d+|令和\d+|\d+年|\d+月|\d+日|\d+歳|\d+人|\d+件|\d+回|\d+度|\d+階|\d+号|\d+線|\d+丁目|\d+番地?|\d+条|\d+段|\d+級|\d+位|\d+選|\d+点|\d+倍|\d+割|\d+部|\d+期|\d+代|\d+本|\d+匹|\d+頭|\d+羽|\d+冊|\d+台|\d+発|\d+勝|\d+敗|\d+分|\d+秒|\d+時|\d+ドル|\d+円|\d+万|\d+億|\d+兆|\d+％|\d+%|震度\d+[強弱]?|気温\d+|マイナス\d+|プラス\d+|国道\d+|県道\d+|午後\d+|午前\d+)$'
     for m in re.finditer(r'(?:[A-Za-z]+|[\u4e00-\u9fa5]+)\d{1,3}', text):
         t = m.group(0)
-        if not re.match(r'^(?:第?\d+|昭和\d+|平成\d+|令和\d+|\d+年|\d+月|\d+日|\d+歳|\d+人|\d+件|\d+回)$', t):
+        if not re.match(UNIT_COUNTER_PATTERN, t):
             terms.append(t)
+
 
     # 4. 敬称・肩書が付いた人名候補（河野俊嗣さん、菅原選手、高市総理など）
     for m in re.finditer(r'[\u4e00-\u9fa5]{2,4}(?=(?:さん|氏|選手|知事|首相|大臣|総理|議員|社長|会長|監督|コーチ|容疑者|被告))', text):
