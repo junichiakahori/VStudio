@@ -141,9 +141,9 @@ function getNewsConfig() {
   if (window.newsConfigManager && typeof window.newsConfigManager.getNewsConfig === "function") {
     return window.newsConfigManager.getNewsConfig();
   }
-  const title = document.getElementById("news-program-title")?.value || "今日の最新ニュース";
-  const op = document.getElementById("news-opening-text")?.value || "本日の最新ニュースをお届けいたします。";
-  const ed = document.getElementById("news-ending-text")?.value || "以上、本日のニュースでした。";
+  const title = document.getElementById("news-config-title")?.value || document.getElementById("news-program-title")?.value || "今日の最新ニュース";
+  const op = document.getElementById("news-config-opening")?.value || document.getElementById("news-opening-text")?.value || (window.newsConfigManager ? window.newsConfigManager.getTimeBasedGreeting(false, title) : "本日の最新ニュースをお届けいたします。");
+  const ed = document.getElementById("news-config-closing")?.value || document.getElementById("news-ending-text")?.value || (window.newsConfigManager ? window.newsConfigManager.getTimeBasedClosing(false) : "以上、本日の最新ニュースをお届けいたしました。それでは、今日も素敵な一日をお過ごしください。");
   return { title, op, ed, useOpChime: true, useTransition: true, useEdChime: true };
 }
   function initNewsSetlist(newsList) {

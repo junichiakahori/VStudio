@@ -29,9 +29,9 @@
   }
 
   function getNewsConfig() {
-    const title = document.getElementById("news-program-title")?.value || "今日の最新ニュース";
-    const op = document.getElementById("news-opening-text")?.value || getTimeBasedGreeting(false, title);
-    const ed = document.getElementById("news-ending-text")?.value || getTimeBasedClosing(false);
+    const title = document.getElementById("news-config-title")?.value || document.getElementById("news-program-title")?.value || "今日の最新ニュース";
+    const op = document.getElementById("news-config-opening")?.value || document.getElementById("news-opening-text")?.value || getTimeBasedGreeting(false, title);
+    const ed = document.getElementById("news-config-closing")?.value || document.getElementById("news-ending-text")?.value || getTimeBasedClosing(false);
     const useOpChime = document.getElementById("news-se-op-chime")?.checked ?? true;
     const useTransition = document.getElementById("news-se-transition")?.checked ?? true;
     const useEdChime = document.getElementById("news-se-ed-chime")?.checked ?? true;
