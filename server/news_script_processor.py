@@ -156,8 +156,11 @@ def call_ollama_backend(prompt, model="qwen2.5:7b", base_url="http://127.0.0.1:1
         "system": "You are a professional Japanese VTuber news anchor. Output 100% natural Japanese ONLY. Under no circumstances should you ever output any Chinese words, simplified Chinese characters, or hallucinated facts.",
         "options": {
             "temperature": 0.2,
-            "top_p": 0.8
+            "top_p": 0.8,
+            "num_ctx": 2048,
+            "num_predict": 300
         },
+        "keep_alive": "60m",
         "stream": False
     }
     try:
@@ -462,6 +465,8 @@ def generate_news_item_script_data(payload, custom_dict=None):
         print(f"{tag} 🌐 記事本文をスクレイピング取得中...", flush=True)
         fetched_body = fetch_article_body(article_url)
         if fetched_body and len(fetched_body) > 30:
+            if len(fetched_body) > 800:
+                fetched_body = fetched_body[:800] + "…"
             full_article_content = f"{description}\n【元記事の詳細本文】: {fetched_body}"
             print(f"{tag} 📄 記事本文取得完了 ({len(fetched_body)}文字) ➔ プロンプト注入", flush=True)
         else:
