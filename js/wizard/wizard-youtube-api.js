@@ -12,30 +12,43 @@
     chat: "みなさん、雑談配信へようこそ！AI VTuberの「とろろ」です！✨\nコメントでたくさんお話ししましょう！"
   };
 
+  function getTitleInputElement() {
+    return document.getElementById("wizard-suggested-title") || document.getElementById("wizard-yt-title");
+  }
+
+  function getDescInputElement() {
+    return document.getElementById("wizard-suggested-desc") || document.getElementById("wizard-yt-desc");
+  }
+
   function showYtApiFeedback(msg, isSuccess = true, isWarning = false) {
-    const el = document.getElementById("yt-api-feedback");
-    if (!el) return;
+    const el = document.getElementById("yt-api-feedback-msg") || document.getElementById("yt-api-feedback");
+    if (!el) {
+      if (typeof window.showWizardToast === "function") {
+        window.showWizardToast(msg, isSuccess);
+      }
+      return;
+    }
     el.style.display = "block";
     el.textContent = msg;
     if (isWarning) {
       el.style.background = "rgba(255, 180, 0, 0.15)";
-      el.style.borderColor = "#ffb400";
+      el.style.border = "1px solid #ffb400";
       el.style.color = "#ffeaa7";
     } else if (isSuccess) {
       el.style.background = "rgba(0, 230, 118, 0.15)";
-      el.style.borderColor = "#00e676";
+      el.style.border = "1px solid #00e676";
       el.style.color = "#b8e994";
     } else {
       el.style.background = "rgba(255, 118, 117, 0.15)";
-      el.style.borderColor = "#ff7675";
+      el.style.border = "1px solid #ff7675";
       el.style.color = "#ff7675";
     }
   }
   window.showYtApiFeedback = showYtApiFeedback;
 
   function generateStreamReservationMetadata(forceUpdate = false) {
-    const titleInput = document.getElementById("wizard-yt-title");
-    const descInput = document.getElementById("wizard-yt-desc");
+    const titleInput = getTitleInputElement();
+    const descInput = getDescInputElement();
     if (!titleInput || !descInput) return;
 
     const scheduledTime = typeof window.getWizardScheduledStartTime === "function" ? window.getWizardScheduledStartTime() : "";
@@ -171,8 +184,8 @@
       }
     }
 
-    const titleInput = document.getElementById("wizard-yt-title");
-    const descInput = document.getElementById("wizard-yt-desc");
+    const titleInput = getTitleInputElement();
+    const descInput = getDescInputElement();
     if (titleInput && descInput) {
       const savedTitle = (window.openerWin && window.openerWin.localStorage.getItem(`savedStreamTitle_${activeSlot}`)) || localStorage.getItem(`savedStreamTitle_${activeSlot}`);
       const savedDesc = (window.openerWin && window.openerWin.localStorage.getItem(`savedStreamDesc_${activeSlot}`)) || localStorage.getItem(`savedStreamDesc_${activeSlot}`);
@@ -188,16 +201,16 @@
   window.updateStep4Inputs = updateStep4Inputs;
 
   async function checkYtApiAuthStatus() {
-    const statusBadge = document.getElementById("yt-auth-status-badge");
+    const statusBadge = document.getElementById("yt-oauth-badge") || document.getElementById("yt-auth-status-badge");
     const channelNameEl = document.getElementById("yt-auth-channel-name");
-    const authBtn = document.getElementById("wizard-btn-yt-auth");
+    const authBtn = document.getElementById("btn-yt-oauth-login") || document.getElementById("wizard-btn-yt-auth");
     if (!statusBadge) return;
 
     try {
       const res = await fetch("/api/youtube/oauth_status", { cache: "no-store" });
       const data = await res.json();
       if (data.authenticated) {
-        statusBadge.textContent = "🟢 連携済み";
+        statusBadge.textContent = `🟢 連携済み${data.channel_title ? ' (' + data.channel_title + ')' : ''}`;
         statusBadge.style.color = "#00e676";
         if (channelNameEl && data.channel_title) {
           channelNameEl.textContent = `(${data.channel_title})`;
@@ -205,19 +218,22 @@
         }
         if (authBtn) {
           authBtn.textContent = "🔑 再連携 (別アカウント)";
+          authBtn.style.display = "inline-block";
           authBtn.style.background = "rgba(255,255,255,0.08)";
         }
       } else if (data.quota_exceeded) {
         statusBadge.textContent = "🟡 クォータ上限待機中 (自動回復)";
         statusBadge.style.color = "#ffeaa7";
         if (channelNameEl) channelNameEl.style.display = "none";
+        if (authBtn) authBtn.style.display = "none";
       } else {
         statusBadge.textContent = "🔴 未連携";
         statusBadge.style.color = "#ff7675";
         if (channelNameEl) channelNameEl.style.display = "none";
         if (authBtn) {
-          authBtn.textContent = "🔑 Google連携してログイン";
-          authBtn.style.background = "linear-gradient(135deg, #e17055, #d63031)";
+          authBtn.textContent = "🔑 Google連携";
+          authBtn.style.display = "inline-block";
+          authBtn.style.background = "#ff4444";
         }
       }
     } catch (e) {
@@ -226,7 +242,6 @@
     }
   }
   window.checkYtApiAuthStatus = checkYtApiAuthStatus;
-
 
   // 配信枠一覧から選択モーダル ロジック
   let cachedBroadcasts = [];
@@ -311,8 +326,8 @@
 
       card.addEventListener("click", () => {
         const ytInput = document.getElementById("wizard-yt-input");
-        const titleInput = document.getElementById("wizard-yt-title");
-        const descInput = document.getElementById("wizard-yt-desc");
+        const titleInput = getTitleInputElement();
+        const descInput = getDescInputElement();
         if (ytInput) ytInput.value = item.id;
         if (titleInput && item.title) titleInput.value = item.title;
         if (descInput && item.description) descInput.value = item.description;
@@ -404,7 +419,8 @@
     });
 
     // 枠一覧選択モーダル開閉
-    document.getElementById("wizard-btn-open-picker")?.addEventListener("click", () => {
+    const openPickerBtn = document.getElementById("wizard-yt-select-modal-btn") || document.getElementById("wizard-btn-open-picker");
+    openPickerBtn?.addEventListener("click", () => {
       window.openBroadcastPickerModal();
     });
     document.getElementById("btn-close-broadcast-picker")?.addEventListener("click", () => {
@@ -429,13 +445,14 @@
     });
 
     // Google連携
-    document.getElementById("wizard-btn-yt-auth")?.addEventListener("click", async () => {
+    const authBtn = document.getElementById("btn-yt-oauth-login") || document.getElementById("wizard-btn-yt-auth");
+    authBtn?.addEventListener("click", async () => {
       showYtApiFeedback("🌐 ブラウザでGoogleログイン・アクセス許可を行ってください...", true, true);
       try {
-        const res = await fetch("/api/youtube/auth", { method: "POST" });
+        const res = await fetch("/api/youtube/start_oauth", { method: "POST" });
         const data = await res.json();
         if (data.success) {
-          showYtApiFeedback(`✅ Google連携が完了しました！（チャンネル: ${data.channel_title}）`, true);
+          showYtApiFeedback(`✅ Google連携が完了しました！${data.channel_title ? '（チャンネル: ' + data.channel_title + '）' : ''}`, true);
           checkYtApiAuthStatus();
         } else {
           showYtApiFeedback(`❌ 連携に失敗しました: ${data.error || "ユーザーキャンセルまたはエラー"}`, false);
@@ -446,11 +463,15 @@
     });
 
     // 枠自動作成
-    document.getElementById("wizard-btn-yt-create")?.addEventListener("click", async () => {
-      const title = document.getElementById("wizard-yt-title")?.value?.trim() || "";
-      const desc = document.getElementById("wizard-yt-desc")?.value || "";
+    const createBtn = document.getElementById("btn-api-create-broadcast") || document.getElementById("wizard-btn-yt-create");
+    createBtn?.addEventListener("click", async () => {
+      const titleInput = getTitleInputElement();
+      const descInput = getDescInputElement();
+      const title = titleInput?.value?.trim() || "";
+      const desc = descInput?.value || "";
       const scheduledTime = typeof window.getWizardScheduledStartTime === "function" ? window.getWizardScheduledStartTime() : "";
-      const privacy = document.getElementById("wizard-yt-privacy")?.value || "public";
+      const privacySelect = document.getElementById("wizard-privacy-status") || document.getElementById("wizard-yt-privacy");
+      const privacy = privacySelect?.value || "public";
       const madeForKids = document.getElementById("wizard-yt-kids")?.checked || false;
 
       if (!title) {
@@ -458,18 +479,18 @@
         return;
       }
 
-      const btn = document.getElementById("wizard-btn-yt-create");
-      btn.disabled = true;
-      btn.textContent = "⏳ 枠を作成中...";
+      createBtn.disabled = true;
+      const origText = createBtn.textContent;
+      createBtn.textContent = "⏳ 枠を作成中...";
       showYtApiFeedback("🚀 YouTube上に新規配信予約枠を作成中...", true, true);
 
       try {
-        const authCheck = await fetch("/api/youtube/auth_status");
+        const authCheck = await fetch("/api/youtube/oauth_status");
         const authData = await authCheck.json();
         if (!authData.authenticated) {
           showYtApiFeedback("⚠️ 先に「🔑 Google連携」ボタンを押してログインしてください。", false);
-          btn.disabled = false;
-          btn.textContent = "🚀 枠を新規作成";
+          createBtn.disabled = false;
+          createBtn.textContent = origText;
           return;
         }
 
@@ -488,7 +509,7 @@
         if (data.success && data.id) {
           const ytInput = document.getElementById("wizard-yt-input");
           if (ytInput) ytInput.value = data.id;
-          showYtApiFeedback(`✅ YouTube枠「${data.title}」を自動作成しました！ (ID: ${data.id})`, true);
+          showYtApiFeedback(`✅ YouTube枠「${data.title || title}」を自動作成しました！ (ID: ${data.id})`, true);
 
           try {
             const thumbCanvas = (window.openerWin && window.openerWin.document) ? window.openerWin.document.getElementById("news-thumb-canvas") : null;
@@ -507,18 +528,22 @@
       } catch (err) {
         showYtApiFeedback(`❌ 通信エラー: ${err.message}`, false);
       } finally {
-        btn.disabled = false;
-        btn.textContent = "🚀 枠を新規作成";
+        createBtn.disabled = false;
+        createBtn.textContent = origText;
       }
     });
 
     // 枠情報更新
-    document.getElementById("wizard-btn-yt-update")?.addEventListener("click", async () => {
+    const updateBtn = document.getElementById("btn-api-update-broadcast") || document.getElementById("wizard-btn-yt-update");
+    updateBtn?.addEventListener("click", async () => {
       const videoId = document.getElementById("wizard-yt-input")?.value?.trim() || "";
-      const title = document.getElementById("wizard-yt-title")?.value?.trim() || "";
-      const desc = document.getElementById("wizard-yt-desc")?.value || "";
+      const titleInput = getTitleInputElement();
+      const descInput = getDescInputElement();
+      const title = titleInput?.value?.trim() || "";
+      const desc = descInput?.value || "";
       const scheduledTime = typeof window.getWizardScheduledStartTime === "function" ? window.getWizardScheduledStartTime() : "";
-      const privacy = document.getElementById("wizard-yt-privacy")?.value || "public";
+      const privacySelect = document.getElementById("wizard-privacy-status") || document.getElementById("wizard-yt-privacy");
+      const privacy = privacySelect?.value || "public";
       const madeForKids = document.getElementById("wizard-yt-kids")?.checked || false;
 
       if (!videoId) {
@@ -530,9 +555,9 @@
         return;
       }
 
-      const btn = document.getElementById("wizard-btn-yt-update");
-      btn.disabled = true;
-      btn.textContent = "⏳ 更新中...";
+      updateBtn.disabled = true;
+      const origText = updateBtn.textContent;
+      updateBtn.textContent = "⏳ 更新中...";
       showYtApiFeedback("📝 YouTubeの配信枠情報を更新中...", true, true);
 
       try {
@@ -557,22 +582,23 @@
       } catch (err) {
         showYtApiFeedback(`❌ 通信エラー: ${err.message}`, false);
       } finally {
-        btn.disabled = false;
-        btn.textContent = "📝 既存枠を更新";
+        updateBtn.disabled = false;
+        updateBtn.textContent = origText;
       }
     });
 
     // サムネイル送信
-    document.getElementById("wizard-btn-yt-thumb")?.addEventListener("click", async () => {
+    const thumbBtn = document.getElementById("btn-api-upload-thumbnail") || document.getElementById("wizard-btn-yt-thumb");
+    thumbBtn?.addEventListener("click", async () => {
       const videoId = document.getElementById("wizard-yt-input")?.value?.trim() || "";
       if (!videoId) {
         showYtApiFeedback("⚠️ サムネイル反映対象のYouTube動画IDを入力するか、「枠を自動作成」してください。", false);
         return;
       }
 
-      const btn = document.getElementById("wizard-btn-yt-thumb");
-      btn.disabled = true;
-      btn.textContent = "⏳ サムネイル送信中...";
+      thumbBtn.disabled = true;
+      const origText = thumbBtn.textContent;
+      thumbBtn.textContent = "⏳ サムネイル送信中...";
 
       let base64 = "";
       try {
@@ -587,8 +613,8 @@
 
       if (!base64) {
         showYtApiFeedback("⚠️ サムネイル画像を自動生成できませんでした。「🎨 サムネイルを編集」ボタンを押してご確認ください。", false);
-        btn.disabled = false;
-        btn.textContent = "🖼️ サムネイル反映";
+        thumbBtn.disabled = false;
+        thumbBtn.textContent = origText;
         return;
       }
 
@@ -608,13 +634,14 @@
       } catch (err) {
         showYtApiFeedback(`❌ 通信エラー: ${err.message}`, false);
       } finally {
-        btn.disabled = false;
-        btn.textContent = "🖼️ サムネイル反映";
+        thumbBtn.disabled = false;
+        thumbBtn.textContent = origText;
       }
     });
 
     // サムネイルエディタモーダルを開く
-    document.getElementById("wizard-btn-edit-thumb")?.addEventListener("click", () => {
+    const editThumbBtn = document.getElementById("btn-wizard-open-thumb-editor") || document.getElementById("wizard-btn-edit-thumb");
+    editThumbBtn?.addEventListener("click", () => {
       if (window.openerWin && typeof window.openerWin.openNewsThumbnailModal === "function") {
         window.openerWin.openNewsThumbnailModal();
         window.openerWin.focus();
@@ -622,8 +649,40 @@
     });
 
     // メタデータ再生成ボタン
-    document.getElementById("wizard-btn-yt-meta-suggest")?.addEventListener("click", () => {
+    document.getElementById("btn-regen-title")?.addEventListener("click", () => {
       generateStreamReservationMetadata(true);
+      if (typeof window.showWizardToast === "function") {
+        window.showWizardToast("🎲 配信タイトルを再生成しました", true);
+      }
+    });
+    document.getElementById("btn-regen-desc")?.addEventListener("click", () => {
+      generateStreamReservationMetadata(true);
+      if (typeof window.showWizardToast === "function") {
+        window.showWizardToast("🔄 説明欄を再生成しました", true);
+      }
+    });
+
+    // コピー系ボタン
+    document.getElementById("btn-copy-title")?.addEventListener("click", () => {
+      const val = getTitleInputElement()?.value || "";
+      if (val) {
+        navigator.clipboard.writeText(val);
+        if (typeof window.showWizardToast === "function") window.showWizardToast("📋 タイトルをコピーしました", true);
+      }
+    });
+    document.getElementById("btn-copy-desc")?.addEventListener("click", () => {
+      const val = getDescInputElement()?.value || "";
+      if (val) {
+        navigator.clipboard.writeText(val);
+        if (typeof window.showWizardToast === "function") window.showWizardToast("📋 説明欄をコピーしました", true);
+      }
+    });
+    document.getElementById("btn-copy-all-obs-info")?.addEventListener("click", () => {
+      const title = getTitleInputElement()?.value || "";
+      const desc = getDescInputElement()?.value || "";
+      const allText = `【配信タイトル】\n${title}\n\n【配信説明欄】\n${desc}`;
+      navigator.clipboard.writeText(allText);
+      if (typeof window.showWizardToast === "function") window.showWizardToast("📋 タイトル・説明欄をまとめてコピーしました！", true);
     });
 
     // チャンネルからライブ枠検知
@@ -673,10 +732,43 @@
       }
     });
 
+    // 枠確認ボタン
+    document.getElementById("wizard-yt-check-btn")?.addEventListener("click", async () => {
+      const ytInput = document.getElementById("wizard-yt-input");
+      const val = ytInput?.value?.trim() || "";
+      if (!val) {
+        if (typeof window.showWizardToast === "function") window.showWizardToast("⚠️ YouTube枠IDを入力してください", false);
+        return;
+      }
+      try {
+        const res = await fetch("/get_youtube_video_info", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ videoId: val })
+        });
+        const data = await res.json();
+        if (data.title) {
+          const card = document.getElementById("wizard-yt-info-card");
+          const titleEl = document.getElementById("wizard-yt-title");
+          const thumbEl = document.getElementById("wizard-yt-thumb-preview");
+          if (card) card.style.display = "block";
+          if (titleEl) titleEl.textContent = data.title;
+          if (thumbEl && data.thumbnail_url) {
+            thumbEl.src = data.thumbnail_url;
+            thumbEl.style.display = "block";
+          }
+          if (typeof window.showWizardToast === "function") window.showWizardToast(`✅ 枠情報を取得しました: ${data.title}`, true);
+        } else {
+          if (typeof window.showWizardToast === "function") window.showWizardToast("⚠️ 枠情報の取得に失敗しました", false);
+        }
+      } catch(e) {
+        if (typeof window.showWizardToast === "function") window.showWizardToast(`❌ 通信エラー: ${e.message}`, false);
+      }
+    });
+
     // 初期認証状態チェック
     checkYtApiAuthStatus();
   }
-
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initYouTubeAPIHandlers);

@@ -13,9 +13,10 @@
 
       try {
         if (openerWin && !openerWin.closed) {
-          const titleVal = document.getElementById("wizard-yt-title")?.value || "";
-          const descVal = document.getElementById("wizard-yt-desc")?.value || "";
+          const titleVal = document.getElementById("wizard-suggested-title")?.value || document.getElementById("wizard-yt-title")?.value || "";
+          const descVal = document.getElementById("wizard-suggested-desc")?.value || document.getElementById("wizard-yt-desc")?.value || "";
           const wizardActiveSlot = window.wizardActiveSlot || "morning";
+
 
           const mainTitle = openerWin.document.getElementById("stream-title");
           const mainDesc = openerWin.document.getElementById("stream-description");
