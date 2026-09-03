@@ -79,6 +79,8 @@ async function fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal
   }
 
   const promise = (async () => {
+    const ctrl = new AbortController();
+    const tId = setTimeout(() => ctrl.abort(), 15000);
     try {
       // 1. Python バックエンド経由で辞書適用＆音声合成
       const synthRes = await fetch("/api/voicevox/synthesize", {
@@ -89,8 +91,10 @@ async function fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal
           speakerId: parseInt(speakerId, 10) || 3,
           speedScale: speedScaleVal,
           pitchScale: pitchScaleVal
-        })
+        }),
+        signal: ctrl.signal
       });
+      clearTimeout(tId);
       if (synthRes.ok) {
         const kanaHeader = synthRes.headers.get("X-Voicevox-Kana");
         const cleanKanaHeader = synthRes.headers.get("X-Voicevox-Clean-Kana");
@@ -120,30 +124,40 @@ async function fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal
       }
       throw new Error("Backend synthesis failed: " + synthRes.statusText);
     } catch (backendErr) {
+      clearTimeout(tId);
       // Fallback: 直接 VOICEVOX (:50021) 呼び出し
-      const queryRes = await fetch(
-        `http://localhost:50021/audio_query?text=${encodeURIComponent(text)}&speaker=${speakerId}`,
-        { method: "POST" }
-      );
-      if (!queryRes.ok) throw new Error("Audio query failed");
-      const queryJson = await queryRes.json();
-      if (queryJson.kana) {
-        console.log(`[VOICEVOX発音カナ] 🗣️ ${queryJson.kana}`);
-      }
-      const directSynthRes = await fetch(
-        `http://localhost:50021/synthesis?speaker=${speakerId}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(queryJson)
+      const directCtrl = new AbortController();
+      const directTId = setTimeout(() => directCtrl.abort(), 15000);
+      try {
+        const queryRes = await fetch(
+          `http://localhost:50021/audio_query?text=${encodeURIComponent(text)}&speaker=${speakerId}`,
+          { method: "POST", signal: directCtrl.signal }
+        );
+        if (!queryRes.ok) throw new Error("Audio query failed");
+        const queryJson = await queryRes.json();
+        if (queryJson.kana) {
+          console.log(`[VOICEVOX発音カナ] 🗣️ ${queryJson.kana}`);
         }
-      );
-      if (!directSynthRes.ok) throw new Error("Direct synthesis failed");
-      return await directSynthRes.arrayBuffer();
-    }
+        const directSynthRes = await fetch(
+          `http://localhost:50021/synthesis?speaker=${speakerId}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(queryJson),
+            signal: directCtrl.signal
+          }
+        );
+        clearTimeout(directTId);
+        if (directSynthRes.ok) {
+          return await directSynthRes.arrayBuffer();
+        }
+      } catch (directErr) {
+        clearTimeout(directTId);
+      }
   })();
 
   voicevoxAudioBufferCache.set(cacheKey, promise);
+
   if (voicevoxAudioBufferCache.size > 80) {
     const firstKey = voicevoxAudioBufferCache.keys().next().value;
     voicevoxAudioBufferCache.delete(firstKey);
