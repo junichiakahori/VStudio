@@ -17,6 +17,9 @@ TECH_ACRONYMS = {
 
 # ── 日本語文中でカタカナ語として定着している英単語マップ（Case-insensitive） ──
 COMMON_ENGLISH_WORDS = {
+    "APPLE": "アップル", "GOOGLE": "グーグル", "AMAZON": "アマゾン",
+    "MICROSOFT": "マイクロソフト", "SONY": "ソニー", "META": "メタ",
+    "OPENAI": "オープンエーアイ", "CHATGPT": "チャットジーピーティー",
     "MONSTER": "モンスター", "OFFICIAL": "オフィシャル", "SPECIAL": "スペシャル",
     "HUNTER": "ハンター", "RACING": "レーシング", "DRIVER": "ドライバー",
     "UPDATE": "アップデート", "ONLINE": "オンライン", "STUDIO": "スタジオ",
@@ -26,6 +29,7 @@ COMMON_ENGLISH_WORDS = {
     "GAME": "ゲーム", "LIVE": "ライブ", "NEWS": "ニュース",
     "STAR": "スター", "OTTO": "オットー"
 }
+
 
 
 
@@ -110,6 +114,9 @@ def lookup_wikipedia_reading(term):
                                 yomi_hira += c
                         
                         yomi_clean = re.sub(r'[^ぁ-んゔー]', '', yomi_hira)
+                        # 法人格接尾語（いんく、こーぽれーしょん、かぶしきがいしゃ等）を安全にカット
+                        yomi_clean = re.sub(r'(いんく|こーぽれーしょん|かぶしきがいしゃ|ゆーげんがいしゃ|ごうどうがいしゃ|りみてっど)$', '', yomi_clean).strip()
+                        
                         # 英単語に対して異常に長すぎる読みは誤読として除外
                         if re.match(r'^[A-Za-z0-9\s\-_]+$', term) and len(yomi_clean) > len(term) * 2.5:
                             print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi_clean}' は過剰展開のため破棄")
@@ -118,6 +125,7 @@ def lookup_wikipedia_reading(term):
                         if len(yomi_clean) >= 2:
                             _wiki_reading_cache[term] = (yomi_clean, term)
                             return yomi_clean, term
+
 
         search_url = f"https://ja.wikipedia.org/w/api.php?action=opensearch&search={urllib.parse.quote(term)}&limit=1&format=json"
         req_s = urllib.request.Request(search_url, headers=headers)
