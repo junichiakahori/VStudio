@@ -546,10 +546,13 @@ async def handle_start_stream(video_id, websocket):
         logging.error(f"Failed to start stream: {e}")
         await websocket.send(json.dumps({'type': 'error', 'message': f'配信の開始に失敗しました。OBSから映像が送信されているか確認してください。({e})'}))
 
+_youtube_quota_exceeded_until = 0
+
 async def check_youtube_stream_status(video_id, websocket):
     """YouTube APIで動画の予約時間と現在の状態を取得する"""
-    global youtube_api_client
-    if not youtube_api_client:
+    global youtube_api_client, _youtube_quota_exceeded_until
+    now_ts = time.time()
+    if not youtube_api_client or now_ts < _youtube_quota_exceeded_until:
         return
     
     try:
@@ -572,7 +575,11 @@ async def check_youtube_stream_status(video_id, websocket):
                 'scheduledStartTime': scheduled_start_time
             }))
     except Exception as e:
-        logging.error(f"Failed to fetch stream status: {e}")
+        err_str = str(e)
+        if "quotaExceeded" in err_str or "403" in err_str:
+            _youtube_quota_exceeded_until = now_ts + 1800
+        else:
+            logging.error(f"Failed to fetch stream status: {e}")
 
 async def send_history(websocket):
     """接続したクライアントに履歴を送信する"""
@@ -584,10 +591,9 @@ async def send_history(websocket):
         except websockets.exceptions.ConnectionClosed:
             break
 
-
 async def fetch_stats(video_id):
     global youtube_api_client, current_video_id
-_youtube_quota_exceeded_until = 0
+
 
 async def fetch_live_stats_loop(video_id):
     """
