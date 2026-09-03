@@ -46,15 +46,6 @@ import ssl
 import urllib.request
 import urllib.parse
 
-# ── VOICEVOXの形態素解析で誤分割・誤読されやすい日本語複合語マップ ──
-COMMON_JAPANESE_WORDS = {
-    "安定性": "あんていせい",
-    "安定化": "あんていか",
-    "安定感": "あんていかん",
-    "安定期": "あんていき",
-    "不安定": "ふあんてい",
-}
-
 # ── 国名略称（1文字）の報道文法プレフィックスマップ ──
 COUNTRY_PREFIX_MAP = {
     '米': 'べい',
@@ -68,6 +59,7 @@ COUNTRY_PREFIX_MAP = {
     '中': 'ちゅう',
     '日': 'にち',
 }
+
 
 
 # ── Wikipedia 読み取得キャッシュ ──
@@ -381,7 +373,6 @@ def apply_it_context_rules(text):
     t = re.sub(r'([\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF、。！？\s])IT(?=[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF、。！？\s]|$)', r'\1アイティー', t)
     t = re.sub(r'^IT(?=[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF、。！？\s])', 'アイティー', t)
 
-
     return t
 
 def apply_tech_acronyms(text):
@@ -407,7 +398,7 @@ def apply_okonau_context_rules(text):
 
 def normalize_for_tts(text, custom_dict=None, log_collector=None):
     """
-    TTS用テキストの包括的正規化処理（文脈解決 -> 辞書 -> 英語マップ -> Wikipedia動的解決）
+    TTS用テキストの包括的正規化処理（文脈解決 -> 辞書 -> 英語マップ -> Wikipedia動的解決 -> pykakasi汎用かな化）
     """
     if not text:
         return ""
@@ -424,13 +415,7 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None):
     for eng_word, kana_yomi in COMMON_ENGLISH_WORDS.items():
         t = re.sub(rf'(?<![A-Za-z0-9]){re.escape(eng_word)}(?![A-Za-z0-9])', kana_yomi, t, flags=re.IGNORECASE)
 
-    # 3.5. 形態素解析で誤読されやすい日本語複合語マップ適用
-    for jpn_word, hira_yomi in COMMON_JAPANESE_WORDS.items():
-        if jpn_word in t:
-            t = t.replace(jpn_word, hira_yomi)
-
     # 4. 固有名詞の文脈保護ルール（動詞「探す」と重複する「株探」の誤爆防止）
-
     # 送り仮名（し・す・せ・そ・さ・っ）が直後に続く場合は「探す（さがす）」なので置換せず、メディア名「株探」のみ「かぶたん」に置換
     t = re.sub(r'株探(?![しすせそさっ])', 'かぶたん', t)
 
@@ -454,9 +439,14 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None):
                 log_collector.append({"term": term, "yomi": yomi})
             t = re.sub(rf'(?<![A-Za-z0-9]){re.escape(term)}(?![A-Za-z0-9])', yomi, t)
 
-    # 8. サニタイズ
+    # 8. 残存漢字の高品質ひらがな変換（pykakasi による形態素解析ベース一括解決）
+    # 複合語（安定性、透明感、確実性、持続性、多様性等）のVOICEVOX形態素誤分割を恒久・汎用的に解決
+    t = convert_remaining_kanji_to_hiragana(t)
+
+    # 9. サニタイズ
     t = sanitize_speech_text(t)
     return t
+
 
 
 def convert_remaining_kanji_to_hiragana(text):
