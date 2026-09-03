@@ -599,7 +599,7 @@ async def fetch_live_stats_loop(video_id):
     """
     配信中の同時接続者数・高評価数・チャンネル登録者数を定期更新するループタスク
     """
-    global current_video_id, current_stats, _youtube_quota_exceeded_until
+    global _youtube_quota_exceeded_until
     
     try:
         while current_video_id == video_id:
