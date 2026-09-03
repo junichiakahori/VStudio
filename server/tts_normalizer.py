@@ -62,51 +62,62 @@ COUNTRY_PREFIX_MAP = {
 
 
 
-# ── Wikipedia 読み取得キャッシュ ──
+# ── Wikipedia 読み取得キャッシュ（ヒット・ネガティブ共用）──
 _wiki_reading_cache = {}
-_wiki_not_found_cache = set()
+_WIKI_TIMEOUT = 1.5  # 全ステップ統一タイムアウト（秒）
 
 def lookup_wikipedia_reading(term):
     """
     Wikipedia APIで特殊な固有名詞・アルファベット名の読み（ひらがな）を動的取得。
-    （ネガティブキャッシュ＆短縮タイムアウト1.5秒による超高速化）
+    記事タイトルの直後にある最初の括弧から正確に読みを抽出。
+    ネガティブキャッシュにより一度404/失敗した語のリトライを完全遮断。
     """
-    if not term or len(term) < 2 or term in _wiki_not_found_cache:
+    if not term or len(term) < 2:
         return None, None
-    if term in _wiki_reading_cache:
+    if term in _wiki_reading_cache:  # ヒット（yomi, title）でもネガティブ（None, None）でもキャッシュ済みなら即返却
         return _wiki_reading_cache[term]
 
     ctx = ssl._create_unverified_context()
+
+
     headers = {
         "User-Agent": "VStudio-TTS-Bot/1.0 (https://github.com/junichiakahori/VStudio)"
     }
     INVALID_READINGS = {"あるいは", "または", "かつて", "えいご", "ちゅうごくご", "ちょうせんご", "かんこくご", "りゃくしょう", "つうしょう", "ほんみょう", "きゅうせい"}
 
+    step1_found = False  # step1 (extracts) で有効なページが見つかったかどうか
     try:
-        # 1. 記事概要（Extracts）から読みを取得
         ext_url = (
             "https://ja.wikipedia.org/w/api.php"
             "?action=query&prop=extracts&exintro=true&exsentences=2"
             "&explaintext=true&titles={}&redirects=1&format=json"
         ).format(urllib.parse.quote(term))
         req = urllib.request.Request(ext_url, headers=headers)
-        with urllib.request.urlopen(req, timeout=1.5, context=ctx) as r:
+        with urllib.request.urlopen(req, timeout=_WIKI_TIMEOUT, context=ctx) as r:
             pages = json.loads(r.read().decode("utf-8")).get("query", {}).get("pages", {})
             for pid, pdata in pages.items():
                 if pid == "-1":
                     continue
+                step1_found = True
                 page_title = pdata.get("title", "")
+                # リダイレクト先タイトルが検索語と全く無関係な上位概念（例: 震度3 -> 気象庁震度階級）の場合は破棄
                 clean_pt = re.sub(r'[\(（].*?[\)）]', '', page_title).strip()
-                if term not in clean_pt and clean_pt not in term and term.lower() != clean_pt.lower():
-                    continue
+                if term not in clean_pt and clean_pt not in term:
+                    # アルファベットの大文字小文字違いを除き、乖離したリダイレクトは採用しない
+                    if term.lower() != clean_pt.lower():
+                        continue
 
                 extract = pdata.get("extract", "")
+                # 括弧内の先頭にあるひらがな/カタカナ読みを抽出（英語併記があっても確実に取得）
                 m = re.search(r'[\(（]\s*([ぁ-んァ-ヶゔヴー・、\s,，/／]+)', extract)
+
                 if m:
                     raw_bracket = m.group(1).strip()
+                    # 読点（、）、カンマ（，,）、スラッシュ等で分割し、先頭の1つの代表読みのみを取得（異読の全結合を完全防止）
                     raw_bracket = re.split(r'[、,，\t\n/／|｜]|\s{2,}|(?<=[ぁ-んァ-ヶゔヴー])\s+(?=[A-Za-z])', raw_bracket)[0].strip()
                     yomi_raw = raw_bracket.replace("・", "").replace(" ", "").strip()
                     if yomi_raw and yomi_raw not in INVALID_READINGS:
+                        # カタカナをひらがなに変換（ヴ・ゔもサポート）
                         yomi_hira = ""
                         for c in yomi_raw:
                             if 0x30A1 <= ord(c) <= 0x30F6:
@@ -115,22 +126,34 @@ def lookup_wikipedia_reading(term):
                                 yomi_hira += 'ゔ'
                             else:
                                 yomi_hira += c
+
                         
                         yomi_clean = re.sub(r'[^ぁ-んゔー]', '', yomi_hira)
+                        # 法人格接尾語（いんく、こーぽれーしょん、かぶしきがいしゃ等）を安全にカット
                         yomi_clean = re.sub(r'(いんく|こーぽれーしょん|かぶしきがいしゃ|ゆーげんがいしゃ|ごうどうがいしゃ|りみてっど)$', '', yomi_clean).strip()
                         
-                        if yomi_clean and len(yomi_clean) >= 2:
-                            res = (yomi_clean, page_title)
-                            _wiki_reading_cache[term] = res
-                            return res
+                        # 英単語に対して異常に長すぎる読みは誤読として除外
+                        if re.match(r'^[A-Za-z0-9\s\-_]+$', term) and len(yomi_clean) > len(term) * 2.5:
+                            print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi_clean}' は過剰展開のため破棄")
+                            _wiki_reading_cache[term] = (None, None)
+                            return None, None
+                        if len(yomi_clean) >= 2:
+                            _wiki_reading_cache[term] = (yomi_clean, term)
+                            return yomi_clean, term
 
-        # 2. OpenSearch による完全一致検索
+
+        # ── step2: step1で対象ページが見つからなかった語はopensearch/スニペット検索も無意味なのでスキップ ──
+        if not step1_found:
+            _wiki_reading_cache[term] = (None, None)
+            return None, None
+
         search_url = f"https://ja.wikipedia.org/w/api.php?action=opensearch&search={urllib.parse.quote(term)}&limit=1&format=json"
         req_s = urllib.request.Request(search_url, headers=headers)
-        with urllib.request.urlopen(req_s, timeout=1.5, context=ctx) as r_s:
+        with urllib.request.urlopen(req_s, timeout=_WIKI_TIMEOUT, context=ctx) as r_s:
             s_res = json.loads(r_s.read().decode("utf-8"))
             if s_res and len(s_res) > 1 and s_res[1]:
                 exact_title = s_res[1][0]
+                # カッコ付き曖昧さ回避（例: VIVANT (テレビドラマ)）のみ許可
                 clean_title = re.sub(r'[\(（].*?[\)）]', '', exact_title).strip()
                 if clean_title == term:
                     yomi, _ = lookup_wikipedia_reading(exact_title)
@@ -138,11 +161,47 @@ def lookup_wikipedia_reading(term):
                         _wiki_reading_cache[term] = (yomi, term)
                         return yomi, term
 
-        _wiki_not_found_cache.add(term)
-        return None, None
+        # ── 3. Wikipedia 全文スニペット検索 (単独記事がない「株探」や名字「小籔」等の固有名詞対応) ──
+        sr_url = f"https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(term)}&format=json"
+        req_sr = urllib.request.Request(sr_url, headers=headers)
+        with urllib.request.urlopen(req_sr, timeout=_WIKI_TIMEOUT, context=ctx) as r_sr:
+            sr_data = json.loads(r_sr.read().decode("utf-8"))
+            for item in sr_data.get("query", {}).get("search", []):
+                snippet = item.get("snippet", "")
+                clean_snippet = re.sub(r"<[^>]+>", "", snippet)
+                
+                # パターンA: "term（よみ）" または "term(よみ)"
+                m_direct = re.search(re.escape(term) + r"[（\(]([ぁ-んァ-ヶー]+)[）\)]", clean_snippet)
+                if m_direct:
+                    y_raw = m_direct.group(1).strip()
+                    y_hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in y_raw])
+                    if len(y_hira) >= 2 and y_hira not in INVALID_READINGS:
+                        print(f"[Wikipediaスニペット読み解決] 🎯 '{term}' -> '{y_hira}'")
+                        _wiki_reading_cache[term] = (y_hira, term)
+                        return y_hira, term
+
+                # パターンB: 人名（名字 term:2~3文字 + 名前 extra_name:1~3文字（名字よみ 名前よみ））
+                m_person = re.search(re.escape(term) + r"\s*([^\(（\s、。]{1,3})?\s*[（\(]([ぁ-んァ-ヶー\s・]+)[、,）\)]", clean_snippet)
+                if m_person and len(term) <= 3:
+                    extra_name = m_person.group(1) or ""
+                    y_raw = m_person.group(2).strip().replace("・", " ")
+                    y_hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in y_raw])
+                    parts = y_hira.split()
+                    if extra_name and len(parts) >= 2:
+                        y_surname = parts[0]
+                        if len(y_surname) >= 2 and y_surname not in INVALID_READINGS:
+                            print(f"[Wikipedia人名・名字読み解決] 🎯 '{term}' -> '{y_surname}'")
+                            _wiki_reading_cache[term] = (y_surname, term)
+                            return y_surname, term
+                    elif len(parts) == 1 and len(parts[0]) >= 2 and parts[0] not in INVALID_READINGS:
+                        print(f"[Wikipediaスニペット読み解決] 🎯 '{term}' -> '{parts[0]}'")
+                        _wiki_reading_cache[term] = (parts[0], term)
+                        return parts[0], term
     except Exception:
-        _wiki_not_found_cache.add(term)
-        return None, None
+        pass
+
+    _wiki_reading_cache[term] = (None, None)
+    return None, None
 
 def extract_special_terms(text):
     """
