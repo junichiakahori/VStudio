@@ -20,7 +20,10 @@ _current_log_date = datetime.date.today().strftime('%Y-%m-%d')
 
 ALL_MANAGED_LOGS = [
     ('browser_console', os.path.join(BASE_DIR, "logs", "browser_console.log")),
+    ('native_console', os.path.join(BASE_DIR, "logs", "native_console.log")),
+    ('web_console', os.path.join(BASE_DIR, "logs", "web_console.log")),
 ]
+
 MAX_LOG_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
 RETENTION_DAYS = 7
 
