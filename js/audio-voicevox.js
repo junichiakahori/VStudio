@@ -16,11 +16,30 @@ function getVoicevoxAudioContext() {
     window.voicevoxAudioContext = new AudioCtx();
     window.voicevoxAnalyser = null;
     window.voicevoxGainNode = null;
+    window.voicevoxCompressorNode = null; // ← コンプレッサーもリセット
     console.log("[VOICEVOX AudioContext] 🔄 オーディオセッションを新規初期化・再生成しました");
   }
   return window.voicevoxAudioContext;
 }
 window.getVoicevoxAudioContext = getVoicevoxAudioContext;
+
+// 🔇 ソフトウェアリミッター（DynamicsCompressor）を共有ノードとして1回だけ生成・再利用
+function getVoicevoxCompressor(ctx) {
+  if (!window.voicevoxCompressorNode || window.voicevoxCompressorNode.context !== ctx) {
+    const comp = ctx.createDynamicsCompressor();
+    // ─── リミッター設定（音割れ防止） ───
+    comp.threshold.setValueAtTime(-6, ctx.currentTime);   // -6 dBFS を超えたら圧縮開始
+    comp.knee.setValueAtTime(3, ctx.currentTime);         // 3 dB のソフトニー（滑らかな圧縮入口）
+    comp.ratio.setValueAtTime(20, ctx.currentTime);       // 20:1 = 実質リミッター
+    comp.attack.setValueAtTime(0.001, ctx.currentTime);   // 1ms で即時反応
+    comp.release.setValueAtTime(0.1, ctx.currentTime);    // 100ms で自然に解放
+    window.voicevoxCompressorNode = comp;
+    console.log("[VOICEVOX Limiter] 🔇 ソフトウェアリミッター初期化 (threshold:-6dB, ratio:20:1)");
+  }
+  return window.voicevoxCompressorNode;
+}
+window.getVoicevoxCompressor = getVoicevoxCompressor;
+
 
 // 🍏 Safari 画面操作（クリック・タッチ・キー入力）時の自動音声ロック解除＆ハードウェア起動
 (function setupSafariAudioAutoUnlock() {
@@ -266,17 +285,22 @@ async function playNextVoicevox() {
     currentVoicevoxSource = ctx.createBufferSource();
     currentVoicevoxSource.buffer = audioBuffer;
 
+    const compressor = getVoicevoxCompressor(ctx);
+
     if (!window.voicevoxAnalyser) {
       window.voicevoxAnalyser = ctx.createAnalyser();
       window.voicevoxAnalyser.fftSize = 256;
-      window.voicevoxAnalyser.connect(ctx.destination);
+      // analyser → compressor → destination（常時接続）
+      window.voicevoxAnalyser.connect(compressor);
+      compressor.connect(ctx.destination);
     }
 
+    // 毎再生で独立したGainNodeを生成し、volume → compressor → destination
     const gainNode = ctx.createGain();
     gainNode.gain.setValueAtTime(targetVol, ctx.currentTime);
     currentVoicevoxSource.connect(gainNode);
     gainNode.connect(window.voicevoxAnalyser);
-    gainNode.connect(ctx.destination); // 確実な直結出力
+    // compressorはanalyserの先に接続済みのため二重接続不要
 
     currentVoicevoxSource.onended = () => {
       try { currentVoicevoxSource.disconnect(); } catch(e){}
@@ -612,6 +636,9 @@ async function playVoicevoxDirectAndWait(displayText, speakText = null) {
         window.voicevoxAnalyser = ctx.createAnalyser();
         window.voicevoxAnalyser.fftSize = 256;
       }
+
+      const compressor = getVoicevoxCompressor(ctx);
+
       const volSlider = document.getElementById("voicevox-volume-slider");
       const savedVol = localStorage.getItem("savedVoicevoxVolume");
       const targetVol = volSlider ? (parseFloat(volSlider.value) / 100.0) : (savedVol ? (parseFloat(savedVol) / 100.0) : 1.0);
@@ -619,8 +646,10 @@ async function playVoicevoxDirectAndWait(displayText, speakText = null) {
       if (!window.voicevoxGainNode) {
         window.voicevoxGainNode = ctx.createGain();
         window.voicevoxGainNode.gain.setValueAtTime(targetVol, ctx.currentTime);
+        // GainNode → Analyser → Compressor → destination
         window.voicevoxGainNode.connect(window.voicevoxAnalyser);
-        window.voicevoxAnalyser.connect(ctx.destination);
+        window.voicevoxAnalyser.connect(compressor);
+        compressor.connect(ctx.destination);
       } else {
         window.voicevoxGainNode.gain.cancelScheduledValues(ctx.currentTime);
         window.voicevoxGainNode.gain.setValueAtTime(targetVol, ctx.currentTime);
