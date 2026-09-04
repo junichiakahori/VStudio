@@ -23,22 +23,65 @@ function getVoicevoxAudioContext() {
 }
 window.getVoicevoxAudioContext = getVoicevoxAudioContext;
 
+// 🔇 ソフトウェアリミッター（DynamicsCompressor）の設定をlocalStorageからロード＆動的適用
+function getSavedLimiterSettings() {
+  const enabled = localStorage.getItem("voicevoxLimiterEnabled") !== "false"; // デフォルトON
+  const threshold = parseFloat(localStorage.getItem("voicevoxLimiterThreshold") || "-6");
+  const ratio = parseFloat(localStorage.getItem("voicevoxLimiterRatio") || "20");
+  const knee = parseFloat(localStorage.getItem("voicevoxLimiterKnee") || "3");
+  const attack = parseFloat(localStorage.getItem("voicevoxLimiterAttack") || "0.001");
+  const release = parseFloat(localStorage.getItem("voicevoxLimiterRelease") || "0.10");
+  return { enabled, threshold, ratio, knee, attack, release };
+}
+
+function applyCompressorNodeParams(comp, ctx, settings) {
+  if (!comp || !ctx) return;
+  const s = settings || getSavedLimiterSettings();
+  const now = ctx.currentTime;
+  try {
+    if (!s.enabled) {
+      // バイパスモード: ratioを1にして圧縮を完全に無効化
+      comp.ratio.setValueAtTime(1, now);
+      comp.threshold.setValueAtTime(0, now);
+    } else {
+      comp.threshold.setValueAtTime(s.threshold, now);
+      comp.knee.setValueAtTime(s.knee, now);
+      comp.ratio.setValueAtTime(s.ratio, now);
+      comp.attack.setValueAtTime(s.attack, now);
+      comp.release.setValueAtTime(s.release, now);
+    }
+  } catch (e) {
+    console.warn("[VOICEVOX Limiter] パラメータ適用エラー:", e);
+  }
+}
+
 // 🔇 ソフトウェアリミッター（DynamicsCompressor）を共有ノードとして1回だけ生成・再利用
 function getVoicevoxCompressor(ctx) {
   if (!window.voicevoxCompressorNode || window.voicevoxCompressorNode.context !== ctx) {
     const comp = ctx.createDynamicsCompressor();
-    // ─── リミッター設定（音割れ防止） ───
-    comp.threshold.setValueAtTime(-6, ctx.currentTime);   // -6 dBFS を超えたら圧縮開始
-    comp.knee.setValueAtTime(3, ctx.currentTime);         // 3 dB のソフトニー（滑らかな圧縮入口）
-    comp.ratio.setValueAtTime(20, ctx.currentTime);       // 20:1 = 実質リミッター
-    comp.attack.setValueAtTime(0.001, ctx.currentTime);   // 1ms で即時反応
-    comp.release.setValueAtTime(0.1, ctx.currentTime);    // 100ms で自然に解放
+    applyCompressorNodeParams(comp, ctx);
     window.voicevoxCompressorNode = comp;
-    console.log("[VOICEVOX Limiter] 🔇 ソフトウェアリミッター初期化 (threshold:-6dB, ratio:20:1)");
+    console.log("[VOICEVOX Limiter] 🔇 ソフトウェアリミッター初期化完了");
   }
   return window.voicevoxCompressorNode;
 }
 window.getVoicevoxCompressor = getVoicevoxCompressor;
+
+// 🎛️ 画面UIからのリアルタイム更新用グローバル関数
+window.updateVoicevoxLimiterSettings = function(customSettings) {
+  const ctx = window.voicevoxAudioContext;
+  if (window.voicevoxCompressorNode && ctx) {
+    applyCompressorNodeParams(window.voicevoxCompressorNode, ctx, customSettings);
+    console.log("[VOICEVOX Limiter] 🎛️ パラメータをリアルタイム更新しました:", customSettings || getSavedLimiterSettings());
+  }
+};
+
+// 🔄 別ウィンドウからの設定変更（localStorage）自動同期
+window.addEventListener("storage", (e) => {
+  if (e.key && e.key.startsWith("voicevoxLimiter")) {
+    window.updateVoicevoxLimiterSettings();
+  }
+});
 
 
 // 🍏 Safari 画面操作（クリック・タッチ・キー入力）時の自動音声ロック解除＆ハードウェア起動

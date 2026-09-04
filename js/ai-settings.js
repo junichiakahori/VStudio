@@ -377,7 +377,147 @@ window.updateAiLink = function updateAiLink() {
         voicevoxGainNode.gain.value = vol / 100.0;
       }
     });
+  // 🛡️ VOICEVOX 音割れ防止リミッター (DynamicsCompressor) UI初期化＆バインド
+  const limiterToggle = document.getElementById("voicevox-limiter-toggle");
+  const limiterThreshold = document.getElementById("limiter-threshold");
+  const limiterThresholdVal = document.getElementById("limiter-threshold-val");
+  const limiterRatio = document.getElementById("limiter-ratio");
+  const limiterRatioVal = document.getElementById("limiter-ratio-val");
+  const limiterKnee = document.getElementById("limiter-knee");
+  const limiterKneeVal = document.getElementById("limiter-knee-val");
+  const limiterAttack = document.getElementById("limiter-attack");
+  const limiterAttackVal = document.getElementById("limiter-attack-val");
+  const limiterRelease = document.getElementById("limiter-release");
+  const limiterReleaseVal = document.getElementById("limiter-release-val");
+
+  const btnPresetSafe = document.getElementById("btn-limiter-preset-safe");
+  const btnPresetBroadcast = document.getElementById("btn-limiter-preset-broadcast");
+  const btnPresetHard = document.getElementById("btn-limiter-preset-hard");
+  const btnLimiterReset = document.getElementById("btn-limiter-reset");
+
+  function updateLimiterUIFromValues(settings) {
+    if (limiterToggle) limiterToggle.checked = settings.enabled;
+    if (limiterThreshold) {
+      limiterThreshold.value = settings.threshold;
+      if (limiterThresholdVal) limiterThresholdVal.textContent = settings.threshold;
+    }
+    if (limiterRatio) {
+      limiterRatio.value = settings.ratio;
+      if (limiterRatioVal) limiterRatioVal.textContent = settings.ratio;
+    }
+    if (limiterKnee) {
+      limiterKnee.value = settings.knee;
+      if (limiterKneeVal) limiterKneeVal.textContent = settings.knee;
+    }
+    if (limiterAttack) {
+      limiterAttack.value = settings.attack;
+      if (limiterAttackVal) limiterAttackVal.textContent = Math.round(settings.attack * 1000);
+    }
+    if (limiterRelease) {
+      limiterRelease.value = settings.release;
+      if (limiterReleaseVal) limiterReleaseVal.textContent = Math.round(settings.release * 1000);
+    }
   }
+
+  function saveAndApplyLimiter() {
+    const settings = {
+      enabled: limiterToggle ? limiterToggle.checked : true,
+      threshold: limiterThreshold ? parseFloat(limiterThreshold.value) : -6,
+      ratio: limiterRatio ? parseFloat(limiterRatio.value) : 20,
+      knee: limiterKnee ? parseFloat(limiterKnee.value) : 3,
+      attack: limiterAttack ? parseFloat(limiterAttack.value) : 0.001,
+      release: limiterRelease ? parseFloat(limiterRelease.value) : 0.10,
+    };
+
+    localStorage.setItem("voicevoxLimiterEnabled", settings.enabled);
+    localStorage.setItem("voicevoxLimiterThreshold", settings.threshold);
+    localStorage.setItem("voicevoxLimiterRatio", settings.ratio);
+    localStorage.setItem("voicevoxLimiterKnee", settings.knee);
+    localStorage.setItem("voicevoxLimiterAttack", settings.attack);
+    localStorage.setItem("voicevoxLimiterRelease", settings.release);
+
+    if (typeof window.updateVoicevoxLimiterSettings === "function") {
+      window.updateVoicevoxLimiterSettings(settings);
+    }
+  }
+
+  function setPresetButtonActive(activeBtn) {
+    [btnPresetSafe, btnPresetBroadcast, btnPresetHard].forEach((btn) => {
+      if (!btn) return;
+      if (btn === activeBtn) {
+        btn.style.background = "rgba(0,243,255,0.2)";
+        btn.style.borderColor = "var(--neon-cyan)";
+        btn.style.color = "var(--neon-cyan)";
+      } else {
+        btn.style.background = "rgba(255,255,255,0.05)";
+        btn.style.borderColor = "rgba(255,255,255,0.2)";
+        btn.style.color = "#ddd";
+      }
+    });
+  }
+
+  function applyPreset(presetName, triggerBtn) {
+    let settings = { enabled: true, threshold: -6, ratio: 20, knee: 3, attack: 0.001, release: 0.10 };
+    if (presetName === "broadcast") {
+      settings = { enabled: true, threshold: -18, ratio: 4, knee: 6, attack: 0.005, release: 0.15 };
+    } else if (presetName === "hard") {
+      settings = { enabled: true, threshold: -12, ratio: 20, knee: 0, attack: 0.001, release: 0.05 };
+    }
+    updateLimiterUIFromValues(settings);
+    saveAndApplyLimiter();
+    if (triggerBtn) setPresetButtonActive(triggerBtn);
+  }
+
+  // 初期値の復元
+  const initialLimiterSettings = {
+    enabled: localStorage.getItem("voicevoxLimiterEnabled") !== "false",
+    threshold: parseFloat(localStorage.getItem("voicevoxLimiterThreshold") || "-6"),
+    ratio: parseFloat(localStorage.getItem("voicevoxLimiterRatio") || "20"),
+    knee: parseFloat(localStorage.getItem("voicevoxLimiterKnee") || "3"),
+    attack: parseFloat(localStorage.getItem("voicevoxLimiterAttack") || "0.001"),
+    release: parseFloat(localStorage.getItem("voicevoxLimiterRelease") || "0.10"),
+  };
+  updateLimiterUIFromValues(initialLimiterSettings);
+
+  // イベントリスナー
+  if (limiterToggle) {
+    limiterToggle.addEventListener("change", saveAndApplyLimiter);
+  }
+  if (limiterThreshold) {
+    limiterThreshold.addEventListener("input", () => {
+      if (limiterThresholdVal) limiterThresholdVal.textContent = limiterThreshold.value;
+      saveAndApplyLimiter();
+    });
+  }
+  if (limiterRatio) {
+    limiterRatio.addEventListener("input", () => {
+      if (limiterRatioVal) limiterRatioVal.textContent = limiterRatio.value;
+      saveAndApplyLimiter();
+    });
+  }
+  if (limiterKnee) {
+    limiterKnee.addEventListener("input", () => {
+      if (limiterKneeVal) limiterKneeVal.textContent = limiterKnee.value;
+      saveAndApplyLimiter();
+    });
+  }
+  if (limiterAttack) {
+    limiterAttack.addEventListener("input", () => {
+      if (limiterAttackVal) limiterAttackVal.textContent = Math.round(parseFloat(limiterAttack.value) * 1000);
+      saveAndApplyLimiter();
+    });
+  }
+  if (limiterRelease) {
+    limiterRelease.addEventListener("input", () => {
+      if (limiterReleaseVal) limiterReleaseVal.textContent = Math.round(parseFloat(limiterRelease.value) * 1000);
+      saveAndApplyLimiter();
+    });
+  }
+
+  if (btnPresetSafe) btnPresetSafe.addEventListener("click", () => applyPreset("safe", btnPresetSafe));
+  if (btnPresetBroadcast) btnPresetBroadcast.addEventListener("click", () => applyPreset("broadcast", btnPresetBroadcast));
+  if (btnPresetHard) btnPresetHard.addEventListener("click", () => applyPreset("hard", btnPresetHard));
+  if (btnLimiterReset) btnLimiterReset.addEventListener("click", () => applyPreset("safe", btnPresetSafe));
 
   window.seVolumeSlider = document.getElementById("se-volume-slider");
   window.seVolumeVal = document.getElementById("se-volume-val");
