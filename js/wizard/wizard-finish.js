@@ -92,22 +92,54 @@
           const mainEndType = openerWin.document.getElementById("end-type-select");
           const mainEndTime = openerWin.document.getElementById("end-time");
 
-          if (mainStartToggle) mainStartToggle.checked = startToggleVal;
-          if (mainStartTime && startTimeVal) mainStartTime.value = startTimeVal;
-          if (mainEndToggle) mainEndToggle.checked = endToggleVal;
+          if (mainStartToggle) {
+            mainStartToggle.checked = startToggleVal;
+            try { mainStartToggle.dispatchEvent(new openerWin.Event("change")); } catch (e) {}
+          }
+          if (mainStartTime && startTimeVal) {
+            mainStartTime.value = startTimeVal;
+            try { mainStartTime.dispatchEvent(new openerWin.Event("change")); } catch (e) {}
+          }
+          if (mainEndToggle) {
+            mainEndToggle.checked = endToggleVal;
+            try { mainEndToggle.dispatchEvent(new openerWin.Event("change")); } catch (e) {}
+          }
           if (mainEndType) mainEndType.value = endTypeVal;
           if (mainEndTime && endTimeVal) mainEndTime.value = endTimeVal;
 
           // 4. OBS配信自動開始
           const obsStreamToggleVal = document.getElementById("wizard-obs-stream-toggle")?.checked ?? false;
           const mainObsToggle = openerWin.document.getElementById("news-obs-auto-stream-toggle") || openerWin.document.getElementById("obs-auto-start-toggle");
-          if (mainObsToggle) mainObsToggle.checked = obsStreamToggleVal;
+          if (mainObsToggle) {
+            mainObsToggle.checked = obsStreamToggleVal;
+            try { mainObsToggle.dispatchEvent(new openerWin.Event("change")); } catch (e) {}
+          }
 
-          console.log(`[Wizard] 🚀 親ウィンドウに設定を適用完了 (モード: ${selectedMode}, OBS自動開始: ${obsStreamToggleVal})`);
+          // 📅 過去時刻判定（指定日時を既に過ぎている場合は直ちに開始）
+          let isPastScheduledTime = false;
+          if (startToggleVal && startTimeVal) {
+            try {
+              let targetDate = null;
+              if (startTimeVal.includes("T")) {
+                targetDate = new Date(startTimeVal);
+              } else if (startTimeVal.includes(":")) {
+                const [h, m] = startTimeVal.split(":").map(Number);
+                targetDate = new Date();
+                targetDate.setHours(h, m, 0, 0);
+              }
+              if (targetDate && !isNaN(targetDate.getTime()) && Date.now() >= targetDate.getTime()) {
+                isPastScheduledTime = true;
+              }
+            } catch (e) {}
+          }
+
+          const shouldStartImmediately = !startToggleVal || isPastScheduledTime;
+
+          console.log(`[Wizard] 🚀 親ウィンドウに設定を適用完了 (モード: ${selectedMode}, OBS自動開始: ${obsStreamToggleVal}, 予約ON: ${startToggleVal}, 過去時刻判定: ${isPastScheduledTime})`);
 
           // 🚀 配信開始の実行 (親画面にアクションを直接指示)
-          if (selectedMode === "news") {
-            if (!startToggleVal) {
+          if (shouldStartImmediately) {
+            if (selectedMode === "news") {
               console.log("[Wizard] 🚀 親ウィンドウにてニュース番組を即時開始します");
               if (typeof openerWin.startNewsBroadcast === "function") {
                 openerWin.startNewsBroadcast(0);
@@ -115,9 +147,7 @@
                 const newsStartBtn = openerWin.document.getElementById("news-broadcast-start-btn");
                 if (newsStartBtn) newsStartBtn.click();
               }
-            }
-          } else if (selectedMode === "radio") {
-            if (!startToggleVal) {
+            } else if (selectedMode === "radio") {
               console.log("[Wizard] 🚀 親ウィンドウにてラジオ番組を即時開始します");
               if (typeof openerWin.startRadioBroadcast === "function") {
                 openerWin.startRadioBroadcast();
@@ -133,7 +163,24 @@
         const startToggleVal = document.getElementById("wizard-start-schedule-toggle")?.checked || false;
         const startTimeVal = document.getElementById("wizard-start-time")?.value || "";
 
+        let isPastTime = false;
         if (startToggleVal && startTimeVal) {
+          try {
+            let targetDate = null;
+            if (startTimeVal.includes("T")) {
+              targetDate = new Date(startTimeVal);
+            } else if (startTimeVal.includes(":")) {
+              const [h, m] = startTimeVal.split(":").map(Number);
+              targetDate = new Date();
+              targetDate.setHours(h, m, 0, 0);
+            }
+            if (targetDate && !isNaN(targetDate.getTime()) && Date.now() >= targetDate.getTime()) {
+              isPastTime = true;
+            }
+          } catch (e) {}
+        }
+
+        if (startToggleVal && startTimeVal && !isPastTime) {
           let displayTime = startTimeVal;
           try {
             const d = new Date(startTimeVal);
@@ -143,6 +190,10 @@
           } catch (e) {}
           if (openerWin && typeof openerWin.showNotification === "function") {
             openerWin.showNotification(`⏰ 配信予約完了！指定日時（${displayTime}）に自動開始します`);
+          }
+        } else if (isPastTime) {
+          if (openerWin && typeof openerWin.showNotification === "function") {
+            openerWin.showNotification("🚀 予定時刻を過ぎているため、直ちに配信を開始します！");
           }
         } else {
           if (openerWin && typeof openerWin.showNotification === "function") {
