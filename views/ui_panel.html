@@ -663,61 +663,61 @@
             </div>
 
             <!-- 🛡️ ソフトウェアリミッター (DynamicsCompressor) 設定 -->
-            <div class="control-group" style="margin-top:12px; padding:10px; background:rgba(0,243,255,0.04); border:1px solid rgba(0,243,255,0.22); border-radius:8px;">
-                <label class="switch-label">
-                    <span style="font-weight:600; color:var(--text-main); font-size:0.8rem; white-space:nowrap;">🛡️ 音割れ防止リミッター</span>
+            <div class="control-group" style="margin-top:10px; padding:8px 10px; background:rgba(0,243,255,0.04); border:1px solid rgba(0,243,255,0.2); border-radius:8px; width:100%; box-sizing:border-box;">
+                <label class="switch-label" style="margin-bottom:0;">
+                    <span style="font-weight:600; color:var(--text-main); font-size:0.78rem; white-space:nowrap;">🛡️ 音割れ防止リミッター</span>
                     <input type="checkbox" id="voicevox-limiter-toggle" checked>
                     <span class="slider round"></span>
                 </label>
 
-                <!-- プリセットボタン -->
-                <div style="margin-top:8px; display:flex; gap:4px;">
-                    <button type="button" id="btn-limiter-preset-safe" class="btn" style="flex:1; padding:4px 2px; font-size:0.68rem; background:rgba(0,243,255,0.15); border:1px solid rgba(0,243,255,0.4); color:var(--neon-cyan); border-radius:4px; cursor:pointer; white-space:nowrap;" title="音割れのみを確実に防止（標準）">🛡️ 標準リミッター</button>
-                    <button type="button" id="btn-limiter-preset-broadcast" class="btn" style="flex:1; padding:4px 2px; font-size:0.68rem; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.2); color:#ddd; border-radius:4px; cursor:pointer; white-space:nowrap;" title="全体の音量を均一に整える">🎙️ 配信コンプ</button>
-                    <button type="button" id="btn-limiter-preset-hard" class="btn" style="flex:1; padding:4px 2px; font-size:0.68rem; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.2); color:#ddd; border-radius:4px; cursor:pointer; white-space:nowrap;" title="大音量でも絶対に割らせない強力防衛">⚡ 強力リミッター</button>
+                <!-- プリセットボタン (横幅に完全フィットする3列グリッド) -->
+                <div style="margin-top:8px; display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; width:100%; box-sizing:border-box;">
+                    <button type="button" id="btn-limiter-preset-safe" class="btn" style="padding:4px 0; font-size:0.68rem; text-align:center; background:rgba(0,243,255,0.18); border:1px solid rgba(0,243,255,0.4); color:var(--neon-cyan); border-radius:4px; cursor:pointer; width:100%; box-sizing:border-box; white-space:nowrap;" title="音割れのみを確実に防止（標準）">🛡️ 標準</button>
+                    <button type="button" id="btn-limiter-preset-broadcast" class="btn" style="padding:4px 0; font-size:0.68rem; text-align:center; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.2); color:#ddd; border-radius:4px; cursor:pointer; width:100%; box-sizing:border-box; white-space:nowrap;" title="全体の音量を均一に整える">🎙️ 配信</button>
+                    <button type="button" id="btn-limiter-preset-hard" class="btn" style="padding:4px 0; font-size:0.68rem; text-align:center; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.2); color:#ddd; border-radius:4px; cursor:pointer; width:100%; box-sizing:border-box; white-space:nowrap;" title="大音量でも絶対に割らせない強力防衛">⚡ 強力</button>
                 </div>
 
                 <!-- 詳細パラメータ開閉アコーディオン -->
-                <details style="margin-top:8px; font-size:0.75rem; color:var(--text-muted);">
-                    <summary style="cursor:pointer; color:var(--neon-cyan); font-weight:600; outline:none; user-select:none; padding:2px 0;">🎛️ 詳細パラメータ手動調整</summary>
-                    <div style="margin-top:8px; display:flex; flex-direction:column; gap:8px;">
-                        <div class="slider-container" style="margin:0;">
-                            <label style="font-size:0.72rem; display:flex; justify-content:space-between; margin-bottom:2px;">
+                <details style="margin-top:8px; font-size:0.75rem; color:var(--text-muted); width:100%; box-sizing:border-box;">
+                    <summary style="cursor:pointer; color:var(--neon-cyan); font-weight:600; outline:none; user-select:none; padding:2px 0; font-size:0.72rem;">🎛️ 詳細パラメータ調整</summary>
+                    <div style="margin-top:6px; display:flex; flex-direction:column; gap:6px; width:100%; box-sizing:border-box;">
+                        <div class="slider-container" style="margin:0; width:100%;">
+                            <label style="font-size:0.7rem; display:flex; justify-content:space-between; margin-bottom:2px;">
                                 <span>閾値 (Threshold)</span>
-                                <span style="color:#00f3ff;"><span id="limiter-threshold-val">-6</span> dB</span>
+                                <span style="color:#00f3ff; font-weight:600;"><span id="limiter-threshold-val">-6</span> dB</span>
                             </label>
-                            <input type="range" id="limiter-threshold" min="-40" max="0" value="-6" step="1">
+                            <input type="range" id="limiter-threshold" min="-40" max="0" value="-6" step="1" style="width:100%;">
                         </div>
-                        <div class="slider-container" style="margin:0;">
-                            <label style="font-size:0.72rem; display:flex; justify-content:space-between; margin-bottom:2px;">
+                        <div class="slider-container" style="margin:0; width:100%;">
+                            <label style="font-size:0.7rem; display:flex; justify-content:space-between; margin-bottom:2px;">
                                 <span>圧縮比 (Ratio)</span>
-                                <span style="color:#00f3ff;"><span id="limiter-ratio-val">20</span>:1</span>
+                                <span style="color:#00f3ff; font-weight:600;"><span id="limiter-ratio-val">20</span>:1</span>
                             </label>
-                            <input type="range" id="limiter-ratio" min="1" max="20" value="20" step="1">
+                            <input type="range" id="limiter-ratio" min="1" max="20" value="20" step="1" style="width:100%;">
                         </div>
-                        <div class="slider-container" style="margin:0;">
-                            <label style="font-size:0.72rem; display:flex; justify-content:space-between; margin-bottom:2px;">
+                        <div class="slider-container" style="margin:0; width:100%;">
+                            <label style="font-size:0.7rem; display:flex; justify-content:space-between; margin-bottom:2px;">
                                 <span>滑らかさ (Knee)</span>
-                                <span style="color:#00f3ff;"><span id="limiter-knee-val">3</span> dB</span>
+                                <span style="color:#00f3ff; font-weight:600;"><span id="limiter-knee-val">3</span> dB</span>
                             </label>
-                            <input type="range" id="limiter-knee" min="0" max="40" value="3" step="1">
+                            <input type="range" id="limiter-knee" min="0" max="40" value="3" step="1" style="width:100%;">
                         </div>
-                        <div class="slider-container" style="margin:0;">
-                            <label style="font-size:0.72rem; display:flex; justify-content:space-between; margin-bottom:2px;">
+                        <div class="slider-container" style="margin:0; width:100%;">
+                            <label style="font-size:0.7rem; display:flex; justify-content:space-between; margin-bottom:2px;">
                                 <span>反応速度 (Attack)</span>
-                                <span style="color:#00f3ff;"><span id="limiter-attack-val">1</span> ms</span>
+                                <span style="color:#00f3ff; font-weight:600;"><span id="limiter-attack-val">1</span> ms</span>
                             </label>
-                            <input type="range" id="limiter-attack" min="0.001" max="0.050" value="0.001" step="0.001">
+                            <input type="range" id="limiter-attack" min="0.001" max="0.050" value="0.001" step="0.001" style="width:100%;">
                         </div>
-                        <div class="slider-container" style="margin:0;">
-                            <label style="font-size:0.72rem; display:flex; justify-content:space-between; margin-bottom:2px;">
+                        <div class="slider-container" style="margin:0; width:100%;">
+                            <label style="font-size:0.7rem; display:flex; justify-content:space-between; margin-bottom:2px;">
                                 <span>復帰時間 (Release)</span>
-                                <span style="color:#00f3ff;"><span id="limiter-release-val">100</span> ms</span>
+                                <span style="color:#00f3ff; font-weight:600;"><span id="limiter-release-val">100</span> ms</span>
                             </label>
-                            <input type="range" id="limiter-release" min="0.01" max="0.50" value="0.10" step="0.01">
+                            <input type="range" id="limiter-release" min="0.01" max="0.50" value="0.10" step="0.01" style="width:100%;">
                         </div>
-                        <div style="text-align:right; margin-top:4px;">
-                            <button type="button" id="btn-limiter-reset" class="btn" style="font-size:0.7rem; padding:3px 8px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2); border-radius:4px; color:#ddd; cursor:pointer;">標準値にリセット</button>
+                        <div style="display:flex; justify-content:flex-end; margin-top:2px;">
+                            <button type="button" id="btn-limiter-reset" class="btn" style="font-size:0.68rem; padding:3px 8px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2); border-radius:4px; color:#ddd; cursor:pointer;">標準値にリセット</button>
                         </div>
                     </div>
                 </details>
