@@ -811,10 +811,9 @@ function getNewsConfig() {
       // OBS配信状態の確認
       const obsStreamToggle = document.getElementById("news-obs-auto-stream-toggle");
       const isObsStreamEnabled = obsStreamToggle ? obsStreamToggle.checked : false;
-      const isDevSafari = (window.location.port === "8444");
 
-      console.log(`[ニュース番組] 🚀 [STEP 3] OBS連携チェック (isObsStreamEnabled: ${isObsStreamEnabled}, isDevSafari: ${isDevSafari})`);
-      if (!isMidwayStart && isObsStreamEnabled && !isDevSafari && typeof window.ensureObsStreamingStarted === "function") {
+      console.log(`[ニュース番組] 🚀 [STEP 3] OBS連携チェック (isObsStreamEnabled: ${isObsStreamEnabled})`);
+      if (isObsStreamEnabled && typeof window.ensureObsStreamingStarted === "function") {
         if (progressEl) progressEl.textContent = "📡 OBS配信接続を確認中...";
         await window.ensureObsStreamingStarted((msg) => {
           if (progressEl) progressEl.textContent = `📡 ${msg}`;

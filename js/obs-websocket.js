@@ -122,16 +122,20 @@ let startStreamPromise = null;
 
 window.ensureObsStreamingStarted = async function (onProgress = null) {
   // 未接続の場合は自動で接続を試みる
-  if (typeof isObsWsConnected === "undefined" || !isObsWsConnected) {
+  if (!window.isObsWsConnected || !window.obsWsClient) {
     if (typeof window.toggleObsWsConnection === "function") {
       console.log("[OBS] OBS WebSocketが未接続のため、自動接続を試みます...");
       if (onProgress) onProgress("OBS WebSocketに自動接続中...");
       await window.toggleObsWsConnection(true);
-      await new Promise(r => setTimeout(r, 600));
+      // 接続完了を最大3秒待機
+      for (let i = 0; i < 15; i++) {
+        if (window.isObsWsConnected && window.obsWsClient) break;
+        await new Promise(r => setTimeout(r, 200));
+      }
     }
   }
 
-  if (typeof isObsWsConnected === "undefined" || !isObsWsConnected || typeof obsWsClient === "undefined" || !obsWsClient) {
+  if (!window.isObsWsConnected || !window.obsWsClient) {
     console.log("[OBS] OBS WebSocket未接続のため、配信状態チェックをスキップします。");
     return true;
   }
