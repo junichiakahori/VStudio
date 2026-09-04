@@ -507,6 +507,22 @@
                     </div>
                 </div>
 
+                <!-- 📡 OBS配信連動スイッチ -->
+                <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(0,210,211,0.3); border-radius: 8px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                    <div>
+                        <div style="font-size: 0.82rem; font-weight: bold; color: #00d2d3; display: flex; align-items: center; gap: 4px;">
+                            <span>📡 OBS配信を同時に開始する</span>
+                        </div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">
+                            ※ONの場合、番組開始と同時にOBSの配信を開始します（OFF時はローカル動作のみ）。
+                        </div>
+                    </div>
+                    <label class="switch-label" style="margin-bottom: 0; flex-shrink: 0;">
+                        <input type="checkbox" id="wizard-obs-stream-toggle" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+
                 <!-- 配信開始予定日時の設定（スマホ最適化・時計ダイヤル式ピッカー連動） -->
                 <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(0,210,211,0.3); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -720,8 +736,8 @@
 
     <script src="/js/wizard/wizard-time-picker.js?v=22.0"></script>
     <script src="/js/wizard/wizard-news-settings.js?v=22.0"></script>
-    <script src="/js/wizard/wizard-youtube-api.js?v=22.9"></script>
-    <script src="/js/wizard/wizard-finish.js?v=22.2"></script>
+    <script src="/js/wizard/wizard-youtube-api.js?v=23.0"></script>
+    <script src="/js/wizard/wizard-finish.js?v=23.0"></script>
 
 
 

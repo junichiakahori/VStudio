@@ -99,8 +99,8 @@
           if (mainEndTime && endTimeVal) mainEndTime.value = endTimeVal;
 
           // 4. OBS配信自動開始
-          const obsStreamToggleVal = document.getElementById("wizard-obs-stream-toggle")?.checked || false;
-          const mainObsToggle = openerWin.document.getElementById("obs-auto-start-toggle");
+          const obsStreamToggleVal = document.getElementById("wizard-obs-stream-toggle")?.checked ?? false;
+          const mainObsToggle = openerWin.document.getElementById("news-obs-auto-stream-toggle") || openerWin.document.getElementById("obs-auto-start-toggle");
           if (mainObsToggle) mainObsToggle.checked = obsStreamToggleVal;
 
           console.log(`[Wizard] 🚀 親ウィンドウに設定を適用完了 (モード: ${selectedMode}, OBS自動開始: ${obsStreamToggleVal})`);

@@ -196,7 +196,7 @@ https://x.com/drone_akahori
 
     const obsToggle = document.getElementById("wizard-obs-stream-toggle");
     if (obsToggle && window.openerWin) {
-      const mainObsToggle = window.openerWin.document.getElementById("obs-auto-start-toggle");
+      const mainObsToggle = window.openerWin.document.getElementById("news-obs-auto-stream-toggle") || window.openerWin.document.getElementById("obs-auto-start-toggle");
       if (mainObsToggle) obsToggle.checked = mainObsToggle.checked;
     }
 
