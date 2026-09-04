@@ -377,6 +377,8 @@ window.updateAiLink = function updateAiLink() {
         voicevoxGainNode.gain.value = vol / 100.0;
       }
     });
+  }
+
   // 🛡️ VOICEVOX 音割れ防止リミッター (DynamicsCompressor) UI初期化＆バインド
   const limiterToggle = document.getElementById("voicevox-limiter-toggle");
   const limiterThreshold = document.getElementById("limiter-threshold");
