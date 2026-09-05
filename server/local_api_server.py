@@ -493,9 +493,17 @@ def run():
     start_log_rotation_scheduler()
     init_preload_all_rss_urls()
     socketserver.ThreadingTCPServer.allow_reuse_address = True
-    with socketserver.ThreadingTCPServer(("", PORT), RequestHandler) as httpd:
-        print(f"API Server running at port {PORT} (Multi-threaded)")
-        httpd.serve_forever()
+    while True:
+        try:
+            with socketserver.ThreadingTCPServer(("", PORT), RequestHandler) as httpd:
+                print(f"API Server running at port {PORT} (Multi-threaded)")
+                httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\n[Local API] シャットダウンシグナルを受信しました。終了します。")
+            break
+        except Exception as e:
+            print(f"[Local API ERROR] サーバー例外発生: {e} (3秒後に自動復旧・再起動します)")
+            time.sleep(3)
 
 
 if __name__ == '__main__':
