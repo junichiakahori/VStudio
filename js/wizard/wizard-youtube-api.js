@@ -654,14 +654,18 @@ https://x.com/drone_akahori
           showYtApiFeedback(`✅ YouTube枠「${data.title || title}」を自動作成しました！ (ID: ${data.id})`, true);
 
           try {
-            const thumbCanvas = (window.openerWin && window.openerWin.document) ? window.openerWin.document.getElementById("news-thumb-canvas") : null;
-            if (thumbCanvas) {
-              const base64 = thumbCanvas.toDataURL("image/png");
+            const base64 = await getLatestThumbnailBase64();
+            if (base64) {
               await fetch("/api/youtube/set_thumbnail", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ video_id: data.id, image_base64: base64 })
               });
+              const thumbPreview = document.getElementById("wizard-yt-thumb-preview");
+              if (thumbPreview) {
+                thumbPreview.src = base64;
+                thumbPreview.style.display = "block";
+              }
             }
           } catch(e) {}
         } else {
@@ -729,6 +733,40 @@ https://x.com/drone_akahori
       }
     });
 
+    // 🎨 最新サムネイル画像の取得ヘルパー
+    async function getLatestThumbnailBase64() {
+      let base64 = "";
+      try {
+        // 1. 親画面のサムネイル生成関数（最新タイトル・背景・アバターで直接レンダリング）
+        if (window.openerWin && typeof window.openerWin.generateThumbnailDataUrl === "function") {
+          base64 = await window.openerWin.generateThumbnailDataUrl();
+        }
+        // 2. 親画面のサムネイルジェネレータ
+        if (!base64 && window.openerWin && window.openerWin.newsThumbnailGenerator && typeof window.openerWin.newsThumbnailGenerator.generateThumbnailBase64 === "function") {
+          base64 = await window.openerWin.newsThumbnailGenerator.generateThumbnailBase64();
+        }
+        // 3. 親画面のCanvas要素
+        if (!base64 && window.openerWin && window.openerWin.document) {
+          const thumbCanvas = window.openerWin.document.getElementById("thumb-preview-canvas") ||
+                              window.openerWin.document.getElementById("news-thumb-canvas");
+          if (thumbCanvas && typeof thumbCanvas.toDataURL === "function") {
+            base64 = thumbCanvas.toDataURL("image/png");
+          }
+        }
+        // 4. localStorage に保存されている最新サムネイル画像
+        if (!base64 || base64.length < 100) {
+          base64 = (window.openerWin && window.openerWin.localStorage.getItem("savedThumb_latestDataUrl")) ||
+                   localStorage.getItem("savedThumb_latestDataUrl") || "";
+        }
+      } catch(e) {
+        console.warn("[Wizard Thumb] サムネイル取得エラー:", e);
+      }
+      return base64;
+    }
+
+    // 枠自動作成時のサムネイル自動反映でも共通利用
+    window._getLatestThumbnailBase64 = getLatestThumbnailBase64;
+
     // サムネイル送信
     const thumbBtn = document.getElementById("btn-api-upload-thumbnail") || document.getElementById("wizard-btn-yt-thumb");
     thumbBtn?.addEventListener("click", async () => {
@@ -742,26 +780,7 @@ https://x.com/drone_akahori
       const origText = thumbBtn.textContent;
       thumbBtn.textContent = "⏳ サムネイル送信中...";
 
-      let base64 = "";
-      try {
-        // 1. 親画面のサムネイルプレビューCanvas
-        if (window.openerWin && window.openerWin.document) {
-          const thumbCanvas = window.openerWin.document.getElementById("thumb-preview-canvas") ||
-                              window.openerWin.document.getElementById("news-thumb-canvas");
-          if (thumbCanvas && typeof thumbCanvas.toDataURL === "function") {
-            base64 = thumbCanvas.toDataURL("image/png");
-          }
-        }
-        // 2. localStorage に保存されている最新サムネイル画像
-        if (!base64 || base64.length < 100) {
-          base64 = (window.openerWin && window.openerWin.localStorage.getItem("savedThumb_latestDataUrl")) ||
-                   localStorage.getItem("savedThumb_latestDataUrl") || "";
-        }
-        // 3. サムネイルジェネレータ
-        if (!base64 && window.openerWin && window.openerWin.newsThumbnailGenerator && typeof window.openerWin.newsThumbnailGenerator.generateThumbnailBase64 === "function") {
-          base64 = await window.openerWin.newsThumbnailGenerator.generateThumbnailBase64();
-        }
-      } catch(e) {}
+      const base64 = await getLatestThumbnailBase64();
 
       if (!base64) {
         showYtApiFeedback("⚠️ サムネイル画像がまだ作成されていません。「🎨 サムネイルを編集」ボタンを押してサムネイルを作成してください。", false);
@@ -780,6 +799,12 @@ https://x.com/drone_akahori
         const data = await res.json();
         if (data.success) {
           showYtApiFeedback(`✅ サムネイル画像をYouTube枠 (${videoId}) に反映完了しました！🎉`, true);
+          // プレビュー画像を即座に最新画像に差し替え
+          const thumbPreview = document.getElementById("wizard-yt-thumb-preview");
+          if (thumbPreview && base64) {
+            thumbPreview.src = base64;
+            thumbPreview.style.display = "block";
+          }
         } else {
           showYtApiFeedback(`❌ サムネイル反映エラー: ${data.error || "不明なエラー"}`, false);
         }
