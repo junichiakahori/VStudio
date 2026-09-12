@@ -1,6 +1,6 @@
 let currentPlayingDisplayText = "";
 
-// 🍏 Safari / Web Audio 共通: AudioContextの自動復旧・自己修復関数
+// 🍏 Safari / Web Audio 共通: 単一Master AudioContextの自動復旧・自己修復関数
 function getVoicevoxAudioContext() {
   if (
     !window.voicevoxAudioContext ||
@@ -14,24 +14,91 @@ function getVoicevoxAudioContext() {
     } catch (e) {}
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     window.voicevoxAudioContext = new AudioCtx();
+    window.bgmAudioContext = window.voicevoxAudioContext; // BGMと完全共有（複数デバイス競合・ハング防止）
     window.voicevoxAnalyser = null;
     window.voicevoxGainNode = null;
-    window.voicevoxCompressorNode = null; // ← コンプレッサーもリセット
-    console.log("[VOICEVOX AudioContext] 🔄 オーディオセッションを新規初期化・再生成しました");
+    window.voicevoxCompressorNode = null;
+    window.bgmGainNode = null;
+    window.bgmAnalyser = null;
+    console.log("[Master AudioContext] 🔄 単一共通オーディオセッションを新規初期化・再生成しました (" + window.voicevoxAudioContext.sampleRate + "Hz)");
   }
   return window.voicevoxAudioContext;
 }
 window.getVoicevoxAudioContext = getVoicevoxAudioContext;
 
+// ⚡ アプリ再起動不要！音声エンジン強制リセット＆ハードウェア即時再起動（配信に音を乗せない完全サイレント修復）
+window.hardResetAudioEngine = async function hardResetAudioEngine() {
+  console.log("[AudioEngine] ⚡ 音声エンジンをサイレント強制再起動・修復します...");
+
+  // 1. HTML5 Audio で物理オーディオデバイス (CoreAudio HAL) を無音で強制覚醒
+  try {
+    const silentAudio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
+    silentAudio.volume = 0.0001;
+    silentAudio.play().catch(() => {});
+  } catch (e) {}
+
+  // 2. 既存の壊れた/休止した AudioContext を解放
+  try {
+    if (window.voicevoxAudioContext && typeof window.voicevoxAudioContext.close === "function") {
+      await window.voicevoxAudioContext.close().catch(() => {});
+    }
+  } catch (e) {}
+
+  // CoreAudio リソース解放の待機 (WebKitパイプラインの競合防止)
+  await new Promise(r => setTimeout(r, 60));
+
+  window.voicevoxAudioContext = null;
+  window.bgmAudioContext = null;
+  window.voicevoxAnalyser = null;
+  window.voicevoxGainNode = null;
+  window.voicevoxCompressorNode = null;
+  window.bgmGainNode = null;
+  window.bgmAnalyser = null;
+
+  // 3. 新規 AudioContext をクリーンに生成＆完全サイレント覚醒
+  const ctx = getVoicevoxAudioContext();
+  if (ctx.state === "suspended" || ctx.state === "interrupted") {
+    await ctx.resume().catch(() => {});
+  }
+
+  // 無音バッファを同期再生して WebKit Web Audio を静かに完全アンロック
+  try {
+    const sampleRate = ctx.sampleRate || 48000;
+    const silentBuffer = ctx.createBuffer(1, 1, sampleRate);
+    const src = ctx.createBufferSource();
+    src.buffer = silentBuffer;
+    src.connect(ctx.destination);
+    src.start(0);
+  } catch (e) {}
+
+  console.log("[AudioEngine] ✅ 音声エンジン完全リセット・再起動完了！ (サイレント修復)");
+
+  // 非同期フィードバック（配信画面を止めない通知）
+  if (typeof window.showNotification === "function") {
+    window.showNotification("⚡ 音声エンジンを修復・再起動しました");
+  } else if (typeof window.showToast === "function") {
+    window.showToast("⚡ 音声エンジンを修復・再起動しました");
+  }
+};
+
 // 🔇 ソフトウェアリミッター（DynamicsCompressor）の設定をlocalStorageからロード＆動的適用
 function getSavedLimiterSettings() {
+  const preset = localStorage.getItem("voicevoxLimiterPreset") || "safe";
+  let defaultThreshold = -6, defaultRatio = 20, defaultGain = 1.5, defaultKnee = 3, defaultAttack = 0.001, defaultRelease = 0.10;
+  if (preset === "broadcast") {
+    defaultThreshold = -18; defaultRatio = 4; defaultGain = 5.0; defaultKnee = 6; defaultAttack = 0.005; defaultRelease = 0.15;
+  } else if (preset === "hard") {
+    defaultThreshold = -12; defaultRatio = 20; defaultGain = 3.0; defaultKnee = 0; defaultAttack = 0.001; defaultRelease = 0.05;
+  }
+
   const enabled = localStorage.getItem("voicevoxLimiterEnabled") !== "false"; // デフォルトON
-  const threshold = parseFloat(localStorage.getItem("voicevoxLimiterThreshold") || "-6");
-  const ratio = parseFloat(localStorage.getItem("voicevoxLimiterRatio") || "20");
-  const knee = parseFloat(localStorage.getItem("voicevoxLimiterKnee") || "3");
-  const attack = parseFloat(localStorage.getItem("voicevoxLimiterAttack") || "0.001");
-  const release = parseFloat(localStorage.getItem("voicevoxLimiterRelease") || "0.10");
-  return { enabled, threshold, ratio, knee, attack, release };
+  const threshold = parseFloat(localStorage.getItem("voicevoxLimiterThreshold") || String(defaultThreshold));
+  const ratio = parseFloat(localStorage.getItem("voicevoxLimiterRatio") || String(defaultRatio));
+  const makeupGain = parseFloat(localStorage.getItem("voicevoxLimiterMakeupGain") || String(defaultGain));
+  const knee = parseFloat(localStorage.getItem("voicevoxLimiterKnee") || String(defaultKnee));
+  const attack = parseFloat(localStorage.getItem("voicevoxLimiterAttack") || String(defaultAttack));
+  const release = parseFloat(localStorage.getItem("voicevoxLimiterRelease") || String(defaultRelease));
+  return { enabled, threshold, ratio, makeupGain, knee, attack, release };
 }
 
 function applyCompressorNodeParams(comp, ctx, settings) {
@@ -84,29 +151,178 @@ window.addEventListener("storage", (e) => {
 });
 
 
-// 🍏 Safari 画面操作（クリック・タッチ・キー入力）時の自動音声ロック解除＆ハードウェア起動
+// 🍏 WebKit / Safari 画面操作（クリック・タッチ・キー入力）時の完全同期アンロックエンジン
+function unlockAudioSystemSynchronously() {
+  try {
+    const ctx = getVoicevoxAudioContext();
+    if (ctx.state === "suspended" || ctx.state === "interrupted") {
+      ctx.resume().catch(() => {});
+    }
+    // Safari / WebKit hardware wake-up: AudioContext のサンプルレートと一致する無音バッファを同期再生
+    const sampleRate = ctx.sampleRate || 48000;
+    const silentBuffer = ctx.createBuffer(1, 1, sampleRate);
+    const src = ctx.createBufferSource();
+    src.buffer = silentBuffer;
+    src.connect(ctx.destination);
+    src.start(0);
+
+    // HTML5 Audio フォールバックアンロック (WebKit メディアパイプラインを強制アクティブ化)
+    if (!window._unlockAudioEl) {
+      window._unlockAudioEl = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
+    }
+    window._unlockAudioEl.play().catch(() => {});
+    console.log("[AudioEngine] 🔓 Web Audio & HTML5 Audio 同期アンロック成功 (state:", ctx.state, ")");
+  } catch (e) {
+    console.warn("[AudioEngine] 同期アンロック警告:", e);
+  }
+}
+window.unlockAudioSystemSynchronously = unlockAudioSystemSynchronously;
+
 (function setupSafariAudioAutoUnlock() {
-  const unlock = () => {
+  ['click', 'pointerdown', 'keydown', 'touchstart', 'mousedown'].forEach(evt => {
+    document.addEventListener(evt, unlockAudioSystemSynchronously, { passive: true, capture: true });
+  });
+
+  // 💤 放置後の画面アクティブ化・フォーカス復帰時の自動ヘルスチェック＆覚醒
+  const wakeOnActivity = () => {
     try {
-      const ctx = getVoicevoxAudioContext();
-      if (ctx.state === "suspended" || ctx.state === "interrupted") {
+      const ctx = window.voicevoxAudioContext;
+      if (ctx && (ctx.state === "suspended" || ctx.state === "interrupted")) {
+        console.log("[AudioEngine] ⏰ 画面復帰検知: オーディオエンジンを自動覚醒します (state:", ctx.state, ")");
         ctx.resume().catch(() => {});
       }
-      if (window.bgmAudioContext && (window.bgmAudioContext.state === "suspended" || window.bgmAudioContext.state === "interrupted")) {
-        window.bgmAudioContext.resume().catch(() => {});
-      }
-      // Safari hardware wake-up (無音バッファキック)
-      const silentBuffer = ctx.createBuffer(1, 1, 22050);
-      const src = ctx.createBufferSource();
-      src.buffer = silentBuffer;
-      src.connect(ctx.destination);
-      src.start(0);
     } catch (e) {}
   };
-  ['click', 'pointerdown', 'keydown', 'touchstart'].forEach(evt => {
-    document.addEventListener(evt, unlock, { passive: true, capture: true });
+  window.addEventListener("focus", wakeOnActivity);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") wakeOnActivity();
   });
 })();
+
+// 🛡️ WAVバイナリ（16bit PCM）に対する高精度スタジオ品質ソフトウェアリミッター＆ゲイン調整DSPエンジン
+function processWavAudio(arrayBuffer, gain, limiterSettings) {
+  if (!arrayBuffer || arrayBuffer.byteLength < 44) return arrayBuffer;
+  const s = limiterSettings || getSavedLimiterSettings();
+  const isLimiterOn = s.enabled !== false;
+  const hasGain = gain !== 1.0;
+
+  // リミッターもOFFでゲインも1.0なら無変換で返す
+  if (!isLimiterOn && !hasGain) return arrayBuffer;
+
+  try {
+    const copy = arrayBuffer.slice(0);
+    const view = new DataView(copy);
+
+    let offset = 12;
+    let sampleRate = 24000;
+    let pcmStart = -1;
+    let pcmBytes = 0;
+
+    // WAV チャンクの解析
+    while (offset < view.byteLength - 8) {
+      const chunkId = String.fromCharCode(
+        view.getUint8(offset),
+        view.getUint8(offset + 1),
+        view.getUint8(offset + 2),
+        view.getUint8(offset + 3)
+      );
+      const chunkSize = view.getUint32(offset + 4, true);
+      if (chunkId === "fmt ") {
+        sampleRate = view.getUint32(offset + 12, true) || 24000;
+      } else if (chunkId === "data") {
+        pcmStart = offset + 8;
+        pcmBytes = chunkSize;
+        break;
+      }
+      offset += 8 + chunkSize;
+    }
+
+    if (pcmStart < 0 || pcmStart >= view.byteLength) return arrayBuffer;
+
+    const numSamples = Math.min(Math.floor(pcmBytes / 2), Math.floor((view.byteLength - pcmStart) / 2));
+    if (numSamples <= 0) return arrayBuffer;
+
+    const thresholdDb = typeof s.threshold === "number" ? s.threshold : -6.0;
+    const ratio = typeof s.ratio === "number" && s.ratio > 1 ? s.ratio : 20.0;
+    const kneeDb = typeof s.knee === "number" && s.knee >= 0 ? s.knee : 3.0;
+    const attackSec = typeof s.attack === "number" && s.attack > 0 ? s.attack : 0.001;
+    const releaseSec = typeof s.release === "number" && s.release > 0 ? s.release : 0.10;
+    const makeupDb = typeof s.makeupGain === "number" ? s.makeupGain : 0.0;
+    const makeupLinear = isLimiterOn && makeupDb !== 0 ? Math.pow(10.0, makeupDb / 20.0) : 1.0;
+
+    const attackCoeff = Math.exp(-1.0 / (sampleRate * attackSec));
+    const releaseCoeff = Math.exp(-1.0 / (sampleRate * releaseSec));
+
+    let envDb = 0.0; // 現在のゲインリダクション量 (dB, <= 0)
+
+    for (let i = 0; i < numSamples; i++) {
+      const byteIdx = pcmStart + i * 2;
+      let rawSample = view.getInt16(byteIdx, true);
+
+      // 1. ゲイン適用 (正規化 [-1.0, 1.0])
+      let x = (rawSample * gain) / 32768.0;
+
+      if (isLimiterOn) {
+        // 2. 入力レベル (dB)
+        const absX = Math.abs(x);
+        const xDb = absX > 1e-6 ? 20.0 * Math.log10(absX) : -120.0;
+
+        // 3. 静的コンプレッションカーブ (Soft-Knee)
+        let deltaDb = 0.0;
+        const diffDb = xDb - thresholdDb;
+
+        if (2.0 * diffDb < -kneeDb) {
+          // ニー領域以下: 圧縮なし
+          deltaDb = 0.0;
+        } else if (2.0 * Math.abs(diffDb) <= kneeDb) {
+          // ソフトニー遷移領域: 2次スプライン平滑化
+          const kneeTerm = diffDb + kneeDb / 2.0;
+          deltaDb = ((1.0 / ratio - 1.0) * kneeTerm * kneeTerm) / (2.0 * kneeDb);
+        } else {
+          // 閾値以上: 比率圧縮
+          deltaDb = diffDb * (1.0 / ratio - 1.0);
+        }
+
+        // 4. アタック / リリース エンベロープスムージング
+        if (deltaDb < envDb) {
+          // 圧縮を強める（Attack）
+          envDb = attackCoeff * envDb + (1.0 - attackCoeff) * deltaDb;
+        } else {
+          // 圧縮を戻す（Release）
+          envDb = releaseCoeff * envDb + (1.0 - releaseCoeff) * deltaDb;
+        }
+
+        // 5. ゲインリダクション適用 ＆ 補償ゲイン（Makeup Gain）適用
+        const reductionGain = Math.pow(10.0, envDb / 20.0);
+        x = x * reductionGain * makeupLinear;
+
+        // 6. 万が一の突発ピークに対するスタジオ品質ソフトサチュレーション (Brickwall Soft-Limiter)
+        if (Math.abs(x) > 0.95) {
+          const sign = x >= 0 ? 1 : -1;
+          const excess = (Math.abs(x) - 0.95) / 0.05;
+          x = sign * (0.95 + 0.049 * Math.tanh(excess));
+        }
+      }
+
+      // 7. 16-bit PCM へ再エンコード
+      let outInt16 = Math.round(x * 32767.0);
+      if (outInt16 > 32767) outInt16 = 32767;
+      if (outInt16 < -32768) outInt16 = -32768;
+
+      view.setInt16(byteIdx, outInt16, true);
+    }
+
+    return copy;
+  } catch (e) {
+    console.warn("[VOICEVOX DSP Limiter Error]:", e);
+    return arrayBuffer;
+  }
+}
+
+// 後方互換性用エイリアス
+function applyGainToWavArrayBuffer(arrayBuffer, gain) {
+  return processWavAudio(arrayBuffer, gain, getSavedLimiterSettings());
+}
 
 function showSubtitles(text) {
   const subEl = document.getElementById("avatar-subtitles");
@@ -119,7 +335,13 @@ function showSubtitles(text) {
     return;
   }
 
-  textEl.textContent = text.trim();
+  let cleanText = text.trim();
+  cleanText = cleanText.replace(/[。！？]+[\s　]*(にゃ|のだ|なのだ)[！!。？?]*/g, '$1。');
+  cleanText = cleanText.replace(/(?:にゃ[！!。？?\s　]*){2,}/g, 'にゃ！');
+  cleanText = cleanText.replace(/(?:のだ[！!。？?\s　]*){2,}/g, 'のだ！');
+  cleanText = cleanText.replace(/。{2,}/g, '。');
+
+  textEl.textContent = cleanText;
   subEl.style.display = "flex";
 }
 
@@ -197,6 +419,16 @@ async function fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal
         );
         if (!queryRes.ok) throw new Error("Audio query failed");
         const queryJson = await queryRes.json();
+        // 🎙️ 発声終了後の余白（postPhonemeLength）を 0.15秒に最適化（語尾切れ防止と軽快テンポの両立）
+        queryJson.postPhonemeLength = 0.15;
+        queryJson.prePhonemeLength = 0.08;
+        // ⚡ フォールバック時でもユーザー設定の話速（speedScale）と音高（pitchScale）を100%確実に適用
+        if (typeof speedScaleVal === "number" && !isNaN(speedScaleVal) && speedScaleVal > 0) {
+          queryJson.speedScale = speedScaleVal;
+        }
+        if (typeof pitchScaleVal === "number" && !isNaN(pitchScaleVal)) {
+          queryJson.pitchScale = pitchScaleVal;
+        }
         if (queryJson.kana) {
           console.log(`[VOICEVOX発音カナ] 🗣️ ${queryJson.kana}`);
         }
@@ -233,30 +465,75 @@ async function fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal
   return await promise;
 }
 
+// 🧹 VOICEVOX送信前テキストの共通クリーンアップ（本編・先読みで100%同一のキーを保証）
+function cleanVoicevoxYomi(t) {
+  if (!t || typeof t !== "string") return "";
+  // 「行う（おこなう）」の文脈誤読防止ルール
+  t = t.replace(/([をがにでもはと])行([っいうわえな])/g, "$1おこな$2");
+  t = t.replace(/(活動|調査|支援|開発|実験|作業|対応|対策|工事|手続き|点検|研修|指導|投票|開票|審査|試験|発表|配信|運営|管理|処理|実行|実施|施行|開催|避難|提供|販売|製造|修理|変更|修正|開始|終了|停止|中止|延期|再開)行([っいうわえな])/g, "$1おこな$2");
+  t = t.replace(/行わ([れせないずぬてたまば])/g, "おこなわ$1");
+  t = t.replace(/行い([まてた])/g, "おこない$1");
+  t = t.replace(/行う([こともの予定方針見込みよう際時ためとがのからに。！？、]|$)/g, "おこなう$1");
+  t = t.replace(/だなにゃ([！!？?。、\s　]|$)/g, "だにゃ$1");
+  t = t.replace(/だなのだ([！!？?。、\s　]|$)/g, "なのだ$1");
+  t = t.replace(/だねにゃ([！!？?。、\s　]|$)/g, "ですね$1");
+  t = t.replace(/(?:この(?:ニュース|話題|記事|出来事)を?(?:受けた|に対する))?(?:とろろ|トロロ|ずんだもん|ズンダモン)としては[、,\s　]*/g, "");
+  t = t.replace(/(^|[。！？\s「（])(?:とろろ|トロロ|ずんだもん|ズンダモン)(?:としては|にゃ|はにゃ|なのだ|のだ|はなのだ|はのだ)[、,\s　]*/g, "$1");
+  t = t.replace(/^[、,\s　]+/, "");
+  let pt = t.replace(/(?<![A-Za-z0-9])[ 　]+(?![A-Za-z0-9])/g, "");
+  // 括弧内の出典・年齢・ルビの安全な発音化（中身を消去せず残す）
+  pt = pt.replace(/[（\(]([^）\)]*より)[）\)]/g, "、$1");
+  pt = pt.replace(/[\u4E00-\u9FFF々ヶ〆〇0-9a-zA-Z]+[（\(]([ぁ-んァ-ヶー]+)[）\)]/g, "$1");
+  pt = pt.replace(/[（\(]([^）\)]*)[）\)]/g, "、$1、");
+  pt = pt.replace(/、+/g, "、").replace(/^、|、$/g, "");
+  if (typeof aiFeatures !== "undefined" && typeof aiFeatures.applyCustomHiraganaDict === "function") {
+    pt = aiFeatures.applyCustomHiraganaDict(pt);
+  }
+  return pt;
+}
+window.cleanVoicevoxYomi = cleanVoicevoxYomi;
+
 window.preloadVoicevoxSentenceAudio = function (text, speakerId, speed, pitch) {
+  if (!text || !text.trim()) return Promise.resolve(null);
   const speakerIdEl = document.getElementById("voicevox-speaker-id");
   const speedEl = document.getElementById("voicevox-speed");
   const pitchEl = document.getElementById("voicevox-pitch");
   const spk = speakerId || (speakerIdEl ? speakerIdEl.value : (window.voicevoxSpeakerId ? window.voicevoxSpeakerId.value : "3"));
   const spd = speed !== undefined ? speed : (speedEl ? parseFloat(speedEl.value) || 1.0 : 1.0);
   const ptc = pitch !== undefined ? pitch : (pitchEl ? parseFloat(pitchEl.value) || 0.0 : 0.0);
-  return fetchVoicevoxBuffer(text, spk, spd, ptc);
+  // 🎯 本編の queueVoicevoxAudio と 100% 一致する cleanVoicevoxYomi を通してキャッシュキーを完全一致
+  const cleanedText = cleanVoicevoxYomi(text);
+  return fetchVoicevoxBuffer(cleanedText, spk, spd, ptc);
 };
 
+let _isVoicevoxProcessing = false;
+let _voicevoxNextTimerId = null;
+
 async function playNextVoicevox() {
+  if (_isVoicevoxProcessing) {
+    return; // 🛡️ 既にキュー取り出しまたは音声生成・再生準備中のため二重実行を100%遮断
+  }
+  if (isVoicevoxPlaying) {
+    return; // 🛡️ 既に発声中のため二重起動を遮断
+  }
+
   if (voicevoxAudioQueue.length === 0) {
     isVoicevoxPlaying = false;
+    _isVoicevoxProcessing = false;
     currentPlayingDisplayText = "";
     hideSubtitles();
     if (typeof resetIdleTimer === "function") resetIdleTimer();
     return;
   }
 
-  const item = voicevoxAudioQueue.shift();
-  // console.log("[DEBUG 最終キュー確認] displayText:", item.displayText, "/ original:", item.original);
+  // 🛡️ 保留中の遅延発火タイマーがあればクリアして二重発火を完全防止
+  if (_voicevoxNextTimerId) {
+    clearTimeout(_voicevoxNextTimerId);
+    _voicevoxNextTimerId = null;
+  }
 
-  isVoicevoxPlaying = true;
-  currentPlayingIsIdle = false;
+  _isVoicevoxProcessing = true;
+  const item = voicevoxAudioQueue.shift();
 
   // 1. 表示用（字幕・原稿ログ）は常に item.displayText を死守する
   let displayString = typeof item === "object" && item !== null ? (item.displayText || item.original || String(item)) : String(item);
@@ -267,6 +544,7 @@ async function playNextVoicevox() {
   // 実質文字（日本語・英数字）が一切含まれていない記号のみの空行（"。" や " " 等）は安全にスキップ
   if (!/[\u4E00-\u9FFFぁ-んァ-ヶーA-Za-z0-9]/.test(displayString) && !/[\u4E00-\u9FFFぁ-んァ-ヶーA-Za-z0-9]/.test(speakString)) {
     isVoicevoxPlaying = false;
+    _isVoicevoxProcessing = false;
     playNextVoicevox();
     return;
   }
@@ -301,6 +579,11 @@ async function playNextVoicevox() {
     showSubtitles(displayString); // 画面の字幕には漢字混じりの綺麗な原稿を表示
     // 音声バッファの取得と再生には speakString を渡す
     let arrayBuffer = await fetchVoicevoxBuffer(speakString, speakerId, speedScaleVal, pitchScaleVal);
+    if (!arrayBuffer) {
+      console.warn("[VOICEVOX] 音声取得初回失敗 ➔ 600ms後に再試行します...");
+      await new Promise(r => setTimeout(r, 600));
+      arrayBuffer = await fetchVoicevoxBuffer(speakString, speakerId, speedScaleVal, pitchScaleVal);
+    }
     if (!arrayBuffer) throw new Error("Empty audio buffer");
 
     const ctx = getVoicevoxAudioContext();
@@ -311,46 +594,66 @@ async function playNextVoicevox() {
         console.warn("[VOICEVOX] Resume error:", e);
       }
     }
-
-
-
     const volSlider = document.getElementById("voicevox-volume-slider");
     const savedVol = localStorage.getItem("savedVoicevoxVolume");
     let targetVol = 1.0;
     if (volSlider && !isNaN(parseFloat(volSlider.value))) {
       targetVol = parseFloat(volSlider.value) / 100.0;
-    } else if (savedVol && !isNaN(parseFloat(savedVol))) {
+    } else if (savedVol !== null && !isNaN(parseFloat(savedVol))) {
       targetVol = parseFloat(savedVol) / 100.0;
     }
-    if (isNaN(targetVol) || targetVol <= 0) targetVol = 1.0;
+    if (isNaN(targetVol)) targetVol = 1.0;
+    targetVol = Math.max(0.0, targetVol);
 
-    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    // 🛡️ ソフトウェアリミッター（DynamicsCompressor）および音量ゲイン調整の適用
+    const limiterSettings = getSavedLimiterSettings();
+    let outputWavBuffer = arrayBuffer;
+    let html5Vol = 1.0;
+
+    // 音量調整またはリミッターが有効な場合はWAVバイナリをDSP処理（スタジオ品質Soft-Knee＆クリッピング防止）
+    if (targetVol !== 1.0 || (limiterSettings && limiterSettings.enabled)) {
+      outputWavBuffer = processWavAudio(arrayBuffer, targetVol, limiterSettings);
+      html5Vol = 1.0; // WAVバイナリ側でゲインおよびリミッティング処理済み
+    } else {
+      html5Vol = Math.min(1.0, targetVol);
+    }
+
+    const audioBlob = new Blob([outputWavBuffer], { type: "audio/wav" });
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const audioEl = new Audio(audioUrl);
+    audioEl.volume = html5Vol;
+
+    // Web Audio は Live2D リップシンク & レベルメーターの波形解析専用として並行稼働
+    // メーター/リップシンク側にもリミッター処理後の outputWavBuffer を渡すことで実音と完全同期
+    const audioBuffer = await ctx.decodeAudioData(outputWavBuffer.slice(0));
     currentVoicevoxSource = ctx.createBufferSource();
     currentVoicevoxSource.buffer = audioBuffer;
-
-    const compressor = getVoicevoxCompressor(ctx);
 
     if (!window.voicevoxAnalyser) {
       window.voicevoxAnalyser = ctx.createAnalyser();
       window.voicevoxAnalyser.fftSize = 256;
-      // analyser → compressor → destination（常時接続）
-      window.voicevoxAnalyser.connect(compressor);
-      compressor.connect(ctx.destination);
     }
 
-    // 毎再生で独立したGainNodeを生成し、volume → compressor → destination
     const gainNode = ctx.createGain();
-    gainNode.gain.setValueAtTime(targetVol, ctx.currentTime);
+    gainNode.gain.setValueAtTime(1.0, ctx.currentTime);
     currentVoicevoxSource.connect(gainNode);
-    gainNode.connect(window.voicevoxAnalyser);
-    // compressorはanalyserの先に接続済みのため二重接続不要
 
-    currentVoicevoxSource.onended = () => {
+    // 🎚️ レベルメーター・Live2Dリップシンク計測用アナライザーへ分岐接続
+    gainNode.connect(window.voicevoxAnalyser);
+
+    let isEnded = false;
+    const handleVoicevoxEnded = () => {
+      if (isEnded) return;
+      isEnded = true;
       try { currentVoicevoxSource.disconnect(); } catch(e){}
       try { gainNode.disconnect(); } catch(e){}
       currentVoicevoxSource = null;
+      window.currentVoicevoxAudioEl = null;
       isVoicevoxPlaying = false;
-
+      _isVoicevoxProcessing = false;
+      setTimeout(() => {
+        try { URL.revokeObjectURL(audioUrl); } catch(e){}
+      }, 1000);
 
       if (voicevoxAudioQueue.length === 0) {
         hideSubtitles();
@@ -369,19 +672,49 @@ async function playNextVoicevox() {
       ) {
         setTimeout(() => triggerIdleSpeech(), 1500);
       } else {
-        playNextVoicevox();
+        // 🌬️ 文と文の間に軽快なブレス（約60msの間）を設けて淀みないテンポへ向上
+        if (_voicevoxNextTimerId) clearTimeout(_voicevoxNextTimerId);
+        _voicevoxNextTimerId = setTimeout(() => {
+          _voicevoxNextTimerId = null;
+          playNextVoicevox();
+        }, 60);
       }
     };
+
+    audioEl.onended = handleVoicevoxEnded;
+    currentVoicevoxSource.onended = () => {
+      // 🛡️ Web Audio側が先に終了しても、実際に発声している audioEl が再生中の場合は絶対に中断させない
+      setTimeout(() => {
+        if (!isEnded) {
+          if (audioEl && !audioEl.paused && !audioEl.ended) {
+            return;
+          }
+          handleVoicevoxEnded();
+        }
+      }, 800);
+    };
+
+    window.currentVoicevoxAudioEl = audioEl;
+
+    // 🎧 再生準備完了: 発声フラグを確定し処理中フラグを解除
+    isVoicevoxPlaying = true;
+    _isVoicevoxProcessing = false;
+
+    // 同期再生スタート (HTML5 Audioでスピーカー発音 + Web Audioでメーター/口パク駆動)
     currentVoicevoxSource.start(0);
+    audioEl.play().catch((err) => {
+      console.warn("[VOICEVOX HTML5 Audio play rejected, falling back to Web Audio destination]:", err);
+      try { gainNode.connect(ctx.destination); } catch(e){}
+    });
 
   } catch (e) {
     console.error("VOICEVOX Error:", e);
     currentPlayingDisplayText = "";
     isVoicevoxPlaying = false;
+    _isVoicevoxProcessing = false;
     hideSubtitles();
     playNextVoicevox();
   }
-
 }
 
 window.playNextVoicevox = playNextVoicevox;
@@ -389,6 +722,8 @@ async function queueVoicevoxAudio(
   text,
   isIdle = false,
   preConvertedYomi = null,
+  forcePlay = false,
+  noSplit = false,
 ) {
   if (!text || !text.trim()) return;
   // 単独の「ニュース」「？」などの無意味なゴミ単語・記号のみの行を完全遮断
@@ -397,45 +732,33 @@ async function queueVoicevoxAudio(
     return;
   }
 
-  // Yahoo! や M!LK 等のブランド名感嘆符で誤分割されない安全な文分割関数
-  const splitSentencesSafely = (rawText) => {
-    if (!rawText) return [];
-    let tSafe = rawText.replace(/Yahoo[!！]/gi, "Yahoo__EXCL__")
-                       .replace(/M[!！]LK/g, "M__EXCL__LK")
-                       .replace(/Y[!！]ニュース/g, "Y__EXCL__ニュース");
-    const parts = tSafe.split(/(?<=[。！？\n])|(?<=[!?])(?![A-Za-z0-9])/g)
-                       .map(s => s.trim())
-                       .filter(s => s.length > 0 && /[\u4E00-\u9FFFぁ-んァ-ヶーA-Za-z0-9]/.test(s));
-    return parts.map(s => s.replace(/Yahoo__EXCL__/g, "Yahoo!").replace(/M__EXCL__LK/g, "M!LK").replace(/Y__EXCL__ニュース/g, "Y!ニュース"));
-  };
+  // クリーンアップ関数（共通の cleanVoicevoxYomi を利用）
+  const cleanYomi = cleanVoicevoxYomi;
 
-  // クリーンアップ関数
-  const cleanYomi = (t) => {
-    // 「行う（おこなう）」の文脈誤読防止ルール
-    t = t.replace(/([をがにでもはと])行([っいうわえな])/g, "$1おこな$2");
-    t = t.replace(/(活動|調査|支援|開発|実験|作業|対応|対策|工事|手続き|点検|研修|指導|投票|開票|審査|試験|発表|配信|運営|管理|処理|実行|実施|施行|開催|避難|提供|販売|製造|修理|変更|修正|開始|終了|停止|中止|延期|再開)行([っいうわえな])/g, "$1おこな$2");
-    t = t.replace(/行わ([れせないずぬてたまば])/g, "おこなわ$1");
-    t = t.replace(/行い([まてた])/g, "おこない$1");
-    t = t.replace(/行う([こともの予定方針見込みよう際時ためとがのからに。！？、]|$)/g, "おこなう$1");
-    t = t.replace(/だなにゃ([！!？?。、\s　]|$)/g, "だにゃ$1");
-    t = t.replace(/だなのだ([！!？?。、\s　]|$)/g, "なのだ$1");
-    t = t.replace(/だねにゃ([！!？?。、\s　]|$)/g, "ですね$1");
-    t = t.replace(/だねのだ([！!？?。、\s　]|$)/g, "なのだ$1");
-    t = t.replace(/(?:^|(?<=[。！？\s]))(?:とろろ|トロロ)にゃ[、,\s　]*/g, "とろろとしては、");
-    t = t.replace(/(?:^|(?<=[。！？\s]))(?:とろろ|トロロ)はにゃ[、,\s　]*/g, "とろろとしては、");
-    t = t.replace(/(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)(?:なのだ|のだ)[、,\s　]*/g, "ずんだもんとしては、");
-    t = t.replace(/(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)は(?:なのだ|のだ)[、,\s　]*/g, "ずんだもんとしては、");
-    let pt = t.replace(/(?<![A-Za-z0-9])[ 　]+(?![A-Za-z0-9])/g, "");
-    pt = pt.replace(/、+/g, "、");
-    pt = pt.replace(/[\u4E00-\u9FFF々ヶ〆〇0-9a-zA-Z]+[（\(]([ぁ-んァ-ヶー]+)[）\)]/g, "$1");
-    pt = pt.replace(/[（\(][^）\)]*[）\)]/g, "");
-    if (typeof aiFeatures !== "undefined" && typeof aiFeatures.applyCustomHiraganaDict === "function") {
-      pt = aiFeatures.applyCustomHiraganaDict(pt);
-    }
-    return pt;
-  };
+  // 📰 見出しモード（noSplit: true）: 人名等の「。」で文分割させず、1つの見出しとして一息で発話
+  if (noSplit) {
+    const rawSpeak = preConvertedYomi || text;
+    const yomiS = cleanYomi(rawSpeak);
+    voicevoxAudioQueue.push({
+      original: yomiS,
+      displayText: text.trim(),
+      promise: Promise.resolve(yomiS),
+      isIdle,
+    });
+  } else {
+    // Yahoo! や M!LK 等のブランド名感嘆符で誤分割されない安全な文分割関数
+    const splitSentencesSafely = (rawText) => {
+      if (!rawText) return [];
+      let tSafe = rawText.replace(/Yahoo[!！]/gi, "Yahoo__EXCL__")
+                         .replace(/M[!！]LK/g, "M__EXCL__LK")
+                         .replace(/Y[!！]ニュース/g, "Y__EXCL__ニュース");
+      const parts = tSafe.split(/(?<=[。！？\n])|(?<=[!?])(?![A-Za-z0-9])/g)
+                         .map(s => s.trim())
+                         .filter(s => s.length > 0 && /[\u4E00-\u9FFFぁ-んァ-ヶーA-Za-z0-9]/.test(s));
+      return parts.map(s => s.replace(/Yahoo__EXCL__/g, "Yahoo!").replace(/M__EXCL__LK/g, "M!LK").replace(/Y__EXCL__ニュース/g, "Y!ニュース"));
+    };
 
-  const origSentences = splitSentencesSafely(text);
+    const origSentences = splitSentencesSafely(text);
 
   if (preConvertedYomi) {
     const yomiSentences = splitSentencesSafely(preConvertedYomi);
@@ -478,6 +801,7 @@ async function queueVoicevoxAudio(
       });
     }
   }
+}
 
   if (
     !isIdle &&
@@ -509,6 +833,11 @@ function stopVoicevoxPlayback() {
   if (typeof voicevoxAudioQueue !== "undefined") {
     voicevoxAudioQueue.length = 0;
   }
+  if (_voicevoxNextTimerId) {
+    clearTimeout(_voicevoxNextTimerId);
+    _voicevoxNextTimerId = null;
+  }
+  _isVoicevoxProcessing = false;
   if (currentVoicevoxSource) {
     try {
       currentVoicevoxSource.onended = null;
@@ -522,6 +851,13 @@ function stopVoicevoxPlayback() {
       audioEl.pause();
       audioEl.currentTime = 0;
     } catch (e) { }
+  }
+  if (window.currentVoicevoxAudioEl) {
+    try {
+      window.currentVoicevoxAudioEl.pause();
+      window.currentVoicevoxAudioEl.currentTime = 0;
+    } catch(e){}
+    window.currentVoicevoxAudioEl = null;
   }
   isVoicevoxPlaying = false;
   if (typeof hideSubtitles === "function") hideSubtitles();
@@ -592,7 +928,7 @@ document.addEventListener("keydown", (e) => {
 // VOICEVOXのキューが空になり、音声再生が完全に終わるまで待つ関数
 function waitForVoicevoxFinish() {
   return new Promise((resolve) => {
-    // キュー投入直後の非同期音声生成・再生開始ラグを考慮して最低300ms待機してから判定
+    // キュー投入直後の非同期音声生成・再生開始ラグを考慮して待機してから判定
     setTimeout(() => {
       const check = setInterval(() => {
         // ニュース番組が手動停止された場合は即座に待機を解除
@@ -603,12 +939,14 @@ function waitForVoicevoxFinish() {
         }
         const queueEmpty = (typeof voicevoxAudioQueue !== "undefined" ? voicevoxAudioQueue.length === 0 : true);
         const notPlaying = (typeof isVoicevoxPlaying !== "undefined" ? !isVoicevoxPlaying : true);
-        if (queueEmpty && notPlaying) {
+        const notProcessing = (typeof _isVoicevoxProcessing !== "undefined" ? !_isVoicevoxProcessing : true);
+        const noPendingTimer = !_voicevoxNextTimerId;
+        if (queueEmpty && notPlaying && notProcessing && noPendingTimer) {
           clearInterval(check);
           resolve();
         }
-      }, 100);
-    }, 350);
+      }, 50);
+    }, 100);
   });
 }
 
@@ -618,30 +956,7 @@ async function playVoicevoxDirectAndWait(displayText, speakText = null) {
   if (/^(ニュース|主要ニュース|トピックス|[？!！\?。、\-–—…\s　]+)$/.test(displayText.trim())) return;
   const rawSpeak = speakText || displayText;
   
-  const cleanYomi = (t) => {
-    // 「行う（おこなう）」の文脈誤読防止ルール
-    t = t.replace(/([をがにでもはと])行([っいうわえな])/g, "$1おこな$2");
-    t = t.replace(/(活動|調査|支援|開発|実験|作業|対応|対策|工事|手続き|点検|研修|指導|投票|開票|審査|試験|発表|配信|運営|管理|処理|実行|実施|施行|開催|避難|提供|販売|製造|修理|変更|修正|開始|終了|停止|中止|延期|再開)行([っいうわえな])/g, "$1おこな$2");
-    t = t.replace(/行わ([れせないずぬてたまば])/g, "おこなわ$1");
-    t = t.replace(/行い([まてた])/g, "おこない$1");
-    t = t.replace(/行う([こともの予定方針見込みよう際時ためとがのからに。！？、]|$)/g, "おこなう$1");
-    t = t.replace(/だなにゃ([！!？?。、\s　]|$)/g, "だにゃ$1");
-    t = t.replace(/だなのだ([！!？?。、\s　]|$)/g, "なのだ$1");
-    t = t.replace(/だねにゃ([！!？?。、\s　]|$)/g, "ですね$1");
-    t = t.replace(/だねのだ([！!？?。、\s　]|$)/g, "なのだ$1");
-    t = t.replace(/(?:^|(?<=[。！？\s]))(?:とろろ|トロロ)にゃ[、,\s　]*/g, "とろろとしては、");
-    t = t.replace(/(?:^|(?<=[。！？\s]))(?:とろろ|トロロ)はにゃ[、,\s　]*/g, "とろろとしては、");
-    t = t.replace(/(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)(?:なのだ|のだ)[、,\s　]*/g, "ずんだもんとしては、");
-    t = t.replace(/(?:^|(?<=[。！？\s]))(?:ずんだもん|ズンダモン)は(?:なのだ|のだ)[、,\s　]*/g, "ずんだもんとしては、");
-    let pt = t.replace(/(?<![A-Za-z0-9])[ 　]+(?![A-Za-z0-9])/g, "");
-    pt = pt.replace(/、+/g, "、");
-    pt = pt.replace(/[\u4E00-\u9FFF々ヶ〆〇0-9a-zA-Z]+[（\(]([ぁ-んァ-ヶー]+)[）\)]/g, "$1");
-    pt = pt.replace(/[（\(][^）\)]*[）\)]/g, "");
-    if (typeof aiFeatures !== "undefined" && typeof aiFeatures.applyCustomHiraganaDict === "function") {
-      pt = aiFeatures.applyCustomHiraganaDict(pt);
-    }
-    return pt;
-  };
+  const cleanYomi = cleanVoicevoxYomi;
   
   const speakString = cleanYomi(rawSpeak);
   const displayString = displayText.trim();
@@ -686,22 +1001,23 @@ async function playVoicevoxDirectAndWait(displayText, speakText = null) {
       const savedVol = localStorage.getItem("savedVoicevoxVolume");
       const targetVol = volSlider ? (parseFloat(volSlider.value) / 100.0) : (savedVol ? (parseFloat(savedVol) / 100.0) : 1.0);
 
-      if (!window.voicevoxGainNode) {
-        window.voicevoxGainNode = ctx.createGain();
-        window.voicevoxGainNode.gain.setValueAtTime(targetVol, ctx.currentTime);
-        // GainNode → Analyser → Compressor → destination
-        window.voicevoxGainNode.connect(window.voicevoxAnalyser);
-        window.voicevoxAnalyser.connect(compressor);
+      const gainNode = ctx.createGain();
+      gainNode.gain.setValueAtTime(targetVol, ctx.currentTime);
+      currentVoicevoxSource.connect(gainNode);
+
+      // 🛡️ リミッター（DynamicsCompressor）経由でスピーカー＆アナライザーへ接続
+      if (compressor) {
+        gainNode.connect(compressor);
         compressor.connect(ctx.destination);
+        compressor.connect(window.voicevoxAnalyser);
       } else {
-        window.voicevoxGainNode.gain.cancelScheduledValues(ctx.currentTime);
-        window.voicevoxGainNode.gain.setValueAtTime(targetVol, ctx.currentTime);
+        gainNode.connect(ctx.destination);
+        gainNode.connect(window.voicevoxAnalyser);
       }
 
-      currentVoicevoxSource.connect(window.voicevoxGainNode);
-
       currentVoicevoxSource.onended = () => {
-        if (currentVoicevoxSource) currentVoicevoxSource.disconnect();
+        try { currentVoicevoxSource.disconnect(); } catch(e){}
+        try { gainNode.disconnect(); } catch(e){}
         currentVoicevoxSource = null;
         isVoicevoxPlaying = false;
         currentPlayingDisplayText = "";

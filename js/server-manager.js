@@ -4,10 +4,11 @@ const API_BASE = "/_api/servers";
 let logIntervals = {};
 let pendingActions = {}; // serverName -> { targetAction, startTime, timeoutId, pollIntervalId }
 
+const isDevEnv = window.location && window.location.port === "8444";
 const SERVER_DISPLAY_NAMES = {
-  local_api_server: "Local API (8001)",
-  youtube_comment_server: "YouTube コメント (8768)",
-  tiktok_comment_server: "TikTok コメント (8767)"
+  local_api_server: isDevEnv ? "Local API (8002)" : "Local API (8001)",
+  youtube_comment_server: isDevEnv ? "YouTube コメント (8778)" : "YouTube コメント (8768)",
+  tiktok_comment_server: isDevEnv ? "TikTok コメント (8777)" : "TikTok コメント (8767)"
 };
 
 // ── スマートトースト通知ヘルパー ──

@@ -7,7 +7,7 @@
     <title>Web Live2D Avatar Studio</title>
     <meta name="description" content="Live2Dモデルを使ったリアルタイムVTuberアバタースタジオ。">
 
-    <link rel="stylesheet" href="/css/live2d-styles.css?v=3.7">
+    <link rel="stylesheet" href="/css/live2d-styles.css?v=4.0">
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+JP:wght@300;500;700&display=swap"
         rel="stylesheet">
@@ -190,12 +190,34 @@
         <!-- 音声ロック解除用警告バナー（移動済み） -->
         <div class="avatar-viewport" id="avatar-viewport">
             <div class="background-layer" id="background-layer"></div>
-            <div class="stream-clock" id="stream-clock" style="display:none;">00:00</div>
+            <div class="stream-clock" id="stream-clock" style="display:none;"></div>
             <div class="stream-stats" id="stream-stats" style="display:none;">
-                <div class="stat-item"><span class="stat-icon">👤</span><span id="stat-subscribers">-</span></div>
-                <div class="stat-item"><span class="stat-icon">👁️</span><span id="stat-viewers">-</span></div>
-                <div class="stat-item"><span class="stat-icon">👍</span><span id="stat-likes">-</span></div>
-                <div class="stat-item"><span class="stat-icon">💬</span><span id="stat-comments">0</span></div>
+                <div class="stat-item" title="チャンネル登録者数"><span class="stat-icon">👤</span><span id="stat-subscribers">-</span></div>
+                <div class="stat-item" title="同時視聴者数（同接）"><span class="stat-icon">👁️</span><span id="stat-viewers">-</span></div>
+                <div class="stat-item" title="累計再生数"><span class="stat-icon">▶️</span><span id="stat-total-views">-</span></div>
+                <div class="stat-item" title="高評価数"><span class="stat-icon">👍</span><span id="stat-likes">-</span></div>
+                <div class="stat-item" title="コメント数"><span class="stat-icon">💬</span><span id="stat-comments">0</span></div>
+            </div>
+            <!-- 🎚️ 画面上オーディオレベルメーターHUD（ドラッグ可能） -->
+            <div class="stream-audio-hud" id="stream-audio-meter" style="display:none;">
+                <div class="hud-meter-header">
+                    <span class="hud-meter-title">🎚️ AUDIO LEVEL</span>
+                    <span class="hud-meter-drag-handle" title="ドラッグして位置を移動">⋮⋮</span>
+                </div>
+                <div class="meter-channel-row" style="margin:2px 0;">
+                    <span class="meter-ch-label" style="width:36px; font-size:0.62rem;">VOICE</span>
+                    <div class="meter-track" style="height:8px;">
+                        <div class="meter-fill" id="hud-meter-voice-bar"></div>
+                        <div class="meter-peak-line" id="hud-meter-voice-peak"></div>
+                    </div>
+                </div>
+                <div class="meter-channel-row" style="margin:2px 0;">
+                    <span class="meter-ch-label" style="width:36px; font-size:0.62rem;">BGM</span>
+                    <div class="meter-track" style="height:8px;">
+                        <div class="meter-fill" id="hud-meter-bgm-bar"></div>
+                        <div class="meter-peak-line" id="hud-meter-bgm-peak"></div>
+                    </div>
+                </div>
             </div>
             <!-- ニュースボード -->
             <div class="news-board" id="news-board">
@@ -245,7 +267,22 @@
                     <p id="loading-text">Live2Dモデルを読み込み中...</p>
                 </div>
                 <!-- 配信オーバーレイ -->
-                <div class="overlay-screen" id="stream-overlay"></div>
+                <div class="overlay-screen" id="stream-overlay">
+                    <div class="overlay-container">
+                        <div class="overlay-main-title" id="overlay-main-title">配信準備中</div>
+                        <div class="overlay-schedule-card" id="overlay-schedule-card" style="display:none;">
+                            <div class="overlay-schedule-time">
+                                <span class="overlay-schedule-icon">⏰</span>
+                                <span class="overlay-schedule-label">配信開始予定</span>
+                                <span class="overlay-schedule-val" id="overlay-schedule-val">--:--</span>
+                            </div>
+                            <div class="overlay-schedule-countdown">
+                                <span class="overlay-countdown-label">START IN</span>
+                                <span class="overlay-countdown-val" id="overlay-countdown-val">00:00:00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -258,49 +295,45 @@
     <!-- OBS WebSocket JS v5 -->
     <script src="https://cdn.jsdelivr.net/npm/obs-websocket-js@5.0.3/dist/obs-ws.min.js"></script>
     <!-- UI Overlay and Features -->
-    <script src="/js/draggable.js?v=21.4"></script>
+    <script src="/js/draggable.js?v=21.5"></script>
     <!-- Extracted Modules -->
     <script src="/js/prompt-loader.js?v=9.7"></script>
-    <script src="/js/audio-voicevox.js?v=2.3"></script>
-
-
-
-
-
-
-
-    <script src="/js/bgm-player.js?v=9.6"></script>
-    <script src="/js/ai-settings.js?v=9.7"></script>
+    <script src="/js/audio-voicevox.js?v=4.1"></script>
+    <script src="/js/audio-level-meter.js?v=1.4"></script>
+    <script src="/js/bgm-player.js?v=10.0"></script>
+    <script src="/js/ai-settings.js?v=10.3"></script>
     <script src="/js/ui-tabs.js?v=9.6"></script>
-    <script src="/js/ui-state-autosave.js?v=9.6"></script>
+    <script src="/js/ui-state-autosave.js?v=9.8"></script>
     <script src="/js/idle-speech.js?v=9.6"></script>
-    <script src="/js/chat-ui.js?v=9.6"></script>
-    <script src="/js/chat-client.js?v=5.2"></script>
-    <script src="/js/stream-automation.js?v=9.7"></script>
-        <script src="/js/news/news-media-resolver.js?v=21.4"></script>
-    <script src="/js/news/news-state-manager.js?v=20.3"></script>
-    <script src="/js/news/news-fetcher.js?v=21.3"></script>
+    <script src="/js/chat-ui.js?v=9.9"></script>
+    <script src="/js/chat-client.js?v=5.7"></script>
+    <script src="/js/stream-automation.js?v=10.8"></script>
+    <script src="/js/news/news-media-resolver.js?v=21.9"></script>
+    <script src="/js/news/news-state-manager.js?v=21.4"></script>
+    <script src="/js/news/news-fetcher.js?v=22.2"></script>
+    <script src="/js/news/news-batch-generator.js?v=21.9"></script>
     <script src="/js/news/news-ui-board.js?v=1.2"></script>
-    <script src="/js/news/news-audio-player.js?v=21.8"></script>
+    <script src="/js/news/news-audio-player.js?v=21.9"></script>
     <script src="/js/hot-reload.js?v=2.1"></script>
-    <script src="/js/news/news-list-popup.js?v=1.3"></script>
+    <script src="/js/news/news-list-popup.js?v=1.5"></script>
     <script src="/js/news/news-config-manager.js?v=21.9"></script>
     <script src="/js/news/news-comment-interlude.js?v=1.0"></script>
-    <script src="/js/news-mode.js?v=22.17"></script>
+    <script src="/js/news-mode.js?v=22.34"></script>
 
 
 
     <script src="/js/radio-mode.js?v=9.6"></script>
 
-    <script src="/js/stream-tools.js?v=9.7"></script>
-    <script src="/js/stream-wizard.js?v=20.0"></script>
+    <script src="/js/stream-tools.js?v=9.8"></script>
+    <script src="/js/stream-wizard.js?v=20.2"></script>
     <script src="/js/obs-websocket.js?v=9.8"></script>
-    <script src="/js/screen-overlay.js?v=9.6"></script>
+    <script src="/js/screen-overlay.js?v=10.1"></script>
     <script src="/js/tracking-camera.js?v=9.6"></script>
     <script src="/js/avatar-features.js?v=9.6"></script>
     <script src="/js/reaction-effects.js?v=9.6"></script>
     <script src="/js/layout-manager.js?v=9.6"></script>
     <script src="/js/hot-reload.js?v=9.6"></script>
+    <script src="/js/ai-rules-tuner.js?v=1.0"></script>
     <script type="module" src="/js/live2d-app.js?v=10.3"></script>
 </body>
 

@@ -604,118 +604,107 @@ async def fetch_live_stats_loop(video_id):
     try:
         while current_video_id == video_id:
             viewers = ""
+            concurrent_viewers = ""
+            total_views = ""
             subscribers = ""
             likes = ""
 
-            # 1. YouTube Data API が利用可能な場合（クォータ制限中は無駄な通信をスキップ）
-            now_ts = time.time()
-            if youtube_api_client and now_ts >= _youtube_quota_exceeded_until:
-                try:
-                    req = youtube_api_client.videos().list(
-                        part="liveStreamingDetails,statistics,snippet",
-                        id=video_id
-                    )
-                    res = await asyncio.to_thread(req.execute)
-                    if res and "items" in res and len(res["items"]) > 0:
-                        item = res["items"][0]
-                        stats = item.get("statistics", {})
-                        lsd = item.get("liveStreamingDetails", {})
-                        # ライブ配信中はconcurrentViewers（同接）を優先（viewCountは0になる場合があるため）
-                        if "concurrentViewers" in lsd:
-                            viewers = f"{int(lsd['concurrentViewers']):,}"
-                        elif "viewCount" in stats and int(stats.get('viewCount', 0)) > 0:
-                            viewers = f"{int(stats['viewCount']):,}"
+            # 🛡️ 【YouTube API クォータ完全保護（永久温存設計）】
+            # 10秒ごとのリアルタイム統計取得（同接・再生数・高評価・登録者数）で貴重なAPI枠(1日10,000ユニット)を
+            # 浪費しないため、クォータ消費ゼロの「Webスクレイピング方式」を100%専任で活用します。
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept-Language": "ja,en-US;q=0.9,en;q=0.8"
+            }
+
+            try:
+                html = await asyncio.to_thread(lambda: requests.get(url, headers=headers, timeout=8).text)
+                
+                # 1. 対象動画自身の ytInitialPlayerResponse を解析（再生数・高評価の確実な情報源）
+                player_match = re.search(r'ytInitialPlayerResponse\s*=\s*(\{.*?\});(?:var|</script>)', html)
+                if player_match:
+                    try:
+                        player = json.loads(player_match.group(1))
+                        videoDetails = player.get("videoDetails", {})
+                        raw_vc = videoDetails.get("viewCount")
+                        if raw_vc is not None and str(raw_vc).isdigit():
+                            total_views = f"{int(raw_vc):,}"
                         
-                        if "likeCount" in stats:
-                            likes = f"{int(stats['likeCount']):,}"
-                        
-                        channel_id = item.get("snippet", {}).get("channelId")
-                        if channel_id:
-                            ch_req = youtube_api_client.channels().list(
-                                part="statistics",
-                                id=channel_id
-                            )
-                            ch_res = await asyncio.to_thread(ch_req.execute)
-                            if ch_res and "items" in ch_res and len(ch_res["items"]) > 0:
-                                ch_stats = ch_res["items"][0].get("statistics", {})
-                                if "subscriberCount" in ch_stats:
-                                    subscribers = f"{int(ch_stats['subscriberCount']):,}"
-                except Exception as e:
-                    err_str = str(e)
-                    if "quotaExceeded" in err_str or "403" in err_str:
-                        _youtube_quota_exceeded_until = now_ts + 1800  # 30分間APIリクエストを停止
-                        logging.info("ℹ️ [YouTube API] 1日のクォータ上限に達したため、API通信を一時休止しスクレイピングフォールバックへ自動移行します（コメント取得・番組進行は正常継続）")
-                    else:
-                        logging.warning(f"YouTube Data API fetch stats failed: {e}")
+                        # microformat からのフォールバック
+                        mf = player.get("microformat", {}).get("playerMicroformatRenderer", {})
+                        if not total_views:
+                            mf_vc = mf.get("viewCount")
+                            if mf_vc is not None and str(mf_vc).isdigit():
+                                total_views = f"{int(mf_vc):,}"
+                        if not likes and "likeCount" in mf:
+                            likes = f"{int(mf['likeCount']):,}"
+                    except Exception as pe:
+                        logging.debug(f"ytInitialPlayerResponse parse error: {pe}")
 
-            # 2. スクレイピングによる抽出（フォールバック）
-            if not viewers or not subscribers or not likes:
-                url = f"https://www.youtube.com/watch?v={video_id}"
-                headers = {
-                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Accept-Language": "ja,en-US;q=0.9,en;q=0.8"
-                }
-
-                try:
-                    html = await asyncio.to_thread(lambda: requests.get(url, headers=headers, timeout=8).text)
-                    
-                    if not viewers:
-                        player_match = re.search(r'ytInitialPlayerResponse\s*=\s*(\{.*?\});(?:var|</script>)', html)
-                        if player_match:
-                            try:
-                                player = json.loads(player_match.group(1))
-                                videoDetails = player.get("videoDetails", {})
-                                raw_vc = videoDetails.get("viewCount")
-                                if raw_vc is not None and str(raw_vc).isdigit():
-                                    viewers = f"{int(raw_vc):,}"
-                            except Exception:
-                                pass
-
-                    if not viewers:
-                        txt_match = re.search(r'"(?:simpleText|label)"\s*:\s*"([\d,]+)\s*(?:回視聴|人が視聴中)"', html)
-                        if txt_match:
-                            viewers = txt_match.group(1)
-
-                    if not viewers:
-                        vc_match = re.search(r'"viewCount"\s*:\s*"?(\d+)"?', html)
-                        if vc_match:
-                            viewers = f"{int(vc_match.group(1)):,}"
-
-                    if not likes:
-                        like_lbl_match = re.search(r'"label"\s*:\s*"([\d,]+)\s*(?:件の|人による)?高評価"', html)
-                        if like_lbl_match:
-                            likes = like_lbl_match.group(1)
+                # 2. 対象動画自身の videoViewCountRenderer をピンポイント解析（おすすめ動画欄の誤爆を100%防止）
+                vvcr_match = re.search(r'\"videoViewCountRenderer\":\s*(\{.*?\}(?=\}\}\}))', html)
+                if vvcr_match:
+                    try:
+                        vvcr_text = vvcr_match.group(1)
+                        # 「12 人が視聴中」または「1 人が待機しています」
+                        live_run_match = re.search(r'\"runs\":\s*\[\s*\{\"text\":\s*\"([\d,]+)\"\s*\}\s*,\s*\{\"text\":\s*\"\s*(?:人が視聴中|人が待機しています)\"', vvcr_text)
+                        if live_run_match:
+                            concurrent_viewers = live_run_match.group(1)
                         else:
-                            like_txt_match = re.search(r'"(?:simpleText|label)"\s*:\s*"([\d,]+)\s*(?:件の高評価|高評価)"', html)
-                            if like_txt_match:
-                                likes = like_txt_match.group(1)
+                            single_run = re.search(r'\"runs\":\s*\[\s*\{\"text\":\s*\"([\d,]+)\s*(?:人が視聴中|人が待機しています)\"', vvcr_text)
+                            if single_run:
+                                concurrent_viewers = single_run.group(1)
                             else:
-                                like_cnt_match = re.search(r'"likeCount"\s*:\s*"?(\d+)"?', html)
-                                if like_cnt_match:
-                                    likes = f"{int(like_cnt_match.group(1)):,}"
+                                simple_m = re.search(r'\"simpleText\":\s*\"([\d,]+)\s*(?:人が視聴中|人が待機しています)\"', vvcr_text)
+                                if simple_m:
+                                    concurrent_viewers = simple_m.group(1)
+                        
+                        # originalViewCount がある場合（動画の再生数）
+                        if not total_views:
+                            orig_m = re.search(r'\"originalViewCount\":\s*\"?(\d+)\"?', vvcr_text)
+                            if orig_m:
+                                total_views = f"{int(orig_m.group(1)):,}"
+                    except Exception as ve:
+                        logging.debug(f"videoViewCountRenderer parse error: {ve}")
 
-                    if not subscribers:
-                        sub_match1 = re.search(r'"subscriberCountText":\{"accessibility":\{"accessibilityData":\{"label":"([^"]+)"\}\}', html)
+                # 3. 高評価の抽出（未取得時のみ、動画アクションボタンから抽出）
+                if not likes:
+                    like_lbl_match = re.search(r'\"accessibilityData\":\{\"label\":\"([\d,]+)\s*(?:件の|人による)?高評価\"\}', html)
+                    if like_lbl_match:
+                        likes = like_lbl_match.group(1)
+                    else:
+                        like_cnt_match = re.search(r'\"likeCount\":\s*\"?(\d+)\"?', html)
+                        if like_cnt_match:
+                            likes = f"{int(like_cnt_match.group(1)):,}"
+
+                # 4. チャンネル登録者数の抽出
+                if not subscribers:
+                    sub_sec_match = re.search(r'\"videoSecondaryInfoRenderer\":.*?\"subscriberCountText\":\{.*?\"label\":\"([^\"]+)\"', html)
+                    if sub_sec_match:
+                        subscribers = sub_sec_match.group(1)
+                    else:
+                        sub_match1 = re.search(r'\"subscriberCountText\":\{.*?\"label\":\"([^\"]+)\"', html)
                         if sub_match1:
                             subscribers = sub_match1.group(1)
-                        else:
-                            sub_match2 = re.search(r'"subscriberCountText":\{"simpleText":"([^"]+)"\}', html)
-                            if sub_match2:
-                                subscribers = sub_match2.group(1)
-                except Exception as e:
-                    logging.error(f"Error fetching stats via scraping: {e}")
+            except Exception as e:
+                logging.error(f"Error fetching stats via scraping: {e}")
 
+            cv_display = concurrent_viewers or viewers or "-"
+            tv_display = total_views or "-"
             if not viewers:
                 viewers = "-"
             if not likes:
                 likes = "-"
 
-            logging.info(f"📊 [YouTube Live 統計] 👁️ 視聴者数/再生数: {viewers} | 👍 高評価: {likes} | 👤 登録者数: {subscribers} (動画ID: {video_id})")
+            logging.info(f"📊 [YouTube Live 統計] 👁️ 同接: {cv_display} | ▶️ 累計再生数: {tv_display} | 👍 高評価: {likes} | 👤 登録者数: {subscribers} (動画ID: {video_id})")
 
             await broadcast_to_clients({
                 "type": "stats",
                 "videoId": video_id,
-                "viewers": viewers,
+                "viewers": cv_display,
+                "concurrentViewers": cv_display,
+                "totalViews": tv_display,
                 "subscribers": subscribers,
                 "likes": likes
             })
@@ -903,14 +892,18 @@ async def start_youtube_client(video_id_or_channel: str, websocket):
                 if local_chat is None or not local_chat.is_alive():
                     try:
                         import httpx
-                        local_chat = await loop.run_in_executor(
-                            None, 
-                            lambda: pytchat.create(
-                                video_id=video_id, 
-                                processor=VStudioChatProcessor(),
-                                interruptable=False, 
-                                client=httpx.Client(http2=False)
-                            )
+                        timeout_cfg = httpx.Timeout(10.0, connect=10.0)
+                        local_chat = await asyncio.wait_for(
+                            loop.run_in_executor(
+                                None, 
+                                lambda: pytchat.create(
+                                    video_id=video_id, 
+                                    processor=VStudioChatProcessor(),
+                                    interruptable=False, 
+                                    client=httpx.Client(timeout=timeout_cfg, http2=False)
+                                )
+                            ),
+                            timeout=15.0
                         )
                         if local_chat.is_alive():
                             if last_status_sent != "connected":
@@ -928,23 +921,29 @@ async def start_youtube_client(video_id_or_channel: str, websocket):
                                     "status": "waiting",
                                     "message": f"待機中... 配信開始またはチャットの有効化を待っています (ID: {video_id})"
                                 })
+                    except asyncio.TimeoutError:
+                        logging.warning(f"pytchat creation timed out (15s) ➔ will retry (ID: {video_id})")
+                        local_chat = None
                     except Exception as e:
                         logging.warning(f"pytchat creation failed (might not be live yet): {e}")
                         local_chat = None
                         if last_status_sent != "waiting":
                             last_status_sent = "waiting"
                             await broadcast_to_clients({
-                                    "type": "status",
-                                    "status": "waiting",
-                                    "message": f"待機中... 配信開始またはチャットの有効化を待っています (ID: {video_id})"
+                                "type": "status",
+                                "status": "waiting",
+                                "message": f"待機中... 配信開始またはチャットの有効化を待っています (ID: {video_id})"
                             })
                     
                     if local_chat is None or not local_chat.is_alive():
-                        await asyncio.sleep(15) # 15秒ごとに再試行
+                        await asyncio.sleep(10) # 10秒ごとに再試行
                         continue
 
                 try:
-                    chat_data = await loop.run_in_executor(None, local_chat.get)
+                    chat_data = await asyncio.wait_for(
+                        loop.run_in_executor(None, local_chat.get),
+                        timeout=12.0
+                    )
                     for c in chat_data.sync_items():
                         # ライブリアクション (YouTube Live Reactions)
                         if getattr(c, 'type', None) == 'reaction':
@@ -1015,8 +1014,22 @@ async def start_youtube_client(video_id_or_channel: str, websocket):
                             })
                     
                     await asyncio.sleep(1) # wait 1 second before polling again
+                except asyncio.TimeoutError:
+                    logging.warning(f"[YouTube] チャット取得タイムアウト (12秒) ➔ 接続切断を検知しセッションを再生成します (ID: {video_id})")
+                    try:
+                        if local_chat:
+                            local_chat.terminate()
+                    except Exception:
+                        pass
+                    local_chat = None
+                    await asyncio.sleep(3)
                 except Exception as e:
                     logging.error(f"Chat fetch error: {e}")
+                    try:
+                        if local_chat:
+                            local_chat.terminate()
+                    except Exception:
+                        pass
                     local_chat = None # エラー時は次回ループで再接続
                     await asyncio.sleep(5)
         except asyncio.CancelledError:
@@ -1053,6 +1066,22 @@ async def stop_youtube_client(broadcast=True):
 async def main():
     host = "localhost"
     port = 8768
+    for _i, _arg in enumerate(sys.argv):
+        if _arg == "--port" and _i + 1 < len(sys.argv):
+            try:
+                port = int(sys.argv[_i + 1])
+            except ValueError:
+                pass
+        elif _arg.startswith("--port="):
+            try:
+                port = int(_arg.split("=", 1)[1])
+            except ValueError:
+                pass
+    if "PORT" in os.environ:
+        try:
+            port = int(os.environ["PORT"])
+        except ValueError:
+            pass
     logging.info(f"Starting YouTube WebSocket server on ws://{host}:{port}")
     
     server = await websockets.serve(ws_handler, host, port)

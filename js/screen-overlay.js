@@ -11,38 +11,82 @@
   window.isStreamEndedState = false;
   window.wasBgmPlayingBeforeOverlay = false;
 
+  function updateOverlayTitle(titleText, showSchedule = false) {
+    if (!streamOverlay) streamOverlay = document.getElementById("stream-overlay");
+    if (!streamOverlay) return;
+
+    let titleEl = document.getElementById("overlay-main-title");
+    if (!titleEl) {
+      streamOverlay.innerHTML = `
+        <div class="overlay-container">
+            <div class="overlay-main-title" id="overlay-main-title">${titleText}</div>
+            <div class="overlay-schedule-card" id="overlay-schedule-card" style="display:none;">
+                <div class="overlay-schedule-time">
+                    <span class="overlay-schedule-icon">⏰</span>
+                    <span class="overlay-schedule-label">配信開始予定</span>
+                    <span class="overlay-schedule-val" id="overlay-schedule-val">--:--</span>
+                </div>
+                <div class="overlay-schedule-countdown">
+                    <span class="overlay-countdown-label">START IN</span>
+                    <span class="overlay-countdown-val" id="overlay-countdown-val">00:00:00</span>
+                </div>
+            </div>
+        </div>
+      `;
+      titleEl = document.getElementById("overlay-main-title");
+    } else {
+      titleEl.textContent = titleText;
+    }
+
+    const card = document.getElementById("overlay-schedule-card");
+    if (card) {
+      card.style.display = showSchedule ? "flex" : "none";
+    }
+  }
+  window.updateOverlayTitle = updateOverlayTitle;
+
+  window.setOverlayPreparing = function () {
+    if (!streamOverlay) streamOverlay = document.getElementById("stream-overlay");
+    if (!streamOverlay) return;
+
+    const schedToggle = document.getElementById("local-schedule-toggle");
+    const isSchedOn = Boolean(schedToggle && schedToggle.checked);
+    updateOverlayTitle("配信準備中", isSchedOn);
+
+    streamOverlay.classList.add("active");
+    isPreparing = true;
+
+    // 配信準備中も独り言を止めるためにキューとタイマーをクリア
+    if (typeof voicevoxAudioQueue !== "undefined") {
+      voicevoxAudioQueue.length = 0;
+    }
+    if (typeof clearIdleTimer === "function") {
+      clearIdleTimer();
+    }
+
+    // BGMの滑らかなフェードアウト停止処理
+    wasBgmPlayingBeforeOverlay = (typeof bgmIsPlaying !== "undefined" ? bgmIsPlaying : false);
+    if (wasBgmPlayingBeforeOverlay && typeof fadeOutBgm === "function") {
+      fadeOutBgm(1800);
+    } else if (wasBgmPlayingBeforeOverlay && typeof stopBgm === "function") {
+      stopBgm();
+    }
+  };
+
   if (overlayPrepBtn && streamOverlay) {
     overlayPrepBtn.addEventListener("click", () => {
-      streamOverlay.textContent = "配信準備中";
-      streamOverlay.classList.add("active");
-      isPreparing = true;
-
-      // 配信準備中も独り言を止めるためにキューとタイマーをクリア
-      if (typeof voicevoxAudioQueue !== "undefined") {
-        voicevoxAudioQueue.length = 0;
-      }
-      if (typeof clearIdleTimer === "function") {
-        clearIdleTimer();
-      }
-
-      // BGMの滑らかなフェードアウト停止処理
-      wasBgmPlayingBeforeOverlay = (typeof bgmIsPlaying !== "undefined" ? bgmIsPlaying : false);
-      if (wasBgmPlayingBeforeOverlay && typeof fadeOutBgm === "function") {
-        fadeOutBgm(1800);
-      } else if (wasBgmPlayingBeforeOverlay && typeof stopBgm === "function") {
-        stopBgm();
-      }
+      window.setOverlayPreparing();
     });
   }
   if (overlayAfkBtn && streamOverlay) {
     overlayAfkBtn.addEventListener("click", () => {
-      streamOverlay.textContent = "離席中";
+      updateOverlayTitle("離席中", false);
       streamOverlay.classList.add("active");
     });
   }
   if (overlayEndBtn && streamOverlay) {
     overlayEndBtn.addEventListener("click", () => {
-      streamOverlay.textContent = "配信終了";
+      updateOverlayTitle("配信終了", false);
       streamOverlay.classList.add("active");
       isStreamEndedState = true;
 
@@ -104,18 +148,11 @@
     isStreamEndedState = false;
     window.isStreamEndProcessRunning = false;
 
-    // 配信準備中を解除したときに挨拶
+    // 配信準備中を解除したときの処理
     if (isPreparing) {
       isPreparing = false;
-      if (typeof isVoicevoxEnabled !== "undefined" && isVoicevoxEnabled) {
-        window.startTextEl = document.getElementById("stream-start-text");
-        const startText = startTextEl
-          ? startTextEl.value
-          : "配信を開始しました！皆さんよろしくお願いします！";
-        if (typeof queueVoicevoxAudio === "function") {
-          queueVoicevoxAudio(startText, false).catch((e) => console.warn(e));
-        }
-      }
+      // ユーザー要望: 配信準備中解除時のデフォルト挨拶（「今日もゆっくりしていってね！」「配信を開始しました！」等）を完全停止！
+      // 解除時は完全な静寂（無音）を保ち、その後の番組本来のオープニング挨拶（ニュースOP等）のみを流す
     } else {
       // 配信終了状態からの解除などの場合は、独り言タイマーを即座に再開する
       if (typeof resetIdleTimer === "function") resetIdleTimer();
@@ -307,7 +344,10 @@
     if (savedStyle && clockStyleSelect) clockStyleSelect.value = savedStyle;
 
     const applyClockState = () => {
-      if (clockToggle.checked) {
+      if (!streamClock) streamClock = document.getElementById("stream-clock");
+      if (!streamClock) return;
+
+      if (clockToggle && clockToggle.checked) {
         streamClock.style.display = "flex";
         if (clockSettingsContainer)
           clockSettingsContainer.style.display = "flex";
@@ -317,13 +357,27 @@
         if (clockStyleSelect)
           streamClock.classList.add(`style-${clockStyleSelect.value}`);
 
-        if (clockPosX && clockPosY) {
-          // X座標に応じてテキストのアライメントを変更 (左寄りなら左揃え、右寄りなら右揃え)
-          // Since sliders are gone, we just default to center or use draggable position heuristics later.
-          streamClock.style.alignItems = "center";
+        streamClock.style.alignItems = "center";
+        const triggerClockUpdate = () => {
+          try {
+            if (typeof window.updateClock === "function") {
+              window.updateClock();
+            } else if (typeof updateClock === "function") {
+              updateClock();
+            } else if (streamClock) {
+              const now = new Date();
+              const pad = (n) => String(n).padStart(2, "0");
+              const days = ["日", "月", "火", "水", "木", "金", "土"];
+              streamClock.textContent = `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())} (${days[now.getDay()]}) ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+            }
+          } catch (e) {
+            console.warn("[ScreenOverlay] Clock update error:", e);
+          }
+        };
+        triggerClockUpdate();
+        if (!clockInterval) {
+          clockInterval = setInterval(triggerClockUpdate, 1000);
         }
-        updateClock();
-        if (!clockInterval) clockInterval = setInterval(updateClock, 1000);
       } else {
         streamClock.style.display = "none";
         if (clockSettingsContainer)

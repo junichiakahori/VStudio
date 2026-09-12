@@ -21,3 +21,8 @@ browser_console.log
 VStudio.app
 assets/AppIcon.icns
 AppIcon.icns
+
+# Runtime Caches & Local History
+data/cached_broadcasts.json
+data/cached_channel_info.json
+data/news_history/

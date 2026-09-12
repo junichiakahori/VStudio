@@ -92,7 +92,21 @@
       ];
 
       const patterns = isMorning ? morningPatterns : eveningPatterns;
-      defaultTitle = patterns[titlePatternIndex % patterns.length];
+
+      // 保存されたお気に入りパターンのインデックスを取得（朝・夜別）
+      const slotKey = isMorning ? "morning" : "evening";
+      let savedIdx = parseInt(localStorage.getItem("savedTitlePatternIndex_" + slotKey) || "0", 10);
+      if (isNaN(savedIdx) || savedIdx < 0) savedIdx = 0;
+
+      if (cyclePattern) {
+        savedIdx = (savedIdx + 1) % patterns.length;
+        localStorage.setItem("savedTitlePatternIndex_" + slotKey, savedIdx);
+        if (window.openerWin) {
+          try { window.openerWin.localStorage.setItem("savedTitlePatternIndex_" + slotKey, savedIdx); } catch(e) {}
+        }
+      }
+
+      defaultTitle = patterns[savedIdx % patterns.length];
 
       let greetingTemplate = (isMorning
         ? (localStorage.getItem("savedGreeting_news_morning") || GREETING_DEFAULTS.morning)
@@ -195,30 +209,75 @@ https://x.com/drone_akahori
     }
 
     const obsToggle = document.getElementById("wizard-obs-stream-toggle");
-    if (obsToggle && window.openerWin) {
-      const mainObsToggle = window.openerWin.document.getElementById("news-obs-auto-stream-toggle") || window.openerWin.document.getElementById("obs-auto-start-toggle");
-      if (mainObsToggle) obsToggle.checked = mainObsToggle.checked;
+    if (obsToggle) {
+      let restoredObs = null;
+      if (window.openerWin) {
+        const mainObsToggle = window.openerWin.document.getElementById("news-obs-auto-stream-toggle") || window.openerWin.document.getElementById("obs-auto-start-toggle");
+        if (mainObsToggle) restoredObs = mainObsToggle.checked;
+        if (restoredObs === null && typeof window.openerWin.isObsStreamAutoStart !== "undefined") {
+          restoredObs = !!window.openerWin.isObsStreamAutoStart;
+        }
+        if (restoredObs === null && window.openerWin.localStorage) {
+          const s = window.openerWin.localStorage.getItem("savedObsStreamAutoStart");
+          if (s !== null) restoredObs = (s === "true");
+        }
+      }
+      if (restoredObs === null) {
+        const s = localStorage.getItem("savedObsStreamAutoStart");
+        if (s !== null) restoredObs = (s === "true");
+      }
+      if (restoredObs !== null) {
+        obsToggle.checked = restoredObs;
+      }
     }
 
     const schedToggle = document.getElementById("wizard-start-schedule-toggle");
-    if (schedToggle && window.openerWin) {
-      const mainSchedToggle = window.openerWin.document.getElementById("start-schedule-toggle");
-      if (mainSchedToggle) schedToggle.checked = mainSchedToggle.checked;
+    if (schedToggle) {
+      let savedSched = null;
+      try {
+        savedSched = localStorage.getItem("savedWizardStartScheduleToggle");
+        if (savedSched === null && window.openerWin && window.openerWin.localStorage) {
+          savedSched = window.openerWin.localStorage.getItem("savedWizardStartScheduleToggle");
+        }
+        if (savedSched === null && window.openerWin) {
+          const mainSchedToggle = window.openerWin.document.getElementById("local-schedule-toggle");
+          if (mainSchedToggle) savedSched = String(mainSchedToggle.checked);
+        }
+      } catch (e) {}
+
+      if (savedSched !== null) {
+        schedToggle.checked = (savedSched === "true");
+      }
+      if (typeof window.updateWizardScheduleHintUI === "function") {
+        window.updateWizardScheduleHintUI(schedToggle.checked);
+      }
+
+      schedToggle.addEventListener("change", () => {
+        try {
+          localStorage.setItem("savedWizardStartScheduleToggle", String(schedToggle.checked));
+          if (window.openerWin && window.openerWin.localStorage) {
+            window.openerWin.localStorage.setItem("savedWizardStartScheduleToggle", String(schedToggle.checked));
+          }
+        } catch (e) {}
+        if (typeof window.updateWizardScheduleHintUI === "function") {
+          window.updateWizardScheduleHintUI(schedToggle.checked);
+        }
+      });
     }
 
     const schedTime = document.getElementById("wizard-start-time");
     if (schedTime && !schedTime.value && window.openerWin) {
-      const mainSchedTime = window.openerWin.document.getElementById("start-schedule-time");
+      const mainSchedTime = window.openerWin.document.getElementById("local-schedule-time");
       if (mainSchedTime && mainSchedTime.value) schedTime.value = mainSchedTime.value;
     }
 
-    if (!window.wizardActiveSlot) {
-      const currentHour = new Date().getHours();
-      const autoSlot = (currentHour >= 4 && currentHour < 12) ? "morning" : "evening";
-      const activeSlot = (window.openerWin && window.openerWin.activeStreamSlot) ? window.openerWin.activeStreamSlot : autoSlot;
-      window.wizardActiveSlot = activeSlot;
+    // 🌅/🌙 朝なら朝(4〜12時)、夜なら夜(12〜4時)を現在時刻(JST)から常に最優先で自動選択
+    const currentHour = new Date().getHours();
+    const autoSlot = (currentHour >= 4 && currentHour < 12) ? "morning" : "evening";
+    if (!window.wizardManualSlotChanged) {
+      window.wizardActiveSlot = autoSlot;
     }
-    const activeSlot = window.wizardActiveSlot;
+    const activeSlot = window.wizardActiveSlot || autoSlot;
     const morningBtn = document.getElementById("wizard-slot-morning-btn");
     const eveningBtn = document.getElementById("wizard-slot-evening-btn");
 
@@ -240,15 +299,13 @@ https://x.com/drone_akahori
       }
     }
 
+    // 🎲 配信タイトル・説明欄を最新の日付・最新ニュース一覧で100%自動生成（サイコロ・自動生成ボタンの手動押しを完全不要化）
     const titleInput = getTitleInputElement();
     const descInput = getDescInputElement();
     if (titleInput && descInput) {
-      const savedTitle = (window.openerWin && window.openerWin.localStorage.getItem(`savedStreamTitle_${activeSlot}`)) || localStorage.getItem(`savedStreamTitle_${activeSlot}`);
-      const savedDesc = (window.openerWin && window.openerWin.localStorage.getItem(`savedStreamDesc_${activeSlot}`)) || localStorage.getItem(`savedStreamDesc_${activeSlot}`);
-      if (savedTitle) titleInput.value = savedTitle;
-      if (savedDesc) descInput.value = savedDesc;
-      if (!titleInput.value || !descInput.value) {
-        generateStreamReservationMetadata(false);
+      // ユーザーが手動でタイピング編集していない場合は、常に最新のタイトルと説明欄を自動生成してセット
+      if (!window.wizardUserManuallyEditedTitle || !window.wizardUserManuallyEditedDesc) {
+        generateStreamReservationMetadata(true, false);
       }
     }
 
@@ -337,9 +394,12 @@ https://x.com/drone_akahori
     if (m) m.style.display = "none";
   };
 
+  let _isLoadingBroadcasts = false;
   async function loadAndRenderBroadcasts() {
     const listContainer = document.getElementById("broadcast-picker-list");
     if (!listContainer) return;
+    if (_isLoadingBroadcasts) return;
+    _isLoadingBroadcasts = true;
     listContainer.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:20px;">⏳ 配信枠一覧を取得中...</div>';
     try {
       const res = await fetch("/api/youtube/list_broadcasts", { cache: "no-store" });
@@ -347,21 +407,39 @@ https://x.com/drone_akahori
         throw new Error(`サーバー応答エラー (HTTP ${res.status})`);
       }
       const data = await res.json();
-      if (data.success && Array.isArray(data.items)) {
+      if (data.success && Array.isArray(data.items) && data.items.length > 0) {
         cachedBroadcasts = data.items;
-        renderBroadcastList();
+        renderBroadcastList(data.is_cached);
+      } else if (data.quota_exceeded || (data.error && (data.error.includes("quota") || data.error.includes("403")))) {
+        listContainer.innerHTML = `
+          <div style="background:rgba(255,165,2,0.1); border:1px solid rgba(255,165,2,0.3); border-radius:8px; padding:14px; text-align:left; font-size:0.82rem; line-height:1.6; color:#ffeaa7;">
+            <div style="font-weight:bold; color:#ffa502; margin-bottom:6px; font-size:0.9rem;">ℹ️ YouTube APIの1日利用上限に達しています</div>
+            YouTube APIの無料枠上限に達したため、枠一覧の自動取得が一時休止しています（毎日16:00にリセット）。<br>
+            <strong style="color:#fff;">配信の開始には全く問題ありません！</strong><br>
+            YouTube Studioで枠を作成し、上部の入力欄に<span style="background:rgba(0,210,211,0.2); color:#00d2d3; padding:2px 6px; border-radius:4px; font-weight:bold;">動画URL</span>または<span style="background:rgba(0,210,211,0.2); color:#00d2d3; padding:2px 6px; border-radius:4px; font-weight:bold;">動画ID</span>を直接貼り付けてください。
+          </div>
+        `;
       } else {
-        listContainer.innerHTML = `<div style="color:#ff7675; font-size:0.8rem; text-align:center; padding:20px;">⚠️ 取得エラー: ${escapeHtml(data.error || "未認証です。「🔑 Google連携」を行ってください。")}</div>`;
+        listContainer.innerHTML = `<div style="color:#ff7675; font-size:0.8rem; text-align:center; padding:20px;">⚠️ ${escapeHtml(data.message || data.error || "未認証です。「🔑 Google連携」を行ってください。")}</div>`;
       }
     } catch (err) {
       listContainer.innerHTML = `<div style="color:#ff7675; font-size:0.8rem; text-align:center; padding:20px;">❌ 通信エラー: ${escapeHtml(err.message)}</div>`;
+    } finally {
+      _isLoadingBroadcasts = false;
     }
   }
 
-  function renderBroadcastList() {
+  function renderBroadcastList(isCached = false) {
     const listContainer = document.getElementById("broadcast-picker-list");
     if (!listContainer) return;
     listContainer.innerHTML = "";
+
+    if (isCached) {
+      const banner = document.createElement("div");
+      banner.style.cssText = "background:rgba(0,210,211,0.1); border:1px solid rgba(0,210,211,0.3); border-radius:6px; padding:8px 12px; margin-bottom:10px; font-size:0.75rem; color:#00d2d3;";
+      banner.innerHTML = "ℹ️ YouTube API上限到達中（16:00リセット）: 前回保存された配信枠一覧を表示しています";
+      listContainer.appendChild(banner);
+    }
 
     const filtered = cachedBroadcasts.filter(item => {
       if (activeBroadcastFilter === "all") return true;
@@ -372,7 +450,10 @@ https://x.com/drone_akahori
     });
 
     if (filtered.length === 0) {
-      listContainer.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem; text-align:center; padding:20px;">該当する配信枠がありません。</div>';
+      const emptyMsg = document.createElement("div");
+      emptyMsg.style.cssText = "color:var(--text-muted); font-size:0.8rem; text-align:center; padding:20px;";
+      emptyMsg.textContent = "該当する配信枠がありません。";
+      listContainer.appendChild(emptyMsg);
       return;
     }
 
@@ -500,14 +581,20 @@ https://x.com/drone_akahori
 
     // スロット切り替えボタン (朝・夜)
     document.getElementById("wizard-slot-morning-btn")?.addEventListener("click", () => {
+      window.wizardManualSlotChanged = true;
       window.wizardActiveSlot = "morning";
+      window.wizardUserManuallyEditedTitle = false;
+      window.wizardUserManuallyEditedDesc = false;
       localStorage.setItem("savedStreamSlot", "morning");
       if (window.openerWin) window.openerWin.activeStreamSlot = "morning";
       generateStreamReservationMetadata(true);
       updateStep4Inputs();
     });
     document.getElementById("wizard-slot-evening-btn")?.addEventListener("click", () => {
+      window.wizardManualSlotChanged = true;
       window.wizardActiveSlot = "evening";
+      window.wizardUserManuallyEditedTitle = false;
+      window.wizardUserManuallyEditedDesc = false;
       localStorage.setItem("savedStreamSlot", "evening");
       if (window.openerWin) window.openerWin.activeStreamSlot = "evening";
       generateStreamReservationMetadata(true);
@@ -844,16 +931,26 @@ https://x.com/drone_akahori
 
     // メタデータ再生成ボタン
     document.getElementById("btn-regen-title")?.addEventListener("click", () => {
+      window.wizardUserManuallyEditedTitle = false;
       generateStreamReservationMetadata(true, true);
       if (typeof window.showWizardToast === "function") {
         window.showWizardToast("🎲 配信タイトルを再生成しました", true);
       }
     });
     document.getElementById("btn-regen-desc")?.addEventListener("click", () => {
+      window.wizardUserManuallyEditedDesc = false;
       generateStreamReservationMetadata(true);
       if (typeof window.showWizardToast === "function") {
         window.showWizardToast("🔄 説明欄を再生成しました", true);
       }
+    });
+
+    // ユーザー手動入力検知
+    getTitleInputElement()?.addEventListener("input", () => {
+      window.wizardUserManuallyEditedTitle = true;
+    });
+    getDescInputElement()?.addEventListener("input", () => {
+      window.wizardUserManuallyEditedDesc = true;
     });
 
     // コピー系ボタン
@@ -907,8 +1004,29 @@ https://x.com/drone_akahori
             statusEl.textContent = `🟢 検出成功: ${data.title || data.video_id}`;
             statusEl.style.color = "#00e676";
           }
+
+          // 📅 配信開始予定時刻（scheduledStartTime）が取得できた場合、ウィザードの予定時刻に自動反映＆自動開始トグルON！
+          let schedTimeFormatted = "";
+          if (data.scheduledStartTime) {
+            const d = new Date(data.scheduledStartTime);
+            if (!isNaN(d.getTime())) {
+              if (typeof window.setWizardStartTimeDate === "function") {
+                window.setWizardStartTimeDate(d);
+              }
+              if (typeof window.formatScheduleDateTime === "function") {
+                schedTimeFormatted = window.formatScheduleDateTime(d);
+              }
+              const schedToggle = document.getElementById("wizard-start-schedule-toggle");
+              if (schedToggle) {
+                schedToggle.checked = true;
+                schedToggle.dispatchEvent(new Event("change"));
+              }
+            }
+          }
+
+          const timeMsg = schedTimeFormatted ? ` (開始予定: ${schedTimeFormatted})` : "";
           if (typeof window.showWizardToast === "function") {
-            window.showWizardToast(`✅ ライブ枠を検出しました！ (ID: ${data.video_id})`, true);
+            window.showWizardToast(`✅ ライブ枠を検出しました！${timeMsg}`, true);
           }
         } else {
           const statusEl = document.getElementById("wizard-yt-live-status");
@@ -954,7 +1072,28 @@ https://x.com/drone_akahori
             thumbEl.src = data.thumbnail_url;
             thumbEl.style.display = "block";
           }
-          if (typeof window.showWizardToast === "function") window.showWizardToast(`✅ 枠情報を取得しました: ${data.title}`, true);
+
+          // 📅 配信開始予定時刻（scheduledStartTime）が取得できた場合、ウィザードの予定時刻に自動反映＆自動開始トグルON！
+          let schedTimeFormatted = "";
+          if (data.scheduledStartTime) {
+            const d = new Date(data.scheduledStartTime);
+            if (!isNaN(d.getTime())) {
+              if (typeof window.setWizardStartTimeDate === "function") {
+                window.setWizardStartTimeDate(d);
+              }
+              if (typeof window.formatScheduleDateTime === "function") {
+                schedTimeFormatted = window.formatScheduleDateTime(d);
+              }
+              const schedToggle = document.getElementById("wizard-start-schedule-toggle");
+              if (schedToggle) {
+                schedToggle.checked = true;
+                schedToggle.dispatchEvent(new Event("change"));
+              }
+            }
+          }
+
+          const timeMsg = schedTimeFormatted ? ` (開始予定: ${schedTimeFormatted})` : "";
+          if (typeof window.showWizardToast === "function") window.showWizardToast(`✅ 枠情報を取得しました: ${data.title}${timeMsg}`, true);
         } else {
           if (typeof window.showWizardToast === "function") window.showWizardToast("⚠️ 枠情報の取得に失敗しました", false);
         }

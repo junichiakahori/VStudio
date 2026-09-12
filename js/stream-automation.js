@@ -10,21 +10,36 @@ const updateClock = () => {
   const m = String(now.getMinutes()).padStart(2, "0");
   const s = String(now.getSeconds()).padStart(2, "0");
 
-  streamClock.innerHTML = `
-                <div class="clock-date">${year}/${month}/${date} (${day})</div>
-                <div class="clock-time">${h}:${m}:${s}</div>
-            `;
+  const clockEl = window.streamClock || document.getElementById("stream-clock");
+  if (clockEl) {
+    let schedBadgeHtml = "";
+    if (window.currentScheduledStartTimeDisplay) {
+      schedBadgeHtml = `<div class="stream-clock-schedule">⏰ ${window.currentScheduledStartTimeDisplay}</div>`;
+    }
+    clockEl.innerHTML = `
+      <div class="clock-date">${year}/${month}/${date} (${day})</div>
+      <div class="clock-time">${h}:${m}:${s}</div>
+      ${schedBadgeHtml}
+    `;
+  }
 
   // 1. タイマー指定の終了チェック（24時間耐久や日付跨ぎでも正確に動作）
+  const hasAnnouncedEnd = Boolean(window.hasAnnouncedEnd);
+  const streamEndTextInput = window.streamEndTextInput || document.getElementById("stream-end-text");
+  const streamEndToggle = window.streamEndToggle || document.getElementById("stream-end-toggle");
+  const streamEndTimeInput = window.streamEndTimeInput || document.getElementById("stream-end-time");
+
   if (window.streamEndTargetTimestamp && !hasAnnouncedEnd) {
     if (Date.now() >= window.streamEndTargetTimestamp) {
-      hasAnnouncedEnd = true;
+      window.hasAnnouncedEnd = true;
       const voiceText =
         streamEndTextInput && streamEndTextInput.value
           ? streamEndTextInput.value
           : "予定の配信時間が経過しました。本日の配信はここまでとなります。見に来てくれてありがとうございました！";
 
-      queueVoicevoxAudio(voiceText, false).catch((e) => console.warn(e));
+      if (typeof queueVoicevoxAudio === "function") {
+        queueVoicevoxAudio(voiceText, false).catch((e) => console.warn(e));
+      }
 
       if (typeof window.executeStreamEndProcess === "function") {
         window.executeStreamEndProcess();
@@ -41,14 +56,16 @@ const updateClock = () => {
     !window.streamEndTargetTimestamp
   ) {
     if (!hasAnnouncedEnd && `${h}:${m}` === streamEndTimeInput.value) {
-      hasAnnouncedEnd = true;
+      window.hasAnnouncedEnd = true;
 
       const voiceText =
         streamEndTextInput && streamEndTextInput.value
           ? streamEndTextInput.value
           : "予定の時刻になりました。本日の配信はここまでとなります。見に来てくれてありがとうございました！";
 
-      queueVoicevoxAudio(voiceText, false).catch((e) => console.warn(e));
+      if (typeof queueVoicevoxAudio === "function") {
+        queueVoicevoxAudio(voiceText, false).catch((e) => console.warn(e));
+      }
 
       // APIで配信終了
       if (typeof window.executeStreamEndProcess === "function") {
@@ -57,7 +74,7 @@ const updateClock = () => {
     }
     // 翌日など再び時刻がずれたらフラグを戻す
     if (hasAnnouncedEnd && `${h}:${m}` !== streamEndTimeInput.value) {
-      hasAnnouncedEnd = false;
+      window.hasAnnouncedEnd = false;
     }
   }
 };
@@ -220,6 +237,118 @@ window.executeStreamEndProcess = executeStreamEndProcess;
   let localScheduleTimerId = null;
 
   function updateLocalScheduleTimer() {
+    // 🚀 プロ仕様の配信開始シーケンス
+    // 1. OBS配信開始合図（YouTube接続確立）
+    // 2. 10秒待機（画面は配信準備中を維持）
+    // 3. 配信準備中解除（※定型挨拶なし）
+    // 4. BGM開始
+    // 5. ニュースの挨拶〜最初のニュースへ進行
+    function triggerScheduledBroadcastSequence() {
+      console.log("[Local Schedule] ⏰ 配信開始シーケンス起動: 1. OBS配信開始合図を送信します。");
+
+      // 1. OBS配信の自動開始（ON設定かつ接続時のみ）
+      const isObsAutoStream = (function() {
+        const el = document.getElementById("news-obs-auto-stream-toggle") || document.getElementById("obs-auto-start-toggle");
+        if (el) return el.checked;
+        const saved = localStorage.getItem("savedObsStreamAutoStart");
+        if (saved !== null) return saved === "true";
+        if (typeof window.isObsStreamAutoStart !== "undefined") return !!window.isObsStreamAutoStart;
+        return false;
+      })();
+
+      if (isObsAutoStream && typeof window.ensureObsStreamingStarted === "function") {
+        console.log("[Local Schedule] 📡 OBS配信連動がONのため、OBS配信開始合図を送信します。");
+        window.ensureObsStreamingStarted().catch((e) => console.warn(e));
+      } else {
+        console.log(`[Local Schedule] ℹ️ OBS配信連動はOFFのため、OBS配信開始をスキップします (isObsAutoStream: ${isObsAutoStream})`);
+      }
+
+      // 画面は「配信準備中」を維持（未設定なら準備中にする）
+      if (!window.isPreparing) {
+        if (typeof window.setOverlayPreparing === "function") {
+          window.setOverlayPreparing();
+        } else {
+          const prepBtn = document.getElementById("overlay-prep-btn");
+          if (prepBtn) prepBtn.click();
+        }
+      }
+
+      // ⏳ 2. 設定された待機秒数（デフォルト10秒）待機（OBSが配信サーバーと接続確立するまで「配信準備中」を維持）
+      let waitSec = 10;
+      try {
+        const savedWait = localStorage.getItem("savedPrepareWaitSec");
+        if (savedWait) waitSec = Math.max(3, parseInt(savedWait, 10));
+      } catch (e) {}
+
+      console.log(`[Local Schedule] ⏳ OBS配信確立のため ${waitSec} 秒待機中... (画面: 配信準備中)`);
+      setTimeout(() => {
+        console.log(`[Local Schedule] 🔓 ${waitSec} 秒経過: 配信準備中オーバーレイを解除し、BGMを開始します。`);
+
+        // 配信準備中オーバーレイの解除（※デフォルトの挨拶は流さない）
+        if (typeof window.executeOverlayClearProcess === "function") {
+          window.executeOverlayClearProcess();
+        } else {
+          window.streamOverlayEl = document.getElementById("stream-overlay");
+          if (streamOverlayEl) streamOverlayEl.classList.remove("active");
+          if (typeof isPreparing !== "undefined") isPreparing = false;
+        }
+
+        const prepToggle = document.getElementById("preparing-mode-toggle");
+        if (prepToggle && prepToggle.checked) {
+          prepToggle.checked = false;
+        }
+
+        // 3. BGM再生開始（executeOverlayClearProcessで既にフェードイン再生されていない場合のみ安全に開始）
+        if (typeof bgmIsPlaying !== "undefined" && !bgmIsPlaying) {
+          if (typeof fadeInBgm === "function") {
+            console.log("[Local Schedule] 🎵 BGMフェードイン再生スタート");
+            fadeInBgm(2000);
+          } else {
+            window.bgmPlayBtn = document.getElementById("bgm-play-btn");
+            if (
+              bgmPlayBtn &&
+              typeof window.bgmBuffer !== "undefined" &&
+              window.bgmBuffer
+            ) {
+              console.log("[Local Schedule] 🎵 BGM再生スタート");
+              bgmPlayBtn.click();
+            }
+          }
+        }
+
+        // 4. BGM開始直後（約800ms後）にニュースの挨拶〜最初のニュースを開始！
+        setTimeout(() => {
+          window.isScheduledSequenceRunning = false;
+          const activeTab = localStorage.getItem("activeTab");
+          let mode = window.currentBroadcastMode;
+          if (!mode) {
+            if (activeTab === "tab-radio") mode = "radio";
+            else if (activeTab === "tab-chat") mode = "chat";
+            else mode = "news";
+          }
+
+          if (mode === "news") {
+            console.log("[Local Schedule] 📰 ニュース番組を開始（挨拶〜最初のニュースへ）");
+            if (typeof window.startNewsBroadcast === "function") {
+              window.startNewsBroadcast(0);
+            } else {
+              const newsBtn = document.getElementById("news-broadcast-start-btn");
+              if (newsBtn) newsBtn.click();
+            }
+          } else if (mode === "radio") {
+            console.log("[Local Schedule] 📻 ラジオ番組を開始");
+            const radioBtn = document.getElementById("radio-script-play-btn");
+            if (radioBtn) radioBtn.click();
+          } else {
+            console.log("[Local Schedule] 💬 雑談配信を開始");
+            if (typeof window.resetIdleTimer === "function") {
+              window.resetIdleTimer();
+            }
+          }
+        }, 800);
+      }, waitSec * 1000);
+    }
+
     if (localScheduleTimerId) clearInterval(localScheduleTimerId);
 
     const container = document.getElementById("local-schedule-container");
@@ -280,68 +409,75 @@ window.executeStreamEndProcess = executeStreamEndProcess;
       const nowSetup = new Date();
       const pastDiffMs = nowSetup.getTime() - targetTime.getTime();
 
-      // 既に指定日時を過ぎている場合は、何分過ぎていても直ちに配信を開始する！
+      // 既に指定日時を過ぎている場合は、何分過ぎていても配信開始シーケンスを実行！
       if (pastDiffMs > 0) {
-        console.log("[Local Schedule] 指定日時を既に過ぎているため、直ちに配信を開始します！");
+        console.log("[Local Schedule] 指定日時を既に過ぎているため、配信開始シーケンスを実行します！");
         if (localScheduleCountdown) localScheduleCountdown.textContent = "00:00:00";
         if (statusBadge) {
           statusBadge.textContent = "🟢 開始中";
           statusBadge.style.background = "rgba(0, 255, 102, 0.18)";
           statusBadge.style.color = "#00ff66";
         }
-        
-        // 配信開始プロセスを直ちに実行
-        setTimeout(() => {
-          if (typeof window.ensureObsStreamingStarted === "function") {
-            window.ensureObsStreamingStarted().catch((e) => console.warn(e));
-          }
-          if (typeof window.executeOverlayClearProcess === "function") {
-            window.executeOverlayClearProcess();
-          }
-          const prepToggle = document.getElementById("preparing-mode-toggle");
-          if (prepToggle && prepToggle.checked) {
-            prepToggle.checked = false;
-            prepToggle.dispatchEvent(new Event("change"));
-          }
-          window.bgmPlayBtn = document.getElementById("bgm-play-btn");
-          if (bgmPlayBtn && typeof window.bgmBuffer !== "undefined" && window.bgmBuffer) {
-            bgmPlayBtn.click();
-          }
-          setTimeout(() => {
-            const mode = window.currentBroadcastMode || "news";
-            if (mode === "news") {
-              if (typeof window.startNewsBroadcast === "function") window.startNewsBroadcast();
-            } else if (mode === "radio") {
-              const radioBtn = document.getElementById("radio-script-play-btn");
-              if (radioBtn) radioBtn.click();
-            } else {
-              const startVoice = "定刻を過ぎておりますので、本日の配信を直ちにスタートします！";
-              if (typeof window.queueVoicevoxAudio === "function") {
-                window.queueVoicevoxAudio(startVoice, true).catch((e) => console.warn(e));
-              }
-            }
-          }, 600);
-        }, 300);
+        triggerScheduledBroadcastSequence();
         return;
       }
 
-      localScheduleTimerId = setInterval(() => {
+      // ⏳ 未来時刻待機: 配信開始前は画面を「配信準備中」にして待機
+      if (typeof window.setOverlayPreparing === "function") {
+        window.setOverlayPreparing();
+      } else {
+        const prepBtn = document.getElementById("overlay-prep-btn");
+        if (prepBtn) prepBtn.click();
+      }
+
+      let lastHealthCheckTime = 0;
+
+      const tickScheduleTimer = () => {
         const now = new Date();
         const diff = targetTime.getTime() - now.getTime();
 
+        // 🛡️ 予約待機中のサーバー死活監視（30秒ごと）
+        if (now.getTime() - lastHealthCheckTime >= 30000) {
+          lastHealthCheckTime = now.getTime();
+          fetch("/api/youtube/oauth_status").catch((e) => {
+            console.warn("[予約待機監視] ⚠️ サーバー通信応答なし (Vite/API):", e);
+            if (typeof window.showNotification === "function") {
+              window.showNotification("⚠️ サーバー通信確認中: 接続が一時的に不安定です", "warning");
+            }
+          });
+        }
+
+        const schedTimeDisplay = targetTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+
         if (diff <= 0) {
-          clearInterval(localScheduleTimerId);
+          if (localScheduleTimerId) {
+            clearInterval(localScheduleTimerId);
+            localScheduleTimerId = null;
+          }
+          window.currentScheduledStartTimeDisplay = null;
           if (localScheduleCountdown)
             localScheduleCountdown.textContent = "00:00:00";
 
-          console.log(
-            "[Local Schedule] 指定時刻になりました。OBS配信と番組を自動開始します。",
-          );
+          const overlaySchedCard = document.getElementById("overlay-schedule-card");
+          if (overlaySchedCard) overlaySchedCard.style.display = "none";
 
-          // 自動開始タイマーが発火したら直ちにOFFにする
+          // 自動開始タイマー発火フラグを立ててトグルOFF時の誤爆解除を完全遮断
+          window.isScheduledSequenceRunning = true;
           if (localScheduleToggle && localScheduleToggle.checked) {
             localScheduleToggle.checked = false;
-            localScheduleToggle.dispatchEvent(new Event("change", { bubbles: true }));
+            try {
+              localStorage.setItem("savedWizardStartScheduleToggle", "false");
+            } catch (e) {}
+            if (toggleText) {
+              toggleText.textContent = "OFF";
+              toggleText.style.color = "var(--text-muted)";
+            }
+            if (statusBadge) {
+              statusBadge.textContent = "🟢 開始中";
+              statusBadge.style.background = "rgba(0, 255, 102, 0.18)";
+              statusBadge.style.color = "#00ff66";
+              statusBadge.style.border = "1px solid rgba(0, 255, 102, 0.4)";
+            }
           }
 
           // 配信・番組開始時にコメント履歴とカウントをゼロクリア
@@ -349,88 +485,63 @@ window.executeStreamEndProcess = executeStreamEndProcess;
             window.clearAllComments();
           }
 
-          // 1. OBS配信の自動開始（接続時）
-          if (typeof window.ensureObsStreamingStarted === "function") {
-            window.ensureObsStreamingStarted().catch((e) => console.warn(e));
-          }
-
-          // 2. 配信準備中オーバーレイの解除
-          if (typeof window.executeOverlayClearProcess === "function") {
-            window.executeOverlayClearProcess();
-          } else {
-            window.streamOverlayEl = document.getElementById("stream-overlay");
-            if (streamOverlayEl) streamOverlayEl.classList.remove("active");
-            if (typeof isPreparing !== "undefined") isPreparing = false;
-          }
-
-          const prepToggle = document.getElementById("preparing-mode-toggle");
-          if (prepToggle && prepToggle.checked) {
-            prepToggle.checked = false;
-            prepToggle.dispatchEvent(new Event("change"));
-          }
-
-          // 3. BGMを最初から再生（既に再生中でも再スタート）
-          window.bgmPlayBtn = document.getElementById("bgm-play-btn");
-          if (
-            bgmPlayBtn &&
-            typeof window.bgmBuffer !== "undefined" &&
-            window.bgmBuffer
-          ) {
-            console.log("[Local Schedule] BGMを最初から再生");
-            bgmPlayBtn.click();
-          }
-
-          // 4. 配信モードに応じた番組開始
-          setTimeout(() => {
-            const mode = window.currentBroadcastMode || "news";
-            if (mode === "news") {
-              console.log("[Local Schedule] ニュース番組を自動開始します");
-              if (typeof window.startNewsBroadcast === "function") {
-                window.startNewsBroadcast();
-              } else {
-                const newsBtn = document.getElementById("news-broadcast-start-btn");
-                if (newsBtn) newsBtn.click();
-              }
-            } else if (mode === "radio") {
-              console.log("[Local Schedule] ラジオ自動再生を実行");
-              const radioBtn = document.getElementById("radio-script-play-btn");
-              if (radioBtn) radioBtn.click();
-            } else {
-              console.log("[Local Schedule] 雑談配信を開始します");
-              const charId = window.currentModelId || "";
-              const startVoice = charId.includes("zunda")
-                ? "定刻になったのだ！配信スタートなのだ！"
-                : "定刻になりましたので、本日の配信をスタートします！";
-              if (typeof window.queueVoicevoxAudio === "function") {
-                window.queueVoicevoxAudio(startVoice, true).catch((e) => console.warn(e));
-              }
-              if (typeof window.resetIdleTimer === "function") {
-                window.resetIdleTimer();
-              }
-            }
-          }, 600); // BGM開始から少し遅らせて実行
+          // 🚀 配信開始シーケンスを実行（OBS開始 ➔ 待機秒数 ➔ 準備中解除 ➔ BGM ➔ ニュース挨拶）
+          triggerScheduledBroadcastSequence();
         } else {
           const h = Math.floor(diff / (1000 * 60 * 60));
           const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
           const s = Math.floor((diff % (1000 * 60)) / 1000);
+          const countdownStr =
+            String(h).padStart(2, "0") +
+            ":" +
+            String(m).padStart(2, "0") +
+            ":" +
+            String(s).padStart(2, "0");
+
           if (localScheduleCountdown) {
-            localScheduleCountdown.textContent =
-              String(h).padStart(2, "0") +
-              ":" +
-              String(m).padStart(2, "0") +
-              ":" +
-              String(s).padStart(2, "0");
+            localScheduleCountdown.textContent = countdownStr;
+          }
+
+          // 画面オーバーレイおよび時計バッジへのリアルタイム反映
+          window.currentScheduledStartTimeDisplay = `${schedTimeDisplay} START (${countdownStr})`;
+
+          const overlaySchedCard = document.getElementById("overlay-schedule-card");
+          const overlaySchedVal = document.getElementById("overlay-schedule-val");
+          const overlayCountdownVal = document.getElementById("overlay-countdown-val");
+
+          if (overlaySchedVal) overlaySchedVal.textContent = schedTimeDisplay;
+          if (overlayCountdownVal) overlayCountdownVal.textContent = countdownStr;
+          if (window.isPreparing && overlaySchedCard) {
+            overlaySchedCard.style.display = "flex";
           }
         }
-      }, 1000);
+      };
+
+      // 🛡️ 初回即時実行（1秒の待機遅延なく画面へ直ちに反映）
+      tickScheduleTimer();
+      localScheduleTimerId = setInterval(tickScheduleTimer, 1000);
     } else {
+      window.currentScheduledStartTimeDisplay = null;
+      const overlaySchedCard = document.getElementById("overlay-schedule-card");
+      if (overlaySchedCard) overlaySchedCard.style.display = "none";
+
       if (localScheduleCountdown)
         localScheduleCountdown.textContent = "--:--:--";
+      // 手動で予約トグルをOFFにした場合のみ、準備中画面を解除（自動開始シーケンス中は誤爆解除させない）
+      if (!window.isScheduledSequenceRunning && window.isPreparing && typeof window.executeOverlayClearProcess === "function") {
+        window.executeOverlayClearProcess();
+      }
     }
   }
 
-  if (localScheduleToggle)
-    localScheduleToggle.addEventListener("change", updateLocalScheduleTimer);
+  if (localScheduleToggle) {
+    localScheduleToggle.addEventListener("change", () => {
+      try {
+        localStorage.setItem("savedWizardStartScheduleToggle", String(localScheduleToggle.checked));
+      } catch (e) {}
+      updateLocalScheduleTimer();
+    });
+  }
   if (localScheduleTime)
     localScheduleTime.addEventListener("change", updateLocalScheduleTimer);
 
@@ -489,4 +600,40 @@ window.executeStreamEndProcess = executeStreamEndProcess;
       window.isAutoEndAfterNews = true;
     }
   }
+
+  // ⏱️ 配信準備中解除までの待機秒数（news-prepare-wait, local-schedule-wait）の同期と初期化
+  function initPrepareWaitSliders() {
+    const newsSlider = document.getElementById("news-prepare-wait");
+    const newsVal = document.getElementById("news-prepare-wait-val");
+    const localSlider = document.getElementById("local-schedule-wait");
+    const localVal = document.getElementById("local-schedule-wait-val");
+
+    let currentSec = 10;
+    try {
+      const saved = localStorage.getItem("savedPrepareWaitSec");
+      if (saved) currentSec = Math.max(3, parseInt(saved, 10));
+    } catch (e) { }
+
+    function updateAll(val) {
+      val = Math.max(3, Math.min(60, parseInt(val, 10) || 10));
+      try {
+        localStorage.setItem("savedPrepareWaitSec", val);
+      } catch (e) { }
+      if (newsSlider) newsSlider.value = val;
+      if (newsVal) newsVal.textContent = val;
+      if (localSlider) localSlider.value = val;
+      if (localVal) localVal.textContent = val;
+    }
+
+    if (newsSlider) {
+      newsSlider.addEventListener("input", (e) => updateAll(e.target.value));
+    }
+    if (localSlider) {
+      localSlider.addEventListener("input", (e) => updateAll(e.target.value));
+    }
+
+    updateAll(currentSec);
+  }
+
+  initPrepareWaitSliders();
 });

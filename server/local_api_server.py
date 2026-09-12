@@ -120,14 +120,33 @@ from server.news_crawler import (
     init_preload_all_rss_urls,
     get_all_cached_urls,
     resolve_batch_urls,
-    fetch_rss_xml
+    fetch_rss_xml,
+    check_and_filter_scrapeable_news
 )
 from server.news_script_processor import generate_news_item_script_data
 from server.tts_normalizer import convert_remaining_kanji_to_hiragana, resolve_text_readings
 from server.voicevox_client import synthesize_voicevox_backend, clean_kana_for_display
 import server.youtube_api_helper as youtube_api_helper
+from server.window_manager import bring_subwindow_to_front
 
+# ポート番号（引数 --port または環境変数 PORT、デフォルト 8001）
 PORT = 8001
+for _i, _arg in enumerate(sys.argv):
+    if _arg == "--port" and _i + 1 < len(sys.argv):
+        try:
+            PORT = int(sys.argv[_i + 1])
+        except ValueError:
+            pass
+    elif _arg.startswith("--port="):
+        try:
+            PORT = int(_arg.split("=", 1)[1])
+        except ValueError:
+            pass
+if "PORT" in os.environ:
+    try:
+        PORT = int(os.environ["PORT"])
+    except ValueError:
+        pass
 # BASE_DIR is defined above
 
 # ── データファイルパス定義 ──
@@ -198,6 +217,9 @@ def save_text(file_path, text):
 
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=BASE_DIR, **kwargs)
+
     def end_headers(self):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -263,7 +285,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         if self.path.startswith('/api/log'):
             parsed = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed.query)
-            log_name = params.get('name', ['browser_console'])[0]
+            log_name = params.get('name', params.get('tab', ['browser_console']))[0]
             lines = int(params.get('lines', [200])[0])
             res = read_log_file(log_name, lines=lines)
             return self._send_json(res, status=400 if "error" in res else 200)
@@ -296,10 +318,10 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
         if self.path.startswith('/api/youtube/list_broadcasts'):
             try:
-                items = youtube_api_helper.list_my_broadcasts()
-                return self._send_json({"success": True, "items": items})
+                res = youtube_api_helper.get_my_broadcasts_safe()
+                return self._send_json(res)
             except Exception as e:
-                return self._send_json({"success": False, "error": str(e)}, status=500)
+                return self._send_json({"success": False, "items": [], "error": str(e), "message": "配信枠の取得でエラーが発生しました。"})
 
         if self.path.startswith('/api/youtube/detect_live'):
             parsed = urllib.parse.urlparse(self.path)
@@ -307,6 +329,13 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             channel = params.get('channel', [''])[0]
             res = youtube_api_helper.detect_channel_live(channel)
             return self._send_json(res)
+
+        if self.path.startswith('/api/window/focus'):
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            win_type = params.get('type', [''])[0]
+            success = bring_subwindow_to_front(win_type)
+            return self._send_json({"success": success})
 
         # ── 静的ファイル配信 ──
         super().do_GET()
@@ -368,6 +397,16 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     "applied": (resolved != text)
                 })
 
+            # ── 🤖 AIルールチューナー（読み上げルールの自然言語による即時追加・更新） ──
+            if self.path == '/api/tune-tts-rule':
+                payload = self._read_json()
+                instruction = payload.get('instruction', '').strip()
+                if not instruction:
+                    return self._send_json({"success": False, "error": "指示文が空です。"})
+                from server.rule_tuner_service import tune_tts_rule
+                result = tune_tts_rule(instruction)
+                return self._send_json(result)
+
             # ── 残存漢字の一括ひらがな変換 ──
             if self.path == '/convert_remaining_kanji':
                 body_text = self._read_body().decode('utf-8')
@@ -397,9 +436,21 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 return self.wfile.write(xml_data)
 
-            if self.path == '/api/news/batch_resolve_urls':
-                items = self._read_json().get('items', [])
-                return self._send_json({"status": "ok", "resolved": resolve_batch_urls(items)})
+            if self.path in ('/api/news/batch_resolve_urls', '/api/get_article_urls'):
+                payload = self._read_json()
+                items = payload.get('items', [])
+                if not items and 'titles' in payload:
+                    items = [{'title': t} for t in payload.get('titles', [])]
+                resolved_map = resolve_batch_urls(items)
+                return self._send_json({"status": "ok", "resolved": resolved_map, "urls": resolved_map})
+
+            if self.path in ('/api/news/filter_scrapeable', '/api/news/check_scrapeable'):
+                payload = self._read_json()
+                items = payload.get('items', [])
+                if not items and 'titles' in payload:
+                    items = [{'title': t} for t in payload.get('titles', [])]
+                res = check_and_filter_scrapeable_news(items)
+                return self._send_json(res)
 
             if self.path == '/api/news/generate_item_script':
                 payload = self._read_json()
@@ -433,8 +484,14 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 desc = p.get('description', '')
                 sched = p.get('scheduledStartTime') or p.get('scheduled_start_time')
                 privacy = p.get('privacyStatus') or p.get('privacy_status', 'public')
-                res = youtube_api_helper.create_live_broadcast(title, desc, sched, privacy)
-                return self._send_json({"success": True, **res})
+                try:
+                    res = youtube_api_helper.create_live_broadcast(title, desc, sched, privacy)
+                    return self._send_json({"success": True, **res})
+                except Exception as e:
+                    err_str = str(e)
+                    if "quotaExceeded" in err_str:
+                        err_str = "YouTube APIの1日あたりの利用枠（クォータ上限）に達しました。YouTube Studioから直接設定してください。"
+                    return self._send_json({"success": False, "error": err_str})
 
             if self.path == '/api/youtube/update_broadcast':
                 p = self._read_json()
@@ -443,15 +500,27 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 desc = p.get('description')
                 sched = p.get('scheduledStartTime') or p.get('scheduled_start_time')
                 privacy = p.get('privacyStatus') or p.get('privacy_status')
-                res = youtube_api_helper.update_live_broadcast(vid, title, desc, sched, privacy)
-                return self._send_json({"success": True, "videoId": vid, "data": res})
+                try:
+                    res = youtube_api_helper.update_live_broadcast(vid, title, desc, sched, privacy)
+                    return self._send_json({"success": True, "videoId": vid, "data": res})
+                except Exception as e:
+                    err_str = str(e)
+                    if "quotaExceeded" in err_str:
+                        err_str = "YouTube APIの1日あたりの利用枠（クォータ上限）に達しました。"
+                    return self._send_json({"success": False, "error": err_str})
 
             if self.path in ('/api/youtube/upload_thumbnail', '/api/youtube/set_thumbnail'):
                 p = self._read_json()
                 vid = p.get('videoId') or p.get('video_id', '')
                 img = p.get('imageData') or p.get('image_base64', '')
-                res = youtube_api_helper.upload_thumbnail(vid, img)
-                return self._send_json({"success": True, "videoId": vid, "data": res})
+                try:
+                    res = youtube_api_helper.upload_thumbnail(vid, img)
+                    return self._send_json({"success": True, "videoId": vid, "data": res})
+                except Exception as e:
+                    err_str = str(e)
+                    if "quotaExceeded" in err_str:
+                        err_str = "YouTube APIの1日あたりの利用枠（クォータ上限）に達しました。"
+                    return self._send_json({"success": False, "error": err_str})
 
 
             # ── VOICEVOX 音声合成 ──

@@ -124,6 +124,14 @@ function initDraggableElements() {
     const handle = document.getElementById("subtitles-drag-handle") || subtitles;
     window.makeDraggable(subtitles, handle, "avatarSubtitles");
   }
+
+  // 7. 画面上オーディオレベルメーターHUD
+  const audioMeter = document.getElementById("stream-audio-meter");
+  if (audioMeter && !audioMeter.dataset.draggableInit) {
+    audioMeter.dataset.draggableInit = "true";
+    const handle = audioMeter.querySelector(".hud-meter-header") || audioMeter;
+    window.makeDraggable(audioMeter, handle, "streamAudioMeter");
+  }
 }
 
 (window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("draggable", initDraggableElements);

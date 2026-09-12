@@ -219,7 +219,7 @@
             <p style="font-size: 0.85rem; color: var(--text-primary); margin: 0;">サーバー接続状態とアバター音声を確認してください：</p>
             <div class="status-box">
                 <div class="status-row">
-                    <span>Local API サーバー (port 8001)</span>
+                    <span id="label-status-local-api">Local API サーバー (port 8001)</span>
                     <span id="status-local-api" style="font-weight: bold; color: #ff7675;">🔴 確認中...</span>
                 </div>
                 <div class="status-row">
@@ -227,7 +227,7 @@
                     <span id="status-ai-engine" style="font-weight: bold; color: #ff7675;">🔴 確認中...</span>
                 </div>
                 <div class="status-row">
-                    <span>YouTube コメントサーバー (port 8768)</span>
+                    <span id="label-status-yt-server">YouTube コメントサーバー (port 8768)</span>
                     <span id="status-yt-server" style="font-weight: bold; color: #ff7675;">🔴 確認中...</span>
                 </div>
                 <div class="status-row">
@@ -529,11 +529,14 @@
                         <label style="font-size: 0.82rem; font-weight: bold; color: #00d2d3; display: flex; align-items: center; gap: 4px;">
                             <span>📅 配信開始予定日時</span>
                         </label>
-                        <label style="font-size: 0.75rem; color: #fff; display: flex; align-items: center; gap: 6px; cursor: pointer; background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15);">
-                            <input type="checkbox" id="wizard-start-schedule-toggle" style="cursor: pointer;">
-                            <span style="font-weight: 500;">指定日時に自動開始する</span>
+                        <label id="wizard-start-schedule-label" style="font-size: 0.75rem; color: #fff; display: flex; align-items: center; gap: 6px; cursor: pointer; background: rgba(255,255,255,0.06); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); transition: all 0.2s;">
+                            <input type="checkbox" id="wizard-start-schedule-toggle" style="cursor: pointer; width: 15px; height: 15px; accent-color: #00d2d3;">
+                            <span id="wizard-start-schedule-text" style="font-weight: bold;">指定日時に自動開始する</span>
                         </label>
                     </div>
+
+                    <!-- 予約状態インジケーター（即時開始事故防止ヒント） -->
+                    <div id="wizard-start-schedule-hint" style="font-size: 0.68rem; line-height: 1.35; padding: 5px 8px; border-radius: 4px; transition: all 0.2s; display: none;"></div>
 
                     <!-- 日時カード ＆ タップで時計ダイヤルピッカーを開く -->
                     <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
@@ -562,6 +565,18 @@
                         <button type="button" class="btn wizard-step-btn" data-step-min="1" style="flex:1; background: rgba(0,210,211,0.1); border: 1px solid #00d2d3; color: #00d2d3; font-size: 0.72rem; font-weight: bold; padding: 4px 6px; border-radius: 4px; cursor: pointer; white-space: nowrap;">+1分</button>
                         <button type="button" class="btn wizard-step-btn" data-step-min="10" style="flex:1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.72rem; padding: 4px 6px; border-radius: 4px; cursor: pointer; white-space: nowrap;">+10分</button>
                         <button type="button" class="btn wizard-step-btn" data-step-min="30" style="flex:1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.72rem; padding: 4px 6px; border-radius: 4px; cursor: pointer; white-space: nowrap;">+30分</button>
+                    </div>
+
+                    <!-- 配信準備中解除までの待機秒数 -->
+                    <div style="margin-top: 4px; background: rgba(0,0,0,0.25); border-radius: 6px; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.06); box-sizing: border-box; width: 100%;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                            <span style="font-size: 0.72rem; color: var(--text-muted); white-space: nowrap;">⏱️ 準備中解除までの待機時間:</span>
+                            <span style="font-size: 0.78rem; color: #00d2d3; font-weight: bold;"><span id="wizard-prepare-wait-val">10</span>秒</span>
+                        </div>
+                        <input type="range" id="wizard-prepare-wait" min="3" max="60" value="10" step="1" style="width: 100%; box-sizing: border-box; cursor: pointer;">
+                        <div style="font-size: 0.62rem; color: var(--text-muted); margin-top: 2px; line-height: 1.3;">
+                            ※予定時刻にOBS配信開始合図を出し、この秒数後に準備中を解除して番組を開始します。
+                        </div>
                     </div>
                 </div>
 
@@ -731,13 +746,13 @@
 
 
     <!-- 📦 ウィザード専任外部モジュール群 -->
-    <script src="/js/wizard/wizard-logger.js?v=22.0"></script>
-    <script src="/js/wizard/wizard-core.js?v=22.1"></script>
+    <script src="/js/wizard/wizard-logger.js?v=22.1"></script>
+    <script src="/js/wizard/wizard-core.js?v=22.5"></script>
 
-    <script src="/js/wizard/wizard-time-picker.js?v=22.0"></script>
+    <script src="/js/wizard/wizard-time-picker.js?v=22.1"></script>
     <script src="/js/wizard/wizard-news-settings.js?v=22.0"></script>
-    <script src="/js/wizard/wizard-youtube-api.js?v=23.1"></script>
-    <script src="/js/wizard/wizard-finish.js?v=23.1"></script>
+    <script src="/js/wizard/wizard-youtube-api.js?v=23.8"></script>
+    <script src="/js/wizard/wizard-finish.js?v=23.8"></script>
 
 
 
@@ -801,6 +816,102 @@
             </div>
         </div>
     </div>
+    <script>
+    (function() {
+        // ⏱️ 配信準備中解除までの待機秒数
+        const waitSlider = document.getElementById("wizard-prepare-wait");
+        const waitVal = document.getElementById("wizard-prepare-wait-val");
+        if (waitSlider) {
+            let saved = "10";
+            try {
+                saved = localStorage.getItem("savedPrepareWaitSec") || (window.opener ? window.opener.localStorage.getItem("savedPrepareWaitSec") : null) || "10";
+            } catch(e){}
+            waitSlider.value = saved;
+            if (waitVal) waitVal.textContent = saved;
+            waitSlider.addEventListener("input", function(e) {
+                const val = e.target.value;
+                if (waitVal) waitVal.textContent = val;
+                try {
+                    localStorage.setItem("savedPrepareWaitSec", val);
+                    if (window.opener && window.opener.localStorage) {
+                        window.opener.localStorage.setItem("savedPrepareWaitSec", val);
+                    }
+                } catch(e){}
+            });
+        }
 
+        // 📅 指定日時に自動開始する（トグル状態の即時復元・永続化・視覚的注意喚起）
+        const schedToggle = document.getElementById("wizard-start-schedule-toggle");
+        const schedLabel = document.getElementById("wizard-start-schedule-label");
+        const schedHint = document.getElementById("wizard-start-schedule-hint");
+
+        function updateScheduleHintUI(isChecked) {
+            if (schedLabel) {
+                if (isChecked) {
+                    schedLabel.style.background = "rgba(0, 210, 211, 0.22)";
+                    schedLabel.style.borderColor = "#00d2d3";
+                    schedLabel.style.color = "#00ffff";
+                } else {
+                    schedLabel.style.background = "rgba(255, 255, 255, 0.06)";
+                    schedLabel.style.borderColor = "rgba(255, 255, 255, 0.15)";
+                    schedLabel.style.color = "#ccc";
+                }
+            }
+            if (schedHint) {
+                schedHint.style.display = "block";
+                if (isChecked) {
+                    schedHint.style.background = "rgba(0, 210, 211, 0.12)";
+                    schedHint.style.border = "1px solid rgba(0, 210, 211, 0.35)";
+                    schedHint.style.color = "#00ffff";
+                    schedHint.innerHTML = "⏰ <strong>予約自動開始が有効です:</strong> 開始時刻まで「配信準備中」で待機し、定刻に自動開始します。";
+                } else {
+                    schedHint.style.background = "rgba(255, 170, 0, 0.12)";
+                    schedHint.style.border = "1px solid rgba(255, 170, 0, 0.35)";
+                    schedHint.style.color = "#ffbb33";
+                    schedHint.innerHTML = "⚠️ <strong>自動開始OFF:</strong> 「配信準備完了」ボタンを押すと<strong>今すぐ直ちに配信が開始</strong>されます。";
+                }
+            }
+        }
+        window.updateWizardScheduleHintUI = updateScheduleHintUI;
+
+        if (schedToggle) {
+            let savedSched = null;
+            try {
+                savedSched = localStorage.getItem("savedWizardStartScheduleToggle");
+                if (savedSched === null && window.opener && window.opener.localStorage) {
+                    savedSched = window.opener.localStorage.getItem("savedWizardStartScheduleToggle");
+                }
+                if (savedSched === null && window.opener && window.opener.document) {
+                    const mainToggle = window.opener.document.getElementById("local-schedule-toggle");
+                    if (mainToggle) savedSched = String(mainToggle.checked);
+                }
+            } catch(e){}
+
+            // 以前保存された値（保存がなければデフォルトONを推奨、親画面準拠）
+            if (savedSched !== null) {
+                schedToggle.checked = (savedSched === "true");
+            }
+            updateScheduleHintUI(schedToggle.checked);
+
+            schedToggle.addEventListener("change", function(e) {
+                const isChecked = e.target.checked;
+                updateScheduleHintUI(isChecked);
+                try {
+                    localStorage.setItem("savedWizardStartScheduleToggle", String(isChecked));
+                    if (window.opener && window.opener.localStorage) {
+                        window.opener.localStorage.setItem("savedWizardStartScheduleToggle", String(isChecked));
+                    }
+                    if (window.opener && window.opener.document) {
+                        const mainToggle = window.opener.document.getElementById("local-schedule-toggle");
+                        if (mainToggle) {
+                            mainToggle.checked = isChecked;
+                            mainToggle.dispatchEvent(new window.opener.Event("change"));
+                        }
+                    }
+                } catch(e){}
+            });
+        }
+    })();
+    </script>
 </body>
 </html>

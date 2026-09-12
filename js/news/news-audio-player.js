@@ -3,52 +3,50 @@
 // =====================================================================
 
 (function() {
-    async function playSE(name, customVol = null) {
+  async function playSE(name, customVol = null) {
     try {
       const seVolSlider = document.getElementById("se-volume-slider") || document.getElementById("wizard-se-volume-slider");
       const seVol = (customVol !== null) ? customVol : (seVolSlider ? parseInt(seVolSlider.value, 10) / 100 : 0.85);
       const encoded = encodeURIComponent(name);
 
-      const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
-      const ctx = (typeof window.getVoicevoxAudioContext === "function") 
-        ? window.getVoicevoxAudioContext() 
-        : (window.voicevoxAudioContext || window.bgmAudioContext || new AudioCtxClass());
+      // 🍏 HTML5 Audio で実音声を確実にスピーカーから発音 (CoreAudioスリープ・無音化の完全対策)
+      const audioUrl = `/se/${encoded}.mp3`;
+      const audioEl = new Audio(audioUrl);
+      audioEl.volume = Math.min(1.0, Math.max(0.0, seVol));
 
-      if (ctx.state === "suspended") {
-        await ctx.resume().catch(() => {});
-      }
-
-      let res = await fetch(`/se/${encoded}.mp3`);
-      if (!res.ok) res = await fetch(`/se/${encoded}.wav`);
-      if (!res.ok) throw new Error("SE file not found");
-
-      const arrayBuffer = await res.arrayBuffer();
-      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+      // Web Audio アナライザーがある場合は波形解析（メーター・リップシンク）も並行駆動
+      try {
+        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+        const ctx = (typeof window.getVoicevoxAudioContext === "function") 
+          ? window.getVoicevoxAudioContext() 
+          : (window.voicevoxAudioContext || window.bgmAudioContext || new AudioCtxClass());
+        if (ctx && (ctx.state === "suspended" || ctx.state === "interrupted")) {
+          ctx.resume().catch(() => {});
+        }
+      } catch(e) {}
 
       return new Promise((resolve) => {
-        const source = ctx.createBufferSource();
-        source.buffer = audioBuffer;
-
-        const gainNode = ctx.createGain();
-        gainNode.gain.setValueAtTime(seVol, ctx.currentTime);
-
-        source.connect(gainNode);
-        gainNode.connect(ctx.destination);
-
-        source.onended = () => {
+        audioEl.onended = () => {
           console.log(`[ニュースSE] ✅ 再生完了: ${name}`);
           resolve();
         };
-        source.start(0);
-        console.log(`[ニュースSE] 🔔 効果音再生開始: ${name} (音量: ${seVol})`);
+        audioEl.onerror = () => {
+          // wav フォールバック
+          const wavAudio = new Audio(`/se/${encoded}.wav`);
+          wavAudio.volume = Math.min(1.0, Math.max(0.0, seVol));
+          wavAudio.onended = () => resolve();
+          wavAudio.onerror = () => resolve();
+          wavAudio.play().catch(() => resolve());
+        };
+        audioEl.play().then(() => {
+          console.log(`[ニュースSE] 🔔 効果音再生開始: ${name} (音量: ${seVol})`);
+        }).catch((err) => {
+          console.warn(`[ニュースSE] HTML5 Audio再生エラー:`, err);
+          resolve();
+        });
       });
     } catch (err) {
-      console.warn(`[ニュースSE] Web Audio再生エラー (${name}):`, err);
-      // HTML5 Audio フォールバック
-      try {
-        const audio = new Audio(`/se/${encodeURIComponent(name)}.mp3`);
-        audio.play().catch(e => console.warn("[ニュースSE] HTML5 Audio再生も拒否されました:", e));
-      } catch(e) {}
+      console.warn(`[ニュースSE] 再生例外 (${name}):`, err);
     }
   }
 

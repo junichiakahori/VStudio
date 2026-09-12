@@ -31,6 +31,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         
         let candidatePaths = [
             parentDir,
+            "/Users/junichiakahori/Documents/Antigravity/VStudio-dev",
             "/Users/junichiakahori/Documents/Antigravity/VStudio",
             FileManager.default.currentDirectoryPath
         ]
@@ -43,7 +44,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         }
         
         if appPath.isEmpty {
-            appPath = "/Users/junichiakahori/Documents/Antigravity/VStudio"
+            appPath = "/Users/junichiakahori/Documents/Antigravity/VStudio-dev"
         }
 
         // 1. Setup Mac Native Menu Bar
@@ -67,10 +68,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
             backing: .buffered,
             defer: false
         )
-        window.title = "🎙️ VStudio"
+        window.title = "🎙️ VStudio (Dev)"
         window.isMovable = true
         window.isMovableByWindowBackground = true
-        window.setFrameAutosaveName("VStudioMainWindow")
+        window.setFrameAutosaveName("VStudioDevMainWindow")
         window.delegate = self
         window.minSize = NSSize(width: 900, height: 600)
         window.backgroundColor = NSColor(red: 0.08, green: 0.08, blue: 0.11, alpha: 1.0)
@@ -162,7 +163,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
     }
     
     @objc func reloadPage() {
-        loadVStudioPage()
+        if webView != nil {
+            webView.reloadFromOrigin()
+        } else {
+            loadVStudioPage()
+        }
     }
     
     @objc func toggleDevTools() {
@@ -215,7 +220,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         }
         
         let timestamp = String(Int(Date().timeIntervalSince1970))
-        if let url = URL(string: "http://localhost:8443/log_console.html?v=\(timestamp)") {
+        if let url = URL(string: "http://localhost:8444/log_console.html?v=\(timestamp)") {
             let req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 10.0)
             logWebView?.load(req)
         }
@@ -335,7 +340,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         checkTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] timer in
             guard let self = self else { return }
             attempts += 1
-            if self.checkPort(8443) {
+            if self.checkPort(8444) {
                 timer.invalidate()
                 self.loadVStudioPage()
             } else if attempts >= 24 {
@@ -386,7 +391,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
     }
 
     func loadVStudioPage() {
-        guard let url = URL(string: "http://localhost:8443/live2d.html") else { return }
+        guard let url = URL(string: "http://localhost:8444/live2d.html") else { return }
         
         // URLにタイムスタンプ（?v=...）を付与して、Viteの古いJS/CSSキャッシュを確実にバイパスさせる
         var mutableReq = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 10.0)
@@ -406,6 +411,32 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
     
     // MARK: - WKUIDelegate: Popup Windows (window.open support for Stream Wizard, Log Console, etc.)
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        let reqURL = navigationAction.request.url?.absoluteString ?? ""
+        var targetType = ""
+        if reqURL.contains("wizard") { targetType = "wizard" }
+        else if reqURL.contains("news_list") { targetType = "news_list" }
+        else if reqURL.contains("log_console") { targetType = "log_console" }
+
+        // 既存ウィンドウが既に開いている場合は前面に浮上させて再利用
+        if !targetType.isEmpty {
+            for controller in popupWindows {
+                if let win = controller.window {
+                    let title = win.title
+                    let match = (targetType == "wizard" && (title.contains("ウィザード") || title.contains("Wizard"))) ||
+                                (targetType == "news_list" && (title.contains("ニュース一覧") || title.contains("News"))) ||
+                                (targetType == "log_console" && (title.contains("ログコンソール") || title.contains("Log")))
+                    if match {
+                        NSApp.activate(ignoringOtherApps: true)
+                        win.makeKeyAndOrderFront(nil)
+                        win.orderFrontRegardless()
+                        if let subWebView = win.contentView?.subviews.compactMap({ $0 as? WKWebView }).first {
+                            return subWebView
+                        }
+                    }
+                }
+            }
+        }
+
         let width = windowFeatures.width?.doubleValue ?? 880
         let height = windowFeatures.height?.doubleValue ?? 680
         let popupRect = NSRect(x: 120, y: 120, width: width, height: height)
@@ -416,7 +447,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
             backing: .buffered,
             defer: false
         )
-        let reqURL = navigationAction.request.url?.absoluteString ?? ""
         if reqURL.contains("log_console") {
             popupWindow.title = "📋 VStudio 統合ログコンソール"
         } else if reqURL.contains("wizard") {
@@ -578,6 +608,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
                 }
             }
         }
+        
+        if action == "focusWindow" {
+            let windowType = (body["type"] as? String) ?? ""
+            for controller in popupWindows {
+                if let win = controller.window {
+                    let title = win.title
+                    var match = false
+                    if windowType == "wizard" && (title.contains("ウィザード") || title.contains("Wizard")) {
+                        match = true
+                    } else if windowType == "news_list" && (title.contains("ニュース一覧") || title.contains("News")) {
+                        match = true
+                    } else if windowType == "log_console" && (title.contains("ログコンソール") || title.contains("Log")) {
+                        match = true
+                    } else if windowType.isEmpty {
+                        match = true
+                    }
+                    if match {
+                        NSApp.activate(ignoringOtherApps: true)
+                        win.makeKeyAndOrderFront(nil)
+                        win.orderFrontRegardless()
+                        return
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - WKNavigationDelegate
@@ -595,7 +650,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            if let url = URL(string: "http://localhost:8443/live2d.html") {
+            if let url = URL(string: "http://localhost:8444/live2d.html") {
                 self?.webView.load(URLRequest(url: url))
             }
             self?.hideLoadingUI()

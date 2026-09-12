@@ -25,10 +25,17 @@ rsync -av --delete "$DEV_DIR/views/" "$PROD_DIR/views/"
 rsync -av --delete "$DEV_DIR/css/" "$PROD_DIR/css/"
 rsync -av --delete --exclude="__pycache__" "$DEV_DIR/server/" "$PROD_DIR/server/"
 rsync -av --delete "$DEV_DIR/scripts/" "$PROD_DIR/scripts/" 2>/dev/null || true
+rsync -av --delete "$DEV_DIR/src_native/" "$PROD_DIR/src_native/" 2>/dev/null || true
 
-# AGENTS.md と主要設定（vite.config.js のポート差分は維持）の同期
+# AGENTS.md, prompts.json と主要設定の同期
 if [ -f "$DEV_DIR/AGENTS.md" ]; then
     cp "$DEV_DIR/AGENTS.md" "$PROD_DIR/AGENTS.md"
+fi
+if [ -f "$DEV_DIR/data/prompts.json" ]; then
+    cp "$DEV_DIR/data/prompts.json" "$PROD_DIR/data/prompts.json"
+fi
+if [ -f "$DEV_DIR/data/tts_rules.json" ]; then
+    cp "$DEV_DIR/data/tts_rules.json" "$PROD_DIR/data/tts_rules.json"
 fi
 
 echo "✅ 2. ソースコードの同期が完了しました。"
@@ -40,7 +47,9 @@ node --check js/audio-voicevox.js
 node --check js/wizard/wizard-core.js
 node --check js/wizard/wizard-youtube-api.js
 node --check js/wizard/wizard-finish.js
-python3 -m py_compile server/local_api_server.py server/tts_normalizer.py
+node --check js/news-mode.js
+node --check js/stream-automation.js
+python3 -m py_compile server/local_api_server.py server/tts_normalizer.py server/news_crawler.py server/news_script_processor.py server/youtube_api_helper.py
 
 echo "=========================================================="
 echo "🎉 本番環境への同期および検証がすべて完了しました！"

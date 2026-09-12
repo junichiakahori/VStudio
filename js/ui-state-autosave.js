@@ -10,6 +10,17 @@ window.addEventListener("uiLoaded", () => {
     let savedState = {};
     try {
       savedState = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      // リミッター関連の古いキーを完全クリーンアップ（ai-settings.jsが専用管理）
+      let cleaned = false;
+      Object.keys(savedState).forEach((k) => {
+        if (k.startsWith("limiter-") || k.startsWith("voicevox-limiter-") || k.startsWith("btn-limiter-")) {
+          delete savedState[k];
+          cleaned = true;
+        }
+      });
+      if (cleaned) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(savedState));
+      }
     } catch (e) {}
 
     const elements = document.querySelectorAll(
@@ -19,6 +30,7 @@ window.addEventListener("uiLoaded", () => {
     elements.forEach((el) => {
       if (!el.id) return;
       if (el.type === "file") return;
+      if (el.id.startsWith("limiter-") || el.id.startsWith("voicevox-limiter-") || el.id.startsWith("btn-limiter-")) return; // リミッター設定はai-settings.jsが専用管理（競合防止）
 
       // 復元処理
       if (savedState[el.id] !== undefined) {

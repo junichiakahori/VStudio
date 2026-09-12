@@ -88,11 +88,22 @@
       const pad = (n, z = 2) => String(n).padStart(z, "0");
       const timeStr = `[${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}.${pad(now.getMilliseconds(), 3)}]`;
 
+      const logMessage = `${timeStr} ${clientTag} ${caller} [${type.toUpperCase()}] ${msg}`;
+
+      // 1. keepalive: true により window.close() 破棄後もブラウザが通信を完遂する
       fetch("/log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: `${timeStr} ${clientTag} ${caller} [${type.toUpperCase()}] ${msg}`, client: clientType })
+        body: JSON.stringify({ message: logMessage, client: clientType }),
+        keepalive: true
       }).catch(() => {});
+
+      // 2. 親画面（opener）が生存している場合は親のコンソールにも通知（親側で二重のログ保護）
+      try {
+        if (window.opener && !window.opener.closed && window.opener.console && typeof window.opener.console[type] === "function") {
+          window.opener.console[type](`[子窓経由] ${msg}`);
+        }
+      } catch (openerErr) {}
     } catch(e) {}
   }
 

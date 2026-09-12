@@ -36,6 +36,12 @@ function initChatClient() {
     }
     try {
       localStorage.setItem("savedCommentHistory", JSON.stringify(commentHistory));
+      const currentVid = (youtubeUserInput ? youtubeUserInput.value.trim() : "") ||
+                         localStorage.getItem("savedYoutubeVideoId") ||
+                         localStorage.getItem("savedYoutubeId") || "";
+      if (currentVid) {
+        localStorage.setItem("savedCommentVideoId", currentVid);
+      }
     } catch (e) {
       // localStorage容量超過時は古いデータを削減して安全に退避
       try {
@@ -63,7 +69,8 @@ function initChatClient() {
 
     let avatarHtml = "";
     if (iconUrl) {
-      avatarHtml = `<img src="${iconUrl}" class="comment-avatar" alt="${nickname}" crossorigin="anonymous">`;
+      let safeIconUrl = iconUrl.startsWith("//") ? `https:${iconUrl}` : iconUrl;
+      avatarHtml = `<img src="${safeIconUrl}" class="comment-avatar" alt="${nickname}" referrerpolicy="no-referrer" onerror="this.style.display='none'">`;
     }
 
     el.innerHTML = `<div class="comment-author">${avatarHtml}<span>${icon} ${nickname}</span></div><div class="comment-text">${comment}</div>`;
@@ -118,7 +125,8 @@ function initChatClient() {
       isTiktokIntendedConnect = true;
       joinedUsers.clear();
       tiktokStatus.textContent = "接続中...";
-      tiktokWs = new WebSocket("ws://localhost:8767");
+      const tiktokPort = (window.location && window.location.port === "8444") ? 8777 : 8767;
+      tiktokWs = new WebSocket(`ws://localhost:${tiktokPort}`);
 
       tiktokWs.onopen = () => {
         tiktokWs.send(
@@ -439,7 +447,7 @@ function initChatClient() {
       youtubeStatus.textContent = "🔍 配信枠を自動検出中...";
     }
     try {
-      const res = await fetch("http://localhost:8001/get_youtube_video_info", {
+      const res = await fetch("/get_youtube_video_info", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ videoId: channelVal })
@@ -451,19 +459,52 @@ function initChatClient() {
             youtubeUserInput.value = info.videoId;
             localStorage.setItem("savedYoutubeVideoId", info.videoId);
           }
-          if (silent) {
-            if (youtubeStatus) youtubeStatus.textContent = `✅ 動画IDを自動取得: ${info.videoId}`;
-          } else {
-            alert(`✅ 配信枠を検出しました: ${info.title} (${info.videoId})`);
+
+          // 📅 配信開始予定日時があればメイン画面の自動開始タイマーにも反映
+          let schedMsg = "";
+          if (info.scheduledStartTime) {
+            try {
+              const d = new Date(info.scheduledStartTime);
+              if (!isNaN(d.getTime())) {
+                const pad = (n) => String(n).padStart(2, "0");
+                const localStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                const localTimeInput = document.getElementById("local-schedule-time");
+                if (localTimeInput) {
+                  localTimeInput.value = localStr;
+                  localTimeInput.dispatchEvent(new Event("change"));
+                }
+                const localToggle = document.getElementById("local-schedule-toggle");
+                if (localToggle) {
+                  localToggle.checked = true;
+                  localToggle.dispatchEvent(new Event("change"));
+                }
+                schedMsg = ` (開始予定: ${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())})`;
+              }
+            } catch (e) {}
+          }
+
+          const successMsg = `✅ 配信枠を検出しました: ${info.title || info.videoId}${schedMsg}`;
+          if (youtubeStatus) youtubeStatus.textContent = successMsg;
+          if (!silent) {
+            if (typeof window.showNotification === "function") window.showNotification(successMsg);
+            else if (typeof window.showToast === "function") window.showToast(successMsg);
           }
         } else {
-          if (!silent) alert(`⚠️ 枠情報: ${info.title || "現在進行中/予約中の枠が見つかりませんでした"}`);
-          else if (youtubeStatus) youtubeStatus.textContent = `⚠️ 配信中の枠が見つかりませんでした`;
+          const warnMsg = `⚠️ ${info.title || "現在進行中/予約中の枠が見つかりませんでした"}`;
+          if (youtubeStatus) youtubeStatus.textContent = warnMsg;
+          if (!silent) {
+            if (typeof window.showNotification === "function") window.showNotification(warnMsg);
+            else if (typeof window.showToast === "function") window.showToast(warnMsg);
+          }
         }
       }
     } catch (e) {
-      if (!silent) alert("検出エラー: " + e.message);
-      else if (youtubeStatus) youtubeStatus.textContent = `検出エラー: ${e.message}`;
+      const errMsg = `❌ 検出エラー: ${e.message}`;
+      if (youtubeStatus) youtubeStatus.textContent = errMsg;
+      if (!silent) {
+        if (typeof window.showNotification === "function") window.showNotification(errMsg);
+        else if (typeof window.showToast === "function") window.showToast(errMsg);
+      }
     } finally {
       if (youtubeDetectBtn) {
         youtubeDetectBtn.disabled = false;
@@ -543,6 +584,20 @@ function initChatClient() {
 
   async function startYoutubeConnection(videoId) {
     if (!videoId) return;
+    const cleanVid = videoId.trim();
+    const savedCommentVid = localStorage.getItem("savedCommentVideoId");
+
+    // 📺 配信枠が明確に別のものに変更された場合のみ、過去コメントをクリア
+    if (savedCommentVid && cleanVid && savedCommentVid !== cleanVid) {
+      console.log(`[YouTube] 📺 配信枠が変更されたため (${savedCommentVid} -> ${cleanVid})、コメント履歴をクリアします`);
+      if (typeof clearAllComments === "function") clearAllComments();
+    }
+    if (cleanVid) {
+      localStorage.setItem("savedCommentVideoId", cleanVid);
+      localStorage.setItem("savedYoutubeVideoId", cleanVid);
+      localStorage.setItem("savedYoutubeId", cleanVid);
+    }
+
     window.isYoutubeIntendedConnect = true;
     setYoutubeStatus("YouTube: 接続中...", "connecting");
 
@@ -558,7 +613,8 @@ function initChatClient() {
     }
     localStorage.setItem("radioScriptLastIndex", 0);
 
-    youtubeWs = new WebSocket("ws://localhost:8768");
+    const ytPort = (window.location && window.location.port === "8444") ? 8778 : 8768;
+    youtubeWs = new WebSocket(`ws://localhost:${ytPort}`);
 
     youtubeWs.onopen = () => {
       youtubeWs.send(
@@ -665,8 +721,13 @@ function initChatClient() {
             }
           } else if (data.type === "stats") {
             const statViewers = document.getElementById("stat-viewers");
-            if (statViewers && data.viewers !== undefined) {
-              statViewers.textContent = (data.viewers === "" || data.viewers === null) ? "-" : data.viewers;
+            const viewersVal = data.concurrentViewers !== undefined ? data.concurrentViewers : data.viewers;
+            if (statViewers && viewersVal !== undefined) {
+              statViewers.textContent = (viewersVal === "" || viewersVal === null) ? "-" : viewersVal;
+            }
+            const statTotalViews = document.getElementById("stat-total-views");
+            if (statTotalViews && data.totalViews !== undefined) {
+              statTotalViews.textContent = (data.totalViews === "" || data.totalViews === null) ? "-" : data.totalViews;
             }
             const statSubscribers = document.getElementById("stat-subscribers");
             let subDisplay = "-";
@@ -683,11 +744,12 @@ function initChatClient() {
             const inputVal = document.getElementById("youtube-video-input")?.value || "";
             const currentVid = data.videoId || "-";
             const likesVal = data.likes || "-";
-            const statsSig = `${inputVal}|${currentVid}|${subDisplay}|${data.viewers}|${likesVal}|${currentCommentsCount}`;
+            const totViewsVal = data.totalViews || "-";
+            const statsSig = `${inputVal}|${currentVid}|${subDisplay}|${viewersVal}|${totViewsVal}|${likesVal}|${currentCommentsCount}`;
             if (window._lastLoggedStatsSig !== statsSig) {
               window._lastLoggedStatsSig = statsSig;
               console.log(
-                `[YouTube Live 統計] 📺 接続先: ${inputVal || currentVid} (動画ID: ${currentVid}) | 👤 登録者数: ${subDisplay}人 | 👁️ 視聴者数/再生数: ${data.viewers || '-'} | 👍 高評価: ${likesVal} | 💬 コメント総数: ${currentCommentsCount}件`
+                `[YouTube Live 統計] 📺 接続先: ${inputVal || currentVid} (動画ID: ${currentVid}) | 👤 登録者数: ${subDisplay}人 | 👁️ 同接: ${viewersVal || '-'} | ▶️ 累計再生数: ${totViewsVal} | 👍 高評価: ${likesVal} | 💬 コメント総数: ${currentCommentsCount}件`
               );
             }
           } else if (data.type === "gift") {

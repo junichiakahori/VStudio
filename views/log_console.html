@@ -505,11 +505,14 @@
                 const res = await fetch(`${API_BASE}/log?tab=${currentTab}&_=${Date.now()}`);
                 if (res.ok) {
                     const data = await res.json();
-                    if (data.content !== rawContent || forceScroll) {
-                        rawContent = data.content;
+                    const textContent = typeof data.content === "string" ? data.content : (Array.isArray(data.lines) ? data.lines.join("\n") : "");
+                    if (textContent !== rawContent || forceScroll) {
+                        rawContent = textContent;
                         renderFormattedLog();
                     }
-                    fileInfo.textContent = `📄 ${data.filename}  (${data.lineCount} 行) - ${data.modifiedTime || '最新'}`;
+                    const lineCnt = data.lineCount || data.total_lines || (Array.isArray(data.lines) ? data.lines.length : 0);
+                    const fname = data.filename || data.name || currentTab;
+                    fileInfo.textContent = `📄 ${fname}  (${lineCnt} 行) - ${data.modifiedTime || '最新'}`;
                 }
             } catch (err) {
                 fileInfo.textContent = `⚠️ ログ取得エラー (APIサーバー 8001 接続待機中)`;

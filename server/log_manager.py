@@ -182,18 +182,33 @@ def read_log_file(name, lines=200):
     
     file_path = os.path.join(BASE_DIR, LOG_FILES_MAP[name])
     if not os.path.exists(file_path):
-        return {"name": name, "lines": [], "path": file_path, "size": 0}
+        return {
+            "name": name,
+            "filename": os.path.basename(file_path),
+            "lines": [],
+            "content": "",
+            "total_lines": 0,
+            "lineCount": 0,
+            "path": file_path,
+            "size": 0,
+            "modifiedTime": "-"
+        }
     
     try:
+        mtime = datetime.datetime.fromtimestamp(os.path.getmtime(file_path)).strftime('%Y-%m-%d %H:%M:%S')
         with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
             all_lines = f.readlines()
             tail_lines = [line.rstrip('\r\n') for line in all_lines[-lines:]]
             return {
                 "name": name,
+                "filename": os.path.basename(file_path),
                 "lines": tail_lines,
+                "content": "\n".join(tail_lines),
                 "total_lines": len(all_lines),
+                "lineCount": len(tail_lines),
                 "path": file_path,
-                "size": os.path.getsize(file_path)
+                "size": os.path.getsize(file_path),
+                "modifiedTime": mtime
             }
     except Exception as e:
         return {"error": str(e)}

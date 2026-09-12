@@ -306,6 +306,8 @@
   }
 
   function initTimePickerUI() {
+    const initialDate = getWizardStartTimeDate();
+    setWizardStartTimeDate(initialDate);
     updateWizardClockDisplay();
 
     // 今日 / 明日 ボタン

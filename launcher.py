@@ -41,14 +41,21 @@ def is_port_open(port, host="127.0.0.1"):
 
 def kill_port_owner(port):
     try:
-        res = subprocess.run(["lsof", "-ti", f":{port}"], capture_output=True, text=True)
-        pids = res.stdout.strip().split()
-        for pid in pids:
-            if pid and pid != str(os.getpid()):
-                log(f"Killing old process on port {port} (PID: {pid})")
-                subprocess.run(["kill", "-9", pid], check=False)
+        res = subprocess.run(["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN"], capture_output=True, text=True)
+        lines = res.stdout.strip().split(chr(10))
+        if len(lines) <= 1:
+            return
+        for line in lines[1:]:
+            parts = line.strip().split()
+            if len(parts) >= 2:
+                cmd = parts[0].lower()
+                pid = parts[1]
+                # Python または Node プロセスのみを安全に対象とする (ブラウザ・WebKitの誤爆を100%防止)
+                if ("python" in cmd or "node" in cmd) and pid != str(os.getpid()):
+                    log(f"Safely killing server process on port {port} (PID: {pid}, CMD: {parts[0]})")
+                    subprocess.run(["kill", "-9", pid], check=False)
     except Exception as e:
-        log(f"Error cleaning port {port}: {e}")
+        log(f"Error safely cleaning port {port}: {e}")
 
 # Global processes list
 processes = []

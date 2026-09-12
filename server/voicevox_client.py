@@ -33,6 +33,22 @@ def clean_kana_for_display(kana_str):
         return ""
     return kana_str.replace('/', ' ').replace("'", "").replace("_", "").strip()
 
+def get_voicevox_reading_and_kana(text, speaker_id=1):
+    """VOICEVOXのaudio_queryを呼び出し、実際の読みカナとアクセント記号付きkanaを取得"""
+    if not text:
+        return "", ""
+    try:
+        enc = urllib.parse.quote(text)
+        url = f"http://localhost:50021/audio_query?text={enc}&speaker={speaker_id}"
+        req = urllib.request.Request(url, method="POST")
+        with urllib.request.urlopen(req, timeout=3) as res:
+            q = json.loads(res.read().decode("utf-8"))
+            raw_kana = q.get("kana", "")
+            clean = clean_kana_for_display(raw_kana)
+            return clean, raw_kana
+    except Exception:
+        return "", ""
+
 def synthesize_voicevox_backend(text, speaker_id=1, speed=1.0, pitch=0.0, custom_dict=None):
     """VOICEVOXエンジンへテキスト正規化済みテキストを送信して音声WAVバイナリと発音カナを取得"""
     processed_text = normalize_for_tts(text, custom_dict=custom_dict)
@@ -53,6 +69,10 @@ def synthesize_voicevox_backend(text, speaker_id=1, speed=1.0, pitch=0.0, custom
         query_json["speedScale"] = speed
     if pitch != 0.0:
         query_json["pitchScale"] = pitch
+
+    # 🎙️ 発声終了後の余白（postPhonemeLength）を 0.15秒に最適化（語尾切れ防止と軽快テンポの両立）
+    query_json["postPhonemeLength"] = 0.15
+    query_json["prePhonemeLength"] = 0.08
 
     synth_url = f"http://localhost:50021/synthesis?speaker={speaker_id}"
     req_synth = urllib.request.Request(

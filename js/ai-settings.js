@@ -376,6 +376,9 @@ window.updateAiLink = function updateAiLink() {
       if (voicevoxGainNode) {
         voicevoxGainNode.gain.value = vol / 100.0;
       }
+      if (window.currentVoicevoxAudioEl) {
+        window.currentVoicevoxAudioEl.volume = Math.min(1.0, Math.max(0.0, vol / 100.0));
+      }
     });
   }
 
@@ -385,6 +388,8 @@ window.updateAiLink = function updateAiLink() {
   const limiterThresholdVal = document.getElementById("limiter-threshold-val");
   const limiterRatio = document.getElementById("limiter-ratio");
   const limiterRatioVal = document.getElementById("limiter-ratio-val");
+  const limiterGain = document.getElementById("limiter-gain");
+  const limiterGainVal = document.getElementById("limiter-gain-val");
   const limiterKnee = document.getElementById("limiter-knee");
   const limiterKneeVal = document.getElementById("limiter-knee-val");
   const limiterAttack = document.getElementById("limiter-attack");
@@ -397,8 +402,39 @@ window.updateAiLink = function updateAiLink() {
   const btnPresetHard = document.getElementById("btn-limiter-preset-hard");
   const btnLimiterReset = document.getElementById("btn-limiter-reset");
 
+  // 🎛️ リミッタープリセットマスター定義
+  const LIMITER_PRESETS = {
+    safe: {
+      name: "safe",
+      label: "🛡️ 標準",
+      color: "#00f3ff",
+      bgActive: "rgba(0, 243, 255, 0.2)",
+      borderColor: "var(--neon-cyan)",
+      textColor: "var(--neon-cyan)",
+      settings: { enabled: true, threshold: -6, ratio: 20, makeupGain: 1.5, knee: 3, attack: 0.001, release: 0.10 },
+    },
+    broadcast: {
+      name: "broadcast",
+      label: "🎙️ 配信",
+      color: "#bf5af2",
+      bgActive: "rgba(191, 90, 242, 0.25)",
+      borderColor: "#bf5af2",
+      textColor: "#bf5af2",
+      settings: { enabled: true, threshold: -18, ratio: 4, makeupGain: 5.0, knee: 6, attack: 0.005, release: 0.15 },
+    },
+    hard: {
+      name: "hard",
+      label: "⚡ 強力",
+      color: "#ff9f0a",
+      bgActive: "rgba(255, 159, 10, 0.25)",
+      borderColor: "#ff9f0a",
+      textColor: "#ff9f0a",
+      settings: { enabled: true, threshold: -12, ratio: 20, makeupGain: 3.0, knee: 0, attack: 0.001, release: 0.05 },
+    },
+  };
+
   function updateLimiterUIFromValues(settings) {
-    if (limiterToggle) limiterToggle.checked = settings.enabled;
+    if (limiterToggle) limiterToggle.checked = settings.enabled !== false;
     if (limiterThreshold) {
       limiterThreshold.value = settings.threshold;
       if (limiterThresholdVal) limiterThresholdVal.textContent = settings.threshold;
@@ -406,6 +442,10 @@ window.updateAiLink = function updateAiLink() {
     if (limiterRatio) {
       limiterRatio.value = settings.ratio;
       if (limiterRatioVal) limiterRatioVal.textContent = settings.ratio;
+    }
+    if (limiterGain) {
+      limiterGain.value = settings.makeupGain !== undefined ? settings.makeupGain : 1.5;
+      if (limiterGainVal) limiterGainVal.textContent = parseFloat(limiterGain.value).toFixed(1);
     }
     if (limiterKnee) {
       limiterKnee.value = settings.knee;
@@ -421,11 +461,45 @@ window.updateAiLink = function updateAiLink() {
     }
   }
 
-  function saveAndApplyLimiter() {
+  function setPresetButtonActive(presetName) {
+    const pSafe = LIMITER_PRESETS.safe;
+    const pBc = LIMITER_PRESETS.broadcast;
+    const pHard = LIMITER_PRESETS.hard;
+
+    const resetBtn = (btn) => {
+      if (!btn) return;
+      btn.style.background = "rgba(255,255,255,0.05)";
+      btn.style.borderColor = "rgba(255,255,255,0.2)";
+      btn.style.color = "#ddd";
+    };
+
+    const activateBtn = (btn, presetDef) => {
+      if (!btn) return;
+      btn.style.background = presetDef.bgActive;
+      btn.style.borderColor = presetDef.borderColor;
+      btn.style.color = presetDef.textColor;
+    };
+
+    [btnPresetSafe, btnPresetBroadcast, btnPresetHard].forEach(resetBtn);
+
+    if (presetName === "safe") activateBtn(btnPresetSafe, pSafe);
+    else if (presetName === "broadcast") activateBtn(btnPresetBroadcast, pBc);
+    else if (presetName === "hard") activateBtn(btnPresetHard, pHard);
+  }
+
+  function checkMatchingPreset(th, rt, mk, kn) {
+    if (Math.abs(th - (-6)) < 0.5 && Math.abs(rt - 20) < 0.5 && Math.abs(mk - 1.5) < 0.2 && Math.abs(kn - 3) < 0.5) return "safe";
+    if (Math.abs(th - (-18)) < 0.5 && Math.abs(rt - 4) < 0.5 && Math.abs(mk - 5.0) < 0.2 && Math.abs(kn - 6) < 0.5) return "broadcast";
+    if (Math.abs(th - (-12)) < 0.5 && Math.abs(rt - 20) < 0.5 && Math.abs(mk - 3.0) < 0.2 && Math.abs(kn - 0) < 0.5) return "hard";
+    return "custom";
+  }
+
+  function saveAndApplyLimiter(checkPreset = true) {
     const settings = {
       enabled: limiterToggle ? limiterToggle.checked : true,
       threshold: limiterThreshold ? parseFloat(limiterThreshold.value) : -6,
       ratio: limiterRatio ? parseFloat(limiterRatio.value) : 20,
+      makeupGain: limiterGain ? parseFloat(limiterGain.value) : 1.5,
       knee: limiterKnee ? parseFloat(limiterKnee.value) : 3,
       attack: limiterAttack ? parseFloat(limiterAttack.value) : 0.001,
       release: limiterRelease ? parseFloat(limiterRelease.value) : 0.10,
@@ -434,52 +508,328 @@ window.updateAiLink = function updateAiLink() {
     localStorage.setItem("voicevoxLimiterEnabled", settings.enabled);
     localStorage.setItem("voicevoxLimiterThreshold", settings.threshold);
     localStorage.setItem("voicevoxLimiterRatio", settings.ratio);
+    localStorage.setItem("voicevoxLimiterMakeupGain", settings.makeupGain);
     localStorage.setItem("voicevoxLimiterKnee", settings.knee);
     localStorage.setItem("voicevoxLimiterAttack", settings.attack);
     localStorage.setItem("voicevoxLimiterRelease", settings.release);
 
+    if (checkPreset) {
+      const matched = checkMatchingPreset(settings.threshold, settings.ratio, settings.makeupGain, settings.knee);
+      localStorage.setItem("voicevoxLimiterPreset", matched);
+      setPresetButtonActive(matched === "custom" ? null : matched);
+    }
+
     if (typeof window.updateVoicevoxLimiterSettings === "function") {
       window.updateVoicevoxLimiterSettings(settings);
     }
+    drawLimiterGraph();
   }
 
-  function setPresetButtonActive(activeBtn) {
-    [btnPresetSafe, btnPresetBroadcast, btnPresetHard].forEach((btn) => {
-      if (!btn) return;
-      if (btn === activeBtn) {
-        btn.style.background = "rgba(0,243,255,0.2)";
-        btn.style.borderColor = "var(--neon-cyan)";
-        btn.style.color = "var(--neon-cyan)";
+  function applyPreset(presetName) {
+    const preset = LIMITER_PRESETS[presetName] || LIMITER_PRESETS.safe;
+    const s = { ...preset.settings };
+    if (limiterToggle) {
+      s.enabled = limiterToggle.checked;
+    }
+
+    // 1. localStorage に確実に保存
+    localStorage.setItem("voicevoxLimiterPreset", preset.name);
+    localStorage.setItem("voicevoxLimiterEnabled", s.enabled);
+    localStorage.setItem("voicevoxLimiterThreshold", s.threshold);
+    localStorage.setItem("voicevoxLimiterRatio", s.ratio);
+    localStorage.setItem("voicevoxLimiterMakeupGain", s.makeupGain);
+    localStorage.setItem("voicevoxLimiterKnee", s.knee);
+    localStorage.setItem("voicevoxLimiterAttack", s.attack);
+    localStorage.setItem("voicevoxLimiterRelease", s.release);
+
+    // 2. DOMコントロールに値を反映
+    updateLimiterUIFromValues(s);
+
+    // 3. ボタン選択スタイルを更新
+    setPresetButtonActive(preset.name);
+
+    // 4. 音声エンジンにパラメータを即時伝達
+    if (typeof window.updateVoicevoxLimiterSettings === "function") {
+      window.updateVoicevoxLimiterSettings(s);
+    }
+
+    // 5. グラフ再描画
+    drawLimiterGraph();
+  }
+
+  // 📊 リミッター入出力特性グラフ（Transfer Curve: 入力dB vs 出力dB）描画エンジン
+  const graphCanvas = document.getElementById("limiter-graph-canvas");
+  const graphBadge = document.getElementById("limiter-graph-badge");
+
+  function drawLimiterGraph() {
+    if (!graphCanvas) return;
+    const ctx = graphCanvas.getContext("2d");
+    if (!ctx) return;
+
+    // 高DPI Retinaディスプレイ対応
+    const dpr = window.devicePixelRatio || 1;
+    const rect = graphCanvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    if (graphCanvas.width !== Math.round(rect.width * dpr) || graphCanvas.height !== Math.round(rect.height * dpr)) {
+      graphCanvas.width = Math.round(rect.width * dpr);
+      graphCanvas.height = Math.round(rect.height * dpr);
+    }
+    ctx.resetTransform();
+    ctx.scale(dpr, dpr);
+
+    const w = rect.width;
+    const h = rect.height;
+
+    // 現在のパラメータ
+    const enabled = limiterToggle ? limiterToggle.checked : true;
+    const threshold = limiterThreshold ? parseFloat(limiterThreshold.value) : -6;
+    const ratio = limiterRatio ? parseFloat(limiterRatio.value) : 20;
+    const knee = limiterKnee ? parseFloat(limiterKnee.value) : 3;
+
+    // 背景クリア＆ダークグリッド描画
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "rgba(4, 15, 26, 0.95)";
+    ctx.fillRect(0, 0, w, h);
+
+    // プロットエリア（パディング）
+    const padL = 24;
+    const padR = 8;
+    const padT = 8;
+    const padB = 16;
+    const plotW = Math.max(10, w - padL - padR);
+    const plotH = Math.max(10, h - padT - padB);
+
+    // 入出力範囲: -40dB 〜 0dB
+    const minDb = -40;
+    const maxDb = 0;
+    const dbRange = maxDb - minDb;
+
+    const dbToX = (db) => padL + ((db - minDb) / dbRange) * plotW;
+    const dbToY = (db) => padT + (1.0 - (db - minDb) / dbRange) * plotH;
+
+    // 1. グリッド線 (-30dB, -20dB, -10dB, 0dB)
+    ctx.lineWidth = 0.8;
+    ctx.strokeStyle = "rgba(0, 243, 255, 0.08)";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.32)";
+    ctx.font = "8px monospace";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+
+    for (let db = -30; db <= 0; db += 10) {
+      const x = dbToX(db);
+      const y = dbToY(db);
+
+      // 縦グリッド
+      ctx.beginPath();
+      ctx.moveTo(x, padT);
+      ctx.lineTo(x, padT + plotH);
+      ctx.stroke();
+
+      // 横グリッド
+      ctx.beginPath();
+      ctx.moveTo(padL, y);
+      ctx.lineTo(padL + plotW, y);
+      ctx.stroke();
+
+      // Y軸ラベル
+      ctx.fillText(db, padL - 3, y);
+    }
+
+    // 2. リニア基準線 (45度点線: y = x, No Compression)
+    ctx.save();
+    ctx.setLineDash([2, 3]);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.22)";
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.moveTo(dbToX(minDb), dbToY(minDb));
+    ctx.lineTo(dbToX(maxDb), dbToY(maxDb));
+    ctx.stroke();
+    ctx.restore();
+
+    // 3. 圧縮伝達関数の計算 (Soft-Knee + 補償ゲイン Makeup Gain)
+    const makeupGain = limiterGain ? (parseFloat(limiterGain.value) || 0) : 0;
+
+    function getOutDb(inDb) {
+      if (!enabled) return inDb; // リミッターOFF時はリニア
+      const diffDb = inDb - threshold;
+      let compOut = inDb;
+      if (2.0 * diffDb < -knee) {
+        compOut = inDb;
+      } else if (2.0 * Math.abs(diffDb) <= knee) {
+        const kneeTerm = diffDb + knee / 2.0;
+        compOut = inDb + ((1.0 / ratio - 1.0) * kneeTerm * kneeTerm) / (2.0 * knee);
       } else {
-        btn.style.background = "rgba(255,255,255,0.05)";
-        btn.style.borderColor = "rgba(255,255,255,0.2)";
-        btn.style.color = "#ddd";
+        compOut = threshold + diffDb / ratio;
+      }
+
+      // 補償ゲイン（Makeup Gain）を加算
+      let finalDb = compOut + makeupGain;
+      // 0dBピークでのスタジオ品質ソフトリミッティング表現
+      if (finalDb > -0.5) {
+        const excess = finalDb - (-0.5);
+        finalDb = -0.5 + 0.49 * Math.tanh(excess / 2.0);
+      }
+      return Math.min(0.0, finalDb);
+    }
+
+    // 4. カラー設定（プリセットに応じた発光色）
+    let strokeColor = "#00f3ff"; // デフォルト・標準
+    let fillColorTop = "rgba(0, 243, 255, 0.25)";
+    let badgeText = "🛡️ 標準";
+
+    const currentPreset = localStorage.getItem("voicevoxLimiterPreset") || "safe";
+
+    if (!enabled) {
+      strokeColor = "#888";
+      fillColorTop = "rgba(255, 255, 255, 0.05)";
+      badgeText = "OFF (バイパス)";
+    } else if (currentPreset === "broadcast" || (Math.abs(threshold - (-18)) < 0.5 && Math.abs(ratio - 4) < 0.5)) {
+      strokeColor = "#bf5af2"; // 配信（パープル/マゼンタ）
+      fillColorTop = "rgba(191, 90, 242, 0.25)";
+      badgeText = "🎙️ 配信";
+    } else if (currentPreset === "hard" || (Math.abs(threshold - (-12)) < 0.5 && Math.abs(ratio - 20) < 0.5 && knee <= 1)) {
+      strokeColor = "#ff9f0a"; // 強力（ネオンアンバー/オレンジ）
+      fillColorTop = "rgba(255, 159, 10, 0.25)";
+      badgeText = "⚡ 強力";
+    } else if (currentPreset === "safe" || (Math.abs(threshold - (-6)) < 0.5 && Math.abs(ratio - 20) < 0.5)) {
+      strokeColor = "#00f3ff"; // 標準
+      fillColorTop = "rgba(0, 243, 255, 0.25)";
+      badgeText = "🛡️ 標準";
+    } else {
+      badgeText = `Th:${Math.round(threshold)} R:${Math.round(ratio)} +${makeupGain.toFixed(1)}dB`;
+      strokeColor = "#00f3ff";
+      fillColorTop = "rgba(0, 243, 255, 0.25)";
+    }
+
+    if (graphBadge) {
+      graphBadge.textContent = badgeText;
+      graphBadge.style.color = strokeColor;
+      graphBadge.style.borderColor = strokeColor;
+      graphBadge.style.background = enabled ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.05)";
+    }
+
+    // 5. カーブ塗りつぶし (Gradient Fill)
+    const points = [];
+    const steps = 60;
+    for (let i = 0; i <= steps; i++) {
+      const inDb = minDb + (i / steps) * dbRange;
+      const outDb = getOutDb(inDb);
+      points.push({ x: dbToX(inDb), y: dbToY(outDb) });
+    }
+
+    const grad = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+    grad.addColorStop(0, fillColorTop);
+    grad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
+
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, padT + plotH);
+    for (const pt of points) {
+      ctx.lineTo(pt.x, pt.y);
+    }
+    ctx.lineTo(points[points.length - 1].x, padT + plotH);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // 6. カーブライン描画 (発光エフェクト付き)
+    ctx.save();
+    ctx.shadowColor = strokeColor;
+    ctx.shadowBlur = enabled ? 6 : 0;
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    for (let i = 0; i < points.length; i++) {
+      if (i === 0) ctx.moveTo(points[i].x, points[i].y);
+      else ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    // 7. 閾値（Threshold）インジケータードット
+    if (enabled && threshold >= minDb && threshold <= maxDb) {
+      const thX = dbToX(threshold);
+      const thY = dbToY(getOutDb(threshold));
+
+      ctx.save();
+      ctx.fillStyle = strokeColor;
+      ctx.shadowColor = strokeColor;
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(thX, thY, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 閾値の縦ガイド点線
+      ctx.setLineDash([1, 2]);
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(thX, thY);
+      ctx.lineTo(thX, padT + plotH);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  window.drawLimiterGraph = drawLimiterGraph;
+
+  // live2d_studio_auto_ui_state に過去保存された limiter-* キーを完全消去（競合防止）
+  try {
+    const autoKey = "live2d_studio_auto_ui_state";
+    const autoState = JSON.parse(localStorage.getItem(autoKey) || "{}");
+    let changed = false;
+    Object.keys(autoState).forEach((k) => {
+      if (k.startsWith("limiter-") || k.startsWith("voicevox-limiter-") || k.startsWith("btn-limiter-")) {
+        delete autoState[k];
+        changed = true;
       }
     });
-  }
-
-  function applyPreset(presetName, triggerBtn) {
-    let settings = { enabled: true, threshold: -6, ratio: 20, knee: 3, attack: 0.001, release: 0.10 };
-    if (presetName === "broadcast") {
-      settings = { enabled: true, threshold: -18, ratio: 4, knee: 6, attack: 0.005, release: 0.15 };
-    } else if (presetName === "hard") {
-      settings = { enabled: true, threshold: -12, ratio: 20, knee: 0, attack: 0.001, release: 0.05 };
+    if (changed) {
+      localStorage.setItem(autoKey, JSON.stringify(autoState));
     }
-    updateLimiterUIFromValues(settings);
-    saveAndApplyLimiter();
-    if (triggerBtn) setPresetButtonActive(triggerBtn);
-  }
+  } catch (e) {}
 
   // 初期値の復元
-  const initialLimiterSettings = {
-    enabled: localStorage.getItem("voicevoxLimiterEnabled") !== "false",
-    threshold: parseFloat(localStorage.getItem("voicevoxLimiterThreshold") || "-6"),
-    ratio: parseFloat(localStorage.getItem("voicevoxLimiterRatio") || "20"),
-    knee: parseFloat(localStorage.getItem("voicevoxLimiterKnee") || "3"),
-    attack: parseFloat(localStorage.getItem("voicevoxLimiterAttack") || "0.001"),
-    release: parseFloat(localStorage.getItem("voicevoxLimiterRelease") || "0.10"),
-  };
+  const savedPreset = localStorage.getItem("voicevoxLimiterPreset") || "safe";
+  let initialLimiterSettings;
+
+  if (LIMITER_PRESETS[savedPreset]) {
+    // プリセットが指定されている場合は、そのプリセットの設定をベースにする（微小誤差による崩れを完全防止）
+    initialLimiterSettings = { ...LIMITER_PRESETS[savedPreset].settings };
+    initialLimiterSettings.enabled = localStorage.getItem("voicevoxLimiterEnabled") !== "false";
+    // localStorage の各値も念のため同期
+    localStorage.setItem("voicevoxLimiterThreshold", initialLimiterSettings.threshold);
+    localStorage.setItem("voicevoxLimiterRatio", initialLimiterSettings.ratio);
+    localStorage.setItem("voicevoxLimiterMakeupGain", initialLimiterSettings.makeupGain);
+    localStorage.setItem("voicevoxLimiterKnee", initialLimiterSettings.knee);
+    localStorage.setItem("voicevoxLimiterAttack", initialLimiterSettings.attack);
+    localStorage.setItem("voicevoxLimiterRelease", initialLimiterSettings.release);
+  } else {
+    // customの場合
+    initialLimiterSettings = {
+      enabled: localStorage.getItem("voicevoxLimiterEnabled") !== "false",
+      threshold: parseFloat(localStorage.getItem("voicevoxLimiterThreshold") || "-6"),
+      ratio: parseFloat(localStorage.getItem("voicevoxLimiterRatio") || "20"),
+      makeupGain: parseFloat(localStorage.getItem("voicevoxLimiterMakeupGain") || "1.5"),
+      knee: parseFloat(localStorage.getItem("voicevoxLimiterKnee") || "3"),
+      attack: parseFloat(localStorage.getItem("voicevoxLimiterAttack") || "0.001"),
+      release: parseFloat(localStorage.getItem("voicevoxLimiterRelease") || "0.10"),
+    };
+  }
+
   updateLimiterUIFromValues(initialLimiterSettings);
+  setPresetButtonActive(savedPreset === "custom" ? null : savedPreset);
+  if (typeof window.updateVoicevoxLimiterSettings === "function") {
+    window.updateVoicevoxLimiterSettings(initialLimiterSettings);
+  }
+  setTimeout(drawLimiterGraph, 100);
+  window.addEventListener("resize", drawLimiterGraph);
+  document.querySelectorAll(".nav-tab, .tab-btn, button[data-tab]").forEach((tab) => {
+    tab.addEventListener("click", () => setTimeout(drawLimiterGraph, 80));
+  });
+  document.querySelectorAll("details").forEach((d) => {
+    d.addEventListener("toggle", () => setTimeout(drawLimiterGraph, 50));
+  });
 
   // イベントリスナー
   if (limiterToggle) {
@@ -494,6 +844,12 @@ window.updateAiLink = function updateAiLink() {
   if (limiterRatio) {
     limiterRatio.addEventListener("input", () => {
       if (limiterRatioVal) limiterRatioVal.textContent = limiterRatio.value;
+      saveAndApplyLimiter();
+    });
+  }
+  if (limiterGain) {
+    limiterGain.addEventListener("input", () => {
+      if (limiterGainVal) limiterGainVal.textContent = parseFloat(limiterGain.value).toFixed(1);
       saveAndApplyLimiter();
     });
   }
@@ -516,10 +872,10 @@ window.updateAiLink = function updateAiLink() {
     });
   }
 
-  if (btnPresetSafe) btnPresetSafe.addEventListener("click", () => applyPreset("safe", btnPresetSafe));
-  if (btnPresetBroadcast) btnPresetBroadcast.addEventListener("click", () => applyPreset("broadcast", btnPresetBroadcast));
-  if (btnPresetHard) btnPresetHard.addEventListener("click", () => applyPreset("hard", btnPresetHard));
-  if (btnLimiterReset) btnLimiterReset.addEventListener("click", () => applyPreset("safe", btnPresetSafe));
+  if (btnPresetSafe) btnPresetSafe.addEventListener("click", () => applyPreset("safe"));
+  if (btnPresetBroadcast) btnPresetBroadcast.addEventListener("click", () => applyPreset("broadcast"));
+  if (btnPresetHard) btnPresetHard.addEventListener("click", () => applyPreset("hard"));
+  if (btnLimiterReset) btnLimiterReset.addEventListener("click", () => applyPreset("safe"));
 
   window.seVolumeSlider = document.getElementById("se-volume-slider");
   window.seVolumeVal = document.getElementById("se-volume-val");

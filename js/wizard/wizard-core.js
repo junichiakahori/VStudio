@@ -79,6 +79,12 @@
 
   // Step 2: サーバー状態・システム健全性確認
   async function checkSystemHealth() {
+    const isDev = (window.location && window.location.port === "8444");
+    const labelLocal = document.getElementById("label-status-local-api");
+    if (labelLocal) labelLocal.textContent = `Local API サーバー (port ${isDev ? 8002 : 8001})`;
+    const labelYt = document.getElementById("label-status-yt-server");
+    if (labelYt) labelYt.textContent = `YouTube コメントサーバー (port ${isDev ? 8778 : 8768})`;
+
     // Local API
     const elLocal = document.getElementById("status-local-api");
     try {
@@ -175,7 +181,8 @@
       } catch(e) {}
 
       if (!isUp) {
-        const wsTest = new WebSocket("ws://localhost:8768");
+        const wsPort = (window.location && window.location.port === "8444") ? 8778 : 8768;
+        const wsTest = new WebSocket(`ws://localhost:${wsPort}`);
         isUp = await new Promise((resolve) => {
           wsTest.onopen = () => { wsTest.close(); resolve(true); };
           wsTest.onerror = () => { resolve(false); };
@@ -253,23 +260,14 @@
       try {
         if (window.openerWin && window.openerWin.newsAudioPlayer && typeof window.openerWin.newsAudioPlayer.playSE === "function") {
           window.openerWin.newsAudioPlayer.playSE("放送開始チャイム");
+        } else {
+          const audio = new Audio("/se/%E6%94%BE%E9%80%81%E9%96%8B%E5%A7%8B%E3%83%81%E3%83%A3%E3%82%A4%E3%83%A0.mp3");
+          audio.volume = 0.8;
+          audio.play().catch(() => {});
         }
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        if (ctx.state === "suspended") await ctx.resume();
-        const res = await fetch("/se/%E6%94%BE%E9%80%81%E9%96%8B%E5%A7%8B%E3%83%81%E3%83%A3%E3%82%A4%E3%83%A0.mp3");
-        const buf = await res.arrayBuffer();
-        const audioBuf = await ctx.decodeAudioData(buf);
-        const src = ctx.createBufferSource();
-        src.buffer = audioBuf;
-        src.connect(ctx.destination);
-        src.start(0);
         console.log("[Wizard] ✅ チャイム試聴の再生を開始しました");
       } catch(e) {
         console.warn("[Wizard] チャイム再生エラー:", e);
-        try {
-          const audio = new Audio("/se/%E6%94%BE%E9%80%81%E9%96%8B%E5%A7%8B%E3%83%81%E3%83%A3%E3%82%A4%E3%83%A0.mp3");
-          audio.play();
-        } catch(err) {}
       }
       setTimeout(() => { if (btn) btn.textContent = "🔔 チャイム試聴"; }, 2500);
     });
@@ -281,44 +279,54 @@
         window.showWizardToast("🗣️ 音声テストを再生中...");
       }
 
-      const msg = "音声のテスト発声です。正常に出力されていますにゃ。";
-      let played = false;
+      // キャラクター判定
+      let charId = "";
+      let speakerId = 1;
+      if (window.openerWin && window.openerWin.currentModelId) {
+        charId = window.openerWin.currentModelId;
+        if (charId.includes("zunda")) speakerId = 3;
+      }
+      const msg = charId.includes("zunda")
+        ? "マイクとボイスのテストなのだ！準備万端なのだ！"
+        : "音声のテスト発声です。正常に出力されていますにゃ。";
 
-      // 1. 親ウィンドウでの再生を試みる
+      // 親ウィンドウが存在する場合は親ウィンドウ側のアバター口パク＆音声出力に一本化（二重再生防止）
+      let playedByOpener = false;
       try {
         if (window.openerWin && typeof window.openerWin.queueVoicevoxAudio === "function") {
           if (typeof window.openerWin.getVoicevoxAudioContext === "function") {
             const opCtx = window.openerWin.getVoicevoxAudioContext();
-            if (opCtx && opCtx.state === "suspended") opCtx.resume().catch(()=>{});
+            if (opCtx && (opCtx.state === "suspended" || opCtx.state === "interrupted")) {
+              opCtx.resume().catch(() => {});
+            }
           }
-          const charId = window.openerWin.currentModelId || "";
-          const customMsg = charId.includes("zunda")
-            ? "マイクとボイスのテストなのだ！準備万端なのだ！"
-            : msg;
-          window.openerWin.queueVoicevoxAudio(customMsg, true).catch(e => console.warn(e));
-          played = true;
+          window.openerWin.queueVoicevoxAudio(msg, false, null, true, true).catch(e => console.warn(e));
+          playedByOpener = true;
+          console.log("[Wizard] ✅ 親画面側で音声テストを再生しました（単一再生）");
         }
       } catch (e) {
-        console.warn("[Wizard] 親画面での音声テスト再生エラー:", e);
+        console.warn("[Wizard] 親画面での音声テスト連携エラー:", e);
       }
 
-      // 2. 親画面で再生できない、または直接ウィザード側でも音声を鳴らすフォールバック
-      if (!played) {
+      // 親画面が存在しない単独起動時のみ、ウィザード側で直接フォールバック再生
+      if (!playedByOpener) {
         try {
           const synthRes = await fetch("/api/voicevox/synthesize", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: msg, speakerId: 1 })
+            body: JSON.stringify({ text: msg, speakerId: speakerId })
           });
           if (synthRes.ok) {
             const buf = await synthRes.arrayBuffer();
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            const ctx = new AudioCtx();
             if (ctx.state === "suspended") await ctx.resume();
             const audioBuf = await ctx.decodeAudioData(buf);
             const src = ctx.createBufferSource();
             src.buffer = audioBuf;
             src.connect(ctx.destination);
             src.start(0);
+            console.log("[Wizard] ✅ 単独モード直接音声テスト再生成功！");
           }
         } catch (err) {
           console.warn("[Wizard] ウィザード直接音声テストエラー:", err);

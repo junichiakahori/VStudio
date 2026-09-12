@@ -2,11 +2,11 @@
 set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
-APP_NAME="VStudio.app"
+APP_NAME="VStudio Dev.app"
 APP_DIR="$DIR/$APP_NAME"
 
 echo "================================================="
-echo "🔨 Building Native VStudio.app (Dedicated Window)..."
+echo "🔨 Building Native VStudio Dev.app (Dedicated Window)..."
 echo "================================================="
 
 # 1. Generate icon if not present
@@ -30,17 +30,17 @@ cat << 'EOF' > "$APP_DIR/Contents/Info.plist"
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>VStudio</string>
+    <string>VStudioDev</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>com.vstudio.app</string>
+    <string>com.vstudio.dev.app</string>
     <key>CFBundleName</key>
-    <string>VStudio</string>
+    <string>VStudio Dev</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>2.0</string>
+    <string>2.0-dev</string>
     <key>CFBundleVersion</key>
     <string>2</string>
     <key>LSMinimumSystemVersion</key>
@@ -65,22 +65,22 @@ cat << 'EOF' > "$APP_DIR/Contents/Info.plist"
 EOF
 
 # 5. Compile Swift Native App Binary
-echo "⚡ Compiling Swift Native Dedicated App..."
+echo "⚡ Compiling Swift Native Dedicated App (Dev)..."
 swiftc "$DIR/src_native/main.swift" \
     -O \
     -target arm64-apple-macos11.3 \
     -framework Cocoa \
     -framework WebKit \
     -framework UniformTypeIdentifiers \
-    -o "$APP_DIR/Contents/MacOS/VStudio"
+    -o "$APP_DIR/Contents/MacOS/VStudioDev"
 
 # 6. Create Desktop Shortcut / Copy
-DESKTOP_PATH="$HOME/Desktop/VStudio.app"
+DESKTOP_PATH="$HOME/Desktop/VStudio Dev.app"
 rm -rf "$DESKTOP_PATH"
 cp -R "$APP_DIR" "$DESKTOP_PATH"
 
 echo "================================================="
-echo "🎉 専用画面付き VStudio.app のビルドが完了しました！"
+echo "🎉 専用画面付き VStudio Dev.app のビルドが完了しました！"
 echo "📁 アプリの場所: $APP_DIR"
 echo "🖥️ デスクトップにも配置しました: $DESKTOP_PATH"
 echo "================================================="

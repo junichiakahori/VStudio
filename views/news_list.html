@@ -330,6 +330,28 @@
         </div>
     </header>
 
+    <!-- 原稿一括事前生成バー -->
+    <div id="batch-gen-panel" style="background: rgba(16, 24, 40, 0.7); border: 1px solid rgba(0, 210, 211, 0.25); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+        <div style="flex: 1; min-width: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <span id="batch-gen-label" style="font-size: 0.8rem; font-weight: 600; color: #81ecec;">📝 原稿事前生成: 待機中</span>
+                <span id="batch-gen-stats" style="font-size: 0.75rem; color: #94a3b8;">0 / 0 件 (0%)</span>
+            </div>
+            <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                <div id="batch-gen-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #00d2d3, #00e676); transition: width 0.3s ease;"></div>
+            </div>
+            <div id="batch-gen-current-title" style="font-size: 0.72rem; color: #64748b; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
+        </div>
+        <div style="display: flex; gap: 6px; flex-shrink: 0;">
+            <button id="batch-gen-start-btn" class="action-btn" style="background: linear-gradient(135deg, rgba(0, 210, 211, 0.2), rgba(0, 230, 118, 0.2)); border-color: #00d2d3; color: #81ecec;" onclick="handleBatchGenToggle()">
+                ▶️ 一括生成
+            </button>
+            <button id="batch-gen-stop-btn" class="action-btn" style="display: none; background: rgba(255, 71, 87, 0.15); border-color: #ff4757; color: #ff6b81;" onclick="handleBatchGenStop()">
+                ⏹️ 中止
+            </button>
+        </div>
+    </div>
+
     <div id="news-list-container">
         <div class="empty-state">
             <div class="empty-icon">⏳</div>
@@ -337,9 +359,10 @@
         </div>
     </div>
 
-    <!-- ニュース取得＆メディア正規化モジュール -->
-    <script src="/js/news/news-media-resolver.js?v=21.5"></script>
-    <script src="/js/news/news-fetcher.js?v=21.4"></script>
+    <!-- ニュース取得＆メディア正規化＆事前生成モジュール -->
+    <script src="/js/news/news-media-resolver.js?v=21.9"></script>
+    <script src="/js/news/news-fetcher.js?v=22.2"></script>
+    <script src="/js/news/news-batch-generator.js?v=21.9"></script>
 
     <script>
         const CATEGORY_NAMES = {
@@ -609,7 +632,7 @@
                 btn.innerHTML = "⏳ 抽出中...";
             }
             const params = getNewsFilterParams();
-            logDiag(`🔄 更新ボタンが押されました。配信条件 (${params.startDate} 〜 ${params.endDate}) で262件を抽出します...`);
+            logDiag(`🔄 手動更新が要求されました。配信条件 (${params.startDate} 〜 ${params.endDate}) で最新ニュースを抽出します...`);
             try {
                 if (typeof window.fetchNewsWithOptions === "function") {
                     const freshItems = await window.fetchNewsWithOptions(params.cat, params.maxCount, params.startDate, params.endDate);
@@ -628,27 +651,81 @@
             }
         }
 
-        // 初期化 & 定期更新（別ウィンドウの変更を自動同期）
+        // 初期化 & 定期更新（親画面や別ウィンドウの変更を自動同期）
         renderNewsList();
         setInterval(renderNewsList, 2500);
 
-        // 配信対象ニュース（262件）の自動抽出・描画
-        (async function autoHealNews() {
-            const current = getSortedNews();
-            if (!current || current.length > 500 || current.length < 200) {
-                const params = getNewsFilterParams();
-                logDiag(`⚠️ 保持ニュースが${current.length}件のため、配信条件 (${params.startDate} 〜 ${params.endDate}) で262件を抽出します...`);
-                try {
-                    if (typeof window.fetchNewsWithOptions === "function") {
-                        const fresh = await window.fetchNewsWithOptions(params.cat, params.maxCount, params.startDate, params.endDate);
-                        logDiag(`🎉 抽出完了: 全 ${fresh.length} 件を保持しました`);
-                        renderNewsList();
-                    }
-                } catch (e) {
-                    logDiag(`自動抽出エラー: ${e.message}`, "warn");
-                }
+        // 原稿一括事前生成 UI 制御（ルール18準拠: alert完全排除）
+        function updateBatchGenUI(status) {
+            const label = document.getElementById("batch-gen-label");
+            const stats = document.getElementById("batch-gen-stats");
+            const bar = document.getElementById("batch-gen-progress-bar");
+            const curTitle = document.getElementById("batch-gen-current-title");
+            const startBtn = document.getElementById("batch-gen-start-btn");
+            const stopBtn = document.getElementById("batch-gen-stop-btn");
+
+            if (!label || !stats || !bar || !startBtn || !stopBtn) return;
+
+            stats.textContent = `${status.completed} / ${status.total} 件 (${status.percent}%)`;
+            bar.style.width = `${status.percent}%`;
+            curTitle.textContent = status.currentTitle ? `生成中: ${status.currentTitle}` : "";
+
+            if (status.state === "running") {
+                label.textContent = "📝 原稿事前生成: 実行中...";
+                label.style.color = "#00e676";
+                startBtn.textContent = "⏸️ 一時停止";
+                startBtn.style.display = "inline-flex";
+                stopBtn.style.display = "inline-flex";
+            } else if (status.state === "paused") {
+                label.textContent = "📝 原稿事前生成: 一時停止中";
+                label.style.color = "#ffeaa7";
+                startBtn.textContent = "▶️ 再開";
+                startBtn.style.display = "inline-flex";
+                stopBtn.style.display = "inline-flex";
+            } else if (status.state === "completed") {
+                label.textContent = "📝 原稿事前生成: 全件完了！";
+                label.style.color = "#00d2d3";
+                curTitle.textContent = "🎉 すべての記事の原稿事前生成が完了しました！";
+                startBtn.textContent = "▶️ 再生成";
+                startBtn.style.display = "inline-flex";
+                stopBtn.style.display = "none";
+            } else {
+                label.textContent = "📝 原稿事前生成: 待機中";
+                label.style.color = "#81ecec";
+                startBtn.textContent = "▶️ 一括生成";
+                startBtn.style.display = "inline-flex";
+                stopBtn.style.display = "none";
             }
-        })();
+        }
+
+        if (window.NewsBatchGenerator) {
+            window.NewsBatchGenerator.addListener((event, status) => {
+                updateBatchGenUI(status);
+            });
+        }
+
+        function handleBatchGenToggle() {
+            if (!window.NewsBatchGenerator) return;
+            const status = window.NewsBatchGenerator.getStatus();
+            if (status.state === "running") {
+                window.NewsBatchGenerator.pause();
+            } else if (status.state === "paused") {
+                window.NewsBatchGenerator.resume();
+            } else {
+                const items = getSortedNews();
+                if (!items || items.length === 0) {
+                    const curTitle = document.getElementById("batch-gen-current-title");
+                    if (curTitle) curTitle.textContent = "⚠️ ニュース記事がありません。先に更新ボタンを押してください。";
+                    return;
+                }
+                window.NewsBatchGenerator.start(items);
+            }
+        }
+
+        function handleBatchGenStop() {
+            if (!window.NewsBatchGenerator) return;
+            window.NewsBatchGenerator.stop();
+        }
     </script>
 </body>
 </html>

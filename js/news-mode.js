@@ -14,9 +14,15 @@
     console.log(`[UI] 🔢 ${inputId} を ${current} ➔ ${next} に変更しました`);
   };
 
-console.log("[news-mode.js] 🌟 スクリプトファイルが正常に実行開始されました (v22.16)");
-// 安全な遅延バインド
+let _lastNewsBroadcastTriggerTime = 0;
+// 安全な遅延バインド ＆ 短時間重複実行防止
 window.startNewsBroadcast = async function(startIndex = 0, items = null, isFromNewsList = false) {
+  const now = Date.now();
+  if (now - _lastNewsBroadcastTriggerTime < 1200) {
+    console.warn("[ニュース番組] ⚠️ 短時間での多重呼び出しを抑止しました (1200ms以内)");
+    return;
+  }
+  _lastNewsBroadcastTriggerTime = now;
   if (typeof window._executeNewsBroadcast === "function") {
     return await window._executeNewsBroadcast(startIndex, items, isFromNewsList);
   }
@@ -263,15 +269,49 @@ function getNewsConfig() {
     }
   }
 
-  const preloadedNewsMap = new Map(); // value: { promise, abort }
-
-  function triggerNewsPrefetch(item, isFirst = false, isCategoryChanged = false) {
-    if (!item || !item.title || preloadedNewsMap.has(item.title)) return;
-    // 先読みが既に1件進行中なら新規先読みを開始しない（Ollama多重並列防止）
-    if (preloadedNewsMap.size >= 1) {
-      console.log(`[ニュース先読み] ⏸ 先読み処理が進行中のためスキップ (${item.title.substring(0, 20)}...)`);
-      return;
+  // 🛡️ API通信ヘルパー（Viteリバースプロキシ停止時の直結フォールバック付き）
+  async function safeFetchNewsApi(endpoint, payload, signal) {
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: signal
+      });
+      if (res && res.ok) return res;
+      throw new Error(`Proxy status: ${res ? res.status : 'null'}`);
+    } catch (err) {
+      if (signal && signal.aborted) throw err;
+      const fallbackPort = (window.location && window.location.port === "8444") ? "8002" : "8001";
+      console.warn(`[ニュース通信] ⚠️ 相対パス (${endpoint}) 接続エラー ➔ http://localhost:${fallbackPort}${endpoint} へ直結フォールバック試行:`, err && err.message ? err.message : err);
+      try {
+        const directRes = await fetch(`http://localhost:${fallbackPort}${endpoint}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: signal
+        });
+        if (directRes && directRes.ok) {
+          console.log(`[ニュース通信] ✅ Local API (:${fallbackPort}) への直結通信に成功しました！`);
+          return directRes;
+        }
+      } catch (directErr) {
+        console.warn(`[ニュース通信] ❌ 直結フォールバックも失敗:`, directErr && directErr.message ? directErr.message : directErr);
+      }
+      throw err;
     }
+  }
+
+  const preloadedNewsMap = new Map(); // value: { promise, abort }
+  const consumedNewsTitles = new Set(); // 再生完了・消費済み記事
+  let isPrefetchWorkerRunning = false;
+
+  async function executeNewsPrefetch(item, isFirst = false, isCategoryChanged = false) {
+    if (!item || !item.title) return null;
+    if (preloadedNewsMap.has(item.title)) {
+      return preloadedNewsMap.get(item.title).promise;
+    }
+
     const apiKeyInput = document.getElementById("ai-api-key");
     const providerSelect = document.getElementById("ai-provider-select");
     const modelInput = document.getElementById("ai-model-input");
@@ -299,6 +339,8 @@ function getNewsConfig() {
       description: plainDesc,
       url: item.link || "",
       categoryName: item.categoryName || "",
+      pubDate: item.pubDate || "",
+      source: item.publisher || item.source || "",
       modelId: window.currentModelId || "hiyori",
       isFirst: isFirst,
       isCategoryChanged: isCategoryChanged,
@@ -309,31 +351,54 @@ function getNewsConfig() {
       totalArticles: totalCnt
     };
 
+    const controller = new AbortController();
     const promise = (async () => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 180000); // 先読みは180秒まで待機
+      const timeoutId = setTimeout(() => controller.abort(), 600000); // 最大10分待機（無限リトライ対応）
       try {
-
-
-        console.log(`[ニュース先読み] 🚀 次の記事「${item.title.substring(0, 20)}...」🔗 ${item.link || 'URLなし'} を先行生成中...`);
-        const res = await fetch("/api/news/generate_item_script", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          signal: controller.signal
-        });
+        console.log(`[ニュース先読み] 🚀 原稿先行生成中:「${item.title.substring(0, 20)}...」🔗 ${item.link || 'URLなし'}`);
+        const res = await safeFetchNewsApi("/api/news/generate_item_script", payload, controller.signal);
         clearTimeout(timeoutId);
         if (!res.ok) throw new Error("HTTP " + res.status);
         const data = await res.json();
         if (data && data.status === "ok") {
           console.log(`[ニュース先読み] ✅ 先行生成完了:「${item.title.substring(0, 20)}...」`);
-          // 🚀 最初の文の音声もバックグラウンドで事前合成（記事切り替えラグを0.0秒化）
+          // 🚀 見出し音声＆本文第1文の音声をバックグラウンドで事前合成（記事切り替えラグを0.0秒化）
           try {
-            const firstSentence = (data.items && data.items[0])
-              ? (data.items[0].speech || data.items[0].display)
-              : ((data.sentences && data.sentences[0]) || null);
-            if (firstSentence && typeof window.preloadVoicevoxSentenceAudio === "function") {
-              window.preloadVoicevoxSentenceAudio(firstSentence);
+            const hlText = cleanTitleForSpeech(item);
+            if (hlText && typeof window.preloadVoicevoxSentenceAudio === "function") {
+              let speakHl = "";
+              const mediaMatch = hlText.match(/[（\(]([^）\)]*より)[）\)]/);
+              const mediaSuffix = mediaMatch ? `、${mediaMatch[1]}` : "";
+              if (data && data.headline && data.headline.speech) {
+                speakHl = data.headline.speech + mediaSuffix;
+              } else if (data && data.headline_speech) {
+                speakHl = data.headline_speech + mediaSuffix;
+              } else {
+                speakHl = hlText.replace(/[（\(]([^）\)]*より)[）\)]/g, "、$1");
+              }
+              // 🛡️ 見出しには「にゃ」「のだ」を付けない（客観的見出しのため切除）
+              speakHl = speakHl.replace(/(?:です|だ|だった|された|した|ある|いる|なる|こと)?[\s　]*(?:とろろ)?(?:にゃ|のだ|なのだ)[！!。？?\s　]*(?=、[^、]*より|$)/g, "");
+              speakHl = speakHl.replace(/[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*(?=、[^、]*より|$)/g, "");
+              window.preloadVoicevoxSentenceAudio(speakHl);
+            }
+            // 🚀 本文の全文をバックグラウンドで事前合成（1文ずつ順次合成してキュー詰まり・タイムアウトを完全防止）
+            const allSentences = (data.items || []).map(it => it.speech || it.display).filter(Boolean);
+            if (allSentences.length > 0 && typeof window.preloadVoicevoxSentenceAudio === "function") {
+              (async () => {
+                for (const s of allSentences) {
+                  try {
+                    await window.preloadVoicevoxSentenceAudio(s);
+                  } catch (e) {}
+                }
+              })();
+            } else if (data.sentences && Array.isArray(data.sentences) && typeof window.preloadVoicevoxSentenceAudio === "function") {
+              (async () => {
+                for (const s of data.sentences) {
+                  try {
+                    await window.preloadVoicevoxSentenceAudio(s);
+                  } catch (e) {}
+                }
+              })();
             }
           } catch (audioPreloadErr) { }
           return data;
@@ -348,9 +413,91 @@ function getNewsConfig() {
 
     // {promise, abort} ペアを保存することで、タイムアウト時に幽霊リクエストをキャンセル可能にする
     preloadedNewsMap.set(item.title, { promise, abort: () => controller.abort() });
+    return promise;
   }
 
+  const CATEGORY_ORDER = ["cat_top", "cat_society", "cat_world", "cat_business", "cat_politics", "cat_entertainment", "cat_sports", "cat_tech", "cat_science", "cat_local"];
 
+  function sortNewsItemsByBroadcastOrder(items) {
+    if (!Array.isArray(items)) return [];
+    return [...items].sort((a, b) => {
+      const ai = CATEGORY_ORDER.indexOf(a.categoryKey || "cat_top");
+      const bi = CATEGORY_ORDER.indexOf(b.categoryKey || "cat_top");
+      const catDiff = (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      if (catDiff !== 0) return catDiff;
+      const dateA = new Date(a.pubDate || 0).getTime();
+      const dateB = new Date(b.pubDate || 0).getTime();
+      return dateA - dateB;
+    });
+  }
+  window.sortNewsItemsByBroadcastOrder = sortNewsItemsByBroadcastOrder;
+
+  /**
+   * 🔄 バックグラウンド先読みワーカー
+   * 💡 重要: 全159記事を巡回してVOICEVOXをパンクさせる過剰先読みを恒久禁止！
+   * 常に「次の1記事（直近の次記事）」のみを先読みプールし、最大プール数を1件に厳格制限する。
+   */
+  async function startBackgroundNewsPrefetcher() {
+    if (isPrefetchWorkerRunning) return;
+    let currentList = window.latestFetchedNews || [];
+    if (!currentList || currentList.length === 0) return;
+
+    // 💡 放送順（カテゴリ順＋時系列順）と100%完全同期して先読みを実行
+    currentList = sortNewsItemsByBroadcastOrder(currentList);
+    window.latestFetchedNews = currentList;
+
+    // 🛡️ プール上限ガード: 未消費の先読みが既に3件以上あれば、それ以上は一切先読みしない
+    // 💡 準備中は「第1記事目」「第2記事目」「第3記事目」の最大3件まで先行プールを許可
+    if (preloadedNewsMap.size >= 3) {
+      return;
+    }
+
+    isPrefetchWorkerRunning = true;
+    try {
+      let targetIdx = -1;
+      const isRunning = (typeof newsBroadcastState !== "undefined" && newsBroadcastState.isRunning);
+
+      if (isRunning && newsBroadcastState.currentIndex > 0) {
+        // 放送進行中: 現在再生中の次の記事（currentIndexは1-basedなので配列上はcurrentIndex番目）
+        targetIdx = newsBroadcastState.currentIndex;
+      } else {
+        // 放送準備中: 第1記事(0), 第2記事(1), 第3記事(2) を順番に先読みして序盤の待ち時間を恒久ゼロ化
+        if (currentList[0] && !preloadedNewsMap.has(currentList[0].title) && !consumedNewsTitles.has(currentList[0].title)) {
+          targetIdx = 0;
+        } else if (currentList[1] && !preloadedNewsMap.has(currentList[1].title) && !consumedNewsTitles.has(currentList[1].title)) {
+          targetIdx = 1;
+        } else if (currentList[2] && !preloadedNewsMap.has(currentList[2].title) && !consumedNewsTitles.has(currentList[2].title)) {
+          targetIdx = 2;
+        }
+      }
+
+      if (targetIdx >= 0 && targetIdx < currentList.length) {
+        const targetItem = currentList[targetIdx];
+        if (targetItem && targetItem.title && !preloadedNewsMap.has(targetItem.title) && !consumedNewsTitles.has(targetItem.title)) {
+          const isFirst = (targetIdx === 0);
+          console.log(`[ニュース先読み] 🎯 ${isFirst ? '第1記事目' : '次記事'}をピンポイント先読み:「${targetItem.title.substring(0, 20)}...」`);
+          const prevCat = (targetIdx > 0 && currentList[targetIdx - 1]) ? currentList[targetIdx - 1].categoryName : "";
+          const isCatChanged = (targetItem.categoryName !== prevCat);
+          await executeNewsPrefetch(targetItem, isFirst, isCatChanged);
+        }
+      }
+    } catch (err) {
+      console.warn("[ニュース先読みワーカー] 停止またはエラー:", err);
+    } finally {
+      isPrefetchWorkerRunning = false;
+    }
+  }
+
+  function triggerNewsPrefetch(item, isFirst = false, isCategoryChanged = false) {
+    if (!item || !item.title) return;
+    if (preloadedNewsMap.size >= 3) return; // 既に3件プール中なら重複追加を防止
+    if (!preloadedNewsMap.has(item.title) && !consumedNewsTitles.has(item.title)) {
+      executeNewsPrefetch(item, isFirst, isCategoryChanged);
+    }
+  }
+
+  window.executeNewsPrefetch = executeNewsPrefetch;
+  window.startBackgroundNewsPrefetcher = startBackgroundNewsPrefetcher;
   window.triggerNewsPrefetch = triggerNewsPrefetch;
 
   /**
@@ -460,8 +607,9 @@ function getNewsConfig() {
 
   window.processNewsInterludeComments = processNewsInterludeComments;
 
-  async function readOneNewsItem(item, config, isCategoryChanged, isFirst, nextItem = null, nextIsCatChanged = false) {
+  async function readOneNewsItem(item, config, isCategoryChanged, isFirst, nextItem = null, nextIsCatChanged = false, expectedSessionId = null) {
     if (!newsBroadcastState.isRunning) return false;
+    if (expectedSessionId !== null && expectedSessionId !== window._currentNewsBroadcastSessionId) return false;
 
     const newsTitleEl = document.getElementById("news-article-title");
     const newsDescEl = document.getElementById("news-article-desc");
@@ -499,6 +647,8 @@ function getNewsConfig() {
       description: plainDesc,
       url: item.link || "",
       categoryName: item.categoryName || "",
+      pubDate: item.pubDate || "",
+      source: item.publisher || item.source || "",
       modelId: currentModelId,
       charDesc: charDescVal,
       isFirst: isFirst,
@@ -520,6 +670,7 @@ function getNewsConfig() {
       //    ※ 先読み進行中でも同じ promise をそのまま待ち、二重送信を完全排除する
       if (preloadedNewsMap.has(item.title)) {
         const cached = preloadedNewsMap.get(item.title);
+        consumedNewsTitles.add(item.title);
         preloadedNewsMap.delete(item.title);
         try {
           data = await cached.promise; // 先読みが完了するまでここで待つ（最大180秒）
@@ -546,14 +697,9 @@ function getNewsConfig() {
         if (apiKey || provider === "ollama") {
           console.log(`[ニュース進行] ⏳ [記事 #${newsBroadcastState.currentIndex}/${newsBroadcastState.totalCount}] AI原稿生成リクエスト送信中... 「${item.title.substring(0, 25)}...」 (${provider}: ${modelName})`);
           const fetchCtrl = new AbortController();
-          const fetchTimeout = setTimeout(() => fetchCtrl.abort(), 180000); // 通常フェッチは最大180秒待機（Ollama重負荷対応）
+          const fetchTimeout = setTimeout(() => fetchCtrl.abort(), 600000); // 通常フェッチは最大600秒(10分)待機（無限リトライ対応）
           try {
-            res = await fetch("/api/news/generate_item_script", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-              signal: fetchCtrl.signal
-            });
+            res = await safeFetchNewsApi("/api/news/generate_item_script", payload, fetchCtrl.signal);
             clearTimeout(fetchTimeout);
           } catch (netErr) {
             clearTimeout(fetchTimeout);
@@ -624,12 +770,28 @@ function getNewsConfig() {
 
         await queueVoicevoxAudio(transitionPhrase, true);
 
-        // 📰 ② 元記事タイトルをそのまま発話（見出しは文分割させず、字幕と音声で出典も明瞭に発話）
+        // 📰 ② 元記事タイトルを発話（字幕は綺麗に表示し、音声は記事本文の文脈を反映した高精度ルビで発話）
         if (item.title) {
           const headlineText = cleanTitleForSpeech(item);
           if (headlineText && headlineText.length >= 3 && !/^(ニュース|主要ニュース|トピックス)$/.test(headlineText)) {
-            console.log(`[原稿] [見出し] "${headlineText}"`);
-            const speakHeadline = headlineText.replace(/[（\(]([^）\)]*より)[）\)]/g, "、$1");
+            let mediaSuffix = "";
+            const mediaMatch = headlineText.match(/[（\(]([^）\)]*より)[）\)]/);
+            if (mediaMatch) {
+              mediaSuffix = `、${mediaMatch[1]}`;
+            }
+
+            let speakHeadline = "";
+            if (data && data.headline && data.headline.speech) {
+              speakHeadline = data.headline.speech + mediaSuffix;
+            } else if (data && data.headline_speech) {
+              speakHeadline = data.headline_speech + mediaSuffix;
+            } else {
+              speakHeadline = headlineText.replace(/[（\(]([^）\)]*より)[）\)]/g, "、$1");
+            }
+            // 🛡️ 見出しには「にゃ」「のだ」を付けない（客観的見出しのため切除）
+            speakHeadline = speakHeadline.replace(/(?:です|だ|だった|された|した|ある|いる|なる|こと)?[\s　]*(?:とろろ)?(?:にゃ|のだ|なのだ)[！!。？?\s　]*(?=、[^、]*より|$)/g, "");
+            speakHeadline = speakHeadline.replace(/[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*(?=、[^、]*より|$)/g, "");
+            console.log(`[原稿] [見出し] "${headlineText}" ➔ [音声] "${speakHeadline}"`);
             await queueVoicevoxAudio(headlineText, true, speakHeadline, false, true);
           }
         }
@@ -670,9 +832,18 @@ function getNewsConfig() {
         // VOICEVOXの読み上げが完全に終わるまで待機
         await waitForVoicevoxFinish();
 
+        // ☕ 記事読み上げ完了後の軽快で自然な「間（ポーズ）」（約0.4秒）
+        // 沈黙の空きすぎを防止し、ラジオのようにテンポよく次のニュースへ進行
+        if (newsBroadcastState.isRunning) {
+          await new Promise(r => setTimeout(r, 400));
+        }
+
         // 🎙️ 記事終了時に待機コメントがあればキャスターとして紹介＆返信！
         if (typeof processNewsInterludeComments === "function") {
           await processNewsInterludeComments();
+          if (newsBroadcastState.isRunning) {
+            await new Promise(r => setTimeout(r, 600));
+          }
         }
 
         // 既読マーク
@@ -688,12 +859,12 @@ function getNewsConfig() {
       // ▼▼▼ 異常発生時: ニュースは絶対に読まない！「しばらくお待ちください」待機画面に切り替え ▼▼▼
       console.warn("[ニュース番組] ⚠️ 異常検知（AI未応答・エラーまたはAPIキー未設定）。待機画面へ移行し復旧を待ちます...");
 
-      // 1. テロップを「しばらくお待ちください」待機画面へ切り替え
+      // 1. テロップを「原稿準備中」待機画面へ切り替え
       const newsArticleTitleEl = document.getElementById("news-article-title");
       const newsArticleDescEl = document.getElementById("news-article-desc");
-      if (newsArticleTitleEl) newsArticleTitleEl.textContent = "📡 通信状況を確認中...";
-      if (newsArticleDescEl) newsArticleDescEl.textContent = "原稿サーバーまたはネットワークの復旧を待機しています。しばらくお待ちください...";
-      if (catEl) catEl.textContent = "待機中";
+      if (newsArticleTitleEl) newsArticleTitleEl.textContent = "📰 最新情報を整理中...";
+      if (newsArticleDescEl) newsArticleDescEl.textContent = "次のニュースの原稿を準備しています。少々お待ちください...";
+      if (catEl) catEl.textContent = "原稿準備中";
       if (newsBoardEl) newsBoardEl.classList.add("active");
 
       // 2. 待機アナウンス（初回のみ発話）
@@ -702,8 +873,8 @@ function getNewsConfig() {
         const isZunda = ["zundamon", "zundamon_human"].includes(currentModelId);
         const isCat = ["tororo", "hijiki"].includes(currentModelId);
         const waitMsg = isZunda
-          ? "電波の状況を確認中なのだ。復旧までしばらくお待ちくださいなのだ！"
-          : (isCat ? "電波の状況を確認中ですにゃ。復旧までしばらくお待ちくださいにゃ！" : "通信状況を確認中です。復旧までしばらくお待ちください。");
+          ? "次のニュースの原稿を準備中なのだ！少々お待ちくださいなのだ！"
+          : (isCat ? "次のニュースの原稿を一生懸命まとめていますにゃ！少々お待ちくださいにゃ！" : "次のニュースの原稿を準備しています。少々お待ちください。");
 
         await queueVoicevoxAudio(waitMsg, true);
         await waitForVoicevoxFinish();
@@ -728,7 +899,12 @@ function getNewsConfig() {
   window.readOneNewsItem = readOneNewsItem;
 
   async function _executeNewsBroadcast(startIndex = 0, items = null, isFromNewsList = false) {
-    console.log(`[ニュース番組] 🚀 [STEP 1] startNewsBroadcast 呼び出し検知 (startIndex: ${startIndex}, isFromNewsList: ${isFromNewsList})`);
+    window._currentNewsBroadcastSessionId = (window._currentNewsBroadcastSessionId || 0) + 1;
+    const thisSessionId = window._currentNewsBroadcastSessionId;
+    if (startIndex === 0) {
+      consumedNewsTitles.clear();
+    }
+    console.log(`[ニュース番組] 🚀 [STEP 1] startNewsBroadcast 呼び出し検知 (Session: #${thisSessionId}, startIndex: ${startIndex}, isFromNewsList: ${isFromNewsList})`);
     try {
       if (newsBroadcastState.isRunning) {
         console.log(`[ニュース番組] 🚀 [STEP 1.1] 既存番組を安全に切り替えます (再開位置: #${startIndex + 1})`);
@@ -737,6 +913,10 @@ function getNewsConfig() {
           window.stopVoicevoxPlayback();
         }
         await new Promise(r => setTimeout(r, 400));
+        if (thisSessionId !== window._currentNewsBroadcastSessionId) {
+          console.log(`[ニュース番組] ⏹️ 世代交代（旧セッション #${thisSessionId}）を検知したため中断します`);
+          return;
+        }
       }
 
       const startBtn = document.getElementById("news-broadcast-start-btn");
@@ -760,17 +940,8 @@ function getNewsConfig() {
         return;
       }
 
-      // カテゴリ順 ＆ カテゴリ内は時系列順（古い順）にソート
-      const CATEGORY_ORDER = ["cat_top", "cat_society", "cat_world", "cat_business", "cat_politics", "cat_entertainment", "cat_sports", "cat_tech", "cat_science", "cat_local"];
-      const sortedNews = [...allNews].sort((a, b) => {
-        const ai = CATEGORY_ORDER.indexOf(a.categoryKey || "cat_top");
-        const bi = CATEGORY_ORDER.indexOf(b.categoryKey || "cat_top");
-        const catDiff = (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-        if (catDiff !== 0) return catDiff;
-        const dateA = new Date(a.pubDate || 0).getTime();
-        const dateB = new Date(b.pubDate || 0).getTime();
-        return dateA - dateB;
-      });
+      // カテゴリ順 ＆ カテゴリ内は時系列順（古い順）にソート（先読みワーカーと100%同一）
+      const sortedNews = sortNewsItemsByBroadcastOrder(allNews);
 
       // 保持ニュースを最新ソート済みリストで同期・永続化
       window.latestFetchedNews = sortedNews;
@@ -808,9 +979,19 @@ function getNewsConfig() {
         window.clearAllComments();
       }
 
-      // OBS配信状態の確認
-      const obsStreamToggle = document.getElementById("news-obs-auto-stream-toggle");
-      const isObsStreamEnabled = obsStreamToggle ? obsStreamToggle.checked : false;
+      // OBS配信状態の確認（DOM要素、localStorage、またはwindowプロパティから安全に解決）
+      const obsStreamToggle = document.getElementById("news-obs-auto-stream-toggle") || document.getElementById("obs-auto-start-toggle");
+      let isObsStreamEnabled = false;
+      if (obsStreamToggle) {
+        isObsStreamEnabled = obsStreamToggle.checked;
+      } else {
+        const savedObs = localStorage.getItem("savedObsStreamAutoStart");
+        if (savedObs !== null) {
+          isObsStreamEnabled = (savedObs === "true");
+        } else if (typeof window.isObsStreamAutoStart !== "undefined") {
+          isObsStreamEnabled = !!window.isObsStreamAutoStart;
+        }
+      }
 
       console.log(`[ニュース番組] 🚀 [STEP 3] OBS連携チェック (isObsStreamEnabled: ${isObsStreamEnabled})`);
       if (isObsStreamEnabled && typeof window.ensureObsStreamingStarted === "function") {
@@ -846,9 +1027,7 @@ function getNewsConfig() {
       console.log(`[ニュース番組] 🔄 カテゴリ切り替えSE: ${config.useTransition ? '有効' : '無効'}`);
       console.log("[ニュース番組] 📰 ==========================================");
 
-      console.log(`[ニュース番組] 🚀 [STEP 4] 設定取得完了: タイトル="${config.title}", OP="${config.op}", チャイム=${config.useOpChime}`);
-
-      preloadedNewsMap.clear();
+      // 💡 配信準備中に先読みしたキャッシュ（第1記事目など）は破棄せずそのまま活用
       if (startIndex < sortedNews.length) triggerNewsPrefetch(sortedNews[startIndex], startIndex === 0, false);
       if (startIndex + 1 < sortedNews.length) triggerNewsPrefetch(sortedNews[startIndex + 1], false, (sortedNews[startIndex + 1].categoryKey || "") !== (sortedNews[startIndex].categoryKey || ""));
 
@@ -864,6 +1043,10 @@ function getNewsConfig() {
         await queueVoicevoxAudio(config.op, true, config.op);
         console.log("[ニュース番組] 🚀 [STEP 7] オープニング音声終了待機中 (waitForVoicevoxFinish)...");
         await waitForVoicevoxFinish();
+        if (thisSessionId !== window._currentNewsBroadcastSessionId || !newsBroadcastState.isRunning) {
+          console.log(`[ニュース番組] ⏹️ 世代交代（旧セッション #${thisSessionId}）のためOP完了後に破棄します`);
+          return;
+        }
         console.log("[ニュース番組] 🚀 [STEP 8] オープニング挨拶完了！記事ループへ入ります");
         if (!newsBroadcastState.isRunning) return;
       }
@@ -871,7 +1054,10 @@ function getNewsConfig() {
       // ニュースループ
       const articleRetryCounter = {}; // 記事タイトルごとの外側リトライ回数（無限ループ防止）
       for (let i = startIndex; i < sortedNews.length; i++) {
-        if (!newsBroadcastState.isRunning) break;
+        if (thisSessionId !== window._currentNewsBroadcastSessionId || !newsBroadcastState.isRunning) {
+          console.log(`[ニュース番組] ⏹️ 世代交代（旧セッション #${thisSessionId}）を検知したためループを即時中断します`);
+          break;
+        }
         const item = sortedNews[i];
         const isFirst = (i === 0);
         const isCategoryChanged = (i > 0) && (item.categoryKey || "") !== newsBroadcastState.lastCategory;
@@ -895,11 +1081,16 @@ function getNewsConfig() {
           console.log(`[ニュース番組] 🚀 [STEP 9] カテゴリ切り替え検知: [${item.categoryName || item.categoryKey}] シーン切り替えSE再生`);
           await playSE("シーン切り替え1");
           await new Promise(r => setTimeout(r, 600));
+          if (thisSessionId !== window._currentNewsBroadcastSessionId || !newsBroadcastState.isRunning) break;
         }
 
-        console.log(`[ニュース番組] 🚀 [STEP 10] 記事 #${i + 1}/${sortedNews.length} 「${item.title}」の読み上げを開始します`);
+        console.log(`[ニュース番組] 🚀 [STEP 10] 記事 #${i + 1}/${sortedNews.length} 「${item.title}」の読み上げを開始します (Session: #${thisSessionId})`);
         const reader = window.readOneNewsItem || readOneNewsItem;
-        const success = await reader(item, config, isCategoryChanged, isFirst, nextItem, nextIsCatChanged);
+        const success = await reader(item, config, isCategoryChanged, isFirst, nextItem, nextIsCatChanged, thisSessionId);
+        if (thisSessionId !== window._currentNewsBroadcastSessionId || !newsBroadcastState.isRunning) {
+          console.log(`[ニュース番組] ⏹️ 世代交代（旧セッション #${thisSessionId}）のため記事読み上げ完了後に破棄します`);
+          break;
+        }
         if (!success && newsBroadcastState.isRunning) {
           const retryKey = item.title;
           articleRetryCounter[retryKey] = (articleRetryCounter[retryKey] || 0) + 1;
@@ -1345,3 +1536,90 @@ function getNewsConfig() {
     console.log(`[ニュース番組] 🚀 ロード待機キューから番組を即時自動開始します (startIndex: ${p.startIndex})`);
     _executeNewsBroadcast(p.startIndex, p.items, p.isFromNewsList);
   }
+
+  // =====================================================================
+  // 配信準備中からのバックグラウンド先読み自動キック（常時プール）
+  // =====================================================================
+  setTimeout(() => {
+    if (typeof window.startBackgroundNewsPrefetcher === "function" && window.latestFetchedNews && window.latestFetchedNews.length > 0) {
+      window.startBackgroundNewsPrefetcher();
+    }
+  }, 2500);
+
+  // =====================================================================
+  // ニュース原稿バックグラウンド事前生成 UI 制御（ui_panel 連携）
+  // =====================================================================
+  function updateUiPanelBatchGen(status) {
+    const label = document.getElementById("ui-batch-gen-label");
+    const stats = document.getElementById("ui-batch-gen-stats");
+    const bar = document.getElementById("ui-batch-gen-bar");
+    const mainBtn = document.getElementById("ui-batch-gen-main-btn");
+    const stopBtn = document.getElementById("ui-batch-gen-stop-btn");
+
+    if (!label || !stats || !bar || !mainBtn || !stopBtn) return;
+
+    stats.textContent = `${status.completed} / ${status.total} 件 (${status.percent}%)`;
+    bar.style.width = `${status.percent}%`;
+
+    if (status.state === "running") {
+      label.textContent = "📝 原稿事前生成: 実行中";
+      label.style.color = "#00e676";
+      mainBtn.textContent = "⏸️ 一時停止";
+      mainBtn.style.background = "rgba(255, 193, 7, 0.15)";
+      mainBtn.style.borderColor = "#ffc107";
+      mainBtn.style.color = "#ffeaa7";
+      stopBtn.disabled = false;
+    } else if (status.state === "paused") {
+      label.textContent = "📝 原稿事前生成: 一時停止中";
+      label.style.color = "#ffeaa7";
+      mainBtn.textContent = "▶️ 再開";
+      mainBtn.style.background = "rgba(0, 210, 211, 0.15)";
+      mainBtn.style.borderColor = "#00d2d3";
+      mainBtn.style.color = "#81ecec";
+      stopBtn.disabled = false;
+    } else if (status.state === "completed") {
+      label.textContent = "📝 原稿事前生成: 全件完了！";
+      label.style.color = "#00d2d3";
+      mainBtn.textContent = "▶️ 再生成";
+      mainBtn.style.background = "rgba(0, 210, 211, 0.15)";
+      mainBtn.style.borderColor = "#00d2d3";
+      mainBtn.style.color = "#81ecec";
+      stopBtn.disabled = true;
+    } else {
+      label.textContent = "📝 原稿事前生成";
+      label.style.color = "#81ecec";
+      mainBtn.textContent = "▶️ 事前生成";
+      mainBtn.style.background = "rgba(0, 210, 211, 0.15)";
+      mainBtn.style.borderColor = "#00d2d3";
+      mainBtn.style.color = "#81ecec";
+      stopBtn.disabled = true;
+    }
+  }
+
+  if (window.NewsBatchGenerator) {
+    window.NewsBatchGenerator.addListener((event, status) => {
+      updateUiPanelBatchGen(status);
+    });
+  }
+
+  window.toggleBatchGeneration = function() {
+    if (!window.NewsBatchGenerator) return;
+    const status = window.NewsBatchGenerator.getStatus();
+    if (status.state === "running") {
+      window.NewsBatchGenerator.pause();
+    } else if (status.state === "paused") {
+      window.NewsBatchGenerator.resume();
+    } else {
+      const items = window.latestFetchedNews || [];
+      if (!items || items.length === 0) {
+        console.warn("[原稿事前生成] ニュース記事が取得されていません。先に「ニュースを取得」してください。");
+        return;
+      }
+      window.NewsBatchGenerator.start(items);
+    }
+  };
+
+  window.stopBatchGeneration = function() {
+    if (!window.NewsBatchGenerator) return;
+    window.NewsBatchGenerator.stop();
+  };

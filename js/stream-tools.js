@@ -186,7 +186,7 @@
   async function updatePanelYtStatus() {
     if (!panelYtBadge) return;
     try {
-      const res = await fetch("http://localhost:8001/api/youtube/oauth_status", { cache: "no-store" });
+      const res = await fetch("/api/youtube/oauth_status", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         if (data.authenticated) {
@@ -216,7 +216,7 @@
       panelBtnCreate.textContent = "⏳ 作成中...";
       showPanelYtFeedback("YouTube枠を作成中...", true);
       try {
-        const res = await fetch("http://localhost:8001/api/youtube/create_broadcast", {
+        const res = await fetch("/api/youtube/create_broadcast", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title, description: desc, privacyStatus: "unlisted" })
@@ -275,7 +275,7 @@
       panelBtnUpdate.disabled = true;
       panelBtnUpdate.textContent = "⏳ 更新中...";
       try {
-        const res = await fetch("http://localhost:8001/api/youtube/update_broadcast", {
+        const res = await fetch("/api/youtube/update_broadcast", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ videoId, title, description: desc, scheduledStartTime: scheduledStartTime })
@@ -314,7 +314,7 @@
       panelBtnThumb.disabled = true;
       panelBtnThumb.textContent = "⏳ 送信中...";
       try {
-        const res = await fetch("http://localhost:8001/api/youtube/upload_thumbnail", {
+        const res = await fetch("/api/youtube/upload_thumbnail", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ videoId, imageData })

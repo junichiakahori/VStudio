@@ -105,12 +105,8 @@
                     style="background:var(--danger, #ff4444); color:#fff; border:none; font-size:0.8rem; padding:8px 4px; font-weight:bold; white-space:nowrap;">✕
                     解除（通常）</button>
             </div>
-            <div class="control-group"
-                style="margin-top:10px; display: flex; flex-direction: column; gap:5px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px;">
-                <label style="font-size: 0.8rem; color: var(--text-muted);">開始宣言ボイス (「配信準備中」解除時)</label>
-                <input type="text" id="stream-start-text" value="配信を開始しました！皆さんよろしくお願いします！"
-                    style="width:100%; box-sizing:border-box; padding:0.4rem; border-radius:4px; border:1px solid var(--border-neon); background:#1a1a2e; color:#fff; font-size:0.8rem;">
-            </div>
+            <!-- 配信準備中解除時の固定ボイスは番組本来の挨拶と重複するため廃止（非表示） -->
+            <input type="hidden" id="stream-start-text" value="">
             <div class="control-group"
                 style="margin-top:10px; display: flex; flex-direction: column; gap:6px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 6px;">
                 <label style="font-size: 0.8rem; font-weight: bold; color: var(--primary); white-space: nowrap; display: flex; align-items: center; gap: 4px;">
@@ -205,6 +201,85 @@
                 </div>
             </div>
         </div>
+        <!-- 🎚️ リアルタイム・オーディオレベルモニター -->
+        <div class="panel-section" data-tab="tab-audio">
+            <h3><span class="icon">🎚️</span>オーディオレベルモニター</h3>
+            <div class="audio-meter-panel-card">
+                <!-- 目盛りスケール -->
+                <div class="meter-scale-header">
+                    <span>-40</span>
+                    <span>-24</span>
+                    <span>-12</span>
+                    <span>-6</span>
+                    <span>0</span>
+                    <span style="color:#ff1744;">CLIP</span>
+                </div>
+
+                <!-- VOICE (声・効果音) -->
+                <div class="meter-channel-row">
+                    <span class="meter-ch-label">VOICE</span>
+                    <div class="meter-track">
+                        <div class="meter-fill" id="meter-voice-bar"></div>
+                        <div class="meter-peak-line" id="meter-voice-peak"></div>
+                    </div>
+                    <div class="meter-clip-led" id="meter-voice-clip" title="クリッピング検出"></div>
+                    <span class="meter-db-val" id="meter-voice-val">-∞</span>
+                </div>
+
+                <!-- BGM (音楽) -->
+                <div class="meter-channel-row">
+                    <span class="meter-ch-label">BGM</span>
+                    <div class="meter-track">
+                        <div class="meter-fill" id="meter-bgm-bar"></div>
+                        <div class="meter-peak-line" id="meter-bgm-peak"></div>
+                    </div>
+                    <div class="meter-clip-led" id="meter-bgm-clip" title="クリッピング検出"></div>
+                    <span class="meter-db-val" id="meter-bgm-val">-∞</span>
+                </div>
+
+                <!-- TOTAL (合算出力) -->
+                <div class="meter-channel-row" style="margin-top:7px; padding-top:5px; border-top:1px solid rgba(255,255,255,0.06);">
+                    <span class="meter-ch-label" style="color:var(--neon-cyan,#00f0ff);">TOTAL</span>
+                    <div class="meter-track">
+                        <div class="meter-fill" id="meter-master-bar"></div>
+                    </div>
+                    <div style="width:8px; height:8px; flex-shrink:0;"></div>
+                    <span class="meter-db-val" id="meter-master-val" style="color:var(--neon-cyan,#00f0ff);">-∞</span>
+                </div>
+
+                <!-- テストボタン (2列均等グリッド) -->
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; width:100%; box-sizing:border-box; margin-top:10px;">
+                    <button type="button" id="btn-audio-test-voice" class="btn" style="padding:5px 0; font-size:0.72rem; text-align:center; background:rgba(0,240,255,0.12); border:1px solid rgba(0,240,255,0.35); color:var(--neon-cyan,#00f0ff); border-radius:6px; cursor:pointer; width:100%; box-sizing:border-box; white-space:nowrap;">🎙️ 声テスト</button>
+                    <button type="button" id="btn-audio-test-bgm" class="btn" style="padding:5px 0; font-size:0.72rem; text-align:center; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.2); color:#ddd; border-radius:6px; cursor:pointer; width:100%; box-sizing:border-box; white-space:nowrap;">🎵 BGM試聴</button>
+                </div>
+
+                <!-- ⚡ 音声エンジン強制リセット＆修復ボタン (配信を邪魔しない完全サイレント修復) -->
+                <button type="button" id="btn-audio-hard-reset" class="btn" onclick="window.unlockAudioSystemSynchronously&&window.unlockAudioSystemSynchronously();window.hardResetAudioEngine&&window.hardResetAudioEngine();" style="margin-top:6px; padding:5px 0; font-size:0.72rem; text-align:center; background:linear-gradient(135deg, rgba(255,165,0,0.15), rgba(255,80,0,0.2)); border:1px solid rgba(255,140,0,0.45); color:#ffa502; border-radius:6px; cursor:pointer; width:100%; box-sizing:border-box; font-weight:600;" title="配信中に余計な音を一切乗せず、CoreAudioやWebKitの無音ハングを0.1秒でサイレント即時修復します">⚡ 音声エンジンを即時修復</button>
+
+                <!-- 画面上HUD表示トグルスイッチ -->
+                <div class="control-group" style="margin-top:10px; margin-bottom:0;">
+                    <label class="switch-label" style="margin-bottom:0;">
+                        <span style="font-size:0.75rem;">📺 配信画面にメーターを表示</span>
+                        <input type="checkbox" id="toggle-stream-audio-meter">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+
+                <!-- 💡 OBS音声トラブル解決アコーディオン -->
+                <details style="margin-top:10px; font-size:0.72rem; color:var(--text-muted); width:100%; box-sizing:border-box; border-top:1px dashed rgba(255,255,255,0.1); padding-top:6px;">
+                    <summary style="cursor:pointer; color:var(--neon-cyan,#00f0ff); font-weight:600; outline:none; user-select:none; padding:2px 0;">💡 OBSで音が出ないときは？</summary>
+                    <div style="margin-top:6px; line-height:1.45; background:rgba(0,0,0,0.3); padding:8px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
+                        <p style="margin:0 0 4px 0; font-weight:600; color:#fff;">① アプリのメーター確認</p>
+                        <p style="margin:0 0 6px 0;">上のメーターが振れていれば、アプリは正常に音声を出力しています。</p>
+                        <p style="margin:0 0 4px 0; font-weight:600; color:#fff;">② OBSのソース設定 (macOS)</p>
+                        <p style="margin:0 0 6px 0;">OBSのソースで「+」➔<strong>「macOS 音声キャプチャ」</strong>を追加し、対象アプリ（Safari または VStudio）を選択してください。</p>
+                        <p style="margin:0 0 4px 0; font-weight:600; color:#fff;">③ 音声ロック解除</p>
+                        <p style="margin:0;">Safariでは画面を1回クリックするまでブラウザの仕様で音声が停止状態になります。</p>
+                    </div>
+                </details>
+            </div>
+        </div>
+
         <div class="panel-section" data-tab="tab-audio">
             <h3><span class="icon">🎵</span>BGM設定</h3>
             <div class="control-group">
@@ -672,9 +747,18 @@
 
                 <!-- プリセットボタン (横幅に完全フィットする3列グリッド) -->
                 <div style="margin-top:8px; display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; width:100%; box-sizing:border-box;">
-                    <button type="button" id="btn-limiter-preset-safe" class="btn" style="padding:4px 0; font-size:0.68rem; text-align:center; background:rgba(0,243,255,0.18); border:1px solid rgba(0,243,255,0.4); color:var(--neon-cyan); border-radius:4px; cursor:pointer; width:100%; box-sizing:border-box; white-space:nowrap;" title="音割れのみを確実に防止（標準）">🛡️ 標準</button>
+                    <button type="button" id="btn-limiter-preset-safe" class="btn" style="padding:4px 0; font-size:0.68rem; text-align:center; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.2); color:#ddd; border-radius:4px; cursor:pointer; width:100%; box-sizing:border-box; white-space:nowrap;" title="音割れのみを確実に防止（標準）">🛡️ 標準</button>
                     <button type="button" id="btn-limiter-preset-broadcast" class="btn" style="padding:4px 0; font-size:0.68rem; text-align:center; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.2); color:#ddd; border-radius:4px; cursor:pointer; width:100%; box-sizing:border-box; white-space:nowrap;" title="全体の音量を均一に整える">🎙️ 配信</button>
                     <button type="button" id="btn-limiter-preset-hard" class="btn" style="padding:4px 0; font-size:0.68rem; text-align:center; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.2); color:#ddd; border-radius:4px; cursor:pointer; width:100%; box-sizing:border-box; white-space:nowrap;" title="大音量でも絶対に割らせない強力防衛">⚡ 強力</button>
+                </div>
+
+                <!-- 📊 入出力ダイナミクス特性グラフ (Transfer Curve) -->
+                <div style="margin-top:8px; position:relative; width:100%; height:96px; background:rgba(0,10,20,0.6); border:1px solid rgba(0,243,255,0.22); border-radius:6px; overflow:hidden; box-sizing:border-box;">
+                    <canvas id="limiter-graph-canvas" style="width:100%; height:100%; display:block;"></canvas>
+                    <div style="position:absolute; top:3px; left:6px; font-size:0.56rem; color:rgba(0,243,255,0.7); pointer-events:none; font-family:monospace; font-weight:600;">OUTPUT vs INPUT (dB)</div>
+                    <div id="limiter-graph-badge" style="position:absolute; top:3px; right:6px; font-size:0.56rem; color:#00f3ff; background:rgba(0,243,255,0.15); border:1px solid rgba(0,243,255,0.3); border-radius:3px; padding:1px 4px; pointer-events:none; font-family:monospace; font-weight:600;">🛡️ 標準</div>
+                    <div style="position:absolute; bottom:2px; left:6px; font-size:0.50rem; color:rgba(255,255,255,0.35); pointer-events:none; font-family:monospace;">-40dB</div>
+                    <div style="position:absolute; bottom:2px; right:6px; font-size:0.50rem; color:rgba(255,255,255,0.35); pointer-events:none; font-family:monospace;">0dB</div>
                 </div>
 
                 <!-- 詳細パラメータ開閉アコーディオン -->
@@ -694,6 +778,13 @@
                                 <span style="color:#00f3ff; font-weight:600;"><span id="limiter-ratio-val">20</span>:1</span>
                             </label>
                             <input type="range" id="limiter-ratio" min="1" max="20" value="20" step="1" style="width:100%;">
+                        </div>
+                        <div class="slider-container" style="margin:0; width:100%;">
+                            <label style="font-size:0.7rem; display:flex; justify-content:space-between; margin-bottom:2px;">
+                                <span>補償ゲイン (Makeup Gain)</span>
+                                <span style="color:#00f3ff; font-weight:600;">+<span id="limiter-gain-val">1.5</span> dB</span>
+                            </label>
+                            <input type="range" id="limiter-gain" min="0" max="15" value="1.5" step="0.5" style="width:100%;">
                         </div>
                         <div class="slider-container" style="margin:0; width:100%;">
                             <label style="font-size:0.7rem; display:flex; justify-content:space-between; margin-bottom:2px;">
@@ -805,6 +896,27 @@
                     <input type="checkbox" id="ai-idle-remake-toggle">
                     <span class="slider round"></span>
                 </label>
+            </div>
+        </div>
+
+        <div class="panel-section" data-tab="tab-audio" id="tts-rule-tuner-section">
+            <h3><span class="icon">🤖</span>AI読み上げチューナー</h3>
+            <div class="control-group" style="background:rgba(0,0,0,0.3); border:1px solid rgba(0,255,255,0.25); border-radius:8px; padding:10px; box-sizing:border-box; width:100%;">
+                <div style="font-size:0.75rem; color:#00ffff; font-weight:bold; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
+                    <span>⚡</span><span>誤読・読みの即時修正</span>
+                </div>
+                <p style="font-size:0.65rem; color:var(--text-muted); margin:0 0 6px 0; line-height:1.35;">
+                    「Aimerはエメ」「U-18 → アンダー・エイティーン」「超えをこえと読んで」など自由に入力してください。
+                </p>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    <input type="text" id="ai-rule-tuner-input" placeholder="例: Aimer は エメ / U-18 → アンダー・エイティーン"
+                        style="width:100%; box-sizing:border-box; background:rgba(0,0,0,0.5); border:1px solid var(--border-neon); border-radius:6px; padding:6px 8px; color:#fff; font-size:0.75rem; outline:none;">
+                    <button type="button" id="ai-rule-tuner-submit-btn" class="btn"
+                        style="width:100%; box-sizing:border-box; background:linear-gradient(135deg, #00d2d3, #00b894); color:#000; font-weight:bold; font-size:0.8rem; padding:6px; border-radius:6px; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">
+                        <span>⚡</span><span>AIでルールに即時反映</span>
+                    </button>
+                </div>
+                <div id="ai-rule-tuner-status" style="display:none; margin-top:6px; padding:4px 8px; border-radius:4px; font-size:0.68rem; line-height:1.3; box-sizing:border-box;"></div>
             </div>
         </div>
 
@@ -982,6 +1094,15 @@
                             style="font-size:1.15rem; color:#666; font-family:monospace; font-weight:bold; letter-spacing:1.5px; line-height:1.2; transition: color 0.3s ease;">
                             --:--:--</div>
                     </div>
+                    <!-- 配信準備中の解除待機秒数 -->
+                    <div
+                        style="margin-top:6px; background:rgba(0,0,0,0.25); border-radius:4px; padding:5px 8px; box-sizing:border-box; width:100%;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+                            <span style="font-size:0.68rem; color:var(--text-muted); white-space:nowrap;">⏱️ 準備中解除までの待機:</span>
+                            <span style="font-size:0.75rem; color:#00ffff; font-weight:bold;"><span id="local-schedule-wait-val">10</span>秒</span>
+                        </div>
+                        <input type="range" id="local-schedule-wait" min="3" max="60" value="10" step="1" style="width:100%; box-sizing:border-box; cursor:pointer;">
+                    </div>
                     <div id="local-schedule-desc-text"
                         style="font-size: 0.62rem; color: var(--text-muted); margin-top:5px; line-height:1.3;">
                         指定時刻にOBS配信・BGM・番組を自動スタートします。</div>
@@ -1026,7 +1147,7 @@
                         </select>
                     </div>
                 </div>
-                <input type="text" id="news-rss-url" value="https://www.nhk.or.jp/rss/news/cat0.xml"
+                <input type="text" id="news-rss-url" value="https://news.yahoo.co.jp/rss/topics/top-picks.xml"
                     placeholder="https://..."
                     style="display:none; width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-primary);font-size:0.75rem;outline:none;box-sizing:border-box;">
                 <p style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;">サイトによっては取得できない場合があります。</p>
@@ -1100,6 +1221,21 @@
                     1件読んで感想を言う</button>
             </div>
 
+            <!-- 原稿事前生成コンテナ（ルール1準拠: 幅260px対応） -->
+            <div id="news-batch-gen-container" style="margin-top:8px; padding:8px 10px; background:rgba(0,210,211,0.06); border:1px solid rgba(0,210,211,0.25); border-radius:6px; width:100%; box-sizing:border-box;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <span id="ui-batch-gen-label" style="font-size:0.75rem; font-weight:bold; color:#81ecec; white-space:nowrap;">📝 原稿事前生成</span>
+                    <span id="ui-batch-gen-stats" style="font-size:0.7rem; color:var(--text-muted);">待機中</span>
+                </div>
+                <div style="width:100%; height:5px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden; margin-bottom:6px;">
+                    <div id="ui-batch-gen-bar" style="width:0%; height:100%; background:linear-gradient(90deg, #00d2d3, #00e676); transition:width 0.3s ease;"></div>
+                </div>
+                <div id="ui-batch-gen-controls" style="display:grid; grid-template-columns:1fr 1fr; gap:6px; width:100%; box-sizing:border-box;">
+                    <button type="button" id="ui-batch-gen-main-btn" onclick="window.toggleBatchGeneration && window.toggleBatchGeneration()" class="btn" style="background:rgba(0,210,211,0.15); border:1px solid #00d2d3; color:#81ecec; padding:0.4rem; font-size:0.72rem; font-weight:bold; border-radius:4px; cursor:pointer; white-space:nowrap;">▶️ 事前生成</button>
+                    <button type="button" id="ui-batch-gen-stop-btn" onclick="window.stopBatchGeneration && window.stopBatchGeneration()" class="btn" style="background:rgba(255,71,87,0.12); border:1px solid rgba(255,71,87,0.4); color:#ff6b81; padding:0.4rem; font-size:0.72rem; font-weight:bold; border-radius:4px; cursor:pointer; white-space:nowrap;" disabled>⏹️ 中止</button>
+                </div>
+            </div>
+
             <!-- 番組設定ボタン -->
             <div class="control-group" style="margin-top:8px;">
                 <button id="news-script-btn" class="btn"
@@ -1143,6 +1279,19 @@
                         <button type="button" onclick="window.adjustNumberInput && window.adjustNumberInput('news-broadcast-start-index', 1, 1)" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:4px; color:#fff; font-size:0.85rem; width:26px; height:26px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-weight:bold;">＋</button>
                         <span style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap;">本目〜</span>
                     </div>
+                </div>
+
+                <!-- 配信準備中の解除待機秒数 -->
+                <div
+                    style="margin-bottom:8px; background:rgba(0,0,0,0.25); padding:6px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08); box-sizing:border-box; width:100%;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+                        <span style="font-size:0.72rem; color:var(--text-muted); white-space:nowrap;">⏱️ 準備中解除までの待機:</span>
+                        <span style="font-size:0.75rem; color:#00e676; font-weight:bold;"><span id="news-prepare-wait-val">10</span>秒</span>
+                    </div>
+                    <input type="range" id="news-prepare-wait" min="3" max="60" value="10" step="1" style="width:100%; box-sizing:border-box; cursor:pointer;">
+                    <p style="font-size:0.62rem; color:var(--text-muted); margin:2px 0 0 0; line-height:1.3;">
+                        ※予定時刻にOBS配信開始後、この秒数だけ準備中を維持して番組を開始します。
+                    </p>
                 </div>
 
                 <button id="news-broadcast-start-btn" class="btn"

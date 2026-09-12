@@ -10,6 +10,8 @@ import pickle
 import logging
 import datetime
 
+import threading
+
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
@@ -22,86 +24,143 @@ CLIENT_SECRET_PATH = os.path.join(BASE_DIR, 'config', 'client_secret.json')
 
 _cached_youtube_client = None
 _quota_exceeded_until = 0
+_youtube_api_lock = threading.RLock()
 
 def get_authenticated_service(force_reauth=False):
     """OAuth認証を行いYouTube APIクライアントを返す（エラー時はNone）"""
     global _cached_youtube_client, _quota_exceeded_until
-    if time.time() < _quota_exceeded_until:
-        return None
+    with _youtube_api_lock:
+        if time.time() < _quota_exceeded_until:
+            return None
 
-    if _cached_youtube_client and not force_reauth:
-        return _cached_youtube_client
+        if _cached_youtube_client and not force_reauth:
+            return _cached_youtube_client
 
-    creds = None
-    try:
-        if os.path.exists(TOKEN_PATH):
-            with open(TOKEN_PATH, 'rb') as token:
-                creds = pickle.load(token)
+        creds = None
+        try:
+            if os.path.exists(TOKEN_PATH):
+                with open(TOKEN_PATH, 'rb') as token:
+                    creds = pickle.load(token)
 
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                try:
-                    creds.refresh(Request())
-                    with open(TOKEN_PATH, 'wb') as token:
-                        pickle.dump(creds, token)
-                except Exception as e:
-                    logging.warning(f"[YouTube OAuth] Token refresh failed: {e}")
-                    if os.path.exists(TOKEN_PATH):
-                        os.remove(TOKEN_PATH)
+            if not creds or not creds.valid:
+                if creds and creds.expired and creds.refresh_token:
+                    try:
+                        creds.refresh(Request())
+                        with open(TOKEN_PATH, 'wb') as token:
+                            pickle.dump(creds, token)
+                    except Exception as e:
+                        logging.warning(f"[YouTube OAuth] Token refresh failed: {e}")
+                        if os.path.exists(TOKEN_PATH):
+                            os.remove(TOKEN_PATH)
+                        return None
+                else:
                     return None
-            else:
-                return None
 
-        _cached_youtube_client = build('youtube', 'v3', credentials=creds)
-        return _cached_youtube_client
+            _cached_youtube_client = build('youtube', 'v3', credentials=creds)
+            return _cached_youtube_client
+        except Exception as e:
+            logging.warning(f"[YouTube OAuth] Initialization failed: {e}")
+            return None
+
+CACHE_DIR = os.path.join(BASE_DIR, 'data')
+BROADCAST_CACHE_FILE = os.path.join(CACHE_DIR, 'cached_broadcasts.json')
+CHANNEL_CACHE_FILE = os.path.join(CACHE_DIR, 'cached_channel_info.json')
+
+def load_cached_channel():
+    if os.path.exists(CHANNEL_CACHE_FILE):
+        try:
+            with open(CHANNEL_CACHE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+def save_cached_channel(info):
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        with open(CHANNEL_CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(info, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        logging.warning(f"[YouTube OAuth] Initialization failed: {e}")
-        return None
+        logging.warning(f"[YouTube Cache] Failed to save channel cache: {e}")
+
+def load_cached_broadcasts():
+    if os.path.exists(BROADCAST_CACHE_FILE):
+        try:
+            with open(BROADCAST_CACHE_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get("items", [])
+        except Exception:
+            pass
+    return []
+
+def save_cached_broadcasts(items):
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        with open(BROADCAST_CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump({"updated_at": datetime.datetime.now().isoformat(), "items": items}, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logging.warning(f"[YouTube Cache] Failed to save broadcast cache: {e}")
 
 def get_oauth_status():
     """現在のOAuth認証状態およびチャンネル名を取得"""
     global _quota_exceeded_until
-    has_secret = os.path.exists(CLIENT_SECRET_PATH)
-    if time.time() < _quota_exceeded_until:
+    with _youtube_api_lock:
+        has_secret = os.path.exists(CLIENT_SECRET_PATH)
+        has_token = os.path.exists(TOKEN_PATH)
+        cached_ch = load_cached_channel()
+
+        if time.time() < _quota_exceeded_until:
+            return {
+                "authenticated": bool(has_token),
+                "has_client_secret": has_secret,
+                "channel_title": cached_ch.get("channel_title", ""),
+                "channel_id": cached_ch.get("channel_id", ""),
+                "quota_exceeded": True
+            }
+
+        service = get_authenticated_service()
+        if not service:
+            return {
+                "authenticated": bool(has_token),
+                "has_client_secret": has_secret,
+                "channel_title": cached_ch.get("channel_title", ""),
+                "channel_id": cached_ch.get("channel_id", ""),
+                "quota_exceeded": time.time() < _quota_exceeded_until
+            }
+        try:
+            res = service.channels().list(part="snippet,id", mine=True).execute()
+            if res.get("items"):
+                item = res["items"][0]
+                ch_info = {
+                    "authenticated": True,
+                    "has_client_secret": has_secret,
+                    "channel_title": item["snippet"]["title"],
+                    "channel_id": item["id"],
+                    "quota_exceeded": False
+                }
+                save_cached_channel(ch_info)
+                return ch_info
+        except Exception as e:
+            err_str = str(e)
+            if "quotaExceeded" in err_str or "quota" in err_str.lower():
+                _quota_exceeded_until = time.time() + 1800
+                logging.info("[YouTube OAuth] YouTube Data APIの1日クォータ上限に達したため、APIリクエストを30分間一時休止します")
+                return {
+                    "authenticated": bool(has_token),
+                    "has_client_secret": has_secret,
+                    "channel_title": cached_ch.get("channel_title", ""),
+                    "channel_id": cached_ch.get("channel_id", ""),
+                    "quota_exceeded": True
+                }
+            else:
+                logging.warning(f"[YouTube OAuth] Channels fetch failed: {e}")
         return {
             "authenticated": False,
             "has_client_secret": has_secret,
             "channel_title": "",
             "channel_id": "",
-            "quota_exceeded": True
+            "quota_exceeded": False
         }
-
-    service = get_authenticated_service()
-    if not service:
-        return {
-            "authenticated": False,
-            "has_client_secret": has_secret,
-            "channel_title": "",
-            "channel_id": ""
-        }
-    try:
-        res = service.channels().list(part="snippet,id", mine=True).execute()
-        if res.get("items"):
-            item = res["items"][0]
-            return {
-                "authenticated": True,
-                "has_client_secret": has_secret,
-                "channel_title": item["snippet"]["title"],
-                "channel_id": item["id"]
-            }
-    except Exception as e:
-        err_str = str(e)
-        if "quotaExceeded" in err_str or "quota" in err_str.lower():
-            _quota_exceeded_until = time.time() + 1800
-            logging.info("[YouTube OAuth] YouTube Data APIの1日クォータ上限に達したため、APIリクエストを30分間一時休止します")
-        else:
-            logging.warning(f"[YouTube OAuth] Channels fetch failed: {e}")
-    return {
-        "authenticated": False,
-        "has_client_secret": has_secret,
-        "channel_title": "",
-        "channel_id": ""
-    }
 
 
 def start_oauth_flow():
@@ -165,9 +224,10 @@ def ensure_future_start_time_iso(start_time_iso=None):
 
 def create_live_broadcast(title, description="", start_time_iso=None, privacy_status="unlisted"):
     """YouTube Live配信枠（予約枠）を新規作成し、ストリームにバインド"""
-    service = get_authenticated_service()
-    if not service:
-        raise ValueError("YouTube API未認証です。Googleアカウント連携を行ってください。")
+    with _youtube_api_lock:
+        service = get_authenticated_service()
+        if not service:
+            raise ValueError("YouTube API未認証です。Googleアカウント連携を行ってください。")
 
     # 過去時刻エラー（invalidScheduledStartTime 400）を100%防止する安全未来時刻化
     valid_start_time_iso = ensure_future_start_time_iso(start_time_iso)
@@ -244,9 +304,10 @@ def create_live_broadcast(title, description="", start_time_iso=None, privacy_st
 
 def update_live_broadcast(video_id, title=None, description=None, start_time_iso=None, privacy_status=None):
     """指定された動画ID / 配信枠のタイトル・概要欄・日時を更新"""
-    service = get_authenticated_service()
-    if not service:
-        raise ValueError("YouTube API未認証です。Googleアカウント連携を行ってください。")
+    with _youtube_api_lock:
+        service = get_authenticated_service()
+        if not service:
+            raise ValueError("YouTube API未認証です。Googleアカウント連携を行ってください。")
 
     # 1. まず liveBroadcasts として取得
     get_req = service.liveBroadcasts().list(
@@ -329,68 +390,115 @@ def update_live_broadcast(video_id, title=None, description=None, start_time_iso
 
 def upload_thumbnail(video_id, image_data):
     """配信枠にサムネイル画像をアップロード"""
-    service = get_authenticated_service()
-    if not service:
-        raise ValueError("YouTube API未認証です。Googleアカウント連携を行ってください。")
+    with _youtube_api_lock:
+        service = get_authenticated_service()
+        if not service:
+            raise ValueError("YouTube API未認証です。Googleアカウント連携を行ってください。")
 
-    if isinstance(image_data, str) and "," in image_data:
-        image_data = image_data.split(",", 1)[1]
+        if isinstance(image_data, str) and "," in image_data:
+            image_data = image_data.split(",", 1)[1]
 
-    if isinstance(image_data, str):
-        raw_bytes = base64.b64decode(image_data)
-    else:
-        raw_bytes = image_data
+        if isinstance(image_data, str):
+            raw_bytes = base64.b64decode(image_data)
+        else:
+            raw_bytes = image_data
 
-    media = MediaIoBaseUpload(io.BytesIO(raw_bytes), mimetype='image/png', resumable=False)
-    req = service.thumbnails().set(
-        videoId=video_id,
-        media_body=media
-    )
-    return req.execute()
+        media = MediaIoBaseUpload(io.BytesIO(raw_bytes), mimetype='image/png', resumable=False)
+        req = service.thumbnails().set(
+            videoId=video_id,
+            media_body=media
+        )
+        return req.execute()
 
 def list_my_broadcasts(max_results=15):
     """自身のチャンネルの配信枠（upcoming/active/all）一覧を取得（自動リトライ付き）"""
-    global _cached_youtube_client
-    service = get_authenticated_service()
-    if not service:
-        raise ValueError("YouTube API未認証です。Googleアカウント連携を行ってください。")
+    global _cached_youtube_client, _quota_exceeded_until
+    with _youtube_api_lock:
+        service = get_authenticated_service()
+        if not service:
+            if time.time() < _quota_exceeded_until:
+                raise RuntimeError("quotaExceeded: YouTube Data APIの利用上限（1日制限）に達しています（毎日16:00リセット）。")
+            raise ValueError("YouTube API未認証です。Googleアカウント連携を行ってください。")
 
-    last_err = None
-    for attempt in range(3):
-        try:
-            req = service.liveBroadcasts().list(
-                part="id,snippet,status,contentDetails",
-                mine=True,
-                maxResults=max_results
-            )
-            res = req.execute(num_retries=2)
-            items = []
-            for item in res.get("items", []):
-                snippet = item.get("snippet", {})
-                status = item.get("status", {})
-                thumbnails = snippet.get("thumbnails", {})
-                thumb_url = thumbnails.get("medium", {}).get("url") or thumbnails.get("default", {}).get("url") or f"https://i.ytimg.com/vi/{item.get('id')}/hqdefault.jpg"
-                items.append({
-                    "id": item.get("id"),
-                    "title": snippet.get("title", "無題の配信"),
-                    "description": snippet.get("description", ""),
-                    "scheduledStartTime": snippet.get("scheduledStartTime"),
-                    "lifeCycleStatus": status.get("lifeCycleStatus"),
-                    "privacyStatus": status.get("privacyStatus"),
-                    "thumbnail": thumb_url,
-                    "url": f"https://www.youtube.com/watch?v={item.get('id')}"
-                })
-            return items
-        except Exception as e:
-            last_err = e
-            logging.warning(f"[YouTube API] list_my_broadcasts attempt {attempt + 1} failed: {e}")
-            _cached_youtube_client = None
-            service = get_authenticated_service()
-            time.sleep(0.5)
+        last_err = None
+        for attempt in range(3):
+            try:
+                req = service.liveBroadcasts().list(
+                    part="id,snippet,status,contentDetails",
+                    mine=True,
+                    maxResults=max_results
+                )
+                res = req.execute(num_retries=2)
+                items = []
+                for item in res.get("items", []):
+                    snippet = item.get("snippet", {})
+                    status = item.get("status", {})
+                    thumbnails = snippet.get("thumbnails", {})
+                    thumb_url = thumbnails.get("medium", {}).get("url") or thumbnails.get("default", {}).get("url") or f"https://i.ytimg.com/vi/{item.get('id')}/hqdefault.jpg"
+                    items.append({
+                        "id": item.get("id"),
+                        "title": snippet.get("title", "無題の配信"),
+                        "description": snippet.get("description", ""),
+                        "scheduledStartTime": snippet.get("scheduledStartTime"),
+                        "lifeCycleStatus": status.get("lifeCycleStatus"),
+                        "privacyStatus": status.get("privacyStatus"),
+                        "thumbnail": thumb_url,
+                        "url": f"https://www.youtube.com/watch?v={item.get('id')}"
+                    })
+                save_cached_broadcasts(items)
+                return items
+            except Exception as e:
+                last_err = e
+                err_str = str(e)
+                if "quotaExceeded" in err_str or "quota" in err_str.lower():
+                    _quota_exceeded_until = time.time() + 1800
+                    logging.info("[YouTube API] YouTube Data APIクォータ上限到達を検知。30分間API呼び出しを抑止します")
+                    break
+                logging.warning(f"[YouTube API] list_my_broadcasts attempt {attempt + 1} failed: {e}")
+                _cached_youtube_client = None
+                service = get_authenticated_service()
+                time.sleep(0.5)
 
-    if last_err:
-        raise last_err
-    return []
+        if last_err:
+            raise last_err
+        return []
+
+def get_my_broadcasts_safe(max_results=15):
+    """クォータ上限時やネットワークエラー時でもキャッシュやフォールバックを返す安全な配信枠一覧取得"""
+    global _quota_exceeded_until
+    cached_items = load_cached_broadcasts()
+    is_quota_over = time.time() < _quota_exceeded_until
+
+    if is_quota_over:
+        return {
+            "success": True if cached_items else False,
+            "items": cached_items,
+            "is_cached": bool(cached_items),
+            "quota_exceeded": True,
+            "message": "YouTube APIの利用上限（1日制限）に達しています（毎日16:00にリセットされます）。URLまたは動画IDを直接入力してください。" if not cached_items else "YouTube API上限到達のため、保存された前回の配信枠を表示しています（16:00リセット）。"
+        }
+
+    try:
+        items = list_my_broadcasts(max_results=max_results)
+        return {
+            "success": True,
+            "items": items,
+            "is_cached": False,
+            "quota_exceeded": False
+        }
+    except Exception as e:
+        err_str = str(e)
+        quota = "quotaExceeded" in err_str or "quota" in err_str.lower()
+        if quota:
+            _quota_exceeded_until = time.time() + 1800
+        return {
+            "success": True if cached_items else False,
+            "items": cached_items,
+            "is_cached": bool(cached_items),
+            "quota_exceeded": quota,
+            "error": err_str,
+            "message": "YouTube APIの利用上限（1日制限）に達しています（毎日16:00にリセットされます）。URLまたは動画IDを直接入力してください。" if not cached_items else "YouTube API上限到達のため、保存された前回の配信枠を表示しています（16:00リセット）。"
+        }
 
 
 def fetch_video_info(raw_input):

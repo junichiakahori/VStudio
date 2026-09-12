@@ -27,6 +27,8 @@ window.clearAllComments = function clearAllComments() {
   if (statSubscribers) statSubscribers.textContent = "0";
   window.statViewers = document.getElementById("stat-viewers");
   if (statViewers) statViewers.textContent = "0";
+  window.statTotalViews = document.getElementById("stat-total-views");
+  if (statTotalViews) statTotalViews.textContent = "0";
   window.statLikes = document.getElementById("stat-likes");
   if (statLikes) statLikes.textContent = "0";
 
@@ -34,28 +36,12 @@ window.clearAllComments = function clearAllComments() {
   console.log("[コメント] 🗑️ 画面上のコメントと統計を全消去しました");
 };
 
-try {
-  const saved = localStorage.getItem("savedCommentHistory");
-  if (saved) {
-    window.commentHistory = JSON.parse(saved);
-  }
-  const savedCount = localStorage.getItem("savedTotalCommentsCount");
-  if (savedCount) {
-    window.totalCommentsCount = parseInt(savedCount, 10);
-  }
-  if (window.totalCommentsCount < window.commentHistory.length) {
-    window.totalCommentsCount = window.commentHistory.length;
-  }
-  window.el = document.getElementById("stat-comments");
-  if (el) el.textContent = window.totalCommentsCount;
-} catch (e) {
-  console.warn("Failed to load comment history", e);
-}
-
 window.renderAllComments = function renderAllComments() {
-  window.viewer = document.getElementById("comment-viewer");
+  const viewer = document.getElementById("comment-viewer");
   if (!viewer) return;
   viewer.innerHTML = "";
+  if (!Array.isArray(window.commentHistory)) return;
+
   // 履歴をそのままレンダリング (古い順、最新が下になるように)
   window.commentHistory.forEach((c) => {
     const el = document.createElement("div");
@@ -67,13 +53,66 @@ window.renderAllComments = function renderAllComments() {
 
     let avatarHtml = "";
     if (c.iconUrl) {
-      avatarHtml = `<img src="${c.iconUrl}" class="comment-avatar" alt="${c.nickname}" crossorigin="anonymous">`;
+      let safeIconUrl = c.iconUrl.startsWith("//") ? `https:${c.iconUrl}` : c.iconUrl;
+      avatarHtml = `<img src="${safeIconUrl}" class="comment-avatar" alt="${c.nickname}" referrerpolicy="no-referrer" onerror="this.style.display='none'">`;
     }
     el.innerHTML = `<div class="comment-author">${avatarHtml}<span>${icon} ${c.nickname}</span></div><div class="comment-text">${c.comment}</div>`;
     viewer.appendChild(el);
   });
   viewer.scrollTop = viewer.scrollHeight; // 一番下(最新)にスクロール
 };
+
+// 📺 リロード後も動画IDが変わらない限りコメント履歴を画面に復元する関数
+window.restoreCommentsIfSameVideo = function restoreCommentsIfSameVideo() {
+  try {
+    const currentVid = localStorage.getItem("savedYoutubeVideoId") || localStorage.getItem("savedYoutubeId") || "";
+    const savedCommentVid = localStorage.getItem("savedCommentVideoId") || "";
+
+    // 動画IDが明確に別のものに変わっていた場合のみ古いコメントをクリア
+    if (savedCommentVid && currentVid && savedCommentVid !== currentVid) {
+      console.log(`[コメント復元] 📺 配信枠が変更されています (${savedCommentVid} -> ${currentVid}) ➔ 過去コメントをクリア`);
+      window.clearAllComments();
+      return;
+    }
+
+    // 同一動画IDまたは継続中の場合はコメント履歴を復元
+    const saved = localStorage.getItem("savedCommentHistory");
+    if (saved) {
+      try {
+        window.commentHistory = JSON.parse(saved);
+      } catch (err) {
+        window.commentHistory = [];
+      }
+    }
+    const savedCount = localStorage.getItem("savedTotalCommentsCount");
+    if (savedCount) {
+      window.totalCommentsCount = parseInt(savedCount, 10) || 0;
+    }
+    if (window.totalCommentsCount < window.commentHistory.length) {
+      window.totalCommentsCount = window.commentHistory.length;
+    }
+    const statEl = document.getElementById("stat-comments");
+    if (statEl) statEl.textContent = window.totalCommentsCount;
+
+    // 画面の #comment-viewer に復元レンダリング
+    if (window.commentHistory && window.commentHistory.length > 0) {
+      window.renderAllComments();
+      console.log(`[コメント復元] ✅ リロード前のコメント ${window.commentHistory.length} 件を画面に復元しました (動画ID: ${currentVid || savedCommentVid || '共通'})`);
+    }
+  } catch (e) {
+    console.warn("[コメント復元] 復元例外:", e);
+  }
+};
+
+// 初回ロード（DOM準備完了およびuiLoadedイベントで確実に復元）
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", window.restoreCommentsIfSameVideo);
+} else {
+  window.restoreCommentsIfSameVideo();
+}
+if (typeof window.addEventListener === "function") {
+  window.addEventListener("uiLoaded", window.restoreCommentsIfSameVideo);
+}
 
 // リセットボタンの登録
 window.clearCommentsBtn = document.getElementById("clear-comments-btn");

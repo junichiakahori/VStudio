@@ -8,9 +8,25 @@
   window.openNewsListPopup = function () {
     console.log("[ニュース一覧] 📰 記事一覧ポップアップを開きます");
     try {
+      // 🖥️ Local API サーバー経由で macOS の Accessibility (AXRaise) をキックして OS レベルで最前面化
+      const apiPort = (window.location && window.location.port === "8444") ? "8002" : "8001";
+      fetch(`http://127.0.0.1:${apiPort}/api/window/focus?type=news_list`).catch(() => {});
+
+      // ネイティブアプリ（macOS Dedicated App）へ最前面化を通知
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nativeHost) {
+        try {
+          window.webkit.messageHandlers.nativeHost.postMessage({ action: "focusWindow", type: "news_list" });
+        } catch (e) { }
+      }
+
       if (window.newsListWindow) {
         try {
-          if (!window.newsListWindow.closed && window.newsListWindow.document) {
+          if (!window.newsListWindow.closed) {
+            // ブラウザ側でも既存ターゲット名で呼び出して前面化を促進
+            const existing = window.open("", "VStudioNewsListWindow");
+            if (existing) {
+              existing.focus();
+            }
             window.newsListWindow.focus();
             if (typeof window.newsListWindow.renderNewsList === "function") {
               window.newsListWindow.renderNewsList();
@@ -32,12 +48,12 @@
 
       window.newsListWindow = window.open(
         url,
-        "_blank",
+        "VStudioNewsListWindow",
         `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
       );
 
       if (!window.newsListWindow) {
-        window.newsListWindow = window.open(url, "_blank");
+        window.newsListWindow = window.open(url, "VStudioNewsListWindow");
       }
     } catch (err) {
       console.error("[ニュース一覧] Failed to open popup:", err);

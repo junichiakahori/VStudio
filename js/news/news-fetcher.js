@@ -5,15 +5,15 @@
 // ==============================================================================
 
 window.NEWS_CATEGORIES = window.NEWS_CATEGORIES || {
-  "cat_top": ["https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja", "https://news.yahoo.co.jp/rss/topics/top-picks.xml", "https://www.nhk.or.jp/rss/news/cat0.xml"],
-  "cat_society": ["https://news.google.com/news/rss/headlines/section/topic/NATION?hl=ja&gl=JP&ceid=JP:ja", "https://news.yahoo.co.jp/rss/topics/domestic.xml", "https://www.nhk.or.jp/rss/news/cat1.xml"],
-  "cat_world": ["https://news.google.com/news/rss/headlines/section/topic/WORLD?hl=ja&gl=JP&ceid=JP:ja", "https://news.yahoo.co.jp/rss/topics/world.xml", "https://www.nhk.or.jp/rss/news/cat6.xml"],
-  "cat_business": ["https://news.google.com/news/rss/headlines/section/topic/BUSINESS?hl=ja&gl=JP&ceid=JP:ja", "https://news.yahoo.co.jp/rss/topics/business.xml", "https://www.nhk.or.jp/rss/news/cat5.xml"],
-  "cat_politics": ["https://www.nhk.or.jp/rss/news/cat4.xml"],
-  "cat_entertainment": ["https://news.google.com/news/rss/headlines/section/topic/ENTERTAINMENT?hl=ja&gl=JP&ceid=JP:ja", "https://news.yahoo.co.jp/rss/topics/entertainment.xml", "https://www.nhk.or.jp/rss/news/cat2.xml"],
-  "cat_sports": ["https://news.google.com/news/rss/headlines/section/topic/SPORTS?hl=ja&gl=JP&ceid=JP:ja", "https://news.yahoo.co.jp/rss/topics/sports.xml", "https://www.nhk.or.jp/rss/news/cat7.xml"],
-  "cat_tech": ["https://news.google.com/news/rss/headlines/section/topic/TECHNOLOGY?hl=ja&gl=JP&ceid=JP:ja", "https://news.yahoo.co.jp/rss/topics/it.xml", "https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml"],
-  "cat_science": ["https://news.yahoo.co.jp/rss/topics/science.xml", "https://www.nhk.or.jp/rss/news/cat3.xml"],
+  "cat_top": ["https://news.yahoo.co.jp/rss/topics/top-picks.xml", "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja"],
+  "cat_society": ["https://news.yahoo.co.jp/rss/topics/domestic.xml", "https://news.google.com/news/rss/headlines/section/topic/NATION?hl=ja&gl=JP&ceid=JP:ja"],
+  "cat_world": ["https://news.yahoo.co.jp/rss/topics/world.xml", "https://news.google.com/news/rss/headlines/section/topic/WORLD?hl=ja&gl=JP&ceid=JP:ja"],
+  "cat_business": ["https://news.yahoo.co.jp/rss/topics/business.xml", "https://news.google.com/news/rss/headlines/section/topic/BUSINESS?hl=ja&gl=JP&ceid=JP:ja"],
+  "cat_politics": ["https://news.google.com/news/rss/headlines/section/topic/POLITICS?hl=ja&gl=JP&ceid=JP:ja", "https://news.yahoo.co.jp/rss/topics/domestic.xml"],
+  "cat_entertainment": ["https://news.yahoo.co.jp/rss/topics/entertainment.xml", "https://news.google.com/news/rss/headlines/section/topic/ENTERTAINMENT?hl=ja&gl=JP&ceid=JP:ja"],
+  "cat_sports": ["https://news.yahoo.co.jp/rss/topics/sports.xml", "https://news.google.com/news/rss/headlines/section/topic/SPORTS?hl=ja&gl=JP&ceid=JP:ja"],
+  "cat_tech": ["https://news.yahoo.co.jp/rss/topics/it.xml", "https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml", "https://news.google.com/news/rss/headlines/section/topic/TECHNOLOGY?hl=ja&gl=JP&ceid=JP:ja"],
+  "cat_science": ["https://news.yahoo.co.jp/rss/topics/science.xml", "https://news.google.com/news/rss/headlines/section/topic/SCIENCE?hl=ja&gl=JP&ceid=JP:ja"],
   "cat_local": ["https://news.yahoo.co.jp/rss/topics/local.xml"]
 };
 
@@ -30,6 +30,26 @@ window.CATEGORY_NAMES = window.CATEGORY_NAMES || {
   "cat_science": "科学・医療",
   "cat_local": "地域"
 };
+
+function formatNewsPubDate(rawDateStr) {
+  if (!rawDateStr) return "";
+  try {
+    const d = new Date(rawDateStr);
+    if (isNaN(d.getTime())) return rawDateStr.trim();
+    const jstFormatter = new Intl.DateTimeFormat('ja-JP', {
+      timeZone: 'Asia/Tokyo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    return jstFormatter.format(d).replace(/\//g, '-');
+  } catch (e) {
+    return rawDateStr.trim();
+  }
+}
 
 function extractLinkFromXmlNode(node) {
   let linkUrl = "";
@@ -165,25 +185,44 @@ async function fetchNewsWithOptions(categoryKey = "cat_all", maxPerCategory = In
         const titleNode = node.querySelector("title");
         const descNode = node.querySelector("description");
         const pubDateNode = node.querySelector("pubDate") || node.querySelector("date");
-        let publisherName = "その他";
-        if (target.url.includes('yahoo.co.jp')) publisherName = 'Yahoo!';
-        else if (target.url.includes('google.com')) publisherName = 'Google';
-        else if (target.url.includes('nhk.or.jp')) publisherName = 'NHK';
-        else if (target.url.includes('itmedia.co.jp')) publisherName = 'ITmedia';
+        const sourceNode = node.querySelector("source");
+        const rawSource = sourceNode ? sourceNode.textContent.trim() : "";
+
+        let publisherName = rawSource || "その他";
+        if (target.url.includes('yahoo.co.jp')) {
+          publisherName = rawSource || 'Yahoo!ニュース';
+        } else if (target.url.includes('google.com')) {
+          publisherName = rawSource || 'Googleニュース';
+        } else if (target.url.includes('nhk.or.jp')) {
+          publisherName = 'NHK';
+        } else if (target.url.includes('itmedia.co.jp')) {
+          publisherName = 'ITmedia';
+        }
 
         const linkUrl = extractLinkFromXmlNode(node);
+
+        const rawPubDateStr = pubDateNode ? pubDateNode.textContent.trim() : "";
+        const formattedPubDate = formatNewsPubDate(rawPubDateStr);
 
         return {
           title: titleNode ? titleNode.textContent : "",
           description: stripHtmlTags(descNode ? descNode.textContent : ""),
           link: linkUrl,
-          pubDate: pubDateNode ? pubDateNode.textContent : "",
+          pubDate: formattedPubDate,
+          rawPubDate: rawPubDateStr,
           categoryName: target.categoryName,
           categoryKey: target.categoryKey,
+          source: rawSource,
           publisher: publisherName
         };
       }).filter(item => {
         if (!item.title) return false;
+        // 🛡️ 本文がSPA等で取得できないNHK等のドメインは記事一覧から完全除外
+        if (item.link && (item.link.includes('nhk.or.jp') || item.link.includes('news.web.nhk'))) return false;
+        // 🛡️ Google News RSS経由等で紛れ込むNHK記事を100%除外（source, publisher, titleすべて検査）
+        if (item.source && /NHK/i.test(item.source)) return false;
+        if (item.publisher && /NHK/i.test(item.publisher)) return false;
+        if (item.title && /(?:[\s\-–—|｜]|^)NHK(?:ニュース|NEWS|NEWS\s*WEB)?/i.test(item.title)) return false;
         if (typeof window.isInvalidNewsVideoArticle === "function" && window.isInvalidNewsVideoArticle(item.title, item.description)) return false;
         return true;
       });
@@ -263,20 +302,88 @@ async function fetchNewsWithOptions(categoryKey = "cat_all", maxPerCategory = In
 
   const CATEGORY_ORDER = ["cat_top", "cat_society", "cat_world", "cat_business", "cat_politics", "cat_entertainment", "cat_sports", "cat_tech", "cat_science", "cat_local"];
 
+  // 🛡️ 記事一覧追加前のスクレイピング事前検証（本文が取得できない毎日新聞等の遮断サイト・有料記事を徹底排除）
+  const candidatePool = [];
+  CATEGORY_ORDER.forEach(catKey => {
+    if (categorized[catKey]) {
+      // 各カテゴリから十分な候補を検証対象として抽出
+      candidatePool.push(...categorized[catKey].slice(0, Math.max(8, maxPerCategory * 3)));
+    }
+  });
+  Object.keys(categorized).forEach(k => {
+    if (!CATEGORY_ORDER.includes(k)) {
+      candidatePool.push(...categorized[k].slice(0, Math.max(8, maxPerCategory * 3)));
+    }
+  });
+
+  let scrapeableTitlesSet = new Set();
+  try {
+    console.log(`[ニュース取得] 🔍 候補記事 ${candidatePool.length} 件の本文スクレイピング可能性を事前検証中...`);
+    const checkItems = candidatePool.map(it => ({ title: it.title, url: it.link || it.url || "" }));
+    const res = await fetch("/api/news/filter_scrapeable", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: checkItems })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.scrapeable_titles)) {
+        scrapeableTitlesSet = new Set(data.scrapeable_titles);
+        console.log(`[ニュース取得] ✅ スクレイピング検証完了: ${scrapeableTitlesSet.size}/${candidatePool.length} 件が本文取得可能と確認されました`);
+        // 🎯 ミラーURL（Yahoo!ニュース等）が解決された記事のリンクを自動更新して救済
+        if (data.results) {
+          candidatePool.forEach(it => {
+            const r = data.results[it.title];
+            if (r && r.scrapeable && r.resolved_url) {
+              if (it.link !== r.resolved_url) {
+                console.log(`[ミラー救済適用] 🎯 「${it.title}」のURLをミラー版に更新: ${r.resolved_url}`);
+                it.link = r.resolved_url;
+              }
+            }
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[ニュース取得] ⚠️ スクレイピング事前検証APIエラー (フォールバック):", err);
+  }
+
+  const isItemScrapeable = (item) => {
+    // 検証結果がある場合は、ミラー探索を含めたスクレイピング成否判定に従う
+    if (scrapeableTitlesSet.size > 0) {
+      return scrapeableTitlesSet.has(item.title);
+    }
+    // API未取得時のフォールバック: 既知の遮断サイトを除外
+    const u = (item.link || item.url || "").toLowerCase();
+    if (u.includes("mainichi.jp") || u.includes("nikkei.com") || u.includes("asahi.com/articles")) {
+      return false;
+    }
+    return true;
+  };
+
   CATEGORY_ORDER.forEach(catKey => {
     if (categorized[catKey]) {
       let count = 0;
       for (const item of categorized[catKey]) {
         if (count >= maxPerCategory) break;
+        // 本文スクレイピング不可の記事はスキップし、次の記事へ自動繰り上げ
+        if (!isItemScrapeable(item)) {
+          console.log(`[ニュース選定] 🚫 本文取得不可のため除外 (繰り上げ): 「${item.title}」`);
+          continue;
+        }
         if (!isTopicDuplicate(item.title, selectedTitles)) {
           finalItems.push(item);
           selectedTitles.push(item.title);
           count++;
         }
       }
+      // もし上限に達しなかった場合でもスクレイピング可能な記事のみを探して補完
       if (count === 0 && categorized[catKey].length > 0) {
-        finalItems.push(categorized[catKey][0]);
-        selectedTitles.push(categorized[catKey][0].title);
+        const fallbackItem = categorized[catKey].find(it => isItemScrapeable(it) && !selectedTitles.includes(it.title));
+        if (fallbackItem) {
+          finalItems.push(fallbackItem);
+          selectedTitles.push(fallbackItem.title);
+        }
       }
     }
   });
@@ -284,6 +391,7 @@ async function fetchNewsWithOptions(categoryKey = "cat_all", maxPerCategory = In
   Object.keys(categorized).forEach(k => {
     if (!CATEGORY_ORDER.includes(k)) {
       for (const item of categorized[k]) {
+        if (!isItemScrapeable(item)) continue;
         if (!isTopicDuplicate(item.title, selectedTitles)) {
           finalItems.push(item);
           selectedTitles.push(item.title);
@@ -292,13 +400,21 @@ async function fetchNewsWithOptions(categoryKey = "cat_all", maxPerCategory = In
     }
   });
 
+  if (typeof window.sortNewsItemsByBroadcastOrder === "function") {
+    finalItems = window.sortNewsItemsByBroadcastOrder(finalItems);
+  }
   window.latestFetchedNews = finalItems;
   try {
     localStorage.setItem("latestFetchedNews", JSON.stringify(finalItems));
   } catch (e) { }
 
-  console.log(`[ニュース取得] 取得完了: 合計 ${finalItems.length} 件のニュースを保持`);
+  console.log(`[ニュース取得] 取得完了: 合計 ${finalItems.length} 件のニュースを保持（放送順ソート済み）`);
   enrichCurrentNewsWithLinks();
+
+  // 🚀 配信準備中からの常時直列先読みワーカーを自動キック
+  if (typeof window.startBackgroundNewsPrefetcher === "function") {
+    window.startBackgroundNewsPrefetcher();
+  }
   return finalItems;
 }
 
@@ -308,7 +424,12 @@ async function enrichCurrentNewsWithLinks() {
     .filter(it => !it.link || it.link.includes("news.google.com/rss/articles"))
     .map(it => it.title);
 
-  if (missingTitles.length === 0) return;
+  if (missingTitles.length === 0) {
+    if (typeof window.startBackgroundNewsPrefetcher === "function") {
+      window.startBackgroundNewsPrefetcher();
+    }
+    return;
+  }
 
   try {
     const res = await fetch("/api/get_article_urls", {
@@ -331,7 +452,11 @@ async function enrichCurrentNewsWithLinks() {
         }
       }
     }
-  } catch (e) { }
+  } catch (e) { } finally {
+    if (typeof window.startBackgroundNewsPrefetcher === "function") {
+      window.startBackgroundNewsPrefetcher();
+    }
+  }
 }
 
 window.fetchNewsWithOptions = fetchNewsWithOptions;

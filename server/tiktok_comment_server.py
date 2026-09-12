@@ -227,6 +227,22 @@ async def stop_tiktok_client():
 async def main():
     host = "localhost"
     port = 8767
+    for _i, _arg in enumerate(sys.argv):
+        if _arg == "--port" and _i + 1 < len(sys.argv):
+            try:
+                port = int(sys.argv[_i + 1])
+            except ValueError:
+                pass
+        elif _arg.startswith("--port="):
+            try:
+                port = int(_arg.split("=", 1)[1])
+            except ValueError:
+                pass
+    if "PORT" in os.environ:
+        try:
+            port = int(os.environ["PORT"])
+        except ValueError:
+            pass
     logging.info(f"Starting WebSocket server on ws://{host}:{port}")
     
     server = await websockets.serve(ws_handler, host, port)
