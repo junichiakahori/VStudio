@@ -19,6 +19,11 @@ _log_lock = threading.Lock()
 _current_log_date = datetime.date.today().strftime('%Y-%m-%d')
 
 ALL_MANAGED_LOGS = [
+    ('api_server', os.path.join(BASE_DIR, "logs", "api_server.log")),
+    ('youtube_server', os.path.join(BASE_DIR, "logs", "youtube_server.log")),
+    ('tiktok_server', os.path.join(BASE_DIR, "logs", "tiktok_server.log")),
+    ('launcher', os.path.join(BASE_DIR, "logs", "launcher.log")),
+    ('vite', os.path.join(BASE_DIR, "logs", "vite.log")),
     ('browser_console', os.path.join(BASE_DIR, "logs", "browser_console.log")),
     ('native_console', os.path.join(BASE_DIR, "logs", "native_console.log")),
     ('web_console', os.path.join(BASE_DIR, "logs", "web_console.log")),
@@ -77,7 +82,7 @@ def _rotate_single_log(log_key, file_path, reason_label):
     except Exception as e:
         print(f"[LogRotationエラー {log_key}]: {e}")
 
-def check_and_rotate_logs():
+def check_and_rotate_logs(force=False):
     """日付変更またはサイズ上限(10MB)超過時に全ログをローテーション"""
     global _current_log_date
     today_str = datetime.date.today().strftime('%Y-%m-%d')
@@ -85,11 +90,12 @@ def check_and_rotate_logs():
     with _log_lock:
         is_date_changed = (today_str != _current_log_date)
         
-        if is_date_changed:
+        if is_date_changed or force:
             prev_date = _current_log_date
-            print(f"[LogRotation] 📅 日付変更を検知 ({prev_date} -> {today_str})。全ログをバックアップ退避します。")
+            reason = "Force rotation" if force else f"Date changed from {prev_date}"
+            print(f"[LogRotation] 📅 全ログのバックアップ退避を実行します ({reason})")
             for log_key, file_path in ALL_MANAGED_LOGS:
-                _rotate_single_log(log_key, file_path, f"Date changed from {prev_date}")
+                _rotate_single_log(log_key, file_path, reason)
             _current_log_date = today_str
             clean_old_log_backups(RETENTION_DAYS)
         else:
@@ -100,6 +106,10 @@ def check_and_rotate_logs():
                             _rotate_single_log(log_key, file_path, "Size > 10MB")
                     except Exception:
                         pass
+
+def force_rotate_all_logs():
+    """手動または即時実行用：全ログを今すぐバックアップ退避＆クリーン初期化"""
+    check_and_rotate_logs(force=True)
 
 def check_and_rotate_browser_log():
     """後方互換用ラッパー"""
