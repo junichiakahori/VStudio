@@ -525,7 +525,7 @@ def extract_special_terms(text):
         r'先生|教授|選手|知事|市長|区長|町長|村長|首相|大臣|総理|総裁|長官|議員|社長|会長|'
         r'監督|コーチ|投手|捕手|棋士|名人|竜王|横綱|親方|容疑者|被告)'
     )
-    for m in re.finditer(rf'[\u4e00-\u9fa5]{{3,4}}(?={HONORIFIC_LOOKAHEAD})', text):
+    for m in re.finditer(rf'[\u4e00-\u9fa5]{{2,4}}(?={HONORIFIC_LOOKAHEAD})', text):
         t = m.group(0)
         if t not in NON_NAME_NOUNS:
             terms.append(t)

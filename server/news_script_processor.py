@@ -745,7 +745,10 @@ def audit_and_heal_news_script(items, title="", article_context=""):
     INVALID_SAN_NOUNS = [
         "価格", "値段", "相場", "中国", "アメリカ", "米国", "日本", "ロシア", "ウクライナ",
         "自衛隊", "警察", "政府", "当局", "会社", "組織", "空港", "戦闘機", "滑走路",
-        "モデル", "タイプ", "システム", "アプリ", "機能", "データ"
+        "モデル", "タイプ", "システム", "アプリ", "機能", "データ",
+        "男性", "女性", "男児", "女児", "少年", "少女", "被害者", "容疑者", "患者",
+        "死亡者", "負傷者", "乗客", "住民", "市民", "県民", "国民", "本人", "同氏",
+        "両者", "各位", "全員", "店舗", "施設", "病院", "事件", "事故"
     ]
 
     healed_items = []
@@ -885,7 +888,7 @@ def audit_and_heal_news_script(items, title="", article_context=""):
             ))
         healed_sp = _zenkaku_to_hankaku_alnum(healed_sp)
 
-        # ※略語（NHK, FBI, CIA, SNS, AI, PR, URL, DX, EV, USA, WHO等）は完全保護
+        # ※略語（NHK, FBI, CIA, SNS, AI, PR, URL, DX, EV, USA, WHO, MUFG等）は完全保護
         SAFE_KNOWN_ACRONYMS = {
             "NHK", "FBI", "CIA", "SNS", "AI", "PR", "URL", "DX", "EV", "OS", "UI", "UX",
             "API", "CPU", "GPU", "PC", "TV", "SSD", "HDD", "USB", "NFT", "TGS", "RPG",
@@ -893,7 +896,8 @@ def audit_and_heal_news_script(items, title="", article_context=""):
             "OECD", "GDP", "GNP", "CEO", "COO", "CFO", "CTO", "CIO", "CM", "PV", "MV",
             "BGM", "SE", "MC", "DJ", "CD", "DVD", "BD", "SD", "IC", "ID", "IT", "IP",
             "LTE", "SIM", "PIN", "QR", "VIP", "PTA", "JAL", "ANA", "JR", "NPO", "NGO",
-            "JRA", "NPB", "JFA", "WBC", "FIFA", "IOC", "JOC"
+            "JRA", "NPB", "JFA", "WBC", "FIFA", "IOC", "JOC", "MUFG", "SMBC", "FRB",
+            "CPI", "SMR", "TNO", "LLM"
         }
         def _fix_uppercase_word(m):
             w = m.group(0)
@@ -913,6 +917,52 @@ def audit_and_heal_news_script(items, title="", article_context=""):
             print(f"[誤読自己修復] 🩹 '星街'の誤読を検知・自動修復 (speech): '星街' ➔ 'ほしまち'", flush=True)
             healed_sp = re.sub(r'星街すいせい', 'ほしまちすいせい', healed_sp)
             healed_sp = re.sub(r'星街', 'ほしまち', healed_sp)
+
+        # 13. 文脈依存語句（中条、金、上で）の誤読自己修復（字幕は漢字表記を完全維持、音声側のみ自然な発音へ補正）
+        # A. 人名「中条」➔「なかじょう」（VOICEVOXが「ちゅうじょう」と誤読するのを恒久防止）
+        if "中条" in healed_sp:
+            print(f"[誤読自己修復] 🩹 '中条'の誤読を検知・自動修復 (speech): '中条' ➔ 'なかじょう'", flush=True)
+            healed_sp = re.sub(r'(?<![0-9〇一二三四五六七八九十百千万第])中条(?=(?:あやみ|きよし|さん|氏|様|ちゃん|くん|君))', 'なかじょう', healed_sp)
+
+        # B. お金文脈での「金」➔「かね」（VOICEVOXが「きん」と誤読するのを恒久防止）
+        if "金" in healed_sp:
+            healed_sp = re.sub(r'金(?=目当て|めあて|払い|はらい|勘定|かんじょう|の切れ目|の亡者)', 'かね', healed_sp)
+            healed_sp = re.sub(r'金(?=を(?:要求|受取|受け取|奪|払|はら|持|もっ|渡|わた|取|盗|ぬす|返|かえ|借|か|貸|欲|ほし|稼|かせ|出|だ|使|つか|脅|巻き上げ|せび))', 'かね', healed_sp)
+            healed_sp = re.sub(r'金(?=に(?:困|こま|目がない|目がくら|糸目をつけず|飽か))', 'かね', healed_sp)
+            healed_sp = re.sub(r'金(?=が(?:欲|ほし|無|な|足|た))', 'かね', healed_sp)
+
+        # C. 動詞連体形＋「上で」➔「うえで」（VOICEVOXが「じょうで」と誤読するのを恒久防止）
+        if "上" in healed_sp:
+            healed_sp = re.sub(r'([ぁ-んァ-ヶー一-鿿]+(?:する|できる|行う|おこなう|考える|かんがえる|予測する|判断する|生きる|選ぶ|進める|進む|暮らす|使う|働く|送る|受ける|決める|保つ|守る|続ける|見る|知る|得る|勝つ|負ける|言う|語る|読む|書く|含む|伴う|従う|基づく|沿う|向かう|至る|及ぶ|応じる|した|された|られた|行った|見た|選んだ|読んだ|確認した|検討した|相談した|納得した|調査した|判断した|考慮した))上(?=で|に|は|も|の|[、\s　]|$)', r'\1うえ', healed_sp)
+
+        # 14. 異常な二重化（「緊急事態非常事態」「きんきゅうじたいひじょうじたい」等）の自動一本化
+        if "きんきゅうじたいひじょうじたい" in healed_sp or "緊急事態非常事態" in healed_sp:
+            healed_sp = re.sub(r'きんきゅうじたい[\s　]*ひじょうじたい', 'きんきゅうじたい', healed_sp)
+            healed_sp = re.sub(r'緊急事態[\s　]*非常事態', '緊急事態', healed_sp)
+        if "緊急事態非常事態" in disp:
+            disp = re.sub(r'緊急事態[\s　]*非常事態', '緊急事態', disp)
+
+        # 15. 外国人選手・特殊固有名詞の誤読自己修復
+        if "周啓豪" in healed_sp:
+            healed_sp = re.sub(r'周啓豪', 'しゅうけいごう', healed_sp)
+
+        # 16. 音声用テキスト内の不要な解説括弧ルビ（例: 消費者物価指数（しーぴーあい）等）の自動除去
+        if re.search(r'[（\(]', healed_sp):
+            # パターン1: 直前に日本語/英字があり、括弧内が英字略語またはカナ/ひらがなルビ
+            healed_sp = re.sub(r'([ぁ-んァ-ヶー一-鿿A-Za-z])[（\(](?:[ぁ-んァ-ヴー]{1,10}|[A-Za-z]{2,6})[）\)]', r'\1', healed_sp)
+            # パターン2: 直前に英字略語があり、括弧内が日本語解説（例: LLM（大規模言語モデル））
+            healed_sp = re.sub(r'([A-Za-z]{2,10})[（\(][ぁ-んァ-ヶー一-鿿]{2,15}[）\)]', r'\1', healed_sp)
+
+        # 17. 助詞重複による文法崩れの自己修復（「〜が注目が集まる」➔「〜に注目が集まる」）
+        if "が注目が集まる" in disp:
+            disp = re.sub(r'([ぁ-んァ-ヶー一-鿿A-Za-z0-9]+)が注目が集まる', r'\1に注目が集まる', disp)
+        if "が注目が集まる" in healed_sp:
+            healed_sp = re.sub(r'([ぁ-んァ-ヶー一-鿿A-Za-z0-9]+)が注目が集まる', r'\1に注目が集まる', healed_sp)
+
+        # 18. 「大（おお／だい）」の文脈依存語句の自己修復（字幕は漢字を完全維持、音声のみ自然な読みへ補正）
+        if "大" in healed_sp:
+            healed_sp = re.sub(r'大(?=違い|ちがい|食い|ぐい|一番|いちばん|舞台|ぶたい|荒れ|あれ|雨|あめ|雪|ゆき|水|みず|風|かぜ|波|なみ|勢|ぜい|入り|いり|騒ぎ|さわぎ|掛かり|がかり|掛け|がけ|盛り|もり|急ぎ|いそぎ|慌て|あわて|柄|がら|物|もの|詰め|づめ|筋|すじ|昔|むかし|喜び|よろこび|笑い|わらい|泣き|なき|声|ごえ|怪我|けが|火傷|やけど|粒|つぶ|箱|ばこ|所帯|しょたい|所帯|じょたい|立ち回り|たちまわり|見栄|みえ|見出し|みだし|船|ぶね|元|もと|まか|手|て|相撲|ずもう)', 'おお', healed_sp)
+            healed_sp = re.sub(r'大人気(?=ない|なさ|なく|なかっ)', 'おとなげ', healed_sp)
 
         healed_items.append({
             "display": disp,
