@@ -744,6 +744,14 @@ def audit_and_heal_news_script(items, title="", article_context=""):
     full_context = f"{title} {article_context}"
     has_sports_context = any(kw in full_context for kw in SPORTS_KEYWORDS)
 
+    # 相撲文脈キーワード（力士に対して「選手」と呼ぶ誤爆を検知・除去）
+    SUMO_KEYWORDS = [
+        "大相撲", "相撲", "力士", "関取", "土俵", "秋場所", "春場所", "夏場所", "初場所", "名古屋場所", "九州場所",
+        "横綱", "大関", "関脇", "小結", "幕内", "十両", "幕下", "三段目", "序二段", "序ノ口",
+        "白星", "黒星", "金星", "取組", "寄り切り", "押し出し", "上手投げ", "下手投げ", "叩き込み", "すくい投げ"
+    ]
+    has_sumo_context = any(kw in full_context for kw in SUMO_KEYWORDS)
+
     # 普通名詞・組織名・国名への不自然な「さん」誤爆の最終除去リスト
     INVALID_SAN_NOUNS = [
         "価格", "値段", "相場", "中国", "アメリカ", "米国", "日本", "ロシア", "ウクライナ",
@@ -771,8 +779,20 @@ def audit_and_heal_news_script(items, title="", article_context=""):
         # 1. 読み上げテキスト(speech)の異常置換自己修復
         healed_sp = heal_sentence_reading(disp, sp)
 
-        # 2. 「選手」の文脈適正チェック（スポーツ文脈が皆無なのに「選手」が付いている場合は「さん」へ修正）
-        if not has_sports_context:
+        # 2. 「選手」の文脈適正チェック
+        # (A) 相撲文脈（力士に「選手」が付いている場合は「選手」を除去して力士名単体へ修正）
+        if has_sumo_context:
+            if "選手" in disp:
+                disp_fixed = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1', disp)
+                if disp_fixed != disp:
+                    print(f"[敬称自己修復] 🩹 相撲記事での「選手」誤爆を検知・除去: '{disp}' ➔ '{disp_fixed}'", flush=True)
+                    disp = disp_fixed
+            if "選手" in healed_sp:
+                sp_fixed = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1', healed_sp)
+                if sp_fixed != healed_sp:
+                    healed_sp = sp_fixed
+        # (B) スポーツ文脈が皆無なのに「選手」が付いている場合は「さん」へ修正
+        elif not has_sports_context:
             if "選手" in disp:
                 disp_fixed = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1さん', disp)
                 if disp_fixed != disp:
@@ -791,6 +811,14 @@ def audit_and_heal_news_script(items, title="", article_context=""):
                 disp = disp.replace(san_pattern, noun)
             if san_pattern in healed_sp:
                 healed_sp = healed_sp.replace(san_pattern, noun)
+
+        # 3.5 「男さん」「女さん」の単体誤爆除去（長男さん等の家族呼称は巻き込まず、単独の「男さん」「女さん」を除去）
+        if "男さん" in disp or "女さん" in disp:
+            disp = re.sub(r'(?<![長次三四五ご御])男さん', '男', disp)
+            disp = re.sub(r'(?<![長次三四五ご御])女さん', '女', disp)
+        if "男さん" in healed_sp or "女さん" in healed_sp:
+            healed_sp = re.sub(r'(?<![長次三四五ご御])男さん', '男', healed_sp)
+            healed_sp = re.sub(r'(?<![長次三四五ご御])女さん', '女', healed_sp)
 
         # 4. 「とろろにゃ」誤爆の自己修復（文末・文中の異常なキャラクター口調混入を除去・是正）
         if "とろろにゃ" in disp or "とろろにゃ" in healed_sp:
