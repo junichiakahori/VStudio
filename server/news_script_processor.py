@@ -93,7 +93,10 @@ import ssl
 import time
 import urllib.request
 import threading
-from server.tts_normalizer import normalize_for_tts, sanitize_speech_text, build_context_pronunciation_map, heal_sentence_reading
+from server.tts_normalizer import (
+    normalize_for_tts, sanitize_speech_text, build_context_pronunciation_map,
+    heal_sentence_reading, apply_person_kata_rules
+)
 from server.news_crawler import find_cached_url, search_news_url_by_title, register_cached_url, fetch_article_body, decode_google_news_url
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -963,6 +966,10 @@ def audit_and_heal_news_script(items, title="", article_context=""):
         if "大" in healed_sp:
             healed_sp = re.sub(r'大(?=違い|ちがい|食い|ぐい|一番|いちばん|舞台|ぶたい|荒れ|あれ|雨|あめ|雪|ゆき|水|みず|風|かぜ|波|なみ|勢|ぜい|入り|いり|騒ぎ|さわぎ|掛かり|がかり|掛け|がけ|盛り|もり|急ぎ|いそぎ|慌て|あわて|柄|がら|物|もの|詰め|づめ|筋|すじ|昔|むかし|喜び|よろこび|笑い|わらい|泣き|なき|声|ごえ|怪我|けが|火傷|やけど|粒|つぶ|箱|ばこ|所帯|しょたい|所帯|じょたい|立ち回り|たちまわり|見栄|みえ|見出し|みだし|船|ぶね|元|もと|まか|手|て|相撲|ずもう)', 'おお', healed_sp)
             healed_sp = re.sub(r'大人気(?=ない|なさ|なく|なかっ)', 'おとなげ', healed_sp)
+
+        # 19. 人を指す「方（かた）」の文脈自己修復（字幕は漢字を完全維持、音声のみ自然な発音へ補正）
+        if "方" in healed_sp:
+            healed_sp = apply_person_kata_rules(healed_sp)
 
         healed_items.append({
             "display": disp,
