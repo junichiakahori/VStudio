@@ -77,8 +77,32 @@ def is_plausible_reading(term, yomi):
     if not kanji_chars:
         return sim >= 0.2
 
+    # 多音字（pykakasiが代表読みしか返さない基本漢字の音訓セット）
+    COMMON_POLYPHONIC_KANJI = {
+        "方": {"かた", "ほう", "がた"},
+        "大": {"おお", "だい", "たい"},
+        "上": {"うえ", "じょう", "かみ", "のぼ"},
+        "下": {"した", "げ", "しも", "くだ", "お"},
+        "日": {"ひ", "にち", "じつ", "か", "び"},
+        "月": {"つき", "がつ", "げつ"},
+        "生": {"い", "なま", "しょう", "せい", "う", "は"},
+        "行": {"い", "ゆ", "こう", "ぎょう"},
+        "出": {"で", "だ", "しゅつ"},
+        "入": {"い", "はい", "にゅう"},
+        "人": {"ひと", "にん", "じん", "びと"},
+        "間": {"あいだ", "ま", "かん", "けん"},
+        "所": {"ところ", "しょ", "じょ"},
+        "名": {"な", "めい", "みょう"}
+    }
+
     matched_kanji = 0
     for c in kanji_chars:
+        # 多音字の訓読み・音読み判定
+        if c in COMMON_POLYPHONIC_KANJI:
+            if any(r in yomi for r in COMMON_POLYPHONIC_KANJI[c]):
+                matched_kanji += 1
+                continue
+
         c_res = kks.convert(c)
         if c_res:
             c_hira = c_res[0].get("hira", "")
