@@ -1671,22 +1671,37 @@ def generate_news_item_script_data(payload, custom_dict=None):
         # 6. 馴れ馴れしい雑談調の語頭フレーズ（最近ね、あのね、等）の除去
         clean_text = re.sub(r'(?:^|[。！？\n])[\s　]*(?:最近ね[、,\s]*|あのね[、,\s]*|ねえねえ[、,\s]*|ちょっと聞いて[、,\s]*)', '', clean_text)
 
-        # 7. 個別記事末尾の番組終了挨拶（クロージング誤爆: では、またですね！等）の完全除去
-        clean_text = re.sub(r'[\s　]*(?:では[、,\s]*)?また(?:ですね|お会いしましょう|次回|今度|お会いできるのを楽しみに)[！!。、\s]*$', '', clean_text)
-        clean_text = re.sub(r'[\s　]*(?:それでは[、,\s]*)?(?:さようなら|バイバイ)[！!。、\s]*$', '', clean_text)
+        # 7. 個別記事末尾の番組終了挨拶（クロージング誤爆: ではまたにゃ！、またにゃ！、それではまた次回！等）の完全除去
+        FAREWELL_REMOVAL_PATTERN = (
+            r'[\s　]*(?:それでは|では|じゃあ|それじゃあ)?[、,\s]*'
+            r'(?:また(?:次回)?(?:お会いしましょう|お会いできるのを楽しみに|今度|ですね)?'
+            r'|また(?:ね|な|よ|ですね)?'
+            r'|次回も?お楽しみに'
+            r'|さようなら|バイバイ|ばいばい|ばい)'
+            r'(?:にゃ|のだ|なのだ|ね|よ)?[！!。、\s]*$'
+        )
+        clean_text = re.sub(FAREWELL_REMOVAL_PATTERN, '', clean_text, flags=re.IGNORECASE)
 
-        # 8. 実在の著名人・芸能人・人物に対する呼び捨ての敬称（〜さん）自動補正
+        # 8. 被写体人物への唐突な直接挨拶（武田さん、お疲れ様にゃ！等）の除去
+        DIRECT_GREETING_PATTERN = (
+            r'(?:^|(?<=[。！？\s　]))[A-Za-z0-9\u4e00-\u9fffぁ-んァ-ヶ]+(?:さん|様|氏|選手)[、,\s]*'
+            r'(?:お疲れ様|おつかれさま|おつかれ|ご苦労様|こんにちは|おはよう|こんばんは|いつもありがとう)'
+            r'[！!。、\s]*(?:でした|です|にゃ|のだ|なのだ)?[！!。、\s]*'
+        )
+        clean_text = re.sub(DIRECT_GREETING_PATTERN, '', clean_text)
+
+        # 9. 実在の著名人・芸能人・人物に対する呼び捨ての敬称（〜さん）自動補正
         clean_text = normalize_celebrity_honorifics(clean_text, title, full_article_content)
 
-        # 9. キャラクター口調（にゃ／なのだ）の救済（LLMが客観調で出力した場合でも後半感想を自動補正）
+        # 10. キャラクター口調（にゃ／なのだ）の救済（LLMが客観調で出力した場合でも後半感想を自動補正）
         clean_text = salvage_character_tone(clean_text, char_desc)
 
         split_sentences = split_sentences_safely(clean_text)
-        # 末尾の文が番組終了挨拶単独の場合の安全除去
+        # 末尾の文が番組終了挨拶単独の場合の安全除去（またにゃ！、ではまたにゃ！、バイバイにゃ！等）
         if split_sentences:
             last_s = split_sentences[-1]
-            if re.search(r'^(?:では[、,\s]*)?また(?:ですね|お会いしましょう|次回|今度)?[！!。、\s]*$', last_s) or \
-               re.search(r'^(?:それでは[、,\s]*)?(?:さようなら|バイバイ)[！!。、\s]*$', last_s):
+            if re.search(r'^(?:それでは|では|じゃあ|それじゃあ)?[、,\s]*(?:また(?:次回)?(?:お会いしましょう|お会いできるのを楽しみに|今度|ですね)?|また(?:ね|な|よ|ですね)?|次回も?お楽しみに|さようなら|バイバイ|ばいばい|ばい)(?:にゃ|のだ|なのだ|ね|よ)?[！!。、\s]*$', last_s, flags=re.IGNORECASE):
+                print(f"{tag} ✂️ 個別記事末尾の不自然な終了挨拶（誤爆）を除去: '{last_s}'", flush=True)
                 split_sentences.pop()
 
         def is_transition_phrase(txt):
