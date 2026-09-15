@@ -92,6 +92,7 @@ import json
 import ssl
 import time
 import urllib.request
+import urllib.error
 import threading
 from server.tts_normalizer import (
     normalize_for_tts, sanitize_speech_text, build_context_pronunciation_map,
@@ -1040,6 +1041,14 @@ def audit_and_heal_news_script(items, title="", article_context=""):
         else:
             break
 
+GENERIC_TITLE_WORDS = {
+    'ニュース', '速報', '発表', '開始', '決定', '予定', '実施', '検討', '注意', '情報', '対策',
+    '対応', '確認', '政府', '方針', '問題', '報告', '理由', '影響', '結果', '状況',
+    '活動', '公開', '登場', '開催', '参加', '紹介', '話題', '注目', '人気', '最新',
+    '公式', '更新', '変更', '拡大', '減少', '増加', '提供', '発売', '記念', '取材',
+    'コメント', '投稿', '報告', '解説', '特集', '一覧', 'まとめ'
+}
+
 def _match_title_subjects_in_script(primary_subjects, kanji_names, clean_t, raw_text, article_context):
     """タイトル主要固有名詞・主語のマッチング検証（最大深さ2階層）"""
     matched_subs = [s for s in primary_subjects if s in raw_text]
@@ -1210,14 +1219,6 @@ def validate_news_script_quality(raw_text, title="", article_context="", char_de
             return False, "元記事に存在しないワクチン・新型コロナのハルシネーションが検知されました"
 
         title_keywords = re.findall(r'[一-鿿]{2,}|[ァ-ヶー]{2,}|[A-Za-z0-9]{2,}', title)
-        # 一般的すぎる単語（動詞・メタ単語）はキーワード判定から除外し、固有キーワードのみで照合
-        GENERIC_TITLE_WORDS = {
-            'ニュース', '速報', '発表', '開始', '決定', '予定', '実施', '検討', '注意', '情報', '対策',
-            '対応', '確認', '政府', '方針', '問題', '報告', '理由', '影響', '結果', '状況',
-            '活動', '公開', '登場', '開催', '参加', '紹介', '話題', '注目', '人気', '最新',
-            '公式', '更新', '変更', '拡大', '減少', '増加', '提供', '発売', '記念', '取材',
-            'コメント', '投稿', '報告', '解説', '特集', '一覧', 'まとめ'
-        }
         filtered_keywords = [w for w in title_keywords if w not in GENERIC_TITLE_WORDS]
         # 長い漢字塊（4文字以上、例: 正恩氏後継、無人機接近）がある場合、前後の2文字サブキーワードも候補に加える
         expanded_keywords = list(filtered_keywords)
@@ -1410,6 +1411,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
             print(f"{tag} 🔗 記事URL特定: {article_url}", flush=True)
 
     full_article_content = description
+    fetched_body = ""
     if article_url:
         # Google News の転送リンクであれば、まず配信元の正規URLにデコード
         if "news.google.com" in article_url:

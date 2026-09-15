@@ -12,10 +12,11 @@ import ssl
 import difflib
 import urllib.request
 import urllib.parse
+import typing
 
-_kks_instance = None
+_kks_instance: typing.Any = None
 
-def get_kks():
+def get_kks() -> typing.Any:
     """pykakasi インスタンスの遅延ロード"""
     global _kks_instance
     if _kks_instance is None:
@@ -67,7 +68,7 @@ def is_plausible_reading(term, yomi):
              "だ":"た","ぢ":"ち","づ":"つ","で":"て","ど":"と",
              "ば":"は","び":"ひ","ぶ":"ふ","べ":"へ","ぼ":"ほ",
              "ぱ":"は","ぴ":"ひ","ぷ":"ふ","ぺ":"へ","ぽ":"ほ"}
-        return "".join([d.get(c, c) for c in s])
+        return "".join([str(d.get(c, c)) for c in s])
 
     if difflib.SequenceMatcher(None, _to_seion(std_hira), _to_seion(yomi)).ratio() >= 0.35:
         return True
@@ -432,18 +433,12 @@ def lookup_wikipedia_reading(term):
                 m_direct = re.search(r'(?<![A-Za-z0-9\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff\-_・.])' + re.escape(term) + r'\.?[（\(]([ぁ-んァ-ヶー]+)[）\)]', clean_snippet)
                 if m_direct:
                     y_raw = m_direct.group(1).strip()
-                    y_hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in y_raw])
-                    # 英字略語で読みが元の長さの2.5倍を超える過剰展開は破棄
-                    if re.match(r'^[A-Za-z0-9\s\-_]+$', term) and len(y_hira) > len(term) * 2.5:
-                        print(f"[Wikipedia誤読防止] 🚫 '{term}' のスニペット読み '{y_hira}' は過剰展開のため破棄")
-                        continue
-                    if len(y_hira) >= 2 and y_hira not in INVALID_READINGS:
-                        if not is_plausible_reading(term, y_hira):
-                            print(f"[Wikipedia誤読防止] 🚫 '{term}' のスニペット読み '{y_hira}' は漢字表記と乖離しているため破棄")
-                            continue
-                        print(f"[Wikipediaスニペット読み解決] 🎯 '{term}' -> '{y_hira}'")
-                        _wiki_reading_cache[term] = (y_hira, term)
-                        return y_hira, term
+                    y_hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else ('ゔ' if c == 'ヴ' else c) for c in y_raw])
+                    valid_direct = _validate_wiki_reading(term, y_hira)
+                    if valid_direct:
+                        print(f"[Wikipediaスニペット読み解決] 🎯 '{term}' -> '{valid_direct}'")
+                        _wiki_reading_cache[term] = (valid_direct, term)
+                        return valid_direct, term
 
                 # パターンB: 人名（漢字名字 + 名前）
                 person_yomi = _extract_person_reading_from_snippet(term, clean_snippet)

@@ -378,7 +378,7 @@ class VStudioChatProcessor(DefaultProcessor):
         chatlist = []
         timeout = 0
         if not chat_components:
-            return chatlist, timeout
+            return Chatdata(chatlist, float(timeout), self.abs_diff)
 
         for component in chat_components:
             if component is None:
