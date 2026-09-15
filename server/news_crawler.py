@@ -312,6 +312,25 @@ def is_known_blocked_domain(url):
     u_lower = url.lower()
     return any(b in u_lower for b in BLOCKED_ARTICLE_DOMAINS)
 
+def _resolve_yahoo_pickup_article(url, html_text, headers):
+    """Yahoo!ニュースのpickup中間ページから記事全文ページURLとHTMLを取得（最大深さ2階層）"""
+    if "news.yahoo.co.jp/pickup/" not in url:
+        return url, html_text
+    m_art = re.search(r'href=[\"\'](https://news\.yahoo\.co\.jp/articles/[a-f0-9]+)[\"\']', html_text)
+    if not m_art:
+        return url, html_text
+    art_url = m_art.group(1)
+    try:
+        import requests
+        res_art = requests.get(art_url, headers=headers, timeout=4.0)
+        if res_art.status_code == 200:
+            res_art.encoding = res_art.apparent_encoding or 'utf-8'
+            return art_url, res_art.text
+    except Exception:
+        pass
+    return url, html_text
+
+
 def fetch_article_body(url):
     """元記事URLから本文テキストを軽量スクレイピング（メモリキャッシュ連動）"""
     if not url or not url.startswith('http'):
@@ -344,19 +363,7 @@ def fetch_article_body(url):
         if res.status_code == 200:
             res.encoding = res.apparent_encoding or 'utf-8'
             html_text = res.text
-            # Yahoo!ニュースのpickup中間ページの場合、「記事全文を読む」リンク先（articles/...）へ自動遷移
-            if "news.yahoo.co.jp/pickup/" in url:
-                m_art = re.search(r'href=[\"\'](https://news\.yahoo\.co\.jp/articles/[a-f0-9]+)[\"\']', html_text)
-                if m_art:
-                    art_url = m_art.group(1)
-                    try:
-                        res_art = requests.get(art_url, headers=headers, timeout=4.0)
-                        if res_art.status_code == 200:
-                            res_art.encoding = res_art.apparent_encoding or 'utf-8'
-                            html_text = res_art.text
-                            url = art_url
-                    except Exception:
-                        pass
+            url, html_text = _resolve_yahoo_pickup_article(url, html_text, headers)
     except Exception:
         pass
 

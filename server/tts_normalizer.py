@@ -279,26 +279,64 @@ def apply_contextual_proper_nouns_rules(text):
 _wiki_reading_cache = {}
 _WIKI_TIMEOUT = 1.5  # 全ステップ統一タイムアウト（秒）
 
+def _validate_wiki_reading(term, yomi):
+    """Wikipediaから取得した読み候補の妥当性検証（ネスト最大2階層）"""
+    if not yomi or len(yomi) < 2 or yomi in WIKI_INVALID_READINGS:
+        return None
+    # 英単語に対して異常に長すぎる読みは誤読として除外
+    if re.match(r'^[A-Za-z0-9\s\-_]+$', term) and len(yomi) > len(term) * 2.5:
+        print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi}' は過剰展開のため破棄")
+        return None
+    if not is_plausible_reading(term, yomi):
+        print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi}' は漢字表記と乖離しているため破棄")
+        return None
+    return yomi
+
+
+def _extract_person_reading_from_snippet(term, clean_snippet):
+    """スニペット内の人名（名字＋名前）からの読み解決（最大深さ2階層）"""
+    if not (re.search(r'[\u4e00-\u9fa5]', term) and len(term) <= 3):
+        return None
+    m_person = re.search(r'(?<![A-Za-z0-9\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff\-_・.])' + re.escape(term) + r"\s*([^\(（\s、。]{1,3})?\s*[（\(]([ぁ-んァ-ヶー\s・]+)[、,）\)]", clean_snippet)
+    if not m_person:
+        return None
+
+    extra_name = m_person.group(1) or ""
+    y_raw = m_person.group(2).strip().replace("・", " ")
+    y_hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else ('ゔ' if c == 'ヴ' else c) for c in y_raw])
+    parts = y_hira.split()
+
+    candidate = parts[0] if parts and (extra_name and len(parts) >= 2 or len(parts) == 1) else None
+    if not candidate:
+        return None
+
+    valid = _validate_wiki_reading(term, candidate)
+    if valid:
+        print(f"[Wikipedia人名読み解決] 🎯 '{term}' -> '{valid}'")
+        return valid
+    return None
+
+
+WIKI_INVALID_READINGS = {"あるいは", "または", "かつて", "えいご", "ちゅうごくご", "ちょうせんご", "かんこくご", "りゃくしょう", "つうしょう", "ほんみょう", "きゅうせい"}
+
+
 def lookup_wikipedia_reading(term):
     """
-    Wikipedia APIで特殊な固有名詞・アルファベット名の読み（ひらがな）を動的取得。
+    Wikipedia APIを直接照会して、固有名詞（人名・地名・施設名・ブランド等）の正確な読み仮名（ひらがな）を取得する。
     記事タイトルの直後にある最初の括弧から正確に読みを抽出。
     ネガティブキャッシュにより一度404/失敗した語のリトライを完全遮断。
     """
     if not term or len(term) < 2:
         return None, None
-    if term in _wiki_reading_cache:  # ヒット（yomi, title）でもネガティブ（None, None）でもキャッシュ済みなら即返却
+    if term in _wiki_reading_cache:
         return _wiki_reading_cache[term]
 
     ctx = ssl._create_unverified_context()
-
-
     headers = {
         "User-Agent": "VStudio-TTS-Bot/1.0 (https://github.com/junichiakahori/VStudio)"
     }
-    INVALID_READINGS = {"あるいは", "または", "かつて", "えいご", "ちゅうごくご", "ちょうせんご", "かんこくご", "りゃくしょう", "つうしょう", "ほんみょう", "きゅうせい"}
 
-    step1_found = False  # step1 (extracts) で有効なページが見つかったかどうか
+    step1_found = False
     try:
         ext_url = (
             "https://ja.wikipedia.org/w/api.php"
@@ -313,63 +351,30 @@ def lookup_wikipedia_reading(term):
                     continue
                 step1_found = True
                 page_title = pdata.get("title", "")
-                # リダイレクト先タイトルが検索語と全く無関係な上位概念（例: 震度3 -> 気象庁震度階級）の場合は破棄
-                clean_pt = re.sub(r'[\(（].*?[\)）]', '', page_title).strip()
-                # 漢字語句・漢字数字混じり語句の場合、上位概念・別番組リダイレクト（例: 営業時間 -> 営業、月10 -> 関西テレビ...）による誤読を防止
-                if re.search(r'[\u4e00-\u9fa5]', term):
-                    clean_norm = clean_pt.replace(" ", "")
-                    term_norm = term.replace(" ", "")
-                    # 漢字を含む語句はタイトル（括弧除外後）と完全一致を必須化（上位概念・類似別記事の誤爆を根絶）
-                    if clean_norm != term_norm:
-                        continue
-                elif term.lower() != clean_pt.lower():
-                    # アルファベット語も完全一致のみ採用
-                    continue
-                # アルファベット語に対して漢字やひらがなの記事へリダイレクトされた場合は「概念リダイレクト」として破棄（例: Japan -> 日本）
-                if re.match(r'^[A-Za-z0-9\s\-_.]+$', term) and re.search(r'[\u4e00-\u9fa5\u3040-\u309f]', clean_pt):
-                    continue
-
                 extract = pdata.get("extract", "")
-                # 括弧内の先頭にあるひらがな/カタカナ読みを抽出（英語併記があっても確実に取得）
                 m = re.search(r'[\(（]\s*([ぁ-んァ-ヶゔヴー・、\s,，/／]+)', extract)
+                if not m:
+                    continue
 
-                if m:
-                    raw_bracket = m.group(1).strip()
-                    # 読点（、）、カンマ（，,）、スラッシュ等で分割し、先頭の1つの代表読みのみを取得（異読の全結合を完全防止）
-                    raw_bracket = re.split(r'[、,，\t\n/／|｜]|\s{2,}|(?<=[ぁ-んァ-ヶゔヴー])\s+(?=[A-Za-z])', raw_bracket)[0].strip()
-                    yomi_raw = raw_bracket.replace("・", "").replace(" ", "").strip()
-                    if yomi_raw and yomi_raw not in INVALID_READINGS:
-                        # カタカナをひらがなに変換（ヴ・ゔもサポート）
-                        yomi_hira = ""
-                        for c in yomi_raw:
-                            if 0x30A1 <= ord(c) <= 0x30F6:
-                                yomi_hira += chr(ord(c) - 0x60)
-                            elif c == 'ヴ':
-                                yomi_hira += 'ゔ'
-                            else:
-                                yomi_hira += c
+                raw_bracket = m.group(1).strip()
+                raw_bracket = re.split(r'[、,，\t\n/／|｜]|\s{2,}|(?<=[ぁ-んァ-ヶゔヴー])\s+(?=[A-Za-z])', raw_bracket)[0].strip()
+                yomi_raw = raw_bracket.replace("・", "").replace(" ", "").strip()
+                if not yomi_raw or yomi_raw in WIKI_INVALID_READINGS:
+                    continue
 
-                        yomi_clean = re.sub(r'[^ぁ-んゔー]', '', yomi_hira)
-                        # 法人格接尾語（いんく、こーぽれーしょん、かぶしきがいしゃ等）を安全にカット
-                        yomi_clean = re.sub(r'(いんく|こーぽれーしょん|かぶしきがいしゃ|ゆーげんがいしゃ|ごうどうがいしゃ|りみてっど)$', '', yomi_clean).strip()
-                        # 検索語に含まれない尊称・肩書読み（しんのう、せんしゅ等）を安全にカット
-                        yomi_clean = _strip_unmatched_honorific_reading(term, yomi_clean)
-                        # 検索語に含まれない社名・ブランド名プレフィックス（にんてんどー等）を安全にカット
-                        yomi_clean = _strip_unmatched_brand_prefix(term, yomi_clean)
-                        
-                        # 英単語に対して異常に長すぎる読みは誤読として除外
-                        if re.match(r'^[A-Za-z0-9\s\-_]+$', term) and len(yomi_clean) > len(term) * 2.5:
-                            print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi_clean}' は過剰展開のため破棄")
-                            _wiki_reading_cache[term] = (None, None)
-                            return None, None
-                        if len(yomi_clean) >= 2 and yomi_clean not in INVALID_READINGS:
-                            if not is_plausible_reading(term, yomi_clean):
-                                print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi_clean}' は漢字表記と乖離しているため破棄")
-                                _wiki_reading_cache[term] = (None, None)
-                                return None, None
-                            print(f"[Wikipedia自動発音解決] '{term}' ➔ '{yomi_clean}'")
-                            _wiki_reading_cache[term] = (yomi_clean, term)
-                            return yomi_clean, term
+                yomi_hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else ('ゔ' if c == 'ヴ' else c) for c in yomi_raw])
+                yomi_clean = re.sub(r'[^ぁ-んゔー]', '', yomi_hira)
+                yomi_clean = re.sub(r'(いんく|こーぽれーしょん|かぶしきがいしゃ|ゆーげんがいしゃ|ごうどうがいしゃ|りみてっど)$', '', yomi_clean).strip()
+                yomi_clean = _strip_unmatched_honorific_reading(term, yomi_clean)
+                yomi_clean = _strip_unmatched_brand_prefix(term, yomi_clean)
+
+                valid_yomi = _validate_wiki_reading(term, yomi_clean)
+                if valid_yomi:
+                    print(f"[Wikipedia自動発音解決] '{term}' ➔ '{valid_yomi}'")
+                    _wiki_reading_cache[term] = (valid_yomi, term)
+                    return valid_yomi, term
+                _wiki_reading_cache[term] = (None, None)
+                return None, None
 
         # ── 2. Wikipedia 検索API経由（タイトルの表記揺れ・別名対応） ──
         search_url = f"https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(term)}&format=json"
@@ -377,42 +382,37 @@ def lookup_wikipedia_reading(term):
         with urllib.request.urlopen(req_s, timeout=_WIKI_TIMEOUT, context=ctx) as r_s:
             s_data = json.loads(r_s.read().decode("utf-8"))
             results = s_data.get("query", {}).get("search", [])
-            for res in results[:2]: # 上位2件のみ
+            for res in results[:2]:
                 title = res.get("title", "")
-                if title:
-                    # ── タイトルと検索語の完全一致チェック（Step 1と同等のガード） ──
-                    clean_title = re.sub(r'[\(（].*?[\)）]', '', title).strip()
-                    title_normalized = clean_title.replace(" ", "")
-                    term_normalized = term.replace(" ", "")
-                    if title_normalized != term_normalized and title_normalized.lower() != term_normalized.lower():
-                        print(f"[Wikipedia誤読防止] 🚫 '{term}' の検索結果タイトル '{title}' は完全一致しないため破棄")
-                        continue
-                    p_url = f"https://ja.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(title)}"
-                    try:
-                        req_p = urllib.request.Request(p_url, headers=headers)
-                        with urllib.request.urlopen(req_p, timeout=_WIKI_TIMEOUT, context=ctx) as r_p:
-                            p_data = json.loads(r_p.read().decode("utf-8"))
-                            ext = p_data.get("extract", "")
-                            m2 = re.search(r'^[^\(（]*[（\(]([ぁ-んァ-ヶー\s・]+)[、,）\)]', ext)
-                            if m2:
-                                y2 = m2.group(1).strip().replace("・", "").replace(" ", "")
-                                y2 = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in y2])
-                                # Wikipedia曖昧さ回避や関連語の過剰マッチ防止: タイトルと元の未知語の編集距離/包含をチェック
-                                y2c = _strip_unmatched_honorific_reading(term, y2)
-                                y2c = _strip_unmatched_brand_prefix(term, y2c)
-                                if re.match(r'^[A-Za-z0-9\s\-_]+$', term) and len(y2c) > len(term) * 2.5:
-                                    print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{y2c}' は過剰展開のため破棄")
-                                    _wiki_reading_cache[term] = (None, None)
-                                    return None, None
-                                if len(y2c) >= 2 and y2c not in INVALID_READINGS:
-                                    if not is_plausible_reading(term, y2c):
-                                        print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{y2c}' は漢字表記と乖離しているため破棄")
-                                        _wiki_reading_cache[term] = (None, None)
-                                        return None, None
-                                    _wiki_reading_cache[term] = (y2c, term)
-                                    return y2c, term
-                    except Exception:
-                        pass
+                if not (title == term or (len(term) >= 3 and term in title)):
+                    continue
+                try:
+                    ext_url2 = f"https://ja.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&exsentences=2&explaintext=true&titles={urllib.parse.quote(title)}&redirects=1&format=json"
+                    req2 = urllib.request.Request(ext_url2, headers=headers)
+                    with urllib.request.urlopen(req2, timeout=_WIKI_TIMEOUT, context=ctx) as r2:
+                        pages2 = json.loads(r2.read().decode("utf-8")).get("query", {}).get("pages", {})
+                        for pid2, pdata2 in pages2.items():
+                            if pid2 == "-1":
+                                continue
+                            extract2 = pdata2.get("extract", "")
+                            m2 = re.search(r'[\(（]\s*([ぁ-んァ-ヶゔヴー・、\s,，/／]+)', extract2)
+                            if not m2:
+                                continue
+                            raw_b2 = re.split(r'[、,，\t\n/／|｜]|\s{2,}|(?<=[ぁ-んァ-ヶゔヴー])\s+(?=[A-Za-z])', m2.group(1).strip())[0].strip()
+                            y2 = raw_b2.replace("・", "").replace(" ", "").strip()
+                            y2_hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else ('ゔ' if c == 'ヴ' else c) for c in y2])
+                            y2c = re.sub(r'[^ぁ-んゔー]', '', y2_hira)
+                            y2c = _strip_unmatched_honorific_reading(term, y2c)
+                            y2c = _strip_unmatched_brand_prefix(term, y2c)
+
+                            valid_y2 = _validate_wiki_reading(term, y2c)
+                            if valid_y2:
+                                _wiki_reading_cache[term] = (valid_y2, term)
+                                return valid_y2, term
+                            _wiki_reading_cache[term] = (None, None)
+                            return None, None
+                except Exception:
+                    pass
 
         # ── 3. Wikipedia 全文スニペット検索 (単独記事がない「株探」や名字「小籔」等の固有名詞対応) ──
         # 純粋な漢字熟語（2〜3文字）はVOICEVOXが標準的に読めるため、スニペット検索は行わない
@@ -445,27 +445,11 @@ def lookup_wikipedia_reading(term):
                         _wiki_reading_cache[term] = (y_hira, term)
                         return y_hira, term
 
-                # パターンB: 人名（漢字名字 term:2~3文字 + 名前 extra_name:1~3文字（名字よみ 名前よみ））
-                # ※ 英字略語（AV, AI等）が人名に誤判定されるのを防ぐため、漢字を含む語のみを対象とする
-                if re.search(r'[\u4e00-\u9fa5]', term) and len(term) <= 3:
-                    m_person = re.search(r'(?<![A-Za-z0-9\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff\-_・.])' + re.escape(term) + r"\s*([^\(（\s、。]{1,3})?\s*[（\(]([ぁ-んァ-ヶー\s・]+)[、,）\)]", clean_snippet)
-                    if m_person:
-                        extra_name = m_person.group(1) or ""
-                        y_raw = m_person.group(2).strip().replace("・", " ")
-                        y_hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in y_raw])
-                        parts = y_hira.split()
-                        if extra_name and len(parts) >= 2:
-                            y_surname = parts[0]
-                            if len(y_surname) >= 2 and y_surname not in INVALID_READINGS:
-                                if is_plausible_reading(term, y_surname):
-                                    print(f"[Wikipedia人名・名字読み解決] 🎯 '{term}' -> '{y_surname}'")
-                                    _wiki_reading_cache[term] = (y_surname, term)
-                                    return y_surname, term
-                        elif len(parts) == 1 and len(parts[0]) >= 2 and parts[0] not in INVALID_READINGS:
-                            if is_plausible_reading(term, parts[0]):
-                                print(f"[Wikipediaスニペット読み解決] 🎯 '{term}' -> '{parts[0]}'")
-                                _wiki_reading_cache[term] = (parts[0], term)
-                                return parts[0], term
+                # パターンB: 人名（漢字名字 + 名前）
+                person_yomi = _extract_person_reading_from_snippet(term, clean_snippet)
+                if person_yomi:
+                    _wiki_reading_cache[term] = (person_yomi, term)
+                    return person_yomi, term
     except Exception:
         pass
 
@@ -862,9 +846,7 @@ def build_context_pronunciation_map(full_context, custom_dict=None):
                 if exact_surname_yomi:
                     derived_surnames[surname_kanji] = exact_surname_yomi
                 elif len(yomi) >= 4:
-                    half_len = len(yomi) // 2
-                    if len(yomi) % 2 != 0:
-                        half_len = (len(yomi) + 1) // 2
+                    half_len = (len(yomi) + 1) // 2 if len(yomi) % 2 != 0 else len(yomi) // 2
                     derived_surnames[surname_kanji] = yomi[:half_len]
 
     # 姓の文脈を記録（敬称パターンと連動）

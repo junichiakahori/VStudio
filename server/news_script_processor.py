@@ -329,69 +329,165 @@ def salvage_character_tone(text, char_desc):
     if len(sentences) < 2:
         return text
 
+def _salvage_tone_sentence(sent, is_tororo, is_zunda):
+    """1文に対するキャラクター口調（語尾）の救済補正（ネスト深さ最大2階層）"""
+    l = sent.strip()
+    if is_tororo:
+        replacements = [
+            (r'(?:と思います|思われます)[。！!？?\s]*$', 'と思うにゃ！'),
+            (r'(?:感じます|感じられます)[。！!？?\s]*$', '感じるにゃ！'),
+            (r'(?:期待されます|期待したいです|期待がかかります)[。！!？?\s]*$', '期待されるにゃ！'),
+            (r'楽しみですね[。！!？?\s]*$', '楽しみにゃ！'),
+            (r'(?:目が)?離せません(?:ね)?[。！!？?\s]*$', '目が離せないにゃ！'),
+            (r'([ぁ-んァ-ヶー一-鿿]+)たいですね[。！!？?\s]*$', r'\1たいにゃ！'),
+            (r'(?:でしょう|でしょうか)[。！!？?\s]*$', 'だろうにゃ。'),
+            (r'ですね[。！!？?\s]*$', 'だにゃ。'),
+            (r'ありません[。！!？?\s]*$', 'ないにゃ。'),
+            (r'ました[。！!？?\s]*$', 'たにゃ。'),
+            (r'です[。！!？?\s]*$', 'なんだにゃ。'),
+            (r'だ[。！!？?\s]*$', 'んだにゃ。'),
+        ]
+        for pat, rep in replacements:
+            if re.search(pat, l):
+                return re.sub(pat, rep, l)
+        if not re.search(r'にゃ[！!。、\s]*$', l):
+            return re.sub(r'[。！!？?\s]*$', 'にゃ！', l)
+        return l
+
+    if is_zunda:
+        replacements = [
+            (r'(?:と思います|思われます)[。！!？?\s]*$', 'と思うのだ！'),
+            (r'(?:感じます|感じられます)[。！!？?\s]*$', '感じるのだ！'),
+            (r'(?:期待されます|期待したいです|期待がかかります)[。！!？?\s]*$', '期待されるのだ！'),
+            (r'楽しみですね[。！!？?\s]*$', '楽しみなのだ！'),
+            (r'(?:目が)?離せません(?:ね)?[。！!？?\s]*$', '目が離せないのだ！'),
+            (r'([ぁ-んァ-ヶー一-鿿]+)たいですね[。！!？?\s]*$', r'\1たいのだ！'),
+            (r'(?:でしょう|でしょうか)[。！!？?\s]*$', 'だろうのだ。'),
+            (r'ですね[。！!？?\s]*$', 'なのだ。'),
+            (r'ありません[。！!？?\s]*$', 'ないのだ。'),
+            (r'ました[。！!？?\s]*$', 'たのだ。'),
+            (r'です[。！!？?\s]*$', 'なのだ。'),
+            (r'だ[。！!？?\s]*$', 'なのだ。'),
+        ]
+        for pat, rep in replacements:
+            if re.search(pat, l):
+                return re.sub(pat, rep, l)
+        if not re.search(r'のだ[！!。、\s]*$', l):
+            return re.sub(r'[。！!？?\s]*$', 'なのだ！', l)
+        return l
+
+    return sent
+
+
+def salvage_character_tone(text, char_desc):
+    """
+    LLMがキャラクター口調を喪失して「〜ですね」「〜と思います」等の標準語・丁寧語で
+    出力してしまった場合、文脈を破壊せずに後半（感想部）の語尾を救済・復元する。
+    """
+    if not text or not char_desc:
+        return text
+
+    is_tororo = "にゃ" in char_desc
+    is_zunda = "のだ" in char_desc
+    if not is_tororo and not is_zunda:
+        return text
+
+    target_suffix = "にゃ" if is_tororo else "のだ"
+    if target_suffix in text:
+        return text
+
+    sentences = split_sentences_safely(text)
+    if len(sentences) < 2:
+        return text
+
     salvaged_sentences = []
-    # 後半の感想部分（2〜3文）を救済対象にする
     split_point = max(1, len(sentences) - 2)
 
     for i, sent in enumerate(sentences):
-        if i >= split_point:
-            l = sent.strip()
-            if is_tororo:
-                replacements = [
-                    (r'(?:と思います|思われます)[。！!？?\s]*$', 'と思うにゃ！'),
-                    (r'(?:感じます|感じられます)[。！!？?\s]*$', '感じるにゃ！'),
-                    (r'(?:期待されます|期待したいです|期待がかかります)[。！!？?\s]*$', '期待されるにゃ！'),
-                    (r'楽しみですね[。！!？?\s]*$', '楽しみにゃ！'),
-                    (r'(?:目が)?離せません(?:ね)?[。！!？?\s]*$', '目が離せないにゃ！'),
-                    (r'([ぁ-んァ-ヶー一-鿿]+)たいですね[。！!？?\s]*$', r'\1たいにゃ！'),
-                    (r'(?:でしょう|でしょうか)[。！!？?\s]*$', 'だろうにゃ。'),
-                    (r'ですね[。！!？?\s]*$', 'だにゃ。'),
-                    (r'ありません[。！!？?\s]*$', 'ないにゃ。'),
-                    (r'ました[。！!？?\s]*$', 'たにゃ。'),
-                    (r'です[。！!？?\s]*$', 'なんだにゃ。'),
-                    (r'だ[。！!？?\s]*$', 'んだにゃ。'),
-                ]
-                replaced = False
-                for pat, rep in replacements:
-                    if re.search(pat, l):
-                        l = re.sub(pat, rep, l)
-                        replaced = True
-                        break
-                if not replaced and not re.search(r'にゃ[！!。、\s]*$', l):
-                    l = re.sub(r'[。！!？?\s]*$', 'にゃ！', l)
-            elif is_zunda:
-                replacements = [
-                    (r'(?:と思います|思われます)[。！!？?\s]*$', 'と思うのだ！'),
-                    (r'(?:感じます|感じられます)[。！!？?\s]*$', '感じるのだ！'),
-                    (r'(?:期待されます|期待したいです|期待がかかります)[。！!？?\s]*$', '期待されるのだ！'),
-                    (r'楽しみですね[。！!？?\s]*$', '楽しみなのだ！'),
-                    (r'(?:目が)?離せません(?:ね)?[。！!？?\s]*$', '目が離せないのだ！'),
-                    (r'([ぁ-んァ-ヶー一-鿿]+)たいですね[。！!？?\s]*$', r'\1たいのだ！'),
-                    (r'(?:でしょう|でしょうか)[。！!？?\s]*$', 'だろうのだ。'),
-                    (r'ですね[。！!？?\s]*$', 'なのだ。'),
-                    (r'ありません[。！!？?\s]*$', 'ないのだ。'),
-                    (r'ました[。！!？?\s]*$', 'たのだ。'),
-                    (r'です[。！!？?\s]*$', 'なのだ。'),
-                    (r'だ[。！!？?\s]*$', 'なのだ。'),
-                ]
-                replaced = False
-                for pat, rep in replacements:
-                    if re.search(pat, l):
-                        l = re.sub(pat, rep, l)
-                        replaced = True
-                        break
-                if not replaced and not re.search(r'のだ[！!。、\s]*$', l):
-                    l = re.sub(r'[。！!？?\s]*$', 'なのだ！', l)
-            salvaged_sentences.append(l)
-        else:
+        if i < split_point:
             salvaged_sentences.append(sent)
+            continue
+        salvaged_sentences.append(_salvage_tone_sentence(sent, is_tororo, is_zunda))
 
     return ' '.join(salvaged_sentences)
+
+
+def _apply_zunda_ending(s):
+    """ずんだもん口調（のだ）の文末変換（最大深さ2階層）"""
+    if re.search(r'(?:でした|であった|だった|ました|した|された|決めた|発表した|判明した|合意した)$', s):
+        s = re.sub(r'(?:でした|であった|だった)$', 'だった', s)
+        s = re.sub(r'ました$', 'た', s)
+        return f"{s}のだ。"
+    if re.search(r'(?:です|である|だ)$', s):
+        s = re.sub(r'(?:です|である|だ)$', '', s)
+        return f"{s}なのだ。"
+    if re.search(r'(?:している|されている|となっている|見られている|起きている|ある|いる|ない)$', s):
+        return f"{s}のだ。"
+    return f"{s}なのだ。"
+
+
+def _apply_tororo_ending(s):
+    """とろろ口調（にゃ）の文末変換（最大深さ2階層）"""
+    if re.search(r'(?:でした|であった|だった)$', s):
+        s = re.sub(r'(?:でした|であった|だった)$', '', s)
+        return f"{s}でしたにゃ。"
+    if s.endswith("ました"):
+        return f"{s}にゃ。"
+
+    # 過去形の丁寧語化テーブル
+    past_conversions = [
+        ("判明した", "判明しました"),
+        ("決定した", "決定しました"),
+        ("上がった", "上がりました"),
+        ("出た", "出ました"),
+        ("された", "されました"),
+        ("した", "しました"),
+    ]
+    if re.search(r'(?:発表した|明らかにした|判明した|決定した|合意した|開催された|実施された|報じた|伝えた|落とした|引き上げた|向かった|示した|求めた|受けた|選ばれた|当選した|左右した|上がった|出た|した|された)$', s):
+        for old_tail, new_tail in past_conversions:
+            if s.endswith(old_tail):
+                s = s[:-len(old_tail)] + new_tail
+                break
+        return f"{s}にゃ。"
+
+    if re.search(r'(?:している|されている|となっている|見られている|起きている|進めている|目指している|求めている)$', s):
+        s = re.sub(r'ている$', 'ています', s)
+        return f"{s}にゃ。"
+    if s.endswith("ある"):
+        s = re.sub(r'ある$', 'あります', s)
+        return f"{s}にゃ。"
+    if s.endswith("ない"):
+        s = re.sub(r'ない$', 'ありません', s)
+        return f"{s}にゃ。"
+    if re.search(r'(?:です|ます)$', s):
+        return f"{s}にゃ。"
+    if re.search(r'(?:だ|である)$', s):
+        s = re.sub(r'(?:だ|である)$', '', s)
+        return f"{s}ですにゃ。"
+    return f"{s}ですにゃ。"
+
+
+def _apply_default_ending(s):
+    """標準口調（です・ます）の文末変換（最大深さ2階層）"""
+    if re.search(r'(?:した|された)$', s):
+        s = re.sub(r'された$', 'されました', s)
+        s = re.sub(r'した$', 'しました', s)
+        return f"{s}。"
+    if s.endswith("ている"):
+        s = re.sub(r'ている$', 'ています', s)
+        return f"{s}。"
+    if re.search(r'(?:だ|である)$', s):
+        s = re.sub(r'(?:だ|である)$', 'です', s)
+        return f"{s}。"
+    if not re.search(r'[。！？!?]$', s):
+        return f"{s}です。"
+    return f"{s}。"
+
 
 def apply_character_speech_ending(body_sentence, char_desc):
     """
     ニュース本文の文末を、余計な伝聞（〜とのこと、〜と報じられている等）を一切挟まず、
-    直接的で自然なキャラクター口調（丁寧＋語尾）に整形する。
+    直接的で自然なキャラクター口調（丁寧＋語尾）に整形する（最大深さ2階層）。
     """
     suffix = "にゃ" if "にゃ" in char_desc else ("のだ" if "のだ" in char_desc else "です")
     is_zunda = ("のだ" in suffix)
@@ -407,75 +503,10 @@ def apply_character_speech_ending(body_sentence, char_desc):
         return s.rstrip("！!。") + "のだ。"
 
     if is_zunda:
-        if re.search(r'(?:でした|であった|だった|ました|した|された|決めた|発表した|判明した|合意した)$', s):
-            s = re.sub(r'(?:でした|であった|だった)$', 'だった', s)
-            s = re.sub(r'ました$', 'た', s)
-            return f"{s}のだ。"
-        elif re.search(r'(?:です|である|だ)$', s):
-            s = re.sub(r'(?:です|である|だ)$', '', s)
-            return f"{s}なのだ。"
-        elif re.search(r'(?:している|されている|となっている|見られている|起きている|ある|いる|ない)$', s):
-            return f"{s}のだ。"
-        elif re.search(r'(?:方針|見通し|模様|予定|所属|発言|意向|状況|狙い|理由|結果)$', s):
-            return f"{s}なのだ。"
-        else:
-            return f"{s}なのだ。"
-    elif is_tororo:
-        if re.search(r'(?:でした|であった|だった)$', s):
-            s = re.sub(r'(?:でした|であった|だった)$', '', s)
-            return f"{s}でしたにゃ。"
-        elif re.search(r'ました$', s):
-            return f"{s}にゃ。"
-        elif re.search(r'(?:発表した|明らかにした|判明した|決定した|合意した|開催された|実施された|報じた|伝えた|落とした|引き上げた|向かった|示した|求めた|受けた|選ばれた|当選した|左右した|上がった|出た)$', s):
-            if s.endswith("された"):
-                s = s[:-3] + "されました"
-            elif s.endswith("した"):
-                s = s[:-2] + "しました"
-            elif s.endswith("出た"):
-                s = s[:-2] + "出ました"
-            elif s.endswith("上がった"):
-                s = s[:-4] + "上がりました"
-            elif s.endswith("判明した"):
-                s = s[:-4] + "判明しました"
-            elif s.endswith("決定した"):
-                s = s[:-4] + "決定しました"
-            return f"{s}にゃ。"
-        elif re.search(r'(?:した|された)$', s):
-            if s.endswith("された"):
-                s = s[:-3] + "されました"
-            else:
-                s = s[:-2] + "しました"
-            return f"{s}にゃ。"
-        elif re.search(r'(?:している|されている|となっている|見られている|起きている|進めている|目指している|求めている)$', s):
-            s = re.sub(r'ている$', 'ています', s)
-            return f"{s}にゃ。"
-        elif re.search(r'ある$', s):
-            s = re.sub(r'ある$', 'あります', s)
-            return f"{s}にゃ。"
-        elif re.search(r'ない$', s):
-            s = re.sub(r'ない$', 'ありません', s)
-            return f"{s}にゃ。"
-        elif re.search(r'(?:です|ます)$', s):
-            return f"{s}にゃ。"
-        elif re.search(r'(?:だ|である)$', s):
-            s = re.sub(r'(?:だ|である)$', '', s)
-            return f"{s}ですにゃ。"
-        else:
-            return f"{s}ですにゃ。"
-    else:
-        if re.search(r'(?:した|された)$', s):
-            s = re.sub(r'された$', 'されました', s)
-            s = re.sub(r'した$', 'しました', s)
-            return f"{s}。"
-        elif re.search(r'ている$', s):
-            s = re.sub(r'ている$', 'ています', s)
-            return f"{s}。"
-        elif re.search(r'(?:だ|である)$', s):
-            s = re.sub(r'(?:だ|である)$', 'です', s)
-            return f"{s}。"
-        elif not re.search(r'[。！？!?]$', s):
-            return f"{s}です。"
-        return f"{s}。"
+        return _apply_zunda_ending(s)
+    if is_tororo:
+        return _apply_tororo_ending(s)
+    return _apply_default_ending(s)
 
 
 def build_safe_fallback_sentences(title, article_content, char_desc, custom_dict=None):
@@ -640,15 +671,15 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
         # 単独の「にゃ！」「なのだ！」など意味のある文でないものは直前の文へ安全マージまたはスキップ
         core_chars = re.sub(r'[にゃのだ！!？?。、 \s　]+', '', s)
         if len(core_chars) < 2:
-            if corrected_items:
-                prev_disp = corrected_items[-1]["display"].rstrip("。！？!? \t　")
-                # 直前の文がまだ語尾で終わっていない場合のみ、末尾に自然にマージ
-                if not re.search(r'(?:にゃ|のだ|なのだ)$', prev_disp):
-                    tail_suffix = re.sub(r'^[。！？!? \t　]+', '', s).strip()
-                    if tail_suffix:
-                        combined_disp = f"{prev_disp}{tail_suffix}"
-                        corrected_items[-1]["display"] = combined_disp
-                        corrected_items[-1]["speech"] = normalize_for_tts(combined_disp, custom_dict=custom_dict, context_map=context_map)
+            if not corrected_items:
+                continue
+            prev_disp = corrected_items[-1]["display"].rstrip("。！？!? \t　")
+            tail_suffix = re.sub(r'^[。！？!? \t　]+', '', s).strip()
+            # 直前の文がまだ語尾で終わっておらず、suffixがある場合のみマージ
+            if tail_suffix and not re.search(r'(?:にゃ|のだ|なのだ)$', prev_disp):
+                combined_disp = f"{prev_disp}{tail_suffix}"
+                corrected_items[-1]["display"] = combined_disp
+                corrected_items[-1]["speech"] = normalize_for_tts(combined_disp, custom_dict=custom_dict, context_map=context_map)
             continue
 
         display_s = re.sub(r'(\d+)(?:歳|才)[（\(].*?[）\)]', r'\1歳', s)
@@ -735,6 +766,34 @@ SPORTS_KEYWORDS = {
     "トーナメント", "クラブ", "選手", "アスリート", "F1", "レーサー", "ドライバー", "大谷", "ドジャース"
 }
 
+def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, has_sports_context):
+    """相撲・非スポーツ文脈における『選手』誤爆の自己修復（最大深さ2階層）"""
+    if has_sumo_context:
+        if "選手" in disp:
+            disp_fixed = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1', disp)
+            if disp_fixed != disp:
+                print(f"[敬称自己修復] 🩹 相撲記事での「選手」誤爆を検知・除去: '{disp}' ➔ '{disp_fixed}'", flush=True)
+                disp = disp_fixed
+        if "選手" in healed_sp:
+            disp_sp_fixed = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1', healed_sp)
+            if disp_sp_fixed != healed_sp:
+                healed_sp = disp_sp_fixed
+        return disp, healed_sp
+
+    if not has_sports_context:
+        if "選手" in disp:
+            disp_fixed = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1さん', disp)
+            if disp_fixed != disp:
+                print(f"[敬称自己修復] 🩹 非スポーツ記事での「選手」誤爆を検知: '{disp}' ➔ '{disp_fixed}'", flush=True)
+                disp = disp_fixed
+        if "選手" in healed_sp:
+            disp_sp_fixed = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1さん', healed_sp)
+            if disp_sp_fixed != healed_sp:
+                healed_sp = disp_sp_fixed
+
+    return disp, healed_sp
+
+
 def audit_and_heal_news_script(items, title="", article_context=""):
     """
     生成された原稿各文（items: [{'display': ..., 'speech': ...}]）を再チェックし、
@@ -782,28 +841,7 @@ def audit_and_heal_news_script(items, title="", article_context=""):
         healed_sp = heal_sentence_reading(disp, sp)
 
         # 2. 「選手」の文脈適正チェック
-        # (A) 相撲文脈（力士に「選手」が付いている場合は「選手」を除去して力士名単体へ修正）
-        if has_sumo_context:
-            if "選手" in disp:
-                disp_fixed = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1', disp)
-                if disp_fixed != disp:
-                    print(f"[敬称自己修復] 🩹 相撲記事での「選手」誤爆を検知・除去: '{disp}' ➔ '{disp_fixed}'", flush=True)
-                    disp = disp_fixed
-            if "選手" in healed_sp:
-                sp_fixed = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1', healed_sp)
-                if sp_fixed != healed_sp:
-                    healed_sp = sp_fixed
-        # (B) スポーツ文脈が皆無なのに「選手」が付いている場合は「さん」へ修正
-        elif not has_sports_context:
-            if "選手" in disp:
-                disp_fixed = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1さん', disp)
-                if disp_fixed != disp:
-                    print(f"[敬称自己修復] 🩹 非スポーツ記事での「選手」誤爆を検知: '{disp}' ➔ '{disp_fixed}'", flush=True)
-                    disp = disp_fixed
-            if "選手" in healed_sp:
-                sp_fixed = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1さん', healed_sp)
-                if sp_fixed != healed_sp:
-                    healed_sp = sp_fixed
+        disp, healed_sp = _heal_athlete_honorific(disp, healed_sp, has_sumo_context, has_sports_context)
 
         # 3. 普通名詞・国名・組織名への「さん」誤爆の最終除去
         for noun in INVALID_SAN_NOUNS:
@@ -1024,7 +1062,37 @@ def audit_and_heal_news_script(items, title="", article_context=""):
         else:
             break
 
-    return healed_items
+def _match_title_subjects_in_script(primary_subjects, kanji_names, clean_t, raw_text, article_context):
+    """タイトル主要固有名詞・主語のマッチング検証（最大深さ2階層）"""
+    matched_subs = [s for s in primary_subjects if s in raw_text]
+
+    # 人名の場合、先頭2文字の名字（例: 大森元貴 -> 大森）も許容
+    for k in kanji_names:
+        if re.match(r'^[一-鿿]{4}$', k) and k[:2] in raw_text and k[:2] not in matched_subs:
+            matched_subs.append(k[:2])
+            continue
+        if len(k) >= 4:
+            stem = re.sub(r'(接近|発表|開始|決定|中止|通過|着陸|出発|逮捕|搬送|衝突|火災|避難|警戒|対策|方針|合意|声明|会談|訪問|辞任|就任)$', '', k)
+            if len(stem) >= 2 and stem in raw_text and stem not in matched_subs:
+                matched_subs.append(stem)
+
+    # タイトル内の2〜3文字の重要漢字（例: 大統領、専用機）や本文の固有エンティティが含まれていれば救済
+    if not matched_subs:
+        sub_nouns = [w for w in re.findall(r'[一-鿿]{2,3}', clean_t) if w not in GENERIC_TITLE_WORDS]
+        matched_nouns = [w for w in sub_nouns if w in raw_text]
+        common_kana = {
+            'ニュース', 'コメント', 'オリジナル', 'ランキング', 'アワード', 'アンケート', 'リポート',
+            'シリーズ', 'イベント', 'ストリーミング', 'ショット', 'リリース', 'インタビュー',
+            'トップ', 'ラスト', 'スタート', 'ゴール', 'メンバー', 'グループ', 'チーム', 'ファン',
+            'マイナス', 'プラス', 'ポイント'
+        }
+        body_entities = [w for w in re.findall(r'[ァ-ヶー]{3,}|[A-Za-z]{3,}', article_context or "") if w not in common_kana]
+        matched_body = [w for w in body_entities if w in raw_text]
+        if matched_nouns or (len(matched_body) >= 2):
+            matched_subs.extend(matched_nouns + matched_body)
+
+    return matched_subs
+
 
 def validate_news_script_quality(raw_text, title="", article_context="", char_desc=""):
     """
@@ -1205,26 +1273,7 @@ def validate_news_script_quality(raw_text, title="", article_context="", char_de
         kana_tokens = [k for k in re.findall(r'[ァ-ヶー]{3,}', clean_t) if k not in COMMON_KANA_WORDS]
         primary_subjects = list(dict.fromkeys(eng_tokens + kanji_names + kana_tokens))
         if primary_subjects:
-            matched_subs = [s for s in primary_subjects if s in raw_text]
-            # 人名の場合、先頭2文字の名字（例: 大森元貴 -> 大森）も許容
-            for k in kanji_names:
-                if re.match(r'^[一-鿿]{4}$', k) and k[:2] in raw_text and k[:2] not in matched_subs:
-                    matched_subs.append(k[:2])
-                # 複合語（例: 無人機接近 -> 無人機）の語幹許容
-                elif len(k) >= 4:
-                    stem = re.sub(r'(接近|発表|開始|決定|中止|通過|着陸|出発|逮捕|搬送|衝突|火災|避難|警戒|対策|方針|合意|声明|会談|訪問|辞任|就任)$', '', k)
-                    if len(stem) >= 2 and stem in raw_text and stem not in matched_subs:
-                        matched_subs.append(stem)
-
-            # タイトル内の2〜3文字の重要漢字（例: 大統領、専用機）や本文の固有エンティティが含まれていれば救済
-            if not matched_subs:
-                sub_nouns = [w for w in re.findall(r'[一-鿿]{2,3}', clean_t) if w not in GENERIC_TITLE_WORDS]
-                matched_nouns = [w for w in sub_nouns if w in raw_text]
-                body_entities = [w for w in re.findall(r'[ァ-ヶー]{3,}|[A-Za-z]{3,}', article_context or "") if w not in COMMON_KANA_WORDS]
-                matched_body = [w for w in body_entities if w in raw_text]
-                if matched_nouns or (len(matched_body) >= 2):
-                    matched_subs.extend(matched_nouns + matched_body)
-
+            matched_subs = _match_title_subjects_in_script(primary_subjects, kanji_names, clean_t, raw_text, article_context)
             if not matched_subs:
                 return False, f"元記事タイトルの主要固有名詞・主語（{primary_subjects[:3]}）が原稿内に全く含まれていません（主語喪失・一般論ハルシネーション）"
 

@@ -283,68 +283,77 @@ _original_get_contents = Parser.get_contents
 _last_fountain_update_time = None
 _last_fountain_emoji_counts = {}
 
-def _custom_get_contents(self, jsn):
+def _process_emoji_fountain_mutation(m, jsn):
+    """絵文字ファウンテン（リアルタイムハートリアクション）の抽出と注入（最大深さ2階層）"""
     global _last_fountain_update_time, _last_fountain_emoji_counts
+    payload = m.get("payload", {})
+    if "emojiFountainDataEntity" not in payload:
+        return
+
+    fountain = payload["emojiFountainDataEntity"]
+    update_time = fountain.get("updateTimeUsec")
+    buckets = fountain.get("reactionBuckets", [])
+
+    # 以前と同一の updateTime なら重複処理をスキップ
+    if update_time and update_time == _last_fountain_update_time:
+        return
+
+    # 各絵文字の現在のカウントを集計
+    current_counts = {}
+    for b in buckets:
+        for r in b.get("reactionsData", []) or b.get("reactions", []):
+            cnt = r.get("reactionCount", 0)
+            em = r.get("unicodeEmojiId") or r.get("emojiId") or _resolve_single_emoji(json.dumps(r, ensure_ascii=False))
+            if em and cnt > 0:
+                current_counts[em] = current_counts.get(em, 0) + cnt
+    for r in fountain.get("reactionsData", []) or fountain.get("reactions", []):
+        cnt = r.get("reactionCount", 0)
+        em = r.get("unicodeEmojiId") or r.get("emojiId") or _resolve_single_emoji(json.dumps(r, ensure_ascii=False))
+        if em and cnt > 0:
+            current_counts[em] = current_counts.get(em, 0) + cnt
+
+    # 初回接続時は現在のカウントをベースラインとして記憶（過去の累積を即時発火させない）
+    if _last_fountain_update_time is None:
+        _last_fountain_update_time = update_time
+        _last_fountain_emoji_counts = current_counts
+        return
+
+    _last_fountain_update_time = update_time
+
+    # 差分（新規に増加したリアクション数）のみを発火
+    new_reactions = []
+    for em, cnt in current_counts.items():
+        diff = cnt - _last_fountain_emoji_counts.get(em, 0)
+        if diff > 0:
+            new_reactions.append((em, diff))
+
+    _last_fountain_emoji_counts = current_counts
+    if not new_reactions:
+        return
+
+    lc = (jsn.get('continuationContents') or {}).get('liveChatContinuation')
+    if not lc:
+        return
+
+    if not lc.get('actions'):
+        lc['actions'] = []
+
+    for em, diff in new_reactions:
+        logging.info(f"[YouTube Live Reaction Intercepted!] emoji={em} count={diff} updateTime={update_time}")
+        lc['actions'].append({
+            "vstudioLiveReaction": {
+                "emoji": em,
+                "count": min(diff, 10)  # 一度のバースト上限
+            }
+        })
+
+
+def _custom_get_contents(self, jsn):
     if jsn and "frameworkUpdates" in jsn:
         try:
             mutations = jsn["frameworkUpdates"].get("entityBatchUpdate", {}).get("mutations", [])
             for m in mutations:
-                payload = m.get("payload", {})
-                if "emojiFountainDataEntity" in payload:
-                    fountain = payload["emojiFountainDataEntity"]
-                    update_time = fountain.get("updateTimeUsec")
-                    buckets = fountain.get("reactionBuckets", [])
-                    
-                    # 以前と同一の updateTime なら重複処理をスキップ
-                    if update_time and update_time == _last_fountain_update_time:
-                        continue
-                    
-                    # 各絵文字の現在のカウントを集計
-                    current_counts = {}
-                    for b in buckets:
-                        for r in b.get("reactionsData", []) or b.get("reactions", []):
-                            cnt = r.get("reactionCount", 0)
-                            em = r.get("unicodeEmojiId") or r.get("emojiId") or _resolve_single_emoji(json.dumps(r, ensure_ascii=False))
-                            if em and cnt > 0:
-                                current_counts[em] = current_counts.get(em, 0) + cnt
-                    for r in fountain.get("reactionsData", []) or fountain.get("reactions", []):
-                        cnt = r.get("reactionCount", 0)
-                        em = r.get("unicodeEmojiId") or r.get("emojiId") or _resolve_single_emoji(json.dumps(r, ensure_ascii=False))
-                        if em and cnt > 0:
-                            current_counts[em] = current_counts.get(em, 0) + cnt
-                    
-                    # 初回接続時は現在のカウントをベースラインとして記憶（過去の累積を即時発火させない）
-                    if _last_fountain_update_time is None:
-                        _last_fountain_update_time = update_time
-                        _last_fountain_emoji_counts = current_counts
-                        continue
-                    
-                    _last_fountain_update_time = update_time
-                    
-                    # 差分（新規に増加したリアクション数）のみを発火
-                    new_reactions = []
-                    for em, cnt in current_counts.items():
-                        prev_cnt = _last_fountain_emoji_counts.get(em, 0)
-                        diff = cnt - prev_cnt
-                        if diff > 0:
-                            new_reactions.append((em, diff))
-                    
-                    _last_fountain_emoji_counts = current_counts
-                    
-                    if new_reactions:
-                        contents = jsn.get('continuationContents')
-                        if contents and 'liveChatContinuation' in contents:
-                            lc = contents['liveChatContinuation']
-                            if 'actions' not in lc or lc['actions'] is None:
-                                lc['actions'] = []
-                            for em, diff in new_reactions:
-                                logging.info(f"[YouTube Live Reaction Intercepted!] emoji={em} count={diff} updateTime={update_time}")
-                                lc['actions'].append({
-                                    "vstudioLiveReaction": {
-                                        "emoji": em,
-                                        "count": min(diff, 10)  # 一度のバースト上限
-                                    }
-                                })
+                _process_emoji_fountain_mutation(m, jsn)
         except Exception as err:
             logging.debug(f"Error parsing emojiFountainDataEntity: {err}")
 
@@ -368,26 +377,27 @@ class VStudioChatProcessor(DefaultProcessor):
     def process(self, chat_components: list):
         chatlist = []
         timeout = 0
-        if chat_components:
-            for component in chat_components:
-                if component is None:
+        if not chat_components:
+            return chatlist, timeout
+
+        for component in chat_components:
+            if component is None:
+                continue
+            timeout += component.get('timeout', 0)
+            chatdata = component.get('chatdata')
+            if not chatdata:
+                continue
+            for action in chatdata:
+                if action is None:
                     continue
-                timeout += component.get('timeout', 0)
-                chatdata = component.get('chatdata')
-                if chatdata is None:
-                    continue
-                for action in chatdata:
-                    if action is None:
-                        continue
-                    if action.get('vstudioLiveReaction') is not None:
-                        rx = action['vstudioLiveReaction']
-                        chatlist.append(ReactionItem(emoji=rx.get('emoji', '❤️'), count=rx.get('count', 1)))
-                    elif action.get('addChatItemAction') is not None:
-                        item = action['addChatItemAction'].get('item')
-                        if item:
-                            chat = self._parse(item)
-                            if chat:
-                                chatlist.append(chat)
+                if action.get('vstudioLiveReaction') is not None:
+                    rx = action['vstudioLiveReaction']
+                    chatlist.append(ReactionItem(emoji=rx.get('emoji', '❤️'), count=rx.get('count', 1)))
+                elif action.get('addChatItemAction') is not None:
+                    item = action['addChatItemAction'].get('item')
+                    chat = self._parse(item) if item else None
+                    if chat:
+                        chatlist.append(chat)
                     else:
                         try:
                             action_str = json.dumps(action, ensure_ascii=False)
