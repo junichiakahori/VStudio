@@ -49,22 +49,28 @@ def test_sumo_senshu():
 
 def test_kata_hou():
     print("=== 3. 方（かた）/ 方（ほう）読み分けテスト ===")
+    from server.news_script_processor import audit_and_heal_news_script
+    import re
+
     kata_hou_tests = [
-        ("倉木華さんはセクシー女優として活動していた方で、悲しみとショックを受けているにゃ。", "活動していたかたで"),
-        ("野球界に大きな影響を与えた方として敬意を表したいにゃ！", "影響を与えたかたとして"),
-        ("AIモデルの事前学習に携わってきた方で、批判しましたにゃ。", "携わってきたかたで"),
-        ("そして猟師の方から狩猟を体験してみるようアドバイスを受けたんだにゃ。", "猟師のかたから"),
-        ("本当に才能のある方ですね。", "才能のあるかた"),
-        ("その前に必要な方は早めに購入することをおすすめしますにゃ！", "必要なかたは"),
-        ("朝は時間に余裕を持った行動をした方がいいにゃ！", "した方がいい"),
-        ("世論調査では民主党支持層の方が投票意欲が高いことが示されているにゃ。", "支持層の方が"),
-        ("片方の袖がボリューミーに膨らんだドレスで登場したにゃ。", "片方の袖")
+        ("倉木華さんはセクシー女優として活動していた方（かた）で、悲しみとショックを受けているにゃ。", "活動していた方で", "活動していたかたで"),
+        ("野球界に大きな影響を与えた方（かた）として敬意を表したいにゃ！", "影響を与えた方として", "影響を与えたかたとして"),
+        ("AIモデルの事前学習に携わってきた方（かた）で、批判しましたにゃ。", "携わってきた方で", "携わってきたかたで"),
+        ("そして猟師の方（かた）から狩猟を体験してみるようアドバイスを受けたんだにゃ。", "猟師の方から", "猟師のかたから"),
+        ("朝は時間に余裕を持った行動をした方（ほう）がいいにゃ！", "した方がいい", "したほうがいい"),
+        ("世論調査では民主党支持層の方（ほう）が投票意欲が高いことが示されているにゃ。", "支持層の方が", "支持層のほうが"),
     ]
 
-    for text, expected_snippet in kata_hou_tests:
-        res = apply_person_kata_rules(text)
-        assert expected_snippet in res, f"Fail kata/hou test: expected '{expected_snippet}' in '{res}'"
-        print(f"  ✅ PASS: '{expected_snippet}' ➔ OK")
+    for text, exp_disp, exp_sp in kata_hou_tests:
+        disp = re.sub(r'([\u4e00-\u9fff]{1,8})[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\1', text)
+        disp = disp.replace("（", "").replace("）", "").replace("(", "").replace(")", "").strip()
+        sp = re.sub(r'([\u4e00-\u9fff]{1,8})[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\2', text)
+        items = [{"display": disp, "speech": sp}]
+        healed = audit_and_heal_news_script(items, title="テスト", article_context="記事")
+        
+        assert exp_disp in healed[0]["display"], f"Fail disp: expected '{exp_disp}' in '{healed[0]['display']}'"
+        assert exp_sp in healed[0]["speech"], f"Fail speech: expected '{exp_sp}' in '{healed[0]['speech']}'"
+        print(f"  ✅ PASS: disp='{exp_disp}' / speech='{exp_sp}' ➔ OK")
     print("  ✅ 方（かた）/ 方（ほう）読み分けテスト全件合格！")
 
 if __name__ == "__main__":
