@@ -210,8 +210,18 @@ class _ImperialNounsProxy(list):
 
 IMPERIAL_PROPER_NOUNS = _ImperialNounsProxy()
 
+DEFAULT_HONORIFIC_SUFFIX_PAIRS = [
+    ("親王", "しんのう"), ("内親王", "ないしんのう"), ("選手", "せんしゅ"), ("投手", "とうしゅ"),
+    ("捕手", "ほしゅ"), ("監督", "かんとく"), ("コーチ", "こーち"), ("棋士", "きし"),
+    ("名人", "めいじん"), ("竜王", "りゅうおう"), ("横綱", "よこづな"), ("親方", "おやかた"),
+    ("大統領", "だいとうりょう"), ("首相", "しゅしょう"), ("総理", "そうり"), ("知事", "ちじ")
+]
+
 def get_honorific_suffix_pairs():
-    return [tuple(x) for x in load_tts_rules().get("honorific_suffix_pairs", [])]
+    rules_pairs = load_tts_rules().get("honorific_suffix_pairs")
+    if rules_pairs:
+        return [tuple(x) for x in rules_pairs]
+    return DEFAULT_HONORIFIC_SUFFIX_PAIRS
 
 class _HonorificPairsProxy(list):
     def __iter__(self):
