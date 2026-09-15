@@ -653,7 +653,7 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
 
         display_s = re.sub(r'(\d+)(?:歳|才)[（\(].*?[）\)]', r'\1歳', s)
         s = re.sub(r'(\d+)(?:歳|才)[（\(].*?[）\)]', r'\1歳', s)
-        display_s = re.sub(r'([\u4e00-\u9fff]{1,8})[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\1', display_s)
+        display_s = re.sub(r'([A-Za-z0-9\-]+|[\u4e00-\u9fff]{1,8})[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\1', display_s)
         display_s = display_s.replace("（", "").replace("）", "").replace("(", "").replace(")", "").strip()
         display_s = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)のかた([たち|がた|も|は|が|に|へ|で|を|、|。|！|？\s]|$)', r'\1の方\2', display_s)
         display_s = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)なかた([たち|がた|も|は|が|に|へ|で|を|、|。|！|？\s]|$)', r'\1な方\2', display_s)
@@ -690,7 +690,7 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
             print(f"[不完全文字列検知] 🚫 途切れ文字を検知: '{display_s}' ➔ この文を完全破棄")
             continue
 
-        speech_s = re.sub(r'([\u4e00-\u9fff]{1,8})[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\2', s)
+        speech_s = re.sub(r'([A-Za-z0-9\-]+|[\u4e00-\u9fff]{1,8})[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\2', s)
         speech_s = normalize_for_tts(speech_s, custom_dict=custom_dict, context_map=context_map)
 
         if is_chinese_sentence(display_s) or is_chinese_sentence(speech_s):
