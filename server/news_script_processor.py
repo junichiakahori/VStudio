@@ -306,28 +306,6 @@ def normalize_celebrity_honorifics(text, title, article_content=""):
 
     return result
 
-def salvage_character_tone(text, char_desc):
-    """
-    LLMが客観報道調（〜である、〜だ、〜です）で出力し、キャラクター語尾（にゃ／なのだ）を
-    付け忘れた際に、後半の感想・リアクション部分を自動的にキャラクター口調へ自然に救済補正する。
-    これにより、高品質なAI原稿が不必要に全破棄されてフォールバックに落ちるのを防止する。
-    """
-    if not text or not char_desc:
-        return text
-
-    is_tororo = "にゃ" in char_desc
-    is_zunda = "のだ" in char_desc
-    if not is_tororo and not is_zunda:
-        return text
-
-    target_suffix = "にゃ" if is_tororo else "のだ"
-    if target_suffix in text:
-        return text
-
-    # 改行または句点等で安全に文分割
-    sentences = split_sentences_safely(text)
-    if len(sentences) < 2:
-        return text
 
 def _salvage_tone_sentence(sent, is_tororo, is_zunda):
     """1文に対するキャラクター口調（語尾）の救済補正（ネスト深さ最大2階層）"""
