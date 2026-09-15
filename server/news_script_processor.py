@@ -1,3 +1,24 @@
+# -*- coding: utf-8 -*-
+"""
+news_script_processor.py
+ニュース原稿のAI生成・プロンプト構築・二重検証（ファクト照合・中国語・名乗り・定型句フィルター）・字幕/音声分離モジュール
+"""
+
+import os
+import re
+import json
+import ssl
+import time
+import urllib.request
+import urllib.error
+import threading
+from server.tts_normalizer import (
+    normalize_for_tts, sanitize_speech_text, build_context_pronunciation_map,
+    heal_sentence_reading, apply_person_kata_rules
+)
+from server.news_crawler import find_cached_url, search_news_url_by_title, register_cached_url, fetch_article_body, decode_google_news_url
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def clean_news_description(desc):
     """Google News等のRSS descriptionから各社リンクの羅列や新聞社名を除去"""
@@ -80,27 +101,7 @@ def split_sentences_safely(text):
         for s in parts
     ]
     return restored
-# -*- coding: utf-8 -*-
-"""
-news_script_processor.py
-ニュース原稿のAI生成・プロンプト構築・二重検証（ファクト照合・中国語・名乗り・定型句フィルター）・字幕/音声分離モジュール
-"""
 
-import os
-import re
-import json
-import ssl
-import time
-import urllib.request
-import urllib.error
-import threading
-from server.tts_normalizer import (
-    normalize_for_tts, sanitize_speech_text, build_context_pronunciation_map,
-    heal_sentence_reading, apply_person_kata_rules
-)
-from server.news_crawler import find_cached_url, search_news_url_by_title, register_cached_url, fetch_article_body, decode_google_news_url
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def build_news_prompt(char_desc, title, full_article_content):
     """prompts.json の news_script からプロンプトを構築"""
@@ -172,18 +173,19 @@ def call_openai_backend(prompt, api_key, model="gpt-4o-mini"):
             return choices[0]["message"]["content"].strip()
     return ""
 
-def call_ollama_backend(prompt, model="qwen2.5:7b", base_url="http://127.0.0.1:11434"):
+def call_ollama_backend(prompt, model="qwen2.5:7b", base_url="http://127.0.0.1:11434", system_prompt=None, json_format=False):
     target_model = model or "qwen2.5:7b"
     url = f"{base_url}/api/generate"
     headers = {
         "Content-Type": "application/json"
     }
+    sys_instruction = system_prompt or "You are a professional Japanese VTuber news anchor. Output 100% natural Japanese ONLY. Discuss ONLY the specific news events given in the user prompt. Under no circumstances should you ever output unrelated topics (such as COVID-19 vaccines), Chinese words, or hallucinated facts."
     body = {
         "model": target_model,
         "prompt": prompt,
-        "system": "You are a professional Japanese VTuber news anchor. Output 100% natural Japanese ONLY. Discuss ONLY the specific news events given in the user prompt. Under no circumstances should you ever output unrelated topics (such as COVID-19 vaccines), Chinese words, or hallucinated facts.",
+        "system": sys_instruction,
         "options": {
-            "temperature": 0.2,
+            "temperature": 0.1 if (system_prompt or json_format) else 0.2,
             "top_p": 0.8,
             "num_ctx": 4096,
             "num_predict": 1000
@@ -191,6 +193,8 @@ def call_ollama_backend(prompt, model="qwen2.5:7b", base_url="http://127.0.0.1:1
         "keep_alive": "60m",
         "stream": False
     }
+    if json_format:
+        body["format"] = "json"
     try:
         req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), headers=headers, method="POST")
         with urllib.request.urlopen(req, timeout=60) as res:
@@ -200,13 +204,101 @@ def call_ollama_backend(prompt, model="qwen2.5:7b", base_url="http://127.0.0.1:1
         print(f"[Ollama Backend] モデル '{target_model}' 実行エラー: {e}", flush=True)
     return ""
 
-def call_llm_backend(provider, prompt, api_key="", model_name=""):
+def call_llm_backend(provider, prompt, api_key="", model_name="", system_prompt=None, json_mode=False):
     if provider == 'openai':
         return call_openai_backend(prompt, api_key, model=model_name)
     elif provider == 'ollama':
-        return call_ollama_backend(prompt, model=model_name)
+        return call_ollama_backend(prompt, model=model_name, system_prompt=system_prompt, json_format=json_mode)
     else:
         return call_gemini_backend(prompt, api_key, model=model_name)
+
+def extract_pronunciations_via_ai(text, title="", article_context="", provider="ollama", model_name=None, api_key=""):
+    """
+    VOICEVOXエンジンによるプレ読み（カタカナ列）を取得し、LLMに誤読箇所のみをピンポイント校正・修正させる。
+    ※VOICEVOXが正しく読めている一般的な苗字（蔵内、服部、松本等）はそのまま活かし、
+      皇族（佳子さま、悠仁さま）、芸能人（志尊淳）、多音語（左右対称、山野）等の明らかな誤読のみを修正する。
+    """
+    if not text:
+        return {}
+
+    # VOICEVOXから現在の読み（カタカナ列）を取得
+    current_reading = ""
+    try:
+        from server.voicevox_client import get_voicevox_reading_and_kana
+        full_sample = (title + " " + text).strip()[:600]
+        current_reading, _ = get_voicevox_reading_and_kana(full_sample)
+    except Exception as e:
+        print(f"[VOICEVOX プレ読み取得スキップ]: {e}", flush=True)
+
+    context_source = ""
+    if article_context:
+        context_source += f"【記事の背景】:\n{article_context[:600]}\n\n"
+    context_source += f"【原稿テキスト】:\n{text[:600]}"
+
+    reading_source = ""
+    if current_reading:
+        reading_source = f"【音声合成エンジンの現在の読み（カタカナ）】:\n{current_reading}\n\n"
+
+    prompt = (
+        "あなたは日本語ニュース音声合成の校正AIです。\n"
+        "以下は【記事の背景】と【原稿テキスト】、および音声合成エンジンによる【現在の読み（カタカナ）】です。\n\n"
+        "文脈、人名（芸能人・皇族・政治家など）、固有名詞を考慮し、現在の読みに「明らかな誤読」がある単語だけを特定し、"
+        "元の単語（漢字等の表記）と正しい「ひらがな読み」のペアをJSONで出力してください。\n\n"
+        "※最重要ルール:\n"
+        "- 音声合成エンジンが既に正しく読めている単語（例: 一般的な苗字の蔵内＝クラウチ、服部＝ハットリ、松本若菜＝マツモトワカナ等）は絶対に出力に含めないでください。\n"
+        "- 皇族名（例: 佳子さま＝かこさま、悠仁さま＝ひさひとさま）や芸能人名（例: 志尊淳＝しそんじゅん）、多音語の誤読（例: ケエコサマ、ココロザシミコト、サンヤ等）を最優先で修正してください。\n"
+        "- 原稿テキストやタイトルに実在しない単語は絶対に出力しないでください（ハルシネーションの禁止）。\n"
+        "- 誤読がない場合は空のJSON {} を出力してください。\n\n"
+        f"【タイトル】: {title}\n"
+        f"{context_source}\n\n"
+        f"{reading_source}"
+        "出力形式（有効なJSONのみ、余計な解説文は不要）:\n"
+        "{\n"
+        "  \"誤読された単語\": \"正しいひらがな\"\n"
+        "}"
+    )
+
+    try:
+        raw_res = call_llm_backend(
+            provider, prompt, api_key=api_key, model_name=model_name,
+            system_prompt="You are a JSON assistant. Output valid JSON only.",
+            json_mode=True
+        )
+        if not raw_res:
+            return {}
+
+        m = re.search(r'\{[\s\S]*?\}', raw_res)
+        if not m:
+            return {}
+
+        data = json.loads(m.group(0))
+        if not isinstance(data, dict):
+            return {}
+
+        pron_map = {}
+        all_text = f"{title} {text} {article_context}"
+        for term, yomi in data.items():
+            if not isinstance(term, str) or not isinstance(yomi, str):
+                continue
+            term_clean = term.strip()
+            yomi_clean = re.sub(r'[^ぁ-んー]', '', yomi.strip())
+
+            # ハルシネーション防御: 元テキストやタイトル・記事に実在しない単語は除外
+            if term_clean not in all_text:
+                continue
+
+            # 日本語の音韻原則ガード: 漢字かな混じりを全ひらがなに開いた場合、文字数は原則として元の表記以上になる
+            # （例: 「石油パイプライン」に対して「せきゆ」のように一部だけ切り取られた不正な短縮を排除）
+            if len(yomi_clean) < len(term_clean) * 0.8:
+                continue
+
+            if 2 <= len(term_clean) <= 12 and 2 <= len(yomi_clean) <= 20:
+                pron_map[term_clean] = yomi_clean
+
+        return pron_map
+    except Exception as e:
+        print(f"[AI発音ダブルチェック エラー]: {e}", flush=True)
+        return {}
 
 
 def is_title_duplicate_sentence(sentence, title):
@@ -1041,6 +1133,9 @@ def audit_and_heal_news_script(items, title="", article_context=""):
         else:
             break
 
+    return healed_items
+
+
 GENERIC_TITLE_WORDS = {
     'ニュース', '速報', '発表', '開始', '決定', '予定', '実施', '検討', '注意', '情報', '対策',
     '対応', '確認', '政府', '方針', '問題', '報告', '理由', '影響', '結果', '状況',
@@ -1398,569 +1493,582 @@ def generate_news_item_script_data(payload, custom_dict=None):
                 if cache_key in _NEWS_SCRIPT_CACHE:
                     return _NEWS_SCRIPT_CACHE[cache_key]
 
-    print(f"{tag} 📥 原稿生成リクエスト受信 (AI: {provider}/{model_name or 'default'})", flush=True)
-
-    if not is_special_item:
-        if not article_url:
-            article_url = find_cached_url(title)
-        if not article_url:
-            print(f"{tag} 🔍 記事URLを検索中...", flush=True)
-            article_url = search_news_url_by_title(title)
-        if article_url:
-            register_cached_url(title, article_url)
-            print(f"{tag} 🔗 記事URL特定: {article_url}", flush=True)
-
-    full_article_content = description
-    fetched_body = ""
-    if article_url:
-        # Google News の転送リンクであれば、まず配信元の正規URLにデコード
-        if "news.google.com" in article_url:
-            print(f"{tag} 🔓 Google News転送リンクを配信元URLにデコード中...", flush=True)
-            decoded_url = decode_google_news_url(article_url)
-            if decoded_url and "news.google.com" not in decoded_url:
-                print(f"{tag} 🎯 配信元正規URLデコード成功: {decoded_url}", flush=True)
-                article_url = decoded_url
-                register_cached_url(title, decoded_url)
-
-        print(f"{tag} 🌐 記事本文をスクレイピング取得中...", flush=True)
-        fetched_body = fetch_article_body(article_url)
-        # もし本文が取得できず、かつURLがGoogle News等の転送URLだった場合、Yahoo!ニュース等の正規URLで再探索
-        if not fetched_body and "news.google.com" in article_url:
-            print(f"{tag} 🔄 Google News転送リンクのため、Yahoo!ニュース等の正規URLを再検索中...", flush=True)
-            direct_url = search_news_url_by_title(title)
-            if direct_url and "news.google.com" not in direct_url:
-                article_url = direct_url
-                register_cached_url(title, direct_url)
-                fetched_body = fetch_article_body(direct_url)
-            else:
-                print(f"{tag} 🛡️ 正規の同一記事が特定できないため、別記事混入を防止しRSS概要文のみを安全に活用します", flush=True)
-
-        if fetched_body and len(fetched_body) > 30:
-            if len(fetched_body) > 800:
-                fetched_body = fetched_body[:800] + "…"
-            full_article_content = f"{description}\n【元記事の詳細本文】: {fetched_body}"
-            print(f"{tag} 📄 記事本文取得完了 ({len(fetched_body)}文字) ➔ プロンプト注入", flush=True)
-        else:
-            print(f"{tag} ℹ️ 本文取得スキップ (RSS概要を活用)", flush=True)
-
-    # 著名スイーツ・洋菓子ブランド等の誤認（ナイトクラブ等との混同）防止補足
-    if "クラブハリエ" in title and "洋菓子" not in full_article_content and "バームクーヘン" not in full_article_content:
-        full_article_content += "\n【重要補足】『クラブハリエ』はバームクーヘン等の洋菓子・スイーツで全国的に有名な専門店です。夜のクラブやナイトクラブ・ディスコではありません。"
-
-    # コメント返信や特殊アナウンスはニュース台本（5文構成）ではなく1〜2文の返答専用として直接生成
-    if is_special_item:
-        m_nick = re.search(r'コメント返信:\s*(.+?)さん', title)
-        nickname = m_nick.group(1) if m_nick else "リスナー"
-        m_c = re.search(r'[「『](.*?)[」』]', description)
-        comment_text = m_c.group(1) if m_c else description.replace("さんのコメント", "").replace("に対して1〜2文で返信してください。", "").strip()
-
-        prompt = (
-            f"あなたは{char_desc}\n"
-            f"リスナーの「{nickname}」さんから『{comment_text}』というコメントをいただきました。\n"
-            "キャスターとして、このコメントに対して1〜2文で親しみやすく自然に返信してください（20〜40文字程度）。\n"
-            "※自己紹介やシステムメッセージ、画面名などは含めず、コメントに対する親身な返答セリフのみを出力してください。"
-        )
-
-        candidate_text = call_llm_backend(provider, prompt, api_key, model_name)
-        clean_text = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', candidate_text or '').strip()
-        clean_text = clean_text.replace("「", "").replace("」", "").strip()
-
-        # システム定型文や画面遷移文の誤出力ガード
-        if any(bad in clean_text for bad in ["画面へ移動", "Virtual Studio", "Live2D Virtual", "VStudio -"]):
-            clean_text = f"{nickname}さん、コメントありがとうございますにゃ！"
-        
-        split_s = split_sentences_safely(clean_text)
-        if not split_s:
-            split_s = [clean_text] if clean_text else [f"{nickname}さん、コメントありがとうございますにゃ！"]
-        
-        items = []
-        for s in split_s[:2]:
-            disp = sanitize_speech_text(s)
-            items.append({
-                "display": disp,
-                "speech": normalize_for_tts(disp, custom_dict=custom_dict)
-            })
-        total_speech_chars = sum(len(it.get('speech', '')) for it in items)
-        print(f"{tag} ✅ コメント返信生成完了！ (計 {len(items)}文, {total_speech_chars}文字)", flush=True)
-        return {
-            "status": "ok",
-            "url": "",
-            "headline": { "display": title, "speech": title },
-            "headline_speech": title,
-            "fullText": " ".join([it["display"] for it in items]),
-            "items": items,
-            "sentences": [it["display"] for it in items]
-        }
-
-    # 🛡️ 本文が完全に欠落している場合（40文字未満かつ詳細本文なし）は、LLM妄想創作を物理的に遮断して安全フォールバックへ直行
-    has_valid_body = (fetched_body and len(fetched_body) >= 30) or (full_article_content and len(full_article_content) >= 50)
-    if not has_valid_body:
-        print(f"{tag} 🛡️ 記事本文がスクレイピングできないため、ハルシネーションを防止し安全な定型原稿を自動構築します", flush=True)
-        items = build_safe_fallback_sentences(title, full_article_content, char_desc, custom_dict=custom_dict)
-        raw_text = "\n".join([it["display"] for it in items])
-        headline_dict = {"display": title, "speech": title}
+    try:
+        print(f"{tag} 📥 原稿生成リクエスト受信 (AI: {provider}/{model_name or 'default'})", flush=True)
+    
         if not is_special_item:
-            _save_to_news_history(title, payload, item_obj, article_url, items, headline_dict=headline_dict)
-        return {
+            if not article_url:
+                article_url = find_cached_url(title)
+            if not article_url:
+                print(f"{tag} 🔍 記事URLを検索中...", flush=True)
+                article_url = search_news_url_by_title(title)
+            if article_url:
+                register_cached_url(title, article_url)
+                print(f"{tag} 🔗 記事URL特定: {article_url}", flush=True)
+    
+        full_article_content = description
+        fetched_body = ""
+        if article_url:
+            # Google News の転送リンクであれば、まず配信元の正規URLにデコード
+            if "news.google.com" in article_url:
+                print(f"{tag} 🔓 Google News転送リンクを配信元URLにデコード中...", flush=True)
+                decoded_url = decode_google_news_url(article_url)
+                if decoded_url and "news.google.com" not in decoded_url:
+                    print(f"{tag} 🎯 配信元正規URLデコード成功: {decoded_url}", flush=True)
+                    article_url = decoded_url
+                    register_cached_url(title, decoded_url)
+    
+            print(f"{tag} 🌐 記事本文をスクレイピング取得中...", flush=True)
+            fetched_body = fetch_article_body(article_url)
+            # もし本文が取得できず、かつURLがGoogle News等の転送URLだった場合、Yahoo!ニュース等の正規URLで再探索
+            if not fetched_body and "news.google.com" in article_url:
+                print(f"{tag} 🔄 Google News転送リンクのため、Yahoo!ニュース等の正規URLを再検索中...", flush=True)
+                direct_url = search_news_url_by_title(title)
+                if direct_url and "news.google.com" not in direct_url:
+                    article_url = direct_url
+                    register_cached_url(title, direct_url)
+                    fetched_body = fetch_article_body(direct_url)
+                else:
+                    print(f"{tag} 🛡️ 正規の同一記事が特定できないため、別記事混入を防止しRSS概要文のみを安全に活用します", flush=True)
+    
+            if fetched_body and len(fetched_body) > 30:
+                if len(fetched_body) > 800:
+                    fetched_body = fetched_body[:800] + "…"
+                full_article_content = f"{description}\n【元記事の詳細本文】: {fetched_body}"
+                print(f"{tag} 📄 記事本文取得完了 ({len(fetched_body)}文字) ➔ プロンプト注入", flush=True)
+            else:
+                print(f"{tag} ℹ️ 本文取得スキップ (RSS概要を活用)", flush=True)
+    
+        # 著名スイーツ・洋菓子ブランド等の誤認（ナイトクラブ等との混同）防止補足
+        if "クラブハリエ" in title and "洋菓子" not in full_article_content and "バームクーヘン" not in full_article_content:
+            full_article_content += "\n【重要補足】『クラブハリエ』はバームクーヘン等の洋菓子・スイーツで全国的に有名な専門店です。夜のクラブやナイトクラブ・ディスコではありません。"
+    
+        # コメント返信や特殊アナウンスはニュース台本（5文構成）ではなく1〜2文の返答専用として直接生成
+        if is_special_item:
+            m_nick = re.search(r'コメント返信:\s*(.+?)さん', title)
+            nickname = m_nick.group(1) if m_nick else "リスナー"
+            m_c = re.search(r'[「『](.*?)[」』]', description)
+            comment_text = m_c.group(1) if m_c else description.replace("さんのコメント", "").replace("に対して1〜2文で返信してください。", "").strip()
+    
+            prompt = (
+                f"あなたは{char_desc}\n"
+                f"リスナーの「{nickname}」さんから『{comment_text}』というコメントをいただきました。\n"
+                "キャスターとして、このコメントに対して1〜2文で親しみやすく自然に返信してください（20〜40文字程度）。\n"
+                "※自己紹介やシステムメッセージ、画面名などは含めず、コメントに対する親身な返答セリフのみを出力してください。"
+            )
+    
+            candidate_text = call_llm_backend(provider, prompt, api_key, model_name)
+            clean_text = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', candidate_text or '').strip()
+            clean_text = clean_text.replace("「", "").replace("」", "").strip()
+    
+            # システム定型文や画面遷移文の誤出力ガード
+            if any(bad in clean_text for bad in ["画面へ移動", "Virtual Studio", "Live2D Virtual", "VStudio -"]):
+                clean_text = f"{nickname}さん、コメントありがとうございますにゃ！"
+            
+            split_s = split_sentences_safely(clean_text)
+            if not split_s:
+                split_s = [clean_text] if clean_text else [f"{nickname}さん、コメントありがとうございますにゃ！"]
+            
+            items = []
+            for s in split_s[:2]:
+                disp = sanitize_speech_text(s)
+                items.append({
+                    "display": disp,
+                    "speech": normalize_for_tts(disp, custom_dict=custom_dict)
+                })
+            total_speech_chars = sum(len(it.get('speech', '')) for it in items)
+            print(f"{tag} ✅ コメント返信生成完了！ (計 {len(items)}文, {total_speech_chars}文字)", flush=True)
+            return {
+                "status": "ok",
+                "url": "",
+                "headline": { "display": title, "speech": title },
+                "headline_speech": title,
+                "fullText": " ".join([it["display"] for it in items]),
+                "items": items,
+                "sentences": [it["display"] for it in items]
+            }
+    
+        # 🛡️ 本文が完全に欠落している場合（40文字未満かつ詳細本文なし）は、LLM妄想創作を物理的に遮断して安全フォールバックへ直行
+        has_valid_body = (fetched_body and len(fetched_body) >= 30) or (full_article_content and len(full_article_content) >= 50)
+        if not has_valid_body:
+            print(f"{tag} 🛡️ 記事本文がスクレイピングできないため、ハルシネーションを防止し安全な定型原稿を自動構築します", flush=True)
+            items = build_safe_fallback_sentences(title, full_article_content, char_desc, custom_dict=custom_dict)
+            raw_text = "\n".join([it["display"] for it in items])
+            headline_dict = {"display": title, "speech": title}
+            if not is_special_item:
+                _save_to_news_history(title, payload, item_obj, article_url, items, headline_dict=headline_dict)
+            return {
+                "status": "ok",
+                "url": article_url or "",
+                "headline": headline_dict,
+                "headline_speech": title,
+                "fullText": " ".join([it["display"] for it in items]),
+                "items": items,
+                "sentences": [it["display"] for it in items]
+            }
+    
+        prompt = build_news_prompt(char_desc, title, full_article_content)
+        raw_text = None
+        items = None
+        ai_headline_raw = None
+        best_candidate_text = ""
+        best_candidate_items = []
+        news_context_map = {}
+        attempt = 0
+    
+        while True:
+            attempt += 1
+            cur_prompt = prompt
+            if attempt > 1:
+                suffix_instruction = "語尾には必ず『にゃ』『にゃ！』を付けて発話してください。" if "にゃ" in char_desc else ("語尾には必ず『なのだ』『のだ』を付けて発話してください。" if "なのだ" in char_desc else "")
+                cur_prompt += f"\n\n【重要・品質修正指示（再生成 試行{attempt}回目）】直前の生成で品質基準の不備が検知されたため再生成します。必ず「{title}」の事件・出来事についてのみ解説してください。見出しをそのまま繰り返さず、記事本文の具体的な詳細から解説を始めてください。必ず【前半: 記事要約2〜3文】＋【後半: あなた自身の感想2〜3文】の【合計4〜6文】で作成してください。{suffix_instruction}"
+                print(f"{tag} 🔄 [試行 {attempt}] ダブルチェック再生成を実行中...", flush=True)
+            else:
+                print(f"{tag} 🤖 [試行 1] LLMへ原稿生成リクエスト送信中...", flush=True)
+    
+            candidate_text = call_llm_backend(provider, cur_prompt, api_key, model_name)
+            if not candidate_text:
+                print(f"{tag} ⚠️ [試行 {attempt}] LLM応答なし ➔ 再試行します", flush=True)
+                if attempt >= 3:
+                    print(f"{tag} 🛡️ 最大試行回数(3回)に達してもLLM応答が得られないため、元記事から安全な原稿を自動構築します", flush=True)
+                    items = build_safe_fallback_sentences(title, full_article_content, char_desc, custom_dict=custom_dict)
+                    raw_text = "\n".join([it["display"] for it in items])
+                    break
+                time.sleep(2)
+                continue
+    
+            print(f"{tag} 📩 [試行 {attempt}] LLM応答受信 ({len(candidate_text)}文字) ➔ 発音・ファクト照合中...", flush=True)
+    
+            best_candidate_text = candidate_text
+    
+            # パース・重複除去・発音検証を通して items を作成
+            clean_text = candidate_text
+            clean_text = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', clean_text, flags=re.MULTILINE).strip()
+    
+            headline_match = re.search(r'(?:\[(?:HEADLINE|見出し):\s*|【(?:ニュース)?見出し】[\s:：]*|見出し[\s:：]+)(.*?)(?:\]|\n|$)', candidate_text)
+            if headline_match:
+                ai_headline_raw = headline_match.group(1).strip()
+                ai_headline_raw = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', ai_headline_raw).strip()
+                # 🛡️ 見出しにはキャラクター語尾（にゃ、のだ等）を絶対に付けない（客観的な報道タイトルのため完全切除）
+                ai_headline_raw = re.sub(r'(?:です|だ|だった|された|した|ある|いる|なる|こと)?[\s　]*(?:とろろ)?(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', ai_headline_raw).strip()
+                ai_headline_raw = re.sub(r'[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', ai_headline_raw).strip()
+                clean_text = re.sub(r'(?:\[(?:HEADLINE|見出し):\s*|【(?:ニュース)?見出し】[\s:：]*|見出し[\s:：]+).*?(?:\]|\n|$)', '', clean_text).strip()
+    
+            # ✂️ 【記事本文】【要約】【解説台本】【感想】等のセクションタグ行・見出し行を一括完全消去
+            clean_text = re.sub(r'(?:\[(?:HEADLINE|見出し|記事本文|本文|要約|解説|感想):\s*|【(?:ニュース)?(?:見出し|記事本文|本文|要約|解説台本|解説|感想|リアクション)?(?:の見出し)?】[\s:：]*|(?:記事本文|ニュース本文|記事の見出し|記事要約|解説台本|解説|感想)[\s:：]+).*?(?:\]|\n|$)', '', clean_text).strip()
+    
+            clean_text = clean_text.replace("「", "").replace("」", "").strip()
+            # 不自然な名乗り・導入語尾を正規化（「とろろとしては」「ずんだもんとしては」等の不要な自称・前置きを完全に除去）
+            clean_text = re.sub(r'(?:この(?:ニュース|話題|記事|出来事)を?(?:受けた|に対する))?(?:とろろ|トロロ|ずんだもん|ズンダモン)としては[、,\s　]*', '', clean_text)
+            clean_text = re.sub(r'(?:^|(?<=[。！？\s「（]))(?:とろろ|トロロ|ずんだもん|ズンダモン)(?:としては|にゃ|はにゃ|なのだ|のだ|はなのだ|はのだ)[、,\s　]*', '', clean_text)
+            clean_text = re.sub(r'^[、,\s　]+', '', clean_text)
+            clean_text = re.sub(r'この(?:ニュース|話題|記事|出来事)(?:を|は)?(?:見て|聞いて|知って|読んで)[、,\s　]*本当に便利(?:だにゃ|ですね|だなにゃ|だ)', 'この取り組み、本当に便利だにゃ', clean_text)
+            clean_text = re.sub(r'この(?:ニュース|話題|記事|出来事)(?:を|は)?(?:見て|見た|見ました|聞いて|知って|知った|読んで)[、,\s　]*(?:にゃ|のだ|ですね|だなにゃ|だ|！|。|、|\s)*', '', clean_text)
+            clean_text = re.sub(r'この(?:ニュース|話題|記事|出来事)[、,\s　]+(?=[ぁ-んァ-ヶ一-鿿])', '', clean_text)
+            # 語尾の二重化や不自然な重ねの事前サニタイズ
+            clean_text = re.sub(r'だよですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)
+            clean_text = re.sub(r'だねですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)
+            clean_text = re.sub(r'よねですね([！!？?。、\s　]|$)', r'ですよね\1', clean_text)
+            clean_text = re.sub(r'よですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)
+            clean_text = re.sub(r'ねですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)
+            clean_text = re.sub(r'だよねにゃ([！!？?。、\s　]|$)', r'だよね\1', clean_text)
+            clean_text = re.sub(r'ですよねにゃ([！!？?。、\s　]|$)', r'ですよね\1', clean_text)
+            clean_text = re.sub(r'かもしれませんねにゃ([！\s　。！？]|$)', r'かもしれませんね\1', clean_text)
+            clean_text = re.sub(r'ですねにゃ([！\s　。！？]|$)', r'ですね\1', clean_text)
+            clean_text = re.sub(r'ますねにゃ([！\s　。！？]|$)', r'ますね\1', clean_text)
+            clean_text = re.sub(r'でしたにゃ([！\s　。！？]|$)', r'でした\1', clean_text)
+            clean_text = re.sub(r'ませんにゃ([！\s　。！？]|$)', r'ません\1', clean_text)
+            clean_text = re.sub(r'にゃね([！\s　。！？]|$)', r'ですね\1', clean_text)
+            clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)ねにゃ([！\s　。！？]|$)', r'\1ですね\2', clean_text)
+            clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)ねのだ([！\s　。！？]|$)', r'\1なのだ\2', clean_text)
+            clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)かなにゃ([！\s　。！？]|$)', r'\1かにゃ\2', clean_text)
+            clean_text = clean_text.replace("使えへん", "使えない").replace("出来へん", "出来ない").replace("分からへん", "分からない").replace("知らへん", "知らない")
+            clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)へん([の|ね|よ|な|にゃ|！|？|。|、]|$)', r'\1ない\2', clean_text)
+    
+            # 方言（関西弁）・役割語の標準語化（「〜やろ」「〜んやろ」「じゃが」等の自動補正）
+            clean_text = re.sub(r'(?:^|(?<=[。、！？\s　]))じゃが(?!いも|バター|りこ)[、,\s　]*', 'だが、', clean_text)
+            clean_text = re.sub(r'なんじゃが(?!いも|バター|りこ)', 'なんだが', clean_text)
+            clean_text = re.sub(r'んじゃが(?!いも|バター|りこ)', 'んだが', clean_text)
+            clean_text = re.sub(r'(?<![ぁ-んァ-ヶー一-鿿])じゃが(?!いも|バター|りこ)', 'だが', clean_text)
+            clean_text = re.sub(r'んやろにゃ([！!？?。、\s　]|$)', r'んだろうにゃ\1', clean_text)
+            clean_text = re.sub(r'やろにゃ([！!？?。、\s　]|$)', r'だろうにゃ\1', clean_text)
+            clean_text = re.sub(r'んやろのだ([！!？?。、\s　]|$)', r'んだろうのだ\1', clean_text)
+            clean_text = re.sub(r'やろのだ([！!？?。、\s　]|$)', r'だろうのだ\1', clean_text)
+            clean_text = re.sub(r'んやろ([か？\?！!。、\s　]|な|ね|$)', r'んだろう\1', clean_text)
+            clean_text = re.sub(r'やろ([か？\?！!。、\s　]|な|ね|$)', r'だろう\1', clean_text)
+            clean_text = re.sub(r'んやな([！!？?。、\s　]|$)', r'んだな\1', clean_text)
+            clean_text = re.sub(r'やな([！!？?。、\s　]|$)', r'だな\1', clean_text)
+            clean_text = re.sub(r'んやね([！!？?。、\s　]|$)', r'んだね\1', clean_text)
+            clean_text = re.sub(r'やね([！!？?。、\s　]|$)', r'だね\1', clean_text)
+            clean_text = re.sub(r'ねんにゃ([！!？?。、\s　]|$)', r'んだにゃ\1', clean_text)
+            clean_text = re.sub(r'ねんのだ([！!？?。、\s　]|$)', r'んだのだ\1', clean_text)
+            clean_text = re.sub(r'のじゃ([！!？?。、\s　]|$)', r'のだ\1', clean_text)
+            clean_text = re.sub(r'なんじゃ([！!？?。、\s　]|$)', r'なんだ\1', clean_text)
+            clean_text = re.sub(r'んじゃ([！!？?。、\s　]|$)', r'んだ\1', clean_text)
+    
+            # 🐱 【キャラクター口調・語尾接続の包括的自然化（しにゃ・れにゃ・だにゃ・るにゃ等の完全自動修復）】
+            # 1. 連用形＋にゃ ➔ 過去形「〜たにゃ」への修復（「しにゃ」「れにゃ」「されにゃ」「られにゃ」等）
+            clean_text = re.sub(r'されにゃ([！!？?。、\s　]|$)', r'されたにゃ\1', clean_text)
+            clean_text = re.sub(r'されのだ([！!？?。、\s　]|$)', r'されたのだ\1', clean_text)
+            clean_text = re.sub(r'られにゃ([！!？?。、\s　]|$)', r'られたにゃ\1', clean_text)
+            clean_text = re.sub(r'られのだ([！!？?。、\s　]|$)', r'られたのだ\1', clean_text)
+            clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿]+)しにゃ([！!？?。、\s　]|$)', r'\1したにゃ\2', clean_text)
+            clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿]+)しのだ([！!？?。、\s　]|$)', r'\1したのだ\2', clean_text)
+            clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿]+)れにゃ([！!？?。、\s　]|$)', r'\1れたにゃ\2', clean_text)
+            clean_text = re.sub(r'(?<!どんな)(?<!いい)(?<!良い)(?<!って)(?<!いう)(?<!な)感じにゃ([！!？?。、\s　]|$)', r'感じたにゃ\1', clean_text)
+            clean_text = re.sub(r'(?<!どんな)(?<!いい)(?<!良い)(?<!って)(?<!いう)(?<!な)感じのだ([！!？?。、\s　]|$)', r'感じたのだ\1', clean_text)
+            clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿]+[報信応演生命論禁])じにゃ([！!？?。、\s　]|$)', r'\1じたにゃ\2', clean_text)
+            clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿]+[報信応演生命論禁])じのだ([！!？?。、\s　]|$)', r'\1じたのだ\2', clean_text)
+    
+            # 2. 「だにゃ」「だなにゃ」➔「なんだにゃ」への自然化（大変だにゃ ➔ 大変なんだにゃ、大切だにゃ ➔ 大切なんだにゃ）
+            # ※直前が「ん」「な」「の」の場合は多重化（んなんだにゃ/なんなんだにゃ/のなんだにゃ）を防ぐため除外
+            clean_text = re.sub(r'(?<![んなの])([一-鿿ぁ-んァ-ヶ]{2,})だにゃ([！!？?。、\s　]|$)', r'\1なんだにゃ\2', clean_text)
+            clean_text = re.sub(r'([一-鿿ぁ-んァ-ヶ]{2,})だなにゃ([！!？?。、\s　]|$)', r'\1なんだにゃ\2', clean_text)
+            clean_text = re.sub(r'([一-鿿ぁ-んァ-ヶ]{2,})だよにゃ([！!？?。、\s　]|$)', r'\1なんだよね\2', clean_text)
+            clean_text = re.sub(r'だなにゃ([！!？?。、\s　]|$)', r'なんだにゃ\1', clean_text)
+            clean_text = re.sub(r'だなのだ([！!？?。、\s　]|$)', r'なのだ\1', clean_text)
+            clean_text = re.sub(r'だよにゃ([！!？?。、\s　]|$)', r'なんだよね\1', clean_text)
+            clean_text = re.sub(r'だねにゃ([！!？?。、\s　]|$)', r'ですね\1', clean_text)
+    
+            # 畳語・多重化の完全解消（のなんだにゃ ➔ んだにゃ、なんなんだにゃ ➔ なんだにゃ、感じるんなんだにゃ ➔ 感じるんだにゃ）
+            clean_text = re.sub(r'の+なんだにゃ([！!？?。、\s　]|$)', r'んだにゃ\1', clean_text)
+            clean_text = re.sub(r'の+なのだ([！!？?。、\s　]|$)', r'のだ\1', clean_text)
+            clean_text = re.sub(r'な+んなんだにゃ([！!？?。、\s　]|$)', r'なんだにゃ\1', clean_text)
+            clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿])んなんだにゃ([！!？?。、\s　]|$)', r'\1んだにゃ\2', clean_text)
+            clean_text = re.sub(r'ん+んだにゃ([！!？?。、\s　]|$)', r'んだにゃ\1', clean_text)
+            clean_text = re.sub(r'ん+んだのだ([！!？?。、\s　]|$)', r'んだのだ\1', clean_text)
+    
+            # 3. 「〜るにゃ」「〜すにゃ」の硬い文語体 ➔ 自然な会話口調へ補正
+            clean_text = re.sub(r'となるにゃ([！!？?。、\s　]|$)', r'となりそうだにゃ\1', clean_text)
+            clean_text = re.sub(r'を与えるにゃ([！!？?。、\s　]|$)', r'を与えそうだにゃ\1', clean_text)
+            clean_text = re.sub(r'進められるにゃ([！!？?。、\s　]|$)', r'進められそうだにゃ\1', clean_text)
+            clean_text = re.sub(r'注目されるにゃ([！!？?。、\s　]|$)', r'注目が集まるにゃ\1', clean_text)
+            clean_text = re.sub(r'示唆するにゃ([！!？?。、\s　]|$)', r'示唆しているにゃ\1', clean_text)
+            clean_text = re.sub(r'願うにゃ([！!？?。、\s　]|$)', r'願いたいところだにゃ\1', clean_text)
+            clean_text = re.sub(r'目指すにゃ([！!？?。、\s　]|$)', r'目指しているにゃ\1', clean_text)
+            clean_text = re.sub(r'予想されるにゃ([！!？?。、\s　]|$)', r'予想されているにゃ\1', clean_text)
+            clean_text = re.sub(r'考えられるにゃ([！!？?。、\s　]|$)', r'考えられているにゃ\1', clean_text)
+            clean_text = re.sub(r'期待されるにゃ([！!？?。、\s　]|$)', r'期待されているにゃ\1', clean_text)
+            clean_text = re.sub(r'見られるにゃ([！!？?。、\s　]|$)', r'見られているにゃ\1', clean_text)
+    
+            # 4. 「ましょにゃ」「にゃ！ にゃ！」などの破綻のクリーンアップ
+            clean_text = re.sub(r'いきましょにゃ([！!？?。、\s　]|$)', r'いきましょうにゃ\1', clean_text)
+            clean_text = re.sub(r'(?:にゃ[！!？?\s　]*){2,}', 'にゃ！', clean_text)
+    
+            # 5. 破損語尾・崩れた文末（「みんないゃにゃ」「てみんないゃにゃ」等）の自然化
+            clean_text = re.sub(r'てみんないゃにゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', clean_text)
+            clean_text = re.sub(r'みんないゃにゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', clean_text)
+            clean_text = re.sub(r'てみんないゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', clean_text)
+            clean_text = re.sub(r'みんないゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', clean_text)
+            clean_text = re.sub(r'い+ゃにゃ([！!？?。、\s　]|$)', r'いにゃ\1', clean_text)
+            clean_text = re.sub(r'ない+ゃにゃ([！!？?。、\s　]|$)', r'ないにゃ\1', clean_text)
+            clean_text = re.sub(r'ない+ゃ([！!？?。、\s　]|$)', r'ないにゃ\1', clean_text)
+    
+            # 不自然な英単語動詞・形容詞の混入を自然な日本語へ自動補正（strengthening ➔ 上昇・強含み 等）
+            ENGLISH_FINANCIAL_REPLACEMENTS = [
+                (r'\bstrengthening\b', '上昇'),
+                (r'\bweakening\b', '下落'),
+                (r'\brally(?:ing)?\b', '反発'),
+                (r'\bsurg(?:e|ing)\b', '急上昇'),
+                (r'\bdrop(?:ping)?\b', '下落'),
+                (r'\bloss(?:es)?\b', '損失'),
+                (r'\bgain(?:s|ing)?\b', '上昇'),
+                (r'\brising\b', '上昇'),
+                (r'\bfalling\b', '下落'),
+                (r'\bdeclin(?:e|ing)\b', '下落'),
+                (r'\bgrowth\b', '成長'),
+                (r'\bhigh(?:er)?\b', '高値'),
+                (r'\blow(?:er)?\b', '安値'),
+            ]
+            for eng_pat, jpn_rep in ENGLISH_FINANCIAL_REPLACEMENTS:
+                clean_text = re.sub(eng_pat, jpn_rep, clean_text, flags=re.IGNORECASE)
+    
+            # 5. 方言（西日本・九州等の「〜とった」「〜とる」）の標準語自動正規化
+            clean_text = re.sub(r'なっとった', 'なっていた', clean_text)
+            clean_text = re.sub(r'なっとる', 'なっている', clean_text)
+            clean_text = re.sub(r'しとった', 'していた', clean_text)
+            clean_text = re.sub(r'しとる', 'している', clean_text)
+            clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿]+)とった([！!？?。、\s　]|$)', r'\1ていた\2', clean_text)
+            clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿]+)とる([！!？?。、\s　]|$)', r'\1ている\2', clean_text)
+            clean_text = re.sub(r'やろにゃ([！!？?。、\s　]|$)', r'だろうにゃ\1', clean_text)
+            clean_text = re.sub(r'ねんにゃ([！!？?。、\s　]|$)', r'なんだにゃ\1', clean_text)
+    
+            # 6. 馴れ馴れしい雑談調の語頭フレーズ（最近ね、あのね、等）の除去
+            clean_text = re.sub(r'(?:^|[。！？\n])[\s　]*(?:最近ね[、,\s]*|あのね[、,\s]*|ねえねえ[、,\s]*|ちょっと聞いて[、,\s]*)', '', clean_text)
+    
+            # 7. 個別記事末尾の番組終了挨拶（クロージング誤爆: ではまたにゃ！、またにゃ！、それではまた次回！等）の完全除去
+            FAREWELL_REMOVAL_PATTERN = (
+                r'[\s　]*(?:それでは|では|じゃあ|それじゃあ)?[、,\s]*'
+                r'(?:また(?:次回)?(?:お会いしましょう|お会いできるのを楽しみに|今度|ですね)?'
+                r'|また(?:ね|な|よ|ですね)?'
+                r'|次回も?お楽しみに'
+                r'|さようなら|バイバイ|ばいばい|ばい)'
+                r'(?:にゃ|のだ|なのだ|ね|よ)?[！!。、\s]*$'
+            )
+            clean_text = re.sub(FAREWELL_REMOVAL_PATTERN, '', clean_text, flags=re.IGNORECASE)
+    
+            # 8. 被写体人物への唐突な直接挨拶（武田さん、お疲れ様にゃ！等）の除去
+            DIRECT_GREETING_PATTERN = (
+                r'(?:^|(?<=[。！？\s　]))[A-Za-z0-9\u4e00-\u9fffぁ-んァ-ヶ]+(?:さん|様|氏|選手)[、,\s]*'
+                r'(?:お疲れ様|おつかれさま|おつかれ|ご苦労様|こんにちは|おはよう|こんばんは|いつもありがとう)'
+                r'[！!。、\s]*(?:でした|です|にゃ|のだ|なのだ)?[！!。、\s]*'
+            )
+            clean_text = re.sub(DIRECT_GREETING_PATTERN, '', clean_text)
+    
+            # 9. 実在の著名人・芸能人・人物に対する呼び捨ての敬称（〜さん）自動補正
+            clean_text = normalize_celebrity_honorifics(clean_text, title, full_article_content)
+    
+            # 10. キャラクター口調（にゃ／なのだ）の救済（LLMが客観調で出力した場合でも後半感想を自動補正）
+            clean_text = salvage_character_tone(clean_text, char_desc)
+    
+            split_sentences = split_sentences_safely(clean_text)
+            # 末尾の文が番組終了挨拶単独の場合の安全除去（またにゃ！、ではまたにゃ！、バイバイにゃ！等）
+            if split_sentences:
+                last_s = split_sentences[-1]
+                if re.search(r'^(?:それでは|では|じゃあ|それじゃあ)?[、,\s]*(?:また(?:次回)?(?:お会いしましょう|お会いできるのを楽しみに|今度|ですね)?|また(?:ね|な|よ|ですね)?|次回も?お楽しみに|さようなら|バイバイ|ばいばい|ばい)(?:にゃ|のだ|なのだ|ね|よ)?[！!。、\s]*$', last_s, flags=re.IGNORECASE):
+                    print(f"{tag} ✂️ 個別記事末尾の不自然な終了挨拶（誤爆）を除去: '{last_s}'", flush=True)
+                    split_sentences.pop()
+    
+            def is_transition_phrase(txt):
+                cleaned = re.sub(r'[。！？\!\? \s　、]+', '', txt)
+                keywords = [
+                    "次のニュースですにゃ", "次のニュースにゃ", "次のニュースです", "次のニュースなのだ", "次のニュース",
+                    "続いてのニュースですにゃ", "続いてのニュースにゃ", "続いてのニュースです", "続いてのニュースなのだ", "続いてのニュース",
+                    "最初のニュースですにゃ", "最初のニュースにゃ", "最初のニュースです", "最初のニュースなのだ", "最初のニュース",
+                    "次の話題ですにゃ", "次の話題にゃ", "次の話題です", "次の話題なのだ", "次の話題",
+                    "続いては", "次の記事です", "次の記事にゃ", "続いての記事です", "続いての話題"
+                ]
+                return any(cleaned == kw or cleaned.startswith(kw) for kw in keywords) or (category_name and f"{category_name}のニュース" in cleaned)
+    
+            def is_ai_meta_sentence(s):
+                cleaned = s.strip()
+                if re.search(r'^(了解しました|承知いたしました|承知しました|かしこまりました|以下に|注[：:])', cleaned):
+                    return True
+                if re.search(r'(ルールに従|ルールに基づ|皇族のお名前|ルビを付けないで|キャスター感想の表現|報道倫理ルール|出力形式のルール|深掘り解説台本|指定されたルール|品質修正指示|ダブルチェック)', cleaned):
+                    return True
+                # プロンプトの禁止文句復唱の撃墜
+                if re.search(r'(別の話題へのすり替え|話題のすり替え|すり替えは厳禁)', cleaned):
+                    return True
+                # ✂️ セクション見出し・構成ラベル・プロンプト項目名の漏れ出しを完全除去（「記事本文の見出し」「記事要約」「1文目」等）
+                if re.search(r'^(?:[【\[「(（]?)?(?:記事本文|ニュース本文|本文|見出し|記事要約|要約|解説台本|解説|感想|リアクション|前半|後半|[1-6１-６一二三四五六]文目?)(?:の見出し|の要約|の解説|の感想)?(?:[】\]」)）:：\s　]|にゃ|のだ|です|した|$)', cleaned):
+                    return True
+                if re.search(r'^(?:記事本文|ニュース本文|記事要約|解説台本|前半の要約|後半の感想)', cleaned):
+                    return True
+                # 「〜の見出したにゃ」「〜の見出しにゃ」「〜の見出しです」等のメタ行語尾崩れを完全撃墜
+                if re.search(r'見出し(?:たにゃ|にゃ|なのだ|のだ|です|でした|。[！!？?。、\s　]*$)', cleaned):
+                    return True
+                return False
+    
+            def is_incomplete_sentence_fragment(s):
+                """
+                文として完結しておらず、途中でブツッと切れた不完全な文片（fragment）を検知
+                例: '発売日が', '生活も。', 'FGTが常磁。', '現地で撮。', '本千葉カントリークラブ。' 等
+                """
+                if not s:
+                    return True
+                cleaned = re.sub(r'^[・\-*■◆★【】〈〉\[\]「」『』\s　0-9０-９]+', '', s).strip()
+                if not cleaned or len(cleaned) <= 1:
+                    return True
+    
+                # 句点・感嘆符・疑問符を一旦取り除いた末尾を調査
+                stripped = re.sub(r'[。！？\!\?」』）\)\s　]+$', '', cleaned)
+                if not stripped or len(stripped) <= 1:
+                    return True
+    
+                # 1. 末尾が格助詞・接続助詞・読点で終わっている場合は明らかに文の途中（句点の有無問わず）
+                # 例: 「教師たちの生活も」「発売日が」「今後は」「〜という結果に」など
+                PARTICLE_ENDINGS = r'(?:[がはをにとのとでもからへよりまたそして、,，]|けど|ので|って|とか|など|といった|として|による|により|に対する)$'
+                if re.search(PARTICLE_ENDINGS, stripped) or re.search(r'(\.{2,}|…+)$', stripped):
+                    return True
+    
+                # 2. 文末に述語・用言・終止形・口調（にゃ、のだ、です、ます、だ、た、る、い、よ、ね等）がない未完結・体言止め文
+                # 例: 「〜現地で撮」「〜FGTが常磁」「千葉市緑区の本千葉カントリークラブ」など
+                VALID_PREDICATE_ENDINGS = (
+                    r'(?:にゃ|のだ|なのだ|です|ます|でした|ました|ません|'
+                    r'した|された|られた|なった|行った|言った|見た|あった|いた|勝った|負けた|'
+                    r'ある|いる|ない|たい|だ|た|る|い|う|く|つ|ぬ|ふ|む|ゆ|'
+                    r'ね|よ|わ|よな|よね|かな|かい|ぞ|ぜ|さ|しょう|う！|る！|にゃ！|のだ！)$'
+                )
+                if not re.search(VALID_PREDICATE_ENDINGS, stripped):
+                    return True
+    
+                return False
+    
+            deduped_sentences = []
+            seen_transition = False
+            for s in split_sentences:
+                if is_ai_meta_sentence(s):
+                    print(f"{tag} ✂️ AIメタ行・指示文復唱を除去: '{s}'", flush=True)
+                    continue
+    
+                if is_incomplete_sentence_fragment(s):
+                    print(f"{tag} ✂️ 途中で切れた不完全な文片を除去: '{s}'", flush=True)
+                    continue
+    
+                if is_transition_phrase(s):
+                    if seen_transition:
+                        continue
+                    seen_transition = True
+                    deduped_sentences.append(s)
+                    continue
+                
+                if is_title_duplicate_sentence(s, title):
+                    print(f"{tag} ✂️ タイトル重複文を除去: '{s}'", flush=True)
+                    continue
+    
+                if deduped_sentences and s == deduped_sentences[-1]:
+                    continue
+    
+                # 正常な文で末尾に句点（。）がない場合は補完して自然な音声終端を保証
+                s_clean = s.strip()
+                if not re.search(r'[。！？\!\?」』）\)]\s*$', s_clean):
+                    s_clean = s_clean + "。"
+                deduped_sentences.append(s_clean)
+    
+            raw_sentences = deduped_sentences if deduped_sentences else split_sentences
+    
+            # 🧠 元記事タイトル ＋ 元記事本文 ＋ AI生成台本全文 を統合して記事全体文脈読みマップを一括構築
+            full_context_text = f"{title}\n{full_article_content}\n{clean_text}"
+            news_context_map = build_context_pronunciation_map(full_context_text, custom_dict=custom_dict)
+    
+            # 🤖 AIによる直接発音ダブルチェック（人名・特殊固有名詞のひらがな読みを文脈判定して最優先統合）
+            ai_pron_map = extract_pronunciations_via_ai(
+                clean_text, title=title, article_context=full_article_content,
+                provider=provider, model_name=model_name, api_key=api_key
+            )
+            if ai_pron_map:
+                print(f"{tag} 🤖 [AI発音ダブルチェック] 固有名詞の読みをAI判定: {ai_pron_map}", flush=True)
+                news_context_map.update(ai_pron_map)
+    
+            candidate_items = inspect_and_correct_pronunciation(
+                raw_sentences,
+                full_article_content + " " + title,
+                custom_dict=custom_dict,
+                context_map=news_context_map
+            )
+            candidate_items = audit_and_heal_news_script(candidate_items, title=title, article_context=full_article_content)
+    
+            # 粗チェック（品質・トピック整合性・ファクト照合・キャラクター感想の有無）
+            is_valid, reason = validate_news_script_quality(clean_text, title, full_article_content, char_desc)
+            if not is_valid:
+                print(f"{tag} ⚠️ [試行 {attempt}] 出力を不自然と判定 (理由: {reason})", flush=True)
+                if attempt >= 3:
+                    print(f"{tag} 🛡️ 最大試行回数(3回)に達しましたが原稿が不合格(理由: {reason})のため、幻覚原稿を全破棄し元記事から安全な原稿を自動構築します", flush=True)
+                    items = build_safe_fallback_sentences(title, full_article_content, char_desc, custom_dict=custom_dict)
+                    raw_text = "\n".join([it["display"] for it in items])
+                    break
+                time.sleep(1)
+                continue
+    
+            # 7文以上生成された場合は、要約3文 + 感想2〜3文（最大6文）にスマートに制限
+            if len(candidate_items) > 6:
+                candidate_items = candidate_items[:3] + candidate_items[-3:]
+                if len(candidate_items) > 6:
+                    candidate_items = candidate_items[:6]
+    
+            total_chars = sum(len(it["display"]) for it in candidate_items)
+            if len(candidate_items) < 3 or total_chars < 100 or (len(candidate_items) < 4 and total_chars < 150):
+                reason = f"フィルター適用後の文数・文字数不足 ({len(candidate_items)}文, {total_chars}文字)"
+                print(f"{tag} ⚠️ [試行 {attempt}] 原稿不足 (理由: {reason})", flush=True)
+                if attempt >= 3:
+                    print(f"{tag} 🛡️ 最大試行回数(3回)に達しましたが原稿不足(理由: {reason})のため、元記事から安全な原稿を自動構築します", flush=True)
+                    items = build_safe_fallback_sentences(title, full_article_content, char_desc, custom_dict=custom_dict)
+                    raw_text = "\n".join([it["display"] for it in items])
+                    break
+                time.sleep(1)
+                continue
+    
+            # 5文以上かつ品質・トピック整合性合格！
+            items = candidate_items
+            raw_text = candidate_text
+            if attempt > 1:
+                print(f"{tag} ✅ 試行 {attempt} 回目で高品質な深掘り原稿が生成されました！（{len(items)}文, {total_chars}文字）", flush=True)
+            break
+    
+        if not items:
+            items = []
+    
+        # 見出しが元記事タイトルと一致しているかを厳密検証（トピック乖離・別記事見出しの混入・勝手な途中省略の防止）
+        use_ai_headline = False
+        if ai_headline_raw:
+            clean_ai = re.sub(r'[（\(][ぁ-んァ-ヶー\s]+[）\)]', '', ai_headline_raw)
+            clean_ai = re.sub(r'[★【】〈〉\[\]「」『』\s　、。！？!?,.\-ー…]+', '', clean_ai)
+            clean_orig = re.sub(r'[★【】〈〉\[\]「」『』\s　、。！？!?,.\-ー…]+', '', title)
+    
+            # ⚠️ 勝手な省略（文字数が元タイトルの75%未満）は完全却下
+            if len(clean_orig) >= 10 and len(clean_ai) / len(clean_orig) < 0.75:
+                print(f"{tag} ⚠️ AI見出しが元タイトルを大幅省略・切り捨てしているため却下 ({len(clean_ai)}文字 < 元タイトル{len(clean_orig)}文字の75%) ➔ 元タイトル全文から音声を生成", flush=True)
+                use_ai_headline = False
+            else:
+                title_tokens = re.findall(r'[\u4e00-\u9fff]{2,}|[\u30a0-\u30ff]{2,}', clean_orig)
+                if not title_tokens and len(clean_orig) >= 2:
+                    title_tokens = [clean_orig[:4]]
+    
+                matched_tokens = [tok for tok in title_tokens if tok in clean_ai]
+                # トークン網羅率チェック（元タイトルの主要キーワードの半分以上が含まれているか）
+                token_ratio = (len(matched_tokens) / len(title_tokens)) if title_tokens else 1.0
+                if token_ratio >= 0.50:
+                    use_ai_headline = True
+                else:
+                    print(f"{tag} 🚫 見出しの重要語欠落・トピック乖離を検知 ('{ai_headline_raw}' 一致率: {token_ratio:.2f}) ➔ 幻覚原稿を全破棄し元記事から安全な原稿を自動再構築", flush=True)
+                    use_ai_headline = False
+                    # 🛡️ 本文（items）も幻覚であるため全破棄し、元記事タイトル・本文から安全な要約を生成
+                    items = build_safe_fallback_sentences(title, full_article_content, char_desc, custom_dict=custom_dict)
+    
+        if use_ai_headline and ai_headline_raw:
+            headline_display = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\1', ai_headline_raw)
+            headline_display = headline_display.replace("（", "").replace("）", "").replace("(", "").replace(")", "").strip()
+            if not re.search(r'[\u4e00-\u9fff\u30a0-\u30ffA-Za-z]', headline_display) or len(headline_display) < 3:
+                headline_display = title.replace("「", "").replace("」", "").strip()
+            headline_speech = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\2', ai_headline_raw)
+            headline_speech = normalize_for_tts(headline_speech, custom_dict=custom_dict, context_map=news_context_map)
+            headline_speech = re.sub(r'^[、,\s　]+', '', headline_speech)
+            headline_speech = re.sub(r'[、,\s　]+$', '', headline_speech)
+    
+            # 🛡️ 見出しにはキャラクター語尾（にゃ、のだ等）を絶対に付けない（客観的見出しのため完全切除）
+            headline_display = re.sub(r'(?:です|だ|だった|された|した|ある|いる|なる|こと)?[\s　]*(?:とろろ)?(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', headline_display).strip()
+            headline_display = re.sub(r'[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', headline_display).strip()
+            headline_speech = re.sub(r'(?:です|だ|だった|された|した|ある|いる|なる|こと)?[\s　]*(?:とろろ)?(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', headline_speech).strip()
+            headline_speech = re.sub(r'[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', headline_speech).strip()
+    
+            print(f"{tag} 🗣️ 文脈校正見出し生成成功: 表示='{headline_display}' / 発音='{headline_speech}'", flush=True)
+        else:
+            # 元タイトル全文を一文字も省略せずに文脈読みを付与してTTS音声化
+            headline_display = title.replace("「", "").replace("」", "").strip()
+            headline_speech = normalize_for_tts(headline_display, custom_dict=custom_dict, context_map=news_context_map)
+            headline_speech = re.sub(r'^[、,\s　]+', '', headline_speech)
+            headline_speech = re.sub(r'[、,\s　]+$', '', headline_speech)
+            print(f"{tag} 🗣️ 元タイトル全文から文脈読み生成 (省略ゼロ): 発音='{headline_speech}'", flush=True)
+    
+        total_speech_chars = sum(len(it.get('speech', '')) for it in (items or []))
+        print(f"{tag} ✅ 原稿生成完了！ (計 {len(items or [])}文, {total_speech_chars}文字)", flush=True)
+    
+        result_data = {
             "status": "ok",
             "url": article_url or "",
-            "headline": headline_dict,
-            "headline_speech": title,
-            "fullText": " ".join([it["display"] for it in items]),
+            "headline": {
+                "display": headline_display,
+                "speech": headline_speech
+            },
+            "headline_speech": headline_speech,
             "items": items,
-            "sentences": [it["display"] for it in items]
+            "sentences": [it["display"] for it in items],
+            "fullText": "\n".join([it["display"] for it in items])
         }
-
-    prompt = build_news_prompt(char_desc, title, full_article_content)
-    raw_text = None
-    items = None
-    ai_headline_raw = None
-    best_candidate_text = ""
-    best_candidate_items = []
-    news_context_map = {}
-    attempt = 0
-
-    while True:
-        attempt += 1
-        cur_prompt = prompt
-        if attempt > 1:
-            suffix_instruction = "語尾には必ず『にゃ』『にゃ！』を付けて発話してください。" if "にゃ" in char_desc else ("語尾には必ず『なのだ』『のだ』を付けて発話してください。" if "なのだ" in char_desc else "")
-            cur_prompt += f"\n\n【重要・品質修正指示（再生成 試行{attempt}回目）】直前の生成で品質基準の不備が検知されたため再生成します。必ず「{title}」の事件・出来事についてのみ解説してください。見出しをそのまま繰り返さず、記事本文の具体的な詳細から解説を始めてください。必ず【前半: 記事要約2〜3文】＋【後半: あなた自身の感想2〜3文】の【合計4〜6文】で作成してください。{suffix_instruction}"
-            print(f"{tag} 🔄 [試行 {attempt}] ダブルチェック再生成を実行中...", flush=True)
-        else:
-            print(f"{tag} 🤖 [試行 1] LLMへ原稿生成リクエスト送信中...", flush=True)
-
-        candidate_text = call_llm_backend(provider, cur_prompt, api_key, model_name)
-        if not candidate_text:
-            print(f"{tag} ⚠️ [試行 {attempt}] LLM応答なし ➔ 再試行します", flush=True)
-            if attempt >= 3:
-                print(f"{tag} 🛡️ 最大試行回数(3回)に達してもLLM応答が得られないため、元記事から安全な原稿を自動構築します", flush=True)
-                items = build_safe_fallback_sentences(title, full_article_content, char_desc, custom_dict=custom_dict)
-                raw_text = "\n".join([it["display"] for it in items])
-                break
-            time.sleep(2)
-            continue
-
-        print(f"{tag} 📩 [試行 {attempt}] LLM応答受信 ({len(candidate_text)}文字) ➔ 発音・ファクト照合中...", flush=True)
-
-        best_candidate_text = candidate_text
-
-        # パース・重複除去・発音検証を通して items を作成
-        clean_text = candidate_text
-        clean_text = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', clean_text, flags=re.MULTILINE).strip()
-
-        headline_match = re.search(r'(?:\[(?:HEADLINE|見出し):\s*|【(?:ニュース)?見出し】[\s:：]*|見出し[\s:：]+)(.*?)(?:\]|\n|$)', candidate_text)
-        if headline_match:
-            ai_headline_raw = headline_match.group(1).strip()
-            ai_headline_raw = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', ai_headline_raw).strip()
-            # 🛡️ 見出しにはキャラクター語尾（にゃ、のだ等）を絶対に付けない（客観的な報道タイトルのため完全切除）
-            ai_headline_raw = re.sub(r'(?:です|だ|だった|された|した|ある|いる|なる|こと)?[\s　]*(?:とろろ)?(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', ai_headline_raw).strip()
-            ai_headline_raw = re.sub(r'[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', ai_headline_raw).strip()
-            clean_text = re.sub(r'(?:\[(?:HEADLINE|見出し):\s*|【(?:ニュース)?見出し】[\s:：]*|見出し[\s:：]+).*?(?:\]|\n|$)', '', clean_text).strip()
-
-        # ✂️ 【記事本文】【要約】【解説台本】【感想】等のセクションタグ行・見出し行を一括完全消去
-        clean_text = re.sub(r'(?:\[(?:HEADLINE|見出し|記事本文|本文|要約|解説|感想):\s*|【(?:ニュース)?(?:見出し|記事本文|本文|要約|解説台本|解説|感想|リアクション)?(?:の見出し)?】[\s:：]*|(?:記事本文|ニュース本文|記事の見出し|記事要約|解説台本|解説|感想)[\s:：]+).*?(?:\]|\n|$)', '', clean_text).strip()
-
-        clean_text = clean_text.replace("「", "").replace("」", "").strip()
-        # 不自然な名乗り・導入語尾を正規化（「とろろとしては」「ずんだもんとしては」等の不要な自称・前置きを完全に除去）
-        clean_text = re.sub(r'(?:この(?:ニュース|話題|記事|出来事)を?(?:受けた|に対する))?(?:とろろ|トロロ|ずんだもん|ズンダモン)としては[、,\s　]*', '', clean_text)
-        clean_text = re.sub(r'(?:^|(?<=[。！？\s「（]))(?:とろろ|トロロ|ずんだもん|ズンダモン)(?:としては|にゃ|はにゃ|なのだ|のだ|はなのだ|はのだ)[、,\s　]*', '', clean_text)
-        clean_text = re.sub(r'^[、,\s　]+', '', clean_text)
-        clean_text = re.sub(r'この(?:ニュース|話題|記事|出来事)(?:を|は)?(?:見て|聞いて|知って|読んで)[、,\s　]*本当に便利(?:だにゃ|ですね|だなにゃ|だ)', 'この取り組み、本当に便利だにゃ', clean_text)
-        clean_text = re.sub(r'この(?:ニュース|話題|記事|出来事)(?:を|は)?(?:見て|見た|見ました|聞いて|知って|知った|読んで)[、,\s　]*(?:にゃ|のだ|ですね|だなにゃ|だ|！|。|、|\s)*', '', clean_text)
-        clean_text = re.sub(r'この(?:ニュース|話題|記事|出来事)[、,\s　]+(?=[ぁ-んァ-ヶ一-鿿])', '', clean_text)
-        # 語尾の二重化や不自然な重ねの事前サニタイズ
-        clean_text = re.sub(r'だよですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)
-        clean_text = re.sub(r'だねですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)
-        clean_text = re.sub(r'よねですね([！!？?。、\s　]|$)', r'ですよね\1', clean_text)
-        clean_text = re.sub(r'よですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)
-        clean_text = re.sub(r'ねですね([！!？?。、\s　]|$)', r'ですね\1', clean_text)
-        clean_text = re.sub(r'だよねにゃ([！!？?。、\s　]|$)', r'だよね\1', clean_text)
-        clean_text = re.sub(r'ですよねにゃ([！!？?。、\s　]|$)', r'ですよね\1', clean_text)
-        clean_text = re.sub(r'かもしれませんねにゃ([！\s　。！？]|$)', r'かもしれませんね\1', clean_text)
-        clean_text = re.sub(r'ですねにゃ([！\s　。！？]|$)', r'ですね\1', clean_text)
-        clean_text = re.sub(r'ますねにゃ([！\s　。！？]|$)', r'ますね\1', clean_text)
-        clean_text = re.sub(r'でしたにゃ([！\s　。！？]|$)', r'でした\1', clean_text)
-        clean_text = re.sub(r'ませんにゃ([！\s　。！？]|$)', r'ません\1', clean_text)
-        clean_text = re.sub(r'にゃね([！\s　。！？]|$)', r'ですね\1', clean_text)
-        clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)ねにゃ([！\s　。！？]|$)', r'\1ですね\2', clean_text)
-        clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)ねのだ([！\s　。！？]|$)', r'\1なのだ\2', clean_text)
-        clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)かなにゃ([！\s　。！？]|$)', r'\1かにゃ\2', clean_text)
-        clean_text = clean_text.replace("使えへん", "使えない").replace("出来へん", "出来ない").replace("分からへん", "分からない").replace("知らへん", "知らない")
-        clean_text = re.sub(r'([ぁ-んァ-ヶーA-Za-z0-9・]+)へん([の|ね|よ|な|にゃ|！|？|。|、]|$)', r'\1ない\2', clean_text)
-
-        # 方言（関西弁）・役割語の標準語化（「〜やろ」「〜んやろ」「じゃが」等の自動補正）
-        clean_text = re.sub(r'(?:^|(?<=[。、！？\s　]))じゃが(?!いも|バター|りこ)[、,\s　]*', 'だが、', clean_text)
-        clean_text = re.sub(r'なんじゃが(?!いも|バター|りこ)', 'なんだが', clean_text)
-        clean_text = re.sub(r'んじゃが(?!いも|バター|りこ)', 'んだが', clean_text)
-        clean_text = re.sub(r'(?<![ぁ-んァ-ヶー一-鿿])じゃが(?!いも|バター|りこ)', 'だが', clean_text)
-        clean_text = re.sub(r'んやろにゃ([！!？?。、\s　]|$)', r'んだろうにゃ\1', clean_text)
-        clean_text = re.sub(r'やろにゃ([！!？?。、\s　]|$)', r'だろうにゃ\1', clean_text)
-        clean_text = re.sub(r'んやろのだ([！!？?。、\s　]|$)', r'んだろうのだ\1', clean_text)
-        clean_text = re.sub(r'やろのだ([！!？?。、\s　]|$)', r'だろうのだ\1', clean_text)
-        clean_text = re.sub(r'んやろ([か？\?！!。、\s　]|な|ね|$)', r'んだろう\1', clean_text)
-        clean_text = re.sub(r'やろ([か？\?！!。、\s　]|な|ね|$)', r'だろう\1', clean_text)
-        clean_text = re.sub(r'んやな([！!？?。、\s　]|$)', r'んだな\1', clean_text)
-        clean_text = re.sub(r'やな([！!？?。、\s　]|$)', r'だな\1', clean_text)
-        clean_text = re.sub(r'んやね([！!？?。、\s　]|$)', r'んだね\1', clean_text)
-        clean_text = re.sub(r'やね([！!？?。、\s　]|$)', r'だね\1', clean_text)
-        clean_text = re.sub(r'ねんにゃ([！!？?。、\s　]|$)', r'んだにゃ\1', clean_text)
-        clean_text = re.sub(r'ねんのだ([！!？?。、\s　]|$)', r'んだのだ\1', clean_text)
-        clean_text = re.sub(r'のじゃ([！!？?。、\s　]|$)', r'のだ\1', clean_text)
-        clean_text = re.sub(r'なんじゃ([！!？?。、\s　]|$)', r'なんだ\1', clean_text)
-        clean_text = re.sub(r'んじゃ([！!？?。、\s　]|$)', r'んだ\1', clean_text)
-
-        # 🐱 【キャラクター口調・語尾接続の包括的自然化（しにゃ・れにゃ・だにゃ・るにゃ等の完全自動修復）】
-        # 1. 連用形＋にゃ ➔ 過去形「〜たにゃ」への修復（「しにゃ」「れにゃ」「されにゃ」「られにゃ」等）
-        clean_text = re.sub(r'されにゃ([！!？?。、\s　]|$)', r'されたにゃ\1', clean_text)
-        clean_text = re.sub(r'されのだ([！!？?。、\s　]|$)', r'されたのだ\1', clean_text)
-        clean_text = re.sub(r'られにゃ([！!？?。、\s　]|$)', r'られたにゃ\1', clean_text)
-        clean_text = re.sub(r'られのだ([！!？?。、\s　]|$)', r'られたのだ\1', clean_text)
-        clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿]+)しにゃ([！!？?。、\s　]|$)', r'\1したにゃ\2', clean_text)
-        clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿]+)しのだ([！!？?。、\s　]|$)', r'\1したのだ\2', clean_text)
-        clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿]+)れにゃ([！!？?。、\s　]|$)', r'\1れたにゃ\2', clean_text)
-        clean_text = re.sub(r'(?<!どんな)(?<!いい)(?<!良い)(?<!って)(?<!いう)(?<!な)感じにゃ([！!？?。、\s　]|$)', r'感じたにゃ\1', clean_text)
-        clean_text = re.sub(r'(?<!どんな)(?<!いい)(?<!良い)(?<!って)(?<!いう)(?<!な)感じのだ([！!？?。、\s　]|$)', r'感じたのだ\1', clean_text)
-        clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿]+[報信応演生命論禁])じにゃ([！!？?。、\s　]|$)', r'\1じたにゃ\2', clean_text)
-        clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿]+[報信応演生命論禁])じのだ([！!？?。、\s　]|$)', r'\1じたのだ\2', clean_text)
-
-        # 2. 「だにゃ」「だなにゃ」➔「なんだにゃ」への自然化（大変だにゃ ➔ 大変なんだにゃ、大切だにゃ ➔ 大切なんだにゃ）
-        # ※直前が「ん」「な」「の」の場合は多重化（んなんだにゃ/なんなんだにゃ/のなんだにゃ）を防ぐため除外
-        clean_text = re.sub(r'(?<![んなの])([一-鿿ぁ-んァ-ヶ]{2,})だにゃ([！!？?。、\s　]|$)', r'\1なんだにゃ\2', clean_text)
-        clean_text = re.sub(r'([一-鿿ぁ-んァ-ヶ]{2,})だなにゃ([！!？?。、\s　]|$)', r'\1なんだにゃ\2', clean_text)
-        clean_text = re.sub(r'([一-鿿ぁ-んァ-ヶ]{2,})だよにゃ([！!？?。、\s　]|$)', r'\1なんだよね\2', clean_text)
-        clean_text = re.sub(r'だなにゃ([！!？?。、\s　]|$)', r'なんだにゃ\1', clean_text)
-        clean_text = re.sub(r'だなのだ([！!？?。、\s　]|$)', r'なのだ\1', clean_text)
-        clean_text = re.sub(r'だよにゃ([！!？?。、\s　]|$)', r'なんだよね\1', clean_text)
-        clean_text = re.sub(r'だねにゃ([！!？?。、\s　]|$)', r'ですね\1', clean_text)
-
-        # 畳語・多重化の完全解消（のなんだにゃ ➔ んだにゃ、なんなんだにゃ ➔ なんだにゃ、感じるんなんだにゃ ➔ 感じるんだにゃ）
-        clean_text = re.sub(r'の+なんだにゃ([！!？?。、\s　]|$)', r'んだにゃ\1', clean_text)
-        clean_text = re.sub(r'の+なのだ([！!？?。、\s　]|$)', r'のだ\1', clean_text)
-        clean_text = re.sub(r'な+んなんだにゃ([！!？?。、\s　]|$)', r'なんだにゃ\1', clean_text)
-        clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿])んなんだにゃ([！!？?。、\s　]|$)', r'\1んだにゃ\2', clean_text)
-        clean_text = re.sub(r'ん+んだにゃ([！!？?。、\s　]|$)', r'んだにゃ\1', clean_text)
-        clean_text = re.sub(r'ん+んだのだ([！!？?。、\s　]|$)', r'んだのだ\1', clean_text)
-
-        # 3. 「〜るにゃ」「〜すにゃ」の硬い文語体 ➔ 自然な会話口調へ補正
-        clean_text = re.sub(r'となるにゃ([！!？?。、\s　]|$)', r'となりそうだにゃ\1', clean_text)
-        clean_text = re.sub(r'を与えるにゃ([！!？?。、\s　]|$)', r'を与えそうだにゃ\1', clean_text)
-        clean_text = re.sub(r'進められるにゃ([！!？?。、\s　]|$)', r'進められそうだにゃ\1', clean_text)
-        clean_text = re.sub(r'注目されるにゃ([！!？?。、\s　]|$)', r'注目が集まるにゃ\1', clean_text)
-        clean_text = re.sub(r'示唆するにゃ([！!？?。、\s　]|$)', r'示唆しているにゃ\1', clean_text)
-        clean_text = re.sub(r'願うにゃ([！!？?。、\s　]|$)', r'願いたいところだにゃ\1', clean_text)
-        clean_text = re.sub(r'目指すにゃ([！!？?。、\s　]|$)', r'目指しているにゃ\1', clean_text)
-        clean_text = re.sub(r'予想されるにゃ([！!？?。、\s　]|$)', r'予想されているにゃ\1', clean_text)
-        clean_text = re.sub(r'考えられるにゃ([！!？?。、\s　]|$)', r'考えられているにゃ\1', clean_text)
-        clean_text = re.sub(r'期待されるにゃ([！!？?。、\s　]|$)', r'期待されているにゃ\1', clean_text)
-        clean_text = re.sub(r'見られるにゃ([！!？?。、\s　]|$)', r'見られているにゃ\1', clean_text)
-
-        # 4. 「ましょにゃ」「にゃ！ にゃ！」などの破綻のクリーンアップ
-        clean_text = re.sub(r'いきましょにゃ([！!？?。、\s　]|$)', r'いきましょうにゃ\1', clean_text)
-        clean_text = re.sub(r'(?:にゃ[！!？?\s　]*){2,}', 'にゃ！', clean_text)
-
-        # 5. 破損語尾・崩れた文末（「みんないゃにゃ」「てみんないゃにゃ」等）の自然化
-        clean_text = re.sub(r'てみんないゃにゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', clean_text)
-        clean_text = re.sub(r'みんないゃにゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', clean_text)
-        clean_text = re.sub(r'てみんないゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', clean_text)
-        clean_text = re.sub(r'みんないゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', clean_text)
-        clean_text = re.sub(r'い+ゃにゃ([！!？?。、\s　]|$)', r'いにゃ\1', clean_text)
-        clean_text = re.sub(r'ない+ゃにゃ([！!？?。、\s　]|$)', r'ないにゃ\1', clean_text)
-        clean_text = re.sub(r'ない+ゃ([！!？?。、\s　]|$)', r'ないにゃ\1', clean_text)
-
-        # 不自然な英単語動詞・形容詞の混入を自然な日本語へ自動補正（strengthening ➔ 上昇・強含み 等）
-        ENGLISH_FINANCIAL_REPLACEMENTS = [
-            (r'\bstrengthening\b', '上昇'),
-            (r'\bweakening\b', '下落'),
-            (r'\brally(?:ing)?\b', '反発'),
-            (r'\bsurg(?:e|ing)\b', '急上昇'),
-            (r'\bdrop(?:ping)?\b', '下落'),
-            (r'\bloss(?:es)?\b', '損失'),
-            (r'\bgain(?:s|ing)?\b', '上昇'),
-            (r'\brising\b', '上昇'),
-            (r'\bfalling\b', '下落'),
-            (r'\bdeclin(?:e|ing)\b', '下落'),
-            (r'\bgrowth\b', '成長'),
-            (r'\bhigh(?:er)?\b', '高値'),
-            (r'\blow(?:er)?\b', '安値'),
-        ]
-        for eng_pat, jpn_rep in ENGLISH_FINANCIAL_REPLACEMENTS:
-            clean_text = re.sub(eng_pat, jpn_rep, clean_text, flags=re.IGNORECASE)
-
-        # 5. 方言（西日本・九州等の「〜とった」「〜とる」）の標準語自動正規化
-        clean_text = re.sub(r'なっとった', 'なっていた', clean_text)
-        clean_text = re.sub(r'なっとる', 'なっている', clean_text)
-        clean_text = re.sub(r'しとった', 'していた', clean_text)
-        clean_text = re.sub(r'しとる', 'している', clean_text)
-        clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿]+)とった([！!？?。、\s　]|$)', r'\1ていた\2', clean_text)
-        clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿]+)とる([！!？?。、\s　]|$)', r'\1ている\2', clean_text)
-        clean_text = re.sub(r'やろにゃ([！!？?。、\s　]|$)', r'だろうにゃ\1', clean_text)
-        clean_text = re.sub(r'ねんにゃ([！!？?。、\s　]|$)', r'なんだにゃ\1', clean_text)
-
-        # 6. 馴れ馴れしい雑談調の語頭フレーズ（最近ね、あのね、等）の除去
-        clean_text = re.sub(r'(?:^|[。！？\n])[\s　]*(?:最近ね[、,\s]*|あのね[、,\s]*|ねえねえ[、,\s]*|ちょっと聞いて[、,\s]*)', '', clean_text)
-
-        # 7. 個別記事末尾の番組終了挨拶（クロージング誤爆: ではまたにゃ！、またにゃ！、それではまた次回！等）の完全除去
-        FAREWELL_REMOVAL_PATTERN = (
-            r'[\s　]*(?:それでは|では|じゃあ|それじゃあ)?[、,\s]*'
-            r'(?:また(?:次回)?(?:お会いしましょう|お会いできるのを楽しみに|今度|ですね)?'
-            r'|また(?:ね|な|よ|ですね)?'
-            r'|次回も?お楽しみに'
-            r'|さようなら|バイバイ|ばいばい|ばい)'
-            r'(?:にゃ|のだ|なのだ|ね|よ)?[！!。、\s]*$'
-        )
-        clean_text = re.sub(FAREWELL_REMOVAL_PATTERN, '', clean_text, flags=re.IGNORECASE)
-
-        # 8. 被写体人物への唐突な直接挨拶（武田さん、お疲れ様にゃ！等）の除去
-        DIRECT_GREETING_PATTERN = (
-            r'(?:^|(?<=[。！？\s　]))[A-Za-z0-9\u4e00-\u9fffぁ-んァ-ヶ]+(?:さん|様|氏|選手)[、,\s]*'
-            r'(?:お疲れ様|おつかれさま|おつかれ|ご苦労様|こんにちは|おはよう|こんばんは|いつもありがとう)'
-            r'[！!。、\s]*(?:でした|です|にゃ|のだ|なのだ)?[！!。、\s]*'
-        )
-        clean_text = re.sub(DIRECT_GREETING_PATTERN, '', clean_text)
-
-        # 9. 実在の著名人・芸能人・人物に対する呼び捨ての敬称（〜さん）自動補正
-        clean_text = normalize_celebrity_honorifics(clean_text, title, full_article_content)
-
-        # 10. キャラクター口調（にゃ／なのだ）の救済（LLMが客観調で出力した場合でも後半感想を自動補正）
-        clean_text = salvage_character_tone(clean_text, char_desc)
-
-        split_sentences = split_sentences_safely(clean_text)
-        # 末尾の文が番組終了挨拶単独の場合の安全除去（またにゃ！、ではまたにゃ！、バイバイにゃ！等）
-        if split_sentences:
-            last_s = split_sentences[-1]
-            if re.search(r'^(?:それでは|では|じゃあ|それじゃあ)?[、,\s]*(?:また(?:次回)?(?:お会いしましょう|お会いできるのを楽しみに|今度|ですね)?|また(?:ね|な|よ|ですね)?|次回も?お楽しみに|さようなら|バイバイ|ばいばい|ばい)(?:にゃ|のだ|なのだ|ね|よ)?[！!。、\s]*$', last_s, flags=re.IGNORECASE):
-                print(f"{tag} ✂️ 個別記事末尾の不自然な終了挨拶（誤爆）を除去: '{last_s}'", flush=True)
-                split_sentences.pop()
-
-        def is_transition_phrase(txt):
-            cleaned = re.sub(r'[。！？\!\? \s　、]+', '', txt)
-            keywords = [
-                "次のニュースですにゃ", "次のニュースにゃ", "次のニュースです", "次のニュースなのだ", "次のニュース",
-                "続いてのニュースですにゃ", "続いてのニュースにゃ", "続いてのニュースです", "続いてのニュースなのだ", "続いてのニュース",
-                "最初のニュースですにゃ", "最初のニュースにゃ", "最初のニュースです", "最初のニュースなのだ", "最初のニュース",
-                "次の話題ですにゃ", "次の話題にゃ", "次の話題です", "次の話題なのだ", "次の話題",
-                "続いては", "次の記事です", "次の記事にゃ", "続いての記事です", "続いての話題"
-            ]
-            return any(cleaned == kw or cleaned.startswith(kw) for kw in keywords) or (category_name and f"{category_name}のニュース" in cleaned)
-
-        def is_ai_meta_sentence(s):
-            cleaned = s.strip()
-            if re.search(r'^(了解しました|承知いたしました|承知しました|かしこまりました|以下に|注[：:])', cleaned):
-                return True
-            if re.search(r'(ルールに従|ルールに基づ|皇族のお名前|ルビを付けないで|キャスター感想の表現|報道倫理ルール|出力形式のルール|深掘り解説台本|指定されたルール|品質修正指示|ダブルチェック)', cleaned):
-                return True
-            # プロンプトの禁止文句復唱の撃墜
-            if re.search(r'(別の話題へのすり替え|話題のすり替え|すり替えは厳禁)', cleaned):
-                return True
-            # ✂️ セクション見出し・構成ラベル・プロンプト項目名の漏れ出しを完全除去（「記事本文の見出し」「記事要約」「1文目」等）
-            if re.search(r'^(?:[【\[「(（]?)?(?:記事本文|ニュース本文|本文|見出し|記事要約|要約|解説台本|解説|感想|リアクション|前半|後半|[1-6１-６一二三四五六]文目?)(?:の見出し|の要約|の解説|の感想)?(?:[】\]」)）:：\s　]|にゃ|のだ|です|した|$)', cleaned):
-                return True
-            if re.search(r'^(?:記事本文|ニュース本文|記事要約|解説台本|前半の要約|後半の感想)', cleaned):
-                return True
-            # 「〜の見出したにゃ」「〜の見出しにゃ」「〜の見出しです」等のメタ行語尾崩れを完全撃墜
-            if re.search(r'見出し(?:たにゃ|にゃ|なのだ|のだ|です|でした|。[！!？?。、\s　]*$)', cleaned):
-                return True
-            return False
-
-        def is_incomplete_sentence_fragment(s):
-            """
-            文として完結しておらず、途中でブツッと切れた不完全な文片（fragment）を検知
-            例: '発売日が', '生活も。', 'FGTが常磁。', '現地で撮。', '本千葉カントリークラブ。' 等
-            """
-            if not s:
-                return True
-            cleaned = re.sub(r'^[・\-*■◆★【】〈〉\[\]「」『』\s　0-9０-９]+', '', s).strip()
-            if not cleaned or len(cleaned) <= 1:
-                return True
-
-            # 句点・感嘆符・疑問符を一旦取り除いた末尾を調査
-            stripped = re.sub(r'[。！？\!\?」』）\)\s　]+$', '', cleaned)
-            if not stripped or len(stripped) <= 1:
-                return True
-
-            # 1. 末尾が格助詞・接続助詞・読点で終わっている場合は明らかに文の途中（句点の有無問わず）
-            # 例: 「教師たちの生活も」「発売日が」「今後は」「〜という結果に」など
-            PARTICLE_ENDINGS = r'(?:[がはをにとのとでもからへよりまたそして、,，]|けど|ので|って|とか|など|といった|として|による|により|に対する)$'
-            if re.search(PARTICLE_ENDINGS, stripped) or re.search(r'(\.{2,}|…+)$', stripped):
-                return True
-
-            # 2. 文末に述語・用言・終止形・口調（にゃ、のだ、です、ます、だ、た、る、い、よ、ね等）がない未完結・体言止め文
-            # 例: 「〜現地で撮」「〜FGTが常磁」「千葉市緑区の本千葉カントリークラブ」など
-            VALID_PREDICATE_ENDINGS = (
-                r'(?:にゃ|のだ|なのだ|です|ます|でした|ました|ません|'
-                r'した|された|られた|なった|行った|言った|見た|あった|いた|勝った|負けた|'
-                r'ある|いる|ない|たい|だ|た|る|い|う|く|つ|ぬ|ふ|む|ゆ|'
-                r'ね|よ|わ|よな|よね|かな|かい|ぞ|ぜ|さ|しょう|う！|る！|にゃ！|のだ！)$'
-            )
-            if not re.search(VALID_PREDICATE_ENDINGS, stripped):
-                return True
-
-            return False
-
-        deduped_sentences = []
-        seen_transition = False
-        for s in split_sentences:
-            if is_ai_meta_sentence(s):
-                print(f"{tag} ✂️ AIメタ行・指示文復唱を除去: '{s}'", flush=True)
-                continue
-
-            if is_incomplete_sentence_fragment(s):
-                print(f"{tag} ✂️ 途中で切れた不完全な文片を除去: '{s}'", flush=True)
-                continue
-
-            if is_transition_phrase(s):
-                if seen_transition:
-                    continue
-                seen_transition = True
-                deduped_sentences.append(s)
-                continue
-            
-            if is_title_duplicate_sentence(s, title):
-                print(f"{tag} ✂️ タイトル重複文を除去: '{s}'", flush=True)
-                continue
-
-            if deduped_sentences and s == deduped_sentences[-1]:
-                continue
-
-            # 正常な文で末尾に句点（。）がない場合は補完して自然な音声終端を保証
-            s_clean = s.strip()
-            if not re.search(r'[。！？\!\?」』）\)]\s*$', s_clean):
-                s_clean = s_clean + "。"
-            deduped_sentences.append(s_clean)
-
-        raw_sentences = deduped_sentences if deduped_sentences else split_sentences
-
-        # 🧠 元記事タイトル ＋ 元記事本文 ＋ AI生成台本全文 を統合して記事全体文脈読みマップを一括構築
-        full_context_text = f"{title}\n{full_article_content}\n{clean_text}"
-        news_context_map = build_context_pronunciation_map(full_context_text, custom_dict=custom_dict)
-
-        candidate_items = inspect_and_correct_pronunciation(
-            raw_sentences,
-            full_article_content + " " + title,
-            custom_dict=custom_dict,
-            context_map=news_context_map
-        )
-        candidate_items = audit_and_heal_news_script(candidate_items, title=title, article_context=full_article_content)
-
-        # 粗チェック（品質・トピック整合性・ファクト照合・キャラクター感想の有無）
-        is_valid, reason = validate_news_script_quality(clean_text, title, full_article_content, char_desc)
-        if not is_valid:
-            print(f"{tag} ⚠️ [試行 {attempt}] 出力を不自然と判定 (理由: {reason})", flush=True)
-            if attempt >= 3:
-                print(f"{tag} 🛡️ 最大試行回数(3回)に達しましたが原稿が不合格(理由: {reason})のため、幻覚原稿を全破棄し元記事から安全な原稿を自動構築します", flush=True)
-                items = build_safe_fallback_sentences(title, full_article_content, char_desc, custom_dict=custom_dict)
-                raw_text = "\n".join([it["display"] for it in items])
-                break
-            time.sleep(1)
-            continue
-
-        # 7文以上生成された場合は、要約3文 + 感想2〜3文（最大6文）にスマートに制限
-        if len(candidate_items) > 6:
-            candidate_items = candidate_items[:3] + candidate_items[-3:]
-            if len(candidate_items) > 6:
-                candidate_items = candidate_items[:6]
-
-        total_chars = sum(len(it["display"]) for it in candidate_items)
-        if len(candidate_items) < 3 or total_chars < 100 or (len(candidate_items) < 4 and total_chars < 150):
-            reason = f"フィルター適用後の文数・文字数不足 ({len(candidate_items)}文, {total_chars}文字)"
-            print(f"{tag} ⚠️ [試行 {attempt}] 原稿不足 (理由: {reason})", flush=True)
-            if attempt >= 3:
-                print(f"{tag} 🛡️ 最大試行回数(3回)に達しましたが原稿不足(理由: {reason})のため、元記事から安全な原稿を自動構築します", flush=True)
-                items = build_safe_fallback_sentences(title, full_article_content, char_desc, custom_dict=custom_dict)
-                raw_text = "\n".join([it["display"] for it in items])
-                break
-            time.sleep(1)
-            continue
-
-        # 5文以上かつ品質・トピック整合性合格！
-        items = candidate_items
-        raw_text = candidate_text
-        if attempt > 1:
-            print(f"{tag} ✅ 試行 {attempt} 回目で高品質な深掘り原稿が生成されました！（{len(items)}文, {total_chars}文字）", flush=True)
-        break
-
-    if not items:
-        items = []
-
-    # 見出しが元記事タイトルと一致しているかを厳密検証（トピック乖離・別記事見出しの混入・勝手な途中省略の防止）
-    use_ai_headline = False
-    if ai_headline_raw:
-        clean_ai = re.sub(r'[（\(][ぁ-んァ-ヶー\s]+[）\)]', '', ai_headline_raw)
-        clean_ai = re.sub(r'[★【】〈〉\[\]「」『』\s　、。！？!?,.\-ー…]+', '', clean_ai)
-        clean_orig = re.sub(r'[★【】〈〉\[\]「」『』\s　、。！？!?,.\-ー…]+', '', title)
-
-        # ⚠️ 勝手な省略（文字数が元タイトルの75%未満）は完全却下
-        if len(clean_orig) >= 10 and len(clean_ai) / len(clean_orig) < 0.75:
-            print(f"{tag} ⚠️ AI見出しが元タイトルを大幅省略・切り捨てしているため却下 ({len(clean_ai)}文字 < 元タイトル{len(clean_orig)}文字の75%) ➔ 元タイトル全文から音声を生成", flush=True)
-            use_ai_headline = False
-        else:
-            title_tokens = re.findall(r'[\u4e00-\u9fff]{2,}|[\u30a0-\u30ff]{2,}', clean_orig)
-            if not title_tokens and len(clean_orig) >= 2:
-                title_tokens = [clean_orig[:4]]
-
-            matched_tokens = [tok for tok in title_tokens if tok in clean_ai]
-            # トークン網羅率チェック（元タイトルの主要キーワードの半分以上が含まれているか）
-            token_ratio = (len(matched_tokens) / len(title_tokens)) if title_tokens else 1.0
-            if token_ratio >= 0.50:
-                use_ai_headline = True
-            else:
-                print(f"{tag} 🚫 見出しの重要語欠落・トピック乖離を検知 ('{ai_headline_raw}' 一致率: {token_ratio:.2f}) ➔ 幻覚原稿を全破棄し元記事から安全な原稿を自動再構築", flush=True)
-                use_ai_headline = False
-                # 🛡️ 本文（items）も幻覚であるため全破棄し、元記事タイトル・本文から安全な要約を生成
-                items = build_safe_fallback_sentences(title, full_article_content, char_desc, custom_dict=custom_dict)
-
-    if use_ai_headline and ai_headline_raw:
-        headline_display = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\1', ai_headline_raw)
-        headline_display = headline_display.replace("（", "").replace("）", "").replace("(", "").replace(")", "").strip()
-        if not re.search(r'[\u4e00-\u9fff\u30a0-\u30ffA-Za-z]', headline_display) or len(headline_display) < 3:
-            headline_display = title.replace("「", "").replace("」", "").strip()
-        headline_speech = re.sub(r'([\u4e00-\u9fff\u30a0-\u30ffA-Za-z0-9・]+)[（\(]([ぁ-んァ-ヶー\s]+)[）\)]', r'\2', ai_headline_raw)
-        headline_speech = normalize_for_tts(headline_speech, custom_dict=custom_dict, context_map=news_context_map)
-        headline_speech = re.sub(r'^[、,\s　]+', '', headline_speech)
-        headline_speech = re.sub(r'[、,\s　]+$', '', headline_speech)
-
-        # 🛡️ 見出しにはキャラクター語尾（にゃ、のだ等）を絶対に付けない（客観的見出しのため完全切除）
-        headline_display = re.sub(r'(?:です|だ|だった|された|した|ある|いる|なる|こと)?[\s　]*(?:とろろ)?(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', headline_display).strip()
-        headline_display = re.sub(r'[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', headline_display).strip()
-        headline_speech = re.sub(r'(?:です|だ|だった|された|した|ある|いる|なる|こと)?[\s　]*(?:とろろ)?(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', headline_speech).strip()
-        headline_speech = re.sub(r'[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', headline_speech).strip()
-
-        print(f"{tag} 🗣️ 文脈校正見出し生成成功: 表示='{headline_display}' / 発音='{headline_speech}'", flush=True)
-    else:
-        # 元タイトル全文を一文字も省略せずに文脈読みを付与してTTS音声化
-        headline_display = title.replace("「", "").replace("」", "").strip()
-        headline_speech = normalize_for_tts(headline_display, custom_dict=custom_dict, context_map=news_context_map)
-        headline_speech = re.sub(r'^[、,\s　]+', '', headline_speech)
-        headline_speech = re.sub(r'[、,\s　]+$', '', headline_speech)
-        print(f"{tag} 🗣️ 元タイトル全文から文脈読み生成 (省略ゼロ): 発音='{headline_speech}'", flush=True)
-
-    total_speech_chars = sum(len(it.get('speech', '')) for it in (items or []))
-    print(f"{tag} ✅ 原稿生成完了！ (計 {len(items or [])}文, {total_speech_chars}文字)", flush=True)
-
-    result_data = {
-        "status": "ok",
-        "url": article_url or "",
-        "headline": {
-            "display": headline_display,
-            "speech": headline_speech
-        },
-        "headline_speech": headline_speech,
-        "items": items,
-        "sentences": [it["display"] for it in items],
-        "fullText": "\n".join([it["display"] for it in items])
-    }
-
-    if not is_special_item:
-        _save_to_news_history(title, payload, item_obj, article_url, items, headline_dict=result_data.get("headline"))
-        with _SCRIPT_CACHE_LOCK:
-            _NEWS_SCRIPT_CACHE[cache_key] = result_data
-            if len(_NEWS_SCRIPT_CACHE) > 100:
-                oldest_k = next(iter(_NEWS_SCRIPT_CACHE))
-                del _NEWS_SCRIPT_CACHE[oldest_k]
-            if cache_key in _INFLIGHT_EVENTS:
-                _INFLIGHT_EVENTS[cache_key].set()
-                del _INFLIGHT_EVENTS[cache_key]
-
-    return result_data
+    
+        if not is_special_item:
+            _save_to_news_history(title, payload, item_obj, article_url, items, headline_dict=result_data.get("headline"))
+            with _SCRIPT_CACHE_LOCK:
+                _NEWS_SCRIPT_CACHE[cache_key] = result_data
+                if len(_NEWS_SCRIPT_CACHE) > 100:
+                    oldest_k = next(iter(_NEWS_SCRIPT_CACHE))
+                    del _NEWS_SCRIPT_CACHE[oldest_k]
+    
+        return result_data
+    finally:
+        if my_event is not None:
+            with _SCRIPT_CACHE_LOCK:
+                if cache_key in _INFLIGHT_EVENTS:
+                    _INFLIGHT_EVENTS[cache_key].set()
+                    del _INFLIGHT_EVENTS[cache_key]
 

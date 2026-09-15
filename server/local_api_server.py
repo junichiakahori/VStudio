@@ -128,6 +128,12 @@ from server.tts_normalizer import convert_remaining_kanji_to_hiragana, resolve_t
 from server.voicevox_client import synthesize_voicevox_backend, clean_kana_for_display
 import server.youtube_api_helper as youtube_api_helper
 from server.window_manager import bring_subwindow_to_front
+from server.news_cache_manager import (
+    list_available_cache_dates,
+    get_cache_by_date,
+    clear_cache_by_date,
+    delete_cache_item
+)
 
 # ポート番号（引数 --port または環境変数 PORT、デフォルト 8001）
 PORT = 8001
@@ -337,6 +343,16 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             success = bring_subwindow_to_front(win_type)
             return self._send_json({"success": success})
 
+        # ── ニュースキャッシュ管理 API (GET) ──
+        if self.path == '/api/news_cache/list':
+            return self._send_json({"success": True, "dates": list_available_cache_dates()})
+
+        if self.path.startswith('/api/news_cache'):
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            date_str = params.get('date', [datetime.datetime.now().strftime("%Y-%m-%d")])[0]
+            return self._send_json(get_cache_by_date(date_str))
+
         # ── 静的ファイル配信 ──
         super().do_GET()
 
@@ -460,6 +476,24 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 if cached:
                     tag_str = cache_title[:16] + ("..." if len(cache_title) > 16 else "")
                     print(f"[ニュースAI {tag_str}] ⚡ サーバーキャッシュから即時返却 (重複処理を完全スキップ)", flush=True)
+                    # ファイル側が消去・空だった場合、ファイル履歴にも確実に復元・追記保存
+                    try:
+                        from server.news_history_logger import log_news_script_item
+                        log_news_script_item(
+                            title=cache_title,
+                            pub_date=payload.get('pub_date', ''),
+                            source=payload.get('source', ''),
+                            url=payload.get('url', ''),
+                            sentences=cached.get('sentences', []),
+                            full_display_text=cached.get('full_display_text', ''),
+                            full_reading_text=cached.get('full_reading_text', ''),
+                            title_reading=cached.get('title_reading', ''),
+                            title_voicevox_reading=cached.get('title_voicevox_reading', ''),
+                            title_voicevox_kana=cached.get('title_voicevox_kana', ''),
+                            headline_display=payload.get('title', '')
+                        )
+                    except Exception:
+                        pass
                     return self._send_json(cached)
                 res = generate_news_item_script_data(payload, custom_dict=load_json(CUSTOM_DICT_FILE))
                 if not res:
@@ -522,6 +556,27 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                         err_str = "YouTube APIの1日あたりの利用枠（クォータ上限）に達しました。"
                     return self._send_json({"success": False, "error": err_str})
 
+
+            # ── ニュースキャッシュ管理 API (POST) ──
+            if self.path == '/api/news_cache/clear':
+                p = self._read_json()
+                date_str = p.get('date', datetime.datetime.now().strftime("%Y-%m-%d"))
+                res = clear_cache_by_date(date_str)
+                # 🧠 サーバーのインメモリキャッシュも同時に完全消去（空のまま取り残される現象を防止）
+                NEWS_SCRIPT_CACHE.clear()
+                print("[NewsCacheManager] 🗑️ サーバーインメモリキャッシュ (NEWS_SCRIPT_CACHE) も全消去しました", flush=True)
+                return self._send_json(res)
+
+            if self.path == '/api/news_cache/delete_item':
+                p = self._read_json()
+                date_str = p.get('date', datetime.datetime.now().strftime("%Y-%m-%d"))
+                idx = p.get('index')
+                title = p.get('title')
+                res = delete_cache_item(date_str, item_index=idx, title=title)
+                # 該当記事のインメモリキャッシュも消去
+                if title and title in NEWS_SCRIPT_CACHE:
+                    del NEWS_SCRIPT_CACHE[title]
+                return self._send_json(res)
 
             # ── VOICEVOX 音声合成 ──
             if self.path == '/api/voicevox/synthesize':

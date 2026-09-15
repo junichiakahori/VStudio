@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🗄️ ニュース原稿キャッシュビューア</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0c0f17;
+            --bg-card: #151a28;
+            --bg-card-hover: #1c2336;
+            --bg-card-sub: #101420;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(0, 210, 211, 0.4);
+            --text-main: #f1f2f6;
+            --text-muted: #8b949e;
+            --text-sub: #a4b0be;
+            --accent-green: #00e676;
+            --accent-blue: #00d2d3;
+            --accent-orange: #ff9f43;
+            --accent-pink: #ff6b81;
+            --accent-purple: #a55eea;
+            --danger-bg: rgba(255, 107, 129, 0.15);
+            --danger-border: rgba(255, 107, 129, 0.4);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 16px 20px;
+            overflow-y: auto;
+            min-height: 100vh;
+        }
+
+        /* ── ヘッダー ── */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            background: rgba(12, 15, 23, 0.95);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #00d2d3, #a55eea);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .date-select-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 4px 10px;
+        }
+
+        .date-select-wrap label {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        select.date-select {
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-size: 13px;
+            font-weight: 600;
+            outline: none;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        select.date-select option {
+            background: #151a28;
+            color: #f1f2f6;
+        }
+
+        /* ── ボタン共通 ── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-main);
+            transition: all 0.2s ease;
+            outline: none;
+            user-select: none;
+        }
+
+        .btn:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-refresh {
+            color: var(--accent-blue);
+            border-color: rgba(0, 210, 211, 0.3);
+        }
+
+        .btn-refresh:hover {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 10px rgba(0, 210, 211, 0.2);
+        }
+
+        .btn-danger {
+            color: var(--accent-pink);
+            background: var(--danger-bg);
+            border-color: var(--danger-border);
+        }
+
+        .btn-danger:hover {
+            background: rgba(255, 107, 129, 0.25);
+            border-color: var(--accent-pink);
+            box-shadow: 0 0 10px rgba(255, 107, 129, 0.3);
+        }
+
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 12px;
+            border-radius: 6px;
+        }
+
+        /* ── 検索＆統計バー ── */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 240px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 8px 12px 8px 34px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-main);
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-box input:focus {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 8px rgba(0, 210, 211, 0.2);
+        }
+
+        .search-box .search-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 14px;
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .stats-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .stat-badge {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 4px 10px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat-val {
+            color: var(--accent-green);
+            font-weight: 700;
+        }
+
+        /* ── 記事カード一覧 ── */
+        .news-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .news-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .news-card:hover {
+            border-color: var(--border-hover);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .card-title-wrap {
+            flex: 1;
+        }
+
+        .card-badge-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .card-index-badge {
+            background: rgba(0, 210, 211, 0.15);
+            color: var(--accent-blue);
+            border: 1px solid rgba(0, 210, 211, 0.3);
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .card-source-badge {
+            background: rgba(255, 159, 67, 0.15);
+            color: var(--accent-orange);
+            border: 1px solid rgba(255, 159, 67, 0.3);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .card-time {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-main);
+            line-height: 1.4;
+        }
+
+        .card-title a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .card-title a:hover {
+            color: var(--accent-blue);
+            text-decoration: underline;
+        }
+
+        /* ── 読み上げ対比ボックス ── */
+        .reading-box {
+            background: var(--bg-card-sub);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 13px;
+        }
+
+        .reading-row {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .reading-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            min-width: 85px;
+            flex-shrink: 0;
+            user-select: none;
+        }
+
+        .reading-val {
+            color: #dcdde1;
+            line-height: 1.4;
+            word-break: break-all;
+        }
+
+        .reading-val.kana-val {
+            color: var(--accent-green);
+            font-family: 'Fira Code', monospace;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .reading-val.norm-val {
+            color: #74b9ff;
+        }
+
+        /* ── 原稿アコーディオン ── */
+        .sentences-details {
+            margin-top: 10px;
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .sentences-summary {
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-sub);
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.02);
+            user-select: none;
+            outline: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sentences-summary:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--accent-blue);
+        }
+
+        .sentences-content {
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: var(--bg-card-sub);
+        }
+
+        .sentence-item {
+            border-left: 2px solid var(--accent-blue);
+            padding-left: 8px;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .sentence-disp {
+            color: var(--text-main);
+            margin-bottom: 2px;
+        }
+
+        .sentence-yomi {
+            color: var(--accent-green);
+            font-family: 'Fira Code', monospace;
+            font-size: 11px;
+        }
+
+        /* ── 空状態 ── */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+            background: var(--bg-card);
+            border: 1px dashed var(--border-color);
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+
+        .empty-icon {
+            font-size: 40px;
+            margin-bottom: 12px;
+            opacity: 0.7;
+        }
+
+        .empty-text {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* ── 非同期トースト通知 ── */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: #1e272e;
+            color: #f1f2f6;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 18px;
+            font-size: 13px;
+            font-weight: 500;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transform: translateY(20px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            pointer-events: auto;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast-success {
+            border-color: rgba(0, 230, 118, 0.5);
+            background: #11261e;
+        }
+
+        .toast-error {
+            border-color: rgba(255, 107, 129, 0.5);
+            background: #2b1419;
+        }
+
+        /* ── インライン確認モーダル ── */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-card {
+            background: #181d2c;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 440px;
+            padding: 22px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+            transform: scale(0.95);
+            transition: transform 0.2s ease;
+        }
+
+        .modal-overlay.active .modal-card {
+            transform: scale(1);
+        }
+
+        .modal-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #f1f2f6;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .modal-desc {
+            font-size: 13px;
+            color: var(--text-sub);
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .modal-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ── ヘッダー ── -->
+    <header>
+        <div class="header-left">
+            <span class="header-title">🗄️ ニュース原稿キャッシュマネージャー</span>
+            <div class="date-select-wrap">
+                <label for="date-select">📅 日付:</label>
+                <select id="date-select" class="date-select"></select>
+            </div>
+        </div>
+        <div class="header-actions">
+            <button id="btn-refresh" class="btn btn-refresh" title="キャッシュデータを再読み込み">
+                🔄 更新
+            </button>
+            <button id="btn-clear-all" class="btn btn-danger" title="選択した日のキャッシュを全消去">
+                🗑️ この日のキャッシュを全消去
+            </button>
+        </div>
+    </header>
+
+    <!-- ── 検索＆統計バー ── -->
+    <div class="toolbar">
+        <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="search-input" placeholder="タイトルや読み上げ内容で検索...">
+        </div>
+        <div class="stats-bar">
+            <div class="stat-badge">
+                <span>登録記事数:</span>
+                <span id="stat-count" class="stat-val">0 件</span>
+            </div>
+            <div class="stat-badge">
+                <span>更新日時:</span>
+                <span id="stat-updated" class="stat-val">-</span>
+            </div>
+            <div class="stat-badge">
+                <span>ファイル容量:</span>
+                <span id="stat-size" class="stat-val">-</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 記事一覧コンテナ ── -->
+    <main id="news-container" class="news-grid"></main>
+
+    <!-- ── 空状態表示 ── -->
+    <div id="empty-state" class="empty-state" style="display: none;">
+        <div class="empty-icon">📭</div>
+        <div class="empty-text">キャッシュされているニュース原稿がありません</div>
+    </div>
+
+    <!-- ── インライン確認モーダル ── -->
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div id="modal-title" class="modal-title">⚠️ 削除の確認</div>
+            <div id="modal-desc" class="modal-desc">この操作は元に戻せません。本当に削除しますか？</div>
+            <div class="modal-actions">
+                <button id="modal-cancel-btn" class="btn">キャンセル</button>
+                <button id="modal-confirm-btn" class="btn btn-danger">削除する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── トースト通知コンテナ ── -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script>
+        // ── ポート自動解決 ──
+        const isDev = location.port === "8444";
+        const API_BASE = isDev ? "http://localhost:8002" : "http://localhost:8001";
+
+        let currentItems = [];
+        let currentDate = "";
+
+        // ── トースト通知ヘルパー ──
+        function showToast(message, type = "info") {
+            const container = document.getElementById("toast-container");
+            const toast = document.createElement("div");
+            toast.className = `toast ${type === "error" ? "toast-error" : type === "success" ? "toast-success" : ""}`;
+            toast.innerHTML = `<span>${type === "success" ? "✅" : type === "error" ? "❌" : "ℹ️"}</span><span>${escapeHtml(message)}</span>`;
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => toast.classList.add("show"));
+            setTimeout(() => {
+                toast.classList.remove("show");
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return "";
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // ── インライン確認モーダル表示 ──
+        function showConfirmModal(title, desc, onConfirm) {
+            const modal = document.getElementById("confirm-modal");
+            const titleEl = document.getElementById("modal-title");
+            const descEl = document.getElementById("modal-desc");
+            const confirmBtn = document.getElementById("modal-confirm-btn");
+            const cancelBtn = document.getElementById("modal-cancel-btn");
+
+            titleEl.textContent = title;
+            descEl.textContent = desc;
+
+            const handleConfirm = () => {
+                cleanup();
+                onConfirm();
+            };
+
+            const handleCancel = () => {
+                cleanup();
+            };
+
+            const cleanup = () => {
+                modal.classList.remove("active");
+                confirmBtn.removeEventListener("click", handleConfirm);
+                cancelBtn.removeEventListener("click", handleCancel);
+            };
+
+            confirmBtn.addEventListener("click", handleConfirm);
+            cancelBtn.addEventListener("click", handleCancel);
+            modal.classList.add("active");
+        }
+
+        // ── 利用可能な日付一覧の取得 ──
+        async function loadAvailableDates() {
+            try {
+                const res = await fetch(`${API_BASE}/api/news_cache/list`);
+                const data = await res.json();
+                const select = document.getElementById("date-select");
+                select.innerHTML = "";
+
+                if (data.success && data.dates && data.dates.length > 0) {
+                    data.dates.forEach((d, idx) => {
+                        const opt = document.createElement("option");
+                        opt.value = d.date;
+                        opt.textContent = `${d.date} (${d.item_count}件)`;
+                        select.appendChild(opt);
+                    });
+                    currentDate = data.dates[0].date;
+                } else {
+                    const today = new Date().toISOString().split("T")[0];
+                    const opt = document.createElement("option");
+                    opt.value = today;
+                    opt.textContent = `${today} (0件)`;
+                    select.appendChild(opt);
+                    currentDate = today;
+                }
+
+                select.value = currentDate;
+                select.onchange = (e) => {
+                    currentDate = e.target.value;
+                    loadCacheData(currentDate);
+                };
+
+                await loadCacheData(currentDate);
+            } catch (e) {
+                console.error("日付一覧取得失敗:", e);
+                showToast("キャッシュ日付一覧の取得に失敗しました", "error");
+            }
+        }
+
+        // ── 指定日付のキャッシュデータ読み込み ──
+        async function loadCacheData(dateStr) {
+            try {
+                const res = await fetch(`${API_BASE}/api/news_cache?date=${dateStr}`);
+                const data = await res.json();
+
+                if (data.success) {
+                    currentItems = data.items || [];
+                    document.getElementById("stat-count").textContent = `${currentItems.length} 件`;
+                    document.getElementById("stat-updated").textContent = data.updated_at || "-";
+                    document.getElementById("stat-size").textContent = data.file_size ? `${(data.file_size / 1024).toFixed(1)} KB` : "0 KB";
+
+                    renderCards(currentItems);
+                } else {
+                    showToast(data.error || "データ取得に失敗しました", "error");
+                    renderCards([]);
+                }
+            } catch (e) {
+                console.error("キャッシュデータ取得失敗:", e);
+                showToast("キャッシュデータの取得に失敗しました", "error");
+                renderCards([]);
+            }
+        }
+
+        // ── 記事カードの描画 ──
+        function renderCards(items) {
+            const container = document.getElementById("news-container");
+            const emptyState = document.getElementById("empty-state");
+            container.innerHTML = "";
+
+            if (!items || items.length === 0) {
+                emptyState.style.display = "block";
+                return;
+            }
+
+            emptyState.style.display = "none";
+
+            items.forEach((item, idx) => {
+                const card = document.createElement("div");
+                card.className = "news-card";
+
+                const title = item.title || "(タイトルなし)";
+                const source = item.source || "ニュース";
+                const pubDate = item.pub_date || item.created_at || "";
+                const url = item.url || "";
+                const titleReading = item.title_reading || item.headline?.reading || "";
+                const voicevoxReading = item.title_voicevox_reading || item.headline?.voicevox_reading || "";
+                const sentences = item.sentences || [];
+
+                // センテンス一覧のHTML生成
+                let sentencesHtml = "";
+                if (sentences.length > 0) {
+                    sentencesHtml = `
+                        <details class="sentences-details">
+                            <summary class="sentences-summary">
+                                <span>📄 読み上げ原稿本文 (${sentences.length} 文)</span>
+                                <span>▼ 展開</span>
+                            </summary>
+                            <div class="sentences-content">
+                                ${sentences.map((s, sIdx) => `
+                                    <div class="sentence-item">
+                                        <div class="sentence-disp">#${sIdx + 1}: ${escapeHtml(s.display || "")}</div>
+                                        <div class="sentence-yomi">🗣️ ${escapeHtml(s.voicevox_reading || s.reading || "")}</div>
+                                    </div>
+                                `).join("")}
+                            </div>
+                        </details>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div class="card-title-wrap">
+                            <div class="card-badge-row">
+                                <span class="card-index-badge">#${item.index || idx + 1}</span>
+                                <span class="card-source-badge">${escapeHtml(source)}</span>
+                                <span class="card-time">${escapeHtml(pubDate)}</span>
+                            </div>
+                            <div class="card-title">
+                                ${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)} 🔗</a>` : escapeHtml(title)}
+                            </div>
+                        </div>
+                        <button class="btn btn-danger btn-sm" onclick="handleDeleteItem(${item.index || idx + 1}, '${escapeHtml(title)}')">
+                            🗑️ 削除
+                        </button>
+                    </div>
+
+                    <div class="reading-box">
+                        <div class="reading-row">
+                            <span class="reading-label">📝 見出し読み:</span>
+                            <span class="reading-val norm-val">${escapeHtml(titleReading || "未生成")}</span>
+                        </div>
+                        <div class="reading-row">
+                            <span class="reading-label">🗣️ VOICEVOX:</span>
+                            <span class="reading-val kana-val">${escapeHtml(voicevoxReading || "未生成")}</span>
+                        </div>
+                    </div>
+
+                    ${sentencesHtml}
+                `;
+
+                container.appendChild(card);
+            });
+        }
+
+        // ── 単一記事の削除 ──
+        window.handleDeleteItem = (itemIndex, itemTitle) => {
+            showConfirmModal(
+                "この記事のキャッシュを削除",
+                `「${itemTitle.substring(0, 30)}...」のキャッシュを削除しますか？\n（次回ニュース時に新エンジンで再生成されます）`,
+                async () => {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/news_cache/delete_item`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ date: currentDate, index: itemIndex, title: itemTitle })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast("記事のキャッシュを削除しました", "success");
+                            loadCacheData(currentDate);
+                        } else {
+                            showToast(data.error || "削除に失敗しました", "error");
+                        }
+                    } catch (e) {
+                        showToast("通信エラーが発生しました", "error");
+                    }
+                }
+            );
+        };
+
+        // ── 全件キャッシュ削除 ──
+        document.getElementById("btn-clear-all").onclick = () => {
+            if (!currentItems || currentItems.length === 0) {
+                showToast("削除するキャッシュデータがありません", "info");
+                return;
+            }
+
+            showConfirmModal(
+                "本日のキャッシュ全消去",
+                `日付「${currentDate}」のすべてのニュース原稿キャッシュ（全 ${currentItems.length} 件）を消去しますか？\n次回ニュース時に全記事が新エンジンでゼロから再生成されます。`,
+                async () => {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/news_cache/clear`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ date: currentDate })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast("本日のキャッシュを全消去しました", "success");
+                            loadCacheData(currentDate);
+                        } else {
+                            showToast(data.error || "消去に失敗しました", "error");
+                        }
+                    } catch (e) {
+                        showToast("通信エラーが発生しました", "error");
+                    }
+                }
+            );
+        };
+
+        // ── 更新ボタン ──
+        document.getElementById("btn-refresh").onclick = () => {
+            loadCacheData(currentDate);
+            showToast("キャッシュを再読み込みしました", "info");
+        };
+
+        // ── リアルタイム検索フィルター ──
+        document.getElementById("search-input").addEventListener("input", (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            if (!query) {
+                renderCards(currentItems);
+                return;
+            }
+
+            const filtered = currentItems.filter(item => {
+                const title = (item.title || "").toLowerCase();
+                const reading = (item.title_reading || "").toLowerCase();
+                const kana = (item.title_voicevox_reading || "").toLowerCase();
+                const body = (item.sentences || []).map(s => s.display + " " + (s.voicevox_reading || "")).join(" ").toLowerCase();
+                return title.includes(query) || reading.includes(query) || kana.includes(query) || body.includes(query);
+            });
+
+            renderCards(filtered);
+        });
+
+        // ── 初期化 ──
+        window.addEventListener("DOMContentLoaded", () => {
+            loadAvailableDates();
+        });
+    </script>
+</body>
+</html>

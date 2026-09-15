@@ -90,6 +90,12 @@
       streamOverlay.classList.add("active");
       isStreamEndedState = true;
 
+      // 配信終了時にはニュースボードとセトリ（アジェンダ）を非表示
+      const nb = document.getElementById("news-board");
+      if (nb) nb.classList.remove("active");
+      const sb = document.getElementById("news-setlist-board");
+      if (sb) sb.style.display = "none";
+
       // 配信終了時には、残っている読み上げキューをクリアして即座に黙るようにする
       if (typeof voicevoxAudioQueue !== "undefined") {
         voicevoxAudioQueue.length = 0;

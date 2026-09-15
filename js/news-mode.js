@@ -1168,6 +1168,13 @@ function getNewsConfig() {
     if (startBtn) startBtn.style.display = "block";
     if (stopBtn) stopBtn.style.display = "none";
     if (progressEl) progressEl.textContent = "⏹ 番組を停止しました";
+
+    // ニュースボード（テロップ）およびセトリ（アジェンダ）を非表示
+    const nb = document.getElementById("news-board");
+    if (nb) nb.classList.remove("active");
+    const sb = document.getElementById("news-setlist-board");
+    if (sb) sb.style.display = "none";
+
     console.log("[ニュース番組] ⏹ 番組を停止しました。");
   }
 

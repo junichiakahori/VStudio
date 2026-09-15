@@ -321,6 +321,9 @@
             <span class="stats-badge" id="news-count-badge">0 件</span>
         </div>
         <div class="header-actions">
+            <button class="action-btn" id="open-cache-btn" onclick="handleOpenCacheViewer()" style="background: linear-gradient(135deg, rgba(0, 210, 211, 0.2), rgba(165, 94, 234, 0.25)); border-color: rgba(0, 210, 211, 0.4); color: #00f3ff;" title="ニュース原稿キャッシュマネージャーを開く">
+                🗄️ キャッシュ確認
+            </button>
             <button class="action-btn jump-btn" id="jump-to-current-btn" onclick="scrollToPlayingNews(true)">
                 🎯 放送中へジャンプ
             </button>
@@ -531,7 +534,10 @@
                         ${item.description ? `<div class="news-desc">${escapeHtml(item.description)}</div>` : ''}
                         <div class="news-card-footer">
                             <span>📅 ${escapeHtml(item.pubDate || '日時不明')}</span>
-                            ${linkUrl ? `<a href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener noreferrer" class="news-link">🔗 元記事を開く ↗</a>` : ''}
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <button class="action-btn" style="padding: 2px 8px; font-size: 0.72rem; background: rgba(0, 210, 211, 0.12); border-color: rgba(0, 210, 211, 0.35); color: #00f3ff; border-radius: 4px;" onclick="handleOpenCacheViewer(); event.stopPropagation();" title="ニュース原稿キャッシュマネージャーを開く">🗄️ キャッシュ</button>
+                                ${linkUrl ? `<a href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener noreferrer" class="news-link">🔗 元記事を開く ↗</a>` : ''}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -725,6 +731,23 @@
         function handleBatchGenStop() {
             if (!window.NewsBatchGenerator) return;
             window.NewsBatchGenerator.stop();
+        }
+
+        // ── ニュースキャッシュマネージャーを開く ──
+        function handleOpenCacheViewer() {
+            if (window.opener && typeof window.opener.openNewsCachePopup === "function") {
+                window.opener.openNewsCachePopup();
+            } else {
+                const width = 960;
+                const height = 750;
+                const left = Math.max(0, (window.screen.width - width) / 2);
+                const top = Math.max(0, (window.screen.height - height) / 2);
+                window.open(
+                    `/news_cache_viewer.html?t=${Date.now()}`,
+                    "VStudioNewsCacheWindow",
+                    `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
+                );
+            }
         }
     </script>
 </body>

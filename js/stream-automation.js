@@ -124,10 +124,14 @@ window.executeStreamEndProcess = function () {
     endBtn.click();
   }
 
-  // ニュースボード（テロップ）を非表示
+  // ニュースボード（テロップ）およびセトリ（アジェンダ）を非表示
   const newsBoardEl = document.getElementById("news-board");
   if (newsBoardEl) {
     newsBoardEl.classList.remove("active");
+  }
+  const setlistBoardEl = document.getElementById("news-setlist-board");
+  if (setlistBoardEl) {
+    setlistBoardEl.style.display = "none";
   }
 
   // 配信終了処理に入ったら、未読コメントを破棄してこれ以上読まないようにする

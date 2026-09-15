@@ -30,7 +30,7 @@ def get_kks() -> typing.Any:
 def is_plausible_reading(term, yomi):
     """
     漢字語句 term と読み yomi の妥当性を検証。
-    完全に無関係な単語への破壊的誤読（例: 一時閉鎖 -> すもうべや、運用 -> じょうば、横開き -> ふながこい、快挙 -> おりこん）を100%弾く。
+    完全に無関係な単語や長大作品名への破壊的誤読（例: 一生懸命 -> はしだすがこどらまおんなはいっしょうけんめい、一時閉鎖 -> すもうべや）を100%弾く。
     """
     if not term or not yomi:
         return False
@@ -46,6 +46,10 @@ def is_plausible_reading(term, yomi):
     if re.search(r'[A-Za-z]', norm_term) and re.match(r'^[A-Za-z0-9\s\-_.]+$', norm_term):
         return True
 
+    # 漢字熟語に対して読みが異常に長い場合（例: 4文字に22文字のドラマ名）は即座に除外
+    if re.search(r'[\u4e00-\u9fa5]', norm_term) and len(norm_yomi) > max(len(norm_term) * 3, 8):
+        return False
+
     kks = get_kks()
     if not kks:
         return True
@@ -56,9 +60,23 @@ def is_plausible_reading(term, yomi):
     if yomi == std_hira:
         return True
 
+    # 2〜4文字の漢字ブロック（人名フルネーム・苗字候補: 志尊, 志尊淳, 永島, 永島龍, 角田裕毅, 麻生太郎等）
+    # ※人名・苗字は各文字が音訓・名乗りで構成され、pykakasiが訓読み長大化（例: 志尊->こころざしみこと、志尊淳->こころざしみことあつし）を起こしやすいため、
+    #   妥当な文字数比率（2〜8文字）かつ不審な語句でなければ人名・苗字として許容
+    kanji_chars = [c for c in term if "\u4e00" <= c <= "\u9fa5"]
+    if len(term) in (2, 3, 4) and len(kanji_chars) == len(term):
+        if 2 <= len(yomi) <= len(term) * 2.5:
+            SUSPICIOUS_WORDS = {"すもう", "ふな", "ぐらんぷり", "おりこん", "へいさ", "うんよう", "しけん"}
+            if not any(sw in yomi for sw in SUSPICIOUS_WORDS):
+                return True
+
+    # 標準ひらがな読みと長さが大きく乖離している場合は作品名プレフィックス等の混入と判定
+    if std_hira and (len(yomi) > len(std_hira) * 1.5 or len(yomi) < len(std_hira) * 0.6):
+        return False
+
     # 文字列類似度（レーベンシュタイン比率）
     sim = difflib.SequenceMatcher(None, std_hira, yomi).ratio()
-    if sim >= 0.35:
+    if sim >= 0.40:
         return True
 
     # 濁点・半濁点の清音化による類似度チェック
@@ -70,7 +88,7 @@ def is_plausible_reading(term, yomi):
              "ぱ":"は","ぴ":"ひ","ぷ":"ふ","ぺ":"へ","ぽ":"ほ"}
         return "".join([str(d.get(c, c)) for c in s])
 
-    if difflib.SequenceMatcher(None, _to_seion(std_hira), _to_seion(yomi)).ratio() >= 0.35:
+    if difflib.SequenceMatcher(None, _to_seion(std_hira), _to_seion(yomi)).ratio() >= 0.40:
         return True
 
     # 漢字構成文字の音訓・音節チェック（人名等の特殊読みを許容）
@@ -288,6 +306,10 @@ def _validate_wiki_reading(term, yomi):
     if re.match(r'^[A-Za-z0-9\s\-_]+$', term) and len(yomi) > len(term) * 2.5:
         print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi}' は過剰展開のため破棄")
         return None
+    # 漢字熟語に対して異常に長すぎる読み（作品名・ドラマ名等の混入）を確実に除外
+    if re.search(r'[\u4e00-\u9fa5]', term) and len(yomi) > max(len(term) * 3, 8):
+        print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi}' は漢字文字数に対して長すぎるため破棄")
+        return None
     if not is_plausible_reading(term, yomi):
         print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi}' は漢字表記と乖離しているため破棄")
         return None
@@ -352,7 +374,18 @@ def lookup_wikipedia_reading(term):
                     continue
                 step1_found = True
                 page_title = pdata.get("title", "")
+                # 🛡️ リダイレクト先タイトルが元の単語と異なる場合（例: 左右対称 -> 線対称）は、
+                # 類義語や上位概念への転送であり、元の単語の読み仮名ではないため絶対に採用しない！
+                clean_page_title = re.sub(r'\s*[\(（].*?[\)）]', '', page_title).strip()
+                clean_term = term.strip()
+                if clean_page_title.lower() != clean_term.lower():
+                    continue
                 extract = pdata.get("extract", "")
+                # 名前一覧・曖昧さ回避記事（例: 「佳子（よしこ、かこ）は日本の女性名」等）からの多義語誤爆を完全遮断
+                WIKI_NAME_DISAMBIG_KEYWORDS = ("日本の女性名", "日本の男性名", "日本の人名", "人名の曖昧さ回避", "曖昧さ回避のためのページ", "曖昧さ回避", "同姓同名")
+                if any(kw in extract for kw in WIKI_NAME_DISAMBIG_KEYWORDS):
+                    continue
+
                 m = re.search(r'[\(（]\s*([ぁ-んァ-ヶゔヴー・、\s,，/／]+)', extract)
                 if not m:
                     continue
@@ -385,7 +418,10 @@ def lookup_wikipedia_reading(term):
             results = s_data.get("query", {}).get("search", [])
             for res in results[:2]:
                 title = res.get("title", "")
-                if not (title == term or (len(term) >= 3 and term in title)):
+                # 記事タイトルが単語と完全一致、または「単語 (曖昧さ回避)」形式のみを許可（別名作品・ドラマ名等の誤爆を完全遮断）
+                is_exact = (title == term)
+                is_disambig = bool(re.match(rf'^{re.escape(term)}\s*[\(（]', title))
+                if not (is_exact or is_disambig):
                     continue
                 try:
                     ext_url2 = f"https://ja.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&exsentences=2&explaintext=true&titles={urllib.parse.quote(title)}&redirects=1&format=json"
@@ -396,6 +432,8 @@ def lookup_wikipedia_reading(term):
                             if pid2 == "-1":
                                 continue
                             extract2 = pdata2.get("extract", "")
+                            if any(kw in extract2 for kw in WIKI_NAME_DISAMBIG_KEYWORDS):
+                                continue
                             m2 = re.search(r'[\(（]\s*([ぁ-んァ-ヶゔヴー・、\s,，/／]+)', extract2)
                             if not m2:
                                 continue
@@ -814,40 +852,18 @@ def build_context_pronunciation_map(full_context, custom_dict=None):
     t = normalize_fullwidth_alphanumeric(full_context)
     context_map = {}
 
-    # 1. 皇族・著名人の文脈敬称ルールから抽出
+    # 1. 皇族・著名人の文脈敬称ルールから抽出（data/tts_rules.json より）
     for pattern, yomi in IMPERIAL_PROPER_NOUNS:
         for m in re.finditer(pattern, t):
             matched_term = m.group(0)
             if matched_term and matched_term not in context_map:
                 context_map[matched_term] = yomi
 
-    # 2. 特殊固有名詞・敬称付き人名の抽出
-    terms = extract_special_terms(t)
-    terms_sorted = sorted(terms, key=lambda x: len(x), reverse=True)
-
-    derived_surnames = {}
-    for term in terms_sorted:
-        if term in context_map:
-            continue
-        yomi, _ = lookup_wikipedia_reading(term)
-        if yomi:
-            context_map[term] = yomi
-
-            # 4文字の人名漢字（例: 角田裕毅 -> つのだ、大谷翔平 -> おおたに）の場合、姓の正確な読みを導出
-            if len(term) == 4 and re.match(r'^[\u4e00-\u9fa5]{4}$', term):
-                surname_kanji = term[:2]
-                # Wikipediaのリード文分かち書きから姓の読みを厳密取得
-                exact_surname_yomi = get_wikipedia_surname_reading(term)
-                if exact_surname_yomi:
-                    derived_surnames[surname_kanji] = exact_surname_yomi
-                elif len(yomi) >= 4:
-                    half_len = (len(yomi) + 1) // 2 if len(yomi) % 2 != 0 else len(yomi) // 2
-                    derived_surnames[surname_kanji] = yomi[:half_len]
-
-    # 姓の文脈を記録（敬称パターンと連動）
-    for s_kanji, s_yomi in derived_surnames.items():
-        if s_kanji not in context_map:
-            context_map[s_kanji] = s_yomi
+    # 2. カスタム辞書からの事前適用
+    if custom_dict and isinstance(custom_dict, dict):
+        for orig, yomi in custom_dict.items():
+            if orig and yomi and orig in t:
+                context_map[orig] = yomi
 
     return context_map
 
@@ -942,34 +958,35 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
     t = apply_okonau_context_rules(t)
     t = apply_person_kata_rules(t)
 
-    # 7. 特殊固有名詞のWikipedia動的解決（フルネーム優先・文脈姓連動）
-    terms = extract_special_terms(t)
-    # 長い固有名詞（フルネーム等）を優先して解決し、その姓の読みを文脈マップに蓄積
-    terms_sorted = sorted(terms, key=lambda x: len(x), reverse=True)
-    derived_surnames = {}
+    # 7. 特殊固有名詞の動的解決
+    # ⚠️ context_map（AI発音ダブルチェック）が渡されている場合は、文脈を無視したWikipedia検索による誤読
+    # （例: 「左右対称」->「線対称/せんたいしょう」、「佳子」->「よしこ」、「一時閉鎖」->「すもうべや」等）
+    # を完全に防止するため、Wikipedia自動検索ステップは実行せずAIの文脈判定を100%信頼する。
+    if not context_map:
+        terms = extract_special_terms(t)
+        terms_sorted = sorted(terms, key=lambda x: len(x), reverse=True)
+        derived_surnames = {}
 
-    for term in terms_sorted:
-        yomi, _ = lookup_wikipedia_reading(term)
-        if yomi:
-            print(f"[Wikipedia自動発音解決] '{term}' ➔ '{yomi}'", flush=True)
-            if log_collector is not None and isinstance(log_collector, list):
-                log_collector.append({"term": term, "yomi": yomi})
-            t = re.sub(rf'(?<![A-Za-z0-9]){re.escape(term)}(?![A-Za-z0-9])', yomi, t)
+        for term in terms_sorted:
+            yomi, _ = lookup_wikipedia_reading(term)
+            if yomi:
+                print(f"[Wikipedia自動発音解決] '{term}' ➔ '{yomi}'", flush=True)
+                if log_collector is not None and isinstance(log_collector, list):
+                    log_collector.append({"term": term, "yomi": yomi})
+                t = re.sub(rf'(?<![A-Za-z0-9]){re.escape(term)}(?![A-Za-z0-9])', yomi, t)
 
-            # 4文字の人名漢字（例: 角田裕毅 -> つのだゆうき）の場合、姓2文字（角田 -> つのだ）の文脈を導出
-            if len(term) == 4 and re.match(r'^[\u4e00-\u9fa5]{4}$', term) and len(yomi) >= 4:
-                surname_kanji = term[:2]
-                # 読みの前半（姓の読み）を概算または形態素から安全に派生
-                # 例: つのだ(3) + ゆうき(3) = 6 -> 前半3文字
-                half_len = len(yomi) // 2
-                if len(yomi) % 2 != 0:
-                    half_len = (len(yomi) + 1) // 2
-                surname_yomi = yomi[:half_len]
-                derived_surnames[surname_kanji] = surname_yomi
+                # 4文字の人名漢字（例: 角田裕毅 -> つのだゆうき）の場合、姓2文字（角田 -> つのだ）の文脈を導出
+                if len(term) == 4 and re.match(r'^[\u4e00-\u9fa5]{4}$', term) and len(yomi) >= 4:
+                    surname_kanji = term[:2]
+                    half_len = len(yomi) // 2
+                    if len(yomi) % 2 != 0:
+                        half_len = (len(yomi) + 1) // 2
+                    surname_yomi = yomi[:half_len]
+                    derived_surnames[surname_kanji] = surname_yomi
 
-    # 派生した姓の文脈を、敬称・肩書が付いた単独姓（角田選手、角田氏等）へ安全に適用
-    for s_kanji, s_yomi in derived_surnames.items():
-        t = re.sub(rf'{re.escape(s_kanji)}(?=(?:さま|様|殿|さん|氏|選手|知事|市長|首相|大臣|総理|総裁|議員|社長|会長|監督|コーチ|投手|捕手|棋士))', s_yomi, t)
+        # 派生した姓の文脈を、敬称・肩書が付いた単独姓（角田選手、角田氏等）へ安全に適用
+        for s_kanji, s_yomi in derived_surnames.items():
+            t = re.sub(rf'{re.escape(s_kanji)}(?=(?:さま|様|殿|さん|氏|選手|知事|市長|首相|大臣|総理|総裁|議員|社長|会長|監督|コーチ|投手|捕手|棋士))', s_yomi, t)
 
     # 8. サニタイズ
     t = sanitize_speech_text(t)
