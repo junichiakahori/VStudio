@@ -2135,6 +2135,22 @@ def generate_news_item_script_data(payload, custom_dict=None):
                                 news_context_map[surname_k] = s_yomi
                                 print(f"{tag} 👤 [人名文脈継承] '{target_name}'({w_yomi}) ➔ 姓 '{surname_k}' = '{s_yomi}'", flush=True)
 
+            # 👤 2.5 タイトル・原稿・本文からの4文字人名自動スキャン＆姓の文脈継承（AI抽出漏れ完全フォールバック）
+            scan_corpus = f"{title}\n{clean_text}"
+            auto_kanji_4names = set(re.findall(r'(?<![\u4e00-\u9fa5])([\u4e00-\u9fa5]{4})(?![\u4e00-\u9fa5])', scan_corpus))
+            for k4 in auto_kanji_4names:
+                if k4 not in news_context_map:
+                    w_y = lookup_wikipedia_person_reading(k4, context_hint=full_context_text)
+                    if w_y:
+                        news_context_map[k4] = w_y
+                        sur_k = k4[:2]
+                        s_y = get_wikipedia_surname_reading(k4)
+                        if not s_y and len(w_y) >= 4:
+                            s_y = w_y[:(len(w_y)+1)//2]
+                        if s_y and sur_k not in news_context_map:
+                            news_context_map[sur_k] = s_y
+                            print(f"{tag} 👤 [自動人名スキャン文脈継承] '{k4}'({w_y}) ➔ 姓 '{sur_k}' = '{s_y}'", flush=True)
+
             # 🤖 AIによる直接発音ダブルチェック（人名・特殊固有名詞のひらがな読みを文脈判定して統合）
             ai_pron_map = extract_pronunciations_via_ai(
                 clean_text, title=title, article_context=full_article_content,
