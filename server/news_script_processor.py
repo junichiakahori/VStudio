@@ -16,7 +16,7 @@ from server.tts_normalizer import (
     normalize_for_tts, sanitize_speech_text, build_context_pronunciation_map,
     heal_sentence_reading, apply_person_kata_rules, is_plausible_reading,
     extract_article_rubies, lookup_wikipedia_person_reading,
-    extract_imperial_pronunciations
+    extract_imperial_pronunciations, get_wikipedia_surname_reading
 )
 from server.news_crawler import find_cached_url, search_news_url_by_title, register_cached_url, fetch_article_body, decode_google_news_url
 
@@ -343,7 +343,8 @@ def extract_pronunciations_via_ai(text, title="", article_context="", provider="
             "安全保障", "経済安全保障", "国家安全保障", "シャワー室", "囚人服", "大晦日",
             "大統領", "大統領専用機", "記者会見", "関係者", "防犯カメラ", "傷害容疑",
             "打線", "安打", "連勝", "最多", "過去", "以来", "引退", "移籍", "監督", "顧問",
-            "社長", "会長", "議員", "知事", "市長", "選手", "投手", "捕手"
+            "社長", "会長", "議員", "知事", "市長", "選手", "投手", "捕手",
+            "供給", "石油供給", "電力供給", "需要", "施設", "基地", "空軍基地", "停滞", "混乱", "攻撃"
         }
 
         pron_map = {}
@@ -359,7 +360,7 @@ def extract_pronunciations_via_ai(text, title="", article_context="", provider="
                 continue
 
             # 一般熟語・常用語の破壊を100%防止（VOICEVOXが読める単語の不要なひらがな化を拒絶）
-            if term_clean in FORBIDDEN_GENERAL_TERMS or term_clean.endswith(('不明金', '執行部', '委員会', '本塁打')):
+            if term_clean in FORBIDDEN_GENERAL_TERMS or term_clean.endswith(('不明金', '執行部', '委員会', '本塁打', '供給', '施設', '基地', '停滞', '需要')):
                 print(f"[AI発音チェック 却下] 🛡️ 一般熟語 '{term_clean}' への不要なひらがな化('{yomi_clean}')を拒絶しました", flush=True)
                 continue
 
@@ -2060,15 +2061,29 @@ def generate_news_item_script_data(payload, custom_dict=None):
                         news_context_map[pname] = w_yomi
                         if target_name != pname:
                             news_context_map[target_name] = w_yomi
-    
-            # 🤖 AIによる直接発音ダブルチェック（人名・特殊固有名詞のひらがな読みを文脈判定して最優先統合）
+                        # フルネームから「姓」の読みを自動導出して文脈マップへ即座に登録（溝口勇児 -> 溝口=みぞぐち 等）
+                        if len(target_name) == 4 and re.match(r'^[\u4e00-\u9fa5]{4}$', target_name):
+                            surname_k = target_name[:2]
+                            s_yomi = get_wikipedia_surname_reading(target_name)
+                            if not s_yomi and len(w_yomi) >= 4:
+                                s_yomi = w_yomi[:(len(w_yomi)+1)//2]
+                            if s_yomi and surname_k not in news_context_map:
+                                news_context_map[surname_k] = s_yomi
+                                print(f"{tag} 👤 [人名文脈継承] '{target_name}'({w_yomi}) ➔ 姓 '{surname_k}' = '{s_yomi}'", flush=True)
+
+            # 🤖 AIによる直接発音ダブルチェック（人名・特殊固有名詞のひらがな読みを文脈判定して統合）
             ai_pron_map = extract_pronunciations_via_ai(
                 clean_text, title=title, article_context=full_article_content,
                 provider=provider, model_name=model_name, api_key=api_key
             )
             if ai_pron_map:
                 print(f"{tag} 🤖 [AI発音ダブルチェック] 固有名詞の読みをAI判定: {ai_pron_map}", flush=True)
-                news_context_map.update(ai_pron_map)
+                # 既に信頼できる辞書・人名解決で決まっている読みはAIで上書きしない（麻生をあそで壊すのを防止）
+                for k, v in ai_pron_map.items():
+                    if k not in news_context_map:
+                        news_context_map[k] = v
+                    else:
+                        print(f"{tag} 🛡️ [AI発音上書き防止] '{k}' は既存の信頼できる読み '{news_context_map[k]}' を維持（AI判定 '{v}' を破棄）", flush=True)
     
             candidate_items = inspect_and_correct_pronunciation(
                 raw_sentences,

@@ -60,24 +60,24 @@ def is_plausible_reading(term, yomi):
     if yomi == std_hira:
         return True
 
-    # 2〜4文字の漢字ブロック（人名フルネーム・苗字候補: 志尊, 志尊淳, 永島, 永島龍, 角田裕毅, 麻生太郎等）
-    # ※人名・苗字は各文字が音訓・名乗りで構成され、pykakasiが訓読み長大化（例: 志尊->こころざしみこと、志尊淳->こころざしみことあつし）を起こしやすいため、
-    #   妥当な文字数比率（2〜8文字）かつ不審な語句でなければ人名・苗字として許容
     kanji_chars = [c for c in term if "\u4e00" <= c <= "\u9fa5"]
-    if len(term) in (2, 3, 4) and len(kanji_chars) == len(term):
-        if 2 <= len(yomi) <= len(term) * 2.5:
-            SUSPICIOUS_WORDS = {"すもう", "ふな", "ぐらんぷり", "おりこん", "へいさ", "うんよう", "しけん"}
-            if not any(sw in yomi for sw in SUSPICIOUS_WORDS):
-                return True
+    NON_NAME_ENDINGS = ("供給", "施設", "基地", "会社", "組織", "政府", "停滞", "混乱", "攻撃", "需要", "発表", "決定", "計画", "問題", "対応", "対策", "支援", "規制")
+    NON_NAME_SUFFIX_CHARS = "給金部的人化法案賞権率線点戦界隊団機館所署室駅器品物料費額数量値度業車網道"
 
-    # 標準ひらがな読みと長さが大きく乖離している場合は作品名プレフィックス等の混入と判定
-    if std_hira and (len(yomi) > len(std_hira) * 1.5 or len(yomi) < len(std_hira) * 0.6):
-        return False
+    is_general_compound = term.endswith(NON_NAME_ENDINGS) or (bool(kanji_chars) and term[-1] in NON_NAME_SUFFIX_CHARS)
+
+    # 一般熟語における音節・モーラ脱落の遮断（例: 石油供給 -> せきゆきゅう 等の欠落を100%排除）
+    if is_general_compound:
+        if std_hira and len(kanji_chars) >= 2 and len(yomi) <= len(std_hira) - 2:
+            return False
+        # 標準ひらがな読みと長さが大きく乖離している場合は除外
+        if std_hira and (len(yomi) > len(std_hira) * 1.5 or len(yomi) < len(std_hira) * 0.7):
+            return False
 
     # 文字列類似度（レーベンシュタイン比率）
     sim = difflib.SequenceMatcher(None, std_hira, yomi).ratio()
-    if sim >= 0.40:
-        return True
+    if is_general_compound:
+        return sim >= 0.85
 
     # 濁点・半濁点の清音化による類似度チェック
     def _to_seion(s):
@@ -91,12 +91,18 @@ def is_plausible_reading(term, yomi):
     if difflib.SequenceMatcher(None, _to_seion(std_hira), _to_seion(yomi)).ratio() >= 0.40:
         return True
 
+    # 2〜5文字の人名・苗字ブロック（角田裕毅, 麻生太郎, 志尊淳, 永島龍等）
+    # ※一般熟語サフィックスを持たない純粋な漢字ブロックを許容
+    if len(term) in (2, 3, 4, 5) and len(kanji_chars) == len(term) and not is_general_compound:
+        if len(term) <= len(yomi) <= len(term) * 2.5:
+            SUSPICIOUS_WORDS = {"すもう", "ふな", "ぐらんぷり", "おりこん", "へいさ", "うんよう", "しけん", "どらま", "しょと", "ふも"}
+            if not any(sw in yomi for sw in SUSPICIOUS_WORDS):
+                return True
+
     # 漢字構成文字の音訓・音節チェック（人名等の特殊読みを許容）
-    kanji_chars = [c for c in term if "\u4e00" <= c <= "\u9fa5"]
     if not kanji_chars:
         return sim >= 0.2
 
-    # 多音字（pykakasiが代表読みしか返さない基本漢字の音訓セット）
     COMMON_POLYPHONIC_KANJI = {
         "方": {"かた", "ほう", "がた"},
         "大": {"おお", "だい", "たい"},
@@ -116,12 +122,10 @@ def is_plausible_reading(term, yomi):
 
     matched_kanji = 0
     for c in kanji_chars:
-        # 多音字の訓読み・音読み判定
         if c in COMMON_POLYPHONIC_KANJI:
             if any(r in yomi for r in COMMON_POLYPHONIC_KANJI[c]):
                 matched_kanji += 1
                 continue
-
         c_res = kks.convert(c)
         if c_res:
             c_hira = c_res[0].get("hira", "")
@@ -135,17 +139,7 @@ def is_plausible_reading(term, yomi):
     if len(kanji_chars) == 1 and matched_kanji >= 1:
         return True
 
-    # 3〜4文字の漢字ブロック（人名フルネーム候補: 角田裕毅, 麻生太郎, 悠仁さま等）
-    # ※一般熟語（末尾が「金」「部」「的」「性」「化」「法」「案」等）は人名ではないため除外
-    if len(term) in (3, 4, 5) and len(kanji_chars) == len(term):
-        if term[-1] in "金部的人化法案賞権率線点戦界隊団機館所署室駅":
-            return False
-        if 3 <= len(yomi) <= len(term) * 2.5:
-            SUSPICIOUS_WORDS = {"すもう", "ふな", "ぐらんぷり", "おりこん", "へいさ", "うんよう", "しけん", "しょと", "ふも"}
-            if not any(sw in yomi for sw in SUSPICIOUS_WORDS):
-                return True
-
-    return False
+    return sim >= 0.40
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TTS_RULES_PATH = os.path.join(BASE_DIR, "data", "tts_rules.json")
@@ -193,10 +187,13 @@ def load_pronunciation_memory():
             _pronunciation_memory_cache = {"records": []}
     return _pronunciation_memory_cache or {"records": []}
 
-def apply_pronunciation_memory(text: str) -> str:
+def apply_pronunciation_memory(text: str, full_context: str = "") -> str:
     """
     過去の誤読記憶台帳（data/pronunciation_memory.json）の記録を適用。
     表面表記（surface）を正しい読み（reading）へ置換する。
+    - scope == 'global': 常に適用（一般名詞・確定フルネーム等）
+    - scope == 'contextual': full_context（記事全体）または text に context_keywords が含まれる場合のみ適用。
+      （同姓異名や地名とのバッティングによる巻き添え誤読を100%防止）
     長い語句から優先的にマッチさせることで、部分一致の誤爆を防止。
     """
     if not text:
@@ -212,10 +209,21 @@ def apply_pronunciation_memory(text: str) -> str:
         reverse=True
     )
 
+    combined_context = (full_context or "") + " " + text
+
     res = text
     for r in sorted_records:
         surface = r["surface"]
         reading = r["reading"]
+        scope = r.get("scope", "global")
+
+        # 文脈依存レコードの場合、文脈キーワードとの照合を厳格に実施
+        if scope == "contextual":
+            keywords = r.get("context_keywords", [])
+            # キーワードが未設定または文脈に含まれていない場合は安全にスキップ
+            if not keywords or not any(kw in combined_context for kw in keywords if kw):
+                continue
+
         if surface in res:
             res = res.replace(surface, reading)
     return res
@@ -1213,23 +1221,72 @@ def build_context_pronunciation_map(full_context, custom_dict=None):
     t = normalize_fullwidth_alphanumeric(full_context)
     context_map = {}
 
-    # 1. 皇族・著名人の文脈敬称ルールから抽出（data/tts_rules.json より）
+    # 1. 政治家・著名人マスター（data/tts_rules.json より）
+    prominent = load_tts_rules().get("prominent_people", {})
+    if prominent and isinstance(prominent, dict):
+        for name, yomi in prominent.items():
+            if name and yomi and name in t:
+                context_map[name] = yomi
+
+    # 2. 過去の誤読記憶台帳（data/pronunciation_memory.json）からの文脈判定抽出
+    pm_data = load_pronunciation_memory()
+    for rec in pm_data.get("records", []):
+        surface = rec.get("surface")
+        reading = rec.get("reading")
+        scope = rec.get("scope", "global")
+        if not surface or not reading:
+            continue
+
+        if scope == "global":
+            if surface in t:
+                context_map[surface] = reading
+        elif scope == "contextual":
+            keywords = rec.get("context_keywords", [])
+            if keywords and any(kw in t for kw in keywords if kw):
+                if surface in t:
+                    context_map[surface] = reading
+
+    # 3. 皇族・著名人の文脈敬称ルールから抽出（data/tts_rules.json より）
     for pattern, yomi in IMPERIAL_PROPER_NOUNS:
         for m in re.finditer(pattern, t):
             matched_term = m.group(0)
             if matched_term and matched_term not in context_map:
                 context_map[matched_term] = yomi
 
-    # 2. カスタム辞書からの事前適用
+    # 4. カスタム辞書からの事前適用
     if custom_dict and isinstance(custom_dict, dict):
         for orig, yomi in custom_dict.items():
             if orig and yomi and orig in t:
                 context_map[orig] = yomi
 
+    # 5. フルネームから「姓」の自動抽出・文脈継承
+    # （溝口勇児 -> 溝口=みぞぐち、上坂すみれ -> 上坂=うえさか、麻生太郎 -> 麻生=あそう 等）
+    derived_surnames = {}
+    for full_name, full_yomi in list(context_map.items()):
+        # 4文字漢字の人名（2文字姓＋2文字名: 溝口勇児、角田裕毅等）
+        if len(full_name) == 4 and re.match(r'^[\u4e00-\u9fa5]{4}$', full_name):
+            surname = full_name[:2]
+            if surname not in context_map:
+                s_yomi = get_wikipedia_surname_reading(full_name)
+                if not s_yomi and len(full_yomi) >= 4:
+                    half_len = (len(full_yomi) + 1) // 2
+                    s_yomi = full_yomi[:half_len]
+                if s_yomi:
+                    derived_surnames[surname] = s_yomi
+        # 3文字漢字の人名（2文字姓＋1文字名、または1文字姓+2文字名）
+        elif len(full_name) == 3 and re.match(r'^[\u4e00-\u9fa5]{3}$', full_name):
+            s_yomi = get_wikipedia_surname_reading(full_name)
+            if s_yomi and len(full_name[:2]) == 2 and full_name[:2] not in context_map:
+                derived_surnames[full_name[:2]] = s_yomi
+
+    for s_name, s_yomi in derived_surnames.items():
+        if s_name not in context_map:
+            context_map[s_name] = s_yomi
+
     return context_map
 
 
-def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=None):
+def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=None, full_context=""):
     """
     TTS用テキストの包括的正規化処理（文脈解決 -> 辞書 -> 英語マップ -> Wikipedia動的解決 -> サニタイズ）
     ※ 漢字の形態素解析・アクセント分割はVOICEVOX (OpenJTalk) 本来の文脈解析エンジンに委ね、機械的ひらがな化による誤読破壊を防止
@@ -1312,7 +1369,8 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
     t = re.sub(r'株探(?![しすせそさっ])', 'かぶたん', t)
 
     # 4.5 過去の誤読記憶台帳（data/pronunciation_memory.json）の適用
-    t = apply_pronunciation_memory(t)
+    # （文脈キーワード照合により同姓異名や地名とのバッティング誤読を防止）
+    t = apply_pronunciation_memory(t, full_context=full_context)
 
     # 5. カスタム辞書適用
     if custom_dict and isinstance(custom_dict, dict):
@@ -1335,6 +1393,10 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
         derived_surnames = {}
 
         for term in terms_sorted:
+            # 2文字以下の漢字語句（例: 溝口、上田、中村、麻生）は地名・同音異義語の誤爆が多発するため、
+            # 文脈なしのWikipedia検索による破壊的置換を完全禁止！
+            if len(term) <= 2 and re.match(r'^[\u4e00-\u9fa5]+$', term):
+                continue
             yomi, _ = lookup_wikipedia_reading(term)
             if yomi:
                 print(f"[Wikipedia自動発音解決] '{term}' ➔ '{yomi}'", flush=True)
