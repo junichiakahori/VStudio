@@ -251,7 +251,8 @@ def _extract_ruby_from_snippet(term: str, snippet: str) -> Optional[str]:
 def is_valid_reading_for_term(term: str, ruby: str) -> bool:
     """
     元の単語と取得した読み仮名の妥当性を検証。
-    リダイレクトによる長大別名（例: 震度3 -> きしょうちょうしんどかいきゅう）等の誤爆を100%遮断。
+    リダイレクトによる長大別名（例: 震度3 -> きしょうちょうしんどかいきゅう）や、
+    一般的苗字（神田 -> かんだ）に対するニッチな歴史用語（神田 -> しんでん）の誤爆を100%遮断。
     """
     if not term or not ruby:
         return False
@@ -259,9 +260,14 @@ def is_valid_reading_for_term(term: str, ruby: str) -> bool:
     if len(ruby) > max(len(term) * 3, 8) and len(ruby) > 9:
         return False
     # 明らかに無関係な単語の除外
-    DISALLOWED_READING_KEYWORDS = {"かいきゅう", "しょうさい", "いちらん", "あいまいで", "たいしょう"}
+    DISALLOWED_READING_KEYWORDS = {"かいきゅう", "しょうさい", "いちらん", "あいまいで", "たいしょう", "しんでん"}
     if any(kw in ruby for kw in DISALLOWED_READING_KEYWORDS):
         return False
+
+    from server.tts_normalizer import is_plausible_reading
+    if not is_plausible_reading(term, ruby):
+        return False
+
     return True
 
 def resolve_unknown_reading_online(
@@ -339,12 +345,22 @@ def extract_candidate_terms_from_text(text: str) -> List[str]:
         if not re.match(r'^(?:v\d+|p\d+|s\d+|ch\d+|no\d+|\d+)$', w.lower()):
             candidates.append(w)
 
-    # 3. 敬称・肩書つきの固有名詞候補（2〜4文字漢字: 〇〇選手、〇〇監督等）
+    # 3. 敬称・肩書つきの固有名詞候補（3〜4文字の珍しい人名フルネームを優先）
+    # ※ 神田、田中、鈴木などの2文字の一般的苗字はTTSが標準で正確に読めるため、Web検索で歴史用語（神田->しんでん）を誤爆させないよう除外
     HONORIFIC = r'(?:選手|監督|知事|市長|首相|大臣|総理|総裁|議員|社長|会長|棋士|容疑者|被告)'
+    COMMON_SURNAMES_AND_WORDS = {
+        "政府", "警察", "当局", "関係", "会社", "組織", "日本", "全国", "自民", "公明", "立憲", "共産",
+        "神田", "鈴木", "田中", "佐藤", "高橋", "渡辺", "伊藤", "山本", "中村", "小林", "加藤", "吉田",
+        "山田", "佐々木", "山口", "松本", "井上", "木村", "林", "斎藤", "清水", "山崎", "阿部", "森",
+        "池田", "橋本", "山下", "石川", "中島", "前田", "藤田", "小川", "岡田", "後藤", "長谷川", "石井",
+        "村上", "近藤", "坂本", "遠藤", "青木", "藤井", "西村", "福田", "太田", "三浦", "藤原", "岡本"
+    }
     for m in re.finditer(rf'([\u4e00-\u9fa5]{{2,4}})(?={HONORIFIC})', text):
         t = m.group(1)
-        COMMON_WORDS = {"政府", "警察", "当局", "関係", "会社", "組織", "日本", "全国"}
-        if t not in COMMON_WORDS and not is_quantity_or_common_measure(t):
+        if t not in COMMON_SURNAMES_AND_WORDS and not is_quantity_or_common_measure(t):
+            # 2文字で一般的な音読み・訓読みがあるものは除外
+            if len(t) == 2 and t in COMMON_SURNAMES_AND_WORDS:
+                continue
             candidates.append(t)
 
     # 一般数量表現の除外＆重複排除

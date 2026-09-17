@@ -164,7 +164,13 @@
       "reading": "うえさかさん",
       "wrong_reading": "かみさかさん",
       "scope": "contextual",
-      "context_keywords": ["上坂すみれ", "声優", "アニメ", "声優グランプリ", "キングレコード"],
+      "context_keywords": [
+        "上坂すみれ",
+        "声優",
+        "アニメ",
+        "声優グランプリ",
+        "キングレコード"
+      ],
       "article_topic": "声優・上坂すみれの出演・所属ニュース",
       "sample_sentence": "上坂さんの所属事務所がコメントを発表しました。",
       "category": "voice_actor",
@@ -189,7 +195,14 @@
       "reading": "みぞぐち",
       "wrong_reading": "みぞのくち",
       "scope": "contextual",
-      "context_keywords": ["溝口勇児", "BreakingDown", "ブレイキングダウン", "コカイン逮捕", "ヤマトリノ", "朝倉未来"],
+      "context_keywords": [
+        "溝口勇児",
+        "BreakingDown",
+        "ブレイキングダウン",
+        "コカイン逮捕",
+        "ヤマトリノ",
+        "朝倉未来"
+      ],
       "article_topic": "BreakingDown・格闘技・芸能ニュース",
       "sample_sentence": "溝口氏は今回の騒動について苦言を呈しました。",
       "category": "person",
@@ -214,7 +227,18 @@
       "reading": "あそう",
       "wrong_reading": "あそ",
       "scope": "contextual",
-      "context_keywords": ["麻生太郎", "自民党", "麻生派", "首相", "総理", "鈴木", "内閣", "政権", "党運営", "副総裁"],
+      "context_keywords": [
+        "麻生太郎",
+        "自民党",
+        "麻生派",
+        "首相",
+        "総理",
+        "鈴木",
+        "内閣",
+        "政権",
+        "党運営",
+        "副総裁"
+      ],
       "article_topic": "政治・自民党運営ニュース",
       "sample_sentence": "首相の隣に麻生氏と鈴木氏が並びました。",
       "category": "politician",
@@ -256,6 +280,30 @@
       "category": "noun",
       "registered_date": "2026-09-17",
       "note": "供給の正確な発音保証"
+    },
+    {
+      "id": "kanda_sosai",
+      "surface": "神田総裁",
+      "reading": "かんだそうさい",
+      "wrong_reading": "しんでん",
+      "scope": "global",
+      "article_topic": "経済・アジア開発銀行・神田真人総裁",
+      "sample_sentence": "アジア開発銀行の神田総裁が講演を行いました。",
+      "category": "person",
+      "registered_date": "2026-09-17",
+      "note": "「しんでん」誤読の防止（正しい読み: かんだそうさい）"
+    },
+    {
+      "id": "kanda_person",
+      "surface": "神田",
+      "reading": "かんだ",
+      "wrong_reading": "しんでん",
+      "scope": "global",
+      "article_topic": "一般・人名・地名",
+      "sample_sentence": "神田氏が会見を開きました。",
+      "category": "person",
+      "registered_date": "2026-09-17",
+      "note": "「しんでん」誤読の防止（正しい読み: かんだ）"
     }
   ]
 }
