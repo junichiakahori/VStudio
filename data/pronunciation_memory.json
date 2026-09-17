@@ -338,6 +338,636 @@
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
       "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789614034_9587",
+      "surface": "総理",
+      "reading": "そうり",
+      "scope": "contextual",
+      "article_topic": "高橋洋一・政治経済ホントのところ【サイバー防御】首相陣頭指揮で正念場｜政治｜石川のニュース",
+      "sample_sentence": "総理に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "高橋洋一",
+        "政治経済",
+        "ホント",
+        "サイバー",
+        "防御",
+        "首相陣頭指揮"
+      ]
+    },
+    {
+      "id": "auto_1789614730_7447",
+      "surface": "福澤克雄",
+      "reading": "ふくざわかつお",
+      "scope": "global",
+      "article_topic": "福澤克雄氏 助監督骨折させていた",
+      "sample_sentence": "福澤克雄に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789614797_2525",
+      "surface": "本広克行",
+      "reading": "もとひろかつゆき",
+      "scope": "global",
+      "article_topic": "久しぶりに見る」北村総一朗９０歳 現在の姿にネット驚がく「涙出ました」「マジで」３ショット二度見",
+      "sample_sentence": "本広克行に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789615266_8122",
+      "surface": "生徒",
+      "reading": "ざいせきしゃ",
+      "scope": "contextual",
+      "article_topic": "次にくるマンガ大賞 2026」1位に「さむわんへるつ」、「おかえり水平線",
+      "sample_sentence": "生徒に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "マンガ",
+        "大賞",
+        "2026",
+        "水平線"
+      ]
+    },
+    {
+      "id": "auto_1789616033_1237",
+      "surface": "新庄",
+      "reading": "しんじょう",
+      "scope": "contextual",
+      "article_topic": "レイエス 右ハムストリングス肉離れで離脱 ゲーム復帰まで２週間",
+      "sample_sentence": "新庄に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "レイエス",
+        "ハムストリングス",
+        "肉離",
+        "離脱",
+        "ゲーム",
+        "復帰"
+      ]
+    },
+    {
+      "id": "auto_1789616135_4989",
+      "surface": "吉井",
+      "reading": "よしい",
+      "scope": "contextual",
+      "article_topic": "三木谷氏 来季も吉井監督続投方針",
+      "sample_sentence": "吉井に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "三木谷氏",
+        "来季",
+        "吉井監督続投方針"
+      ]
+    },
+    {
+      "id": "auto_1789616136_3053",
+      "surface": "吉井理人",
+      "reading": "よしいまさと",
+      "scope": "global",
+      "article_topic": "三木谷氏 来季も吉井監督続投方針",
+      "sample_sentence": "吉井理人に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789616233_6131",
+      "surface": "藤川球児",
+      "reading": "ふじかわきゅうじ",
+      "scope": "global",
+      "article_topic": "阪神7連敗でも減る「M」の仕組み",
+      "sample_sentence": "藤川球児に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789616491_6996",
+      "surface": "岸田",
+      "reading": "きしだ",
+      "scope": "contextual",
+      "article_topic": "オリックス岸田監督 2年ぶりBクラス確定に「現実として受け止めて」「必ず強くなるチームだと…",
+      "sample_sentence": "岸田に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "オリックス",
+        "岸田監督",
+        "クラス",
+        "確定",
+        "現実",
+        "チーム"
+      ]
+    },
+    {
+      "id": "auto_1789616553_1120",
+      "surface": "小久保",
+      "reading": "こくぼ",
+      "scope": "contextual",
+      "article_topic": "ついにマジック2も…小久保監督が断罪したミス「この期に及んでありえない」 決勝打の栗原陵矢は「よく打った",
+      "sample_sentence": "小久保に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "マジック",
+        "小久保監督",
+        "断罪",
+        "ミス",
+        "決勝打",
+        "栗原陵矢"
+      ]
+    },
+    {
+      "id": "auto_1789616662_8732",
+      "surface": "新庄剛志",
+      "reading": "しんじょうつよし",
+      "scope": "global",
+      "article_topic": "日本ハム】新庄剛志監督に来季続投を要請へ　レイエス残留で６年目も全力バックアップ",
+      "sample_sentence": "新庄剛志に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789616962_7395",
+      "surface": "A1",
+      "reading": "エイワン",
+      "scope": "global",
+      "article_topic": "日本のテラドローン「次世代型迎撃ドローン」量産化へ動く！高速化するジェット推進タイプに対抗 最新技術を搭載へ - 乗りものニュース",
+      "sample_sentence": "A1に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789617128_7356",
+      "surface": "R8",
+      "reading": "レーシングカー",
+      "scope": "global",
+      "article_topic": "角張ったデザインの狙いは？　ボディ内手ブレ補正も搭載したキヤノン「EOS R8 Mark II」を触ってきた",
+      "sample_sentence": "R8に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789617800_2956",
+      "surface": "厚生労働",
+      "reading": "こうせいろうどうしょう",
+      "scope": "global",
+      "article_topic": "エーザイ認知症薬承認 自ら注射可",
+      "sample_sentence": "厚生労働に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789618161_9419",
+      "surface": "J1655",
+      "reading": "ます",
+      "scope": "global",
+      "article_topic": "天の川銀河を時速40万kmで移動するブラックホール連星「GRO J1655-40」 【今日の宇宙画像】 - sorae 宇宙へのポータルサイト",
+      "sample_sentence": "J1655に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (duckduckgo)"
+    },
+    {
+      "id": "auto_1789618348_2398",
+      "surface": "元総務副",
+      "reading": "すがよしひで",
+      "scope": "global",
+      "article_topic": "赤い羽根募金 さらに7000万円不明",
+      "sample_sentence": "元総務副に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (duckduckgo)"
+    },
+    {
+      "id": "auto_1789618469_8904",
+      "surface": "相原貴",
+      "reading": "まとめ",
+      "scope": "contextual",
+      "article_topic": "10年前に性的暴行疑い",
+      "sample_sentence": "相原貴に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (duckduckgo)",
+      "context_keywords": [
+        "10",
+        "年前",
+        "性的暴行疑"
+      ]
+    },
+    {
+      "id": "auto_1789618469_9743",
+      "surface": "相原",
+      "reading": "あいはら",
+      "scope": "contextual",
+      "article_topic": "10年前に性的暴行疑い",
+      "sample_sentence": "相原に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "10",
+        "年前",
+        "性的暴行疑"
+      ]
+    },
+    {
+      "id": "auto_1789635756_2259",
+      "surface": "高市",
+      "reading": "たかいち",
+      "scope": "contextual",
+      "article_topic": "第2次高市改造内閣が午後発足へ 安定重視、維新と閣内協力に",
+      "sample_sentence": "高市に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (duckduckgo)",
+      "context_keywords": [
+        "次高市改造内閣",
+        "午後発足",
+        "安定重視",
+        "維新",
+        "閣内協力"
+      ]
+    },
+    {
+      "id": "auto_1789635810_9211",
+      "surface": "自民党",
+      "reading": "じゆうみんしゅとう",
+      "scope": "contextual",
+      "article_topic": "簗和生氏を農水相に起用へ 裏金関与では初入閣 1746万円不記載 [高市早苗首相 自民党総裁",
+      "sample_sentence": "自民党に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "簗和生氏",
+        "農水相",
+        "起用",
+        "裏金関与",
+        "初入閣",
+        "1746"
+      ]
+    },
+    {
+      "id": "auto_1789636840_3860",
+      "surface": "出場",
+      "reading": "しゅつじょう",
+      "scope": "contextual",
+      "article_topic": "巨人】橋上監督代行「彼の野球人生にも影響しかねない」浦田俊輔が右肘靱帯損傷で登録抹消 盗塁王争い１個差も…スライディングのリスク考慮で代走限定も断念（スポーツ報知）",
+      "sample_sentence": "出場に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "巨人",
+        "橋上監督代行",
+        "野球人生",
+        "影響",
+        "浦田俊輔",
+        "右肘靱帯損傷"
+      ]
+    },
+    {
+      "id": "auto_1789637071_5726",
+      "surface": "衆院",
+      "reading": "しゅうぎいん",
+      "scope": "contextual",
+      "article_topic": "内閣支持44%で過去最低更新",
+      "sample_sentence": "衆院に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "内閣支持",
+        "44",
+        "過去最低更新"
+      ]
+    },
+    {
+      "id": "auto_1789637287_2786",
+      "surface": "奈良",
+      "reading": "なら",
+      "scope": "contextual",
+      "article_topic": "高市首相地元で「与党対決」か…奈良知事が維新公認で出馬表明、自民は対抗馬擁立方針も高市氏はタッチせず",
+      "sample_sentence": "奈良に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "高市首相地元",
+        "与党対決",
+        "奈良知事",
+        "維新公認",
+        "出馬表明",
+        "自民"
+      ]
+    },
+    {
+      "id": "auto_1789637405_8158",
+      "surface": "西脇隆俊",
+      "reading": "にしわきたかとし",
+      "scope": "global",
+      "article_topic": "校外活動の自粛続く同志社国際 京都府の私学助成金の減額検討に保護者懸念広がる",
+      "sample_sentence": "西脇隆俊に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789637908_9550",
+      "surface": "F15",
+      "reading": "ボーイング",
+      "scope": "global",
+      "article_topic": "独自】自衛隊F15 嘉手納基地に緊急着陸 油圧系に不具合か 4時間後にけん引 沖縄＜動画あり＞",
+      "sample_sentence": "F15に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789638073_8729",
+      "surface": "国会",
+      "reading": "こっかい",
+      "scope": "contextual",
+      "article_topic": "訃報】渡辺孝一衆院議員が死去 自民党・比例代表北海道ブロック 元総務副大臣 自宅で転倒し入院 脳挫傷のため",
+      "sample_sentence": "国会に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "訃報",
+        "渡辺孝一衆院議員",
+        "死去",
+        "自民党",
+        "比例代表北海道",
+        "ブロック"
+      ]
+    },
+    {
+      "id": "auto_1789639604_5563",
+      "surface": "植田和男",
+      "reading": "うえだかずお",
+      "scope": "global",
+      "article_topic": "日銀の政策金利、市場予想は27年7月に2%視野",
+      "sample_sentence": "植田和男に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789640009_9071",
+      "surface": "欧州議会",
+      "reading": "おうしゅうぎかい",
+      "scope": "global",
+      "article_topic": "仏、逃亡中のゴーン被告欠席で初公判 日産ルノー贈収賄事件、収賄側の弁護士は出廷",
+      "sample_sentence": "欧州議会に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789640874_2803",
+      "surface": "民主党",
+      "reading": "みんしゅとう",
+      "scope": "contextual",
+      "article_topic": "反対票投じた7人の民主党議員、クラリティー法案の超党派協議継続へ",
+      "sample_sentence": "民主党に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "反対票投",
+        "民主党議員",
+        "クラリティー",
+        "法案",
+        "超党派協議継続"
+      ]
+    },
+    {
+      "id": "auto_1789640970_875",
+      "surface": "復興",
+      "reading": "ふっこう",
+      "scope": "contextual",
+      "article_topic": "小林鷹之・自民党政調会長の横顔、ライフワークは経済安保…元東大ボート部主将（読売新聞オンライン）",
+      "sample_sentence": "復興に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "小林鷹之",
+        "自民党政調会長",
+        "横顔",
+        "ライフワーク",
+        "経済安保",
+        "元東大"
+      ]
+    },
+    {
+      "id": "auto_1789641175_5353",
+      "surface": "上院",
+      "reading": "じょういん",
+      "scope": "contextual",
+      "article_topic": "アメリカ下院が対ロシア制裁法案可決 ロシア産エネルギー輸入国に最大100％関税も 日本は例外適用の可能性",
+      "sample_sentence": "上院に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "アメリカ",
+        "下院",
+        "ロシア",
+        "制裁法案可決",
+        "ロシア",
+        "エネルギー"
+      ]
+    },
+    {
+      "id": "auto_1789641256_305",
+      "surface": "農林水産",
+      "reading": "だいいちじさんぎょう",
+      "scope": "global",
+      "article_topic": "速報】農林水産大臣に簗和生衆院議員(47)を起用",
+      "sample_sentence": "農林水産に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789641346_4537",
+      "surface": "裏金",
+      "reading": "うらがね",
+      "scope": "contextual",
+      "article_topic": "速報】民主改革の会、裏金議員の入閣を批判",
+      "sample_sentence": "裏金に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "速報",
+        "民主改革",
+        "裏金議員",
+        "入閣",
+        "批判"
+      ]
+    },
+    {
+      "id": "auto_1789641448_3044",
+      "surface": "是枝裕和",
+      "reading": "これえだひろかず",
+      "scope": "global",
+      "article_topic": "認知症の母、ダウン症の姉、酔っぱらいの父と暮らすにしおかすみこに共感の声が集まる理由（FRaU編集部） | FRaU - 現代ビジネス",
+      "sample_sentence": "是枝裕和に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789642488_8473",
+      "surface": "Switch2",
+      "reading": "ニンテンドースイッチトゥー",
+      "scope": "global",
+      "article_topic": "映画『ストリートファイター／ザ・ムービー』日本語吹替版本予告が公開。ジョー役は狩野英孝さん、マービン役は葛葉さん（にじさんじ）など新たな日本語キャストも判明【TGS2026",
+      "sample_sentence": "Switch2に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789643051_2425",
+      "surface": "新人",
+      "reading": "しんじん",
+      "scope": "contextual",
+      "article_topic": "ホンマ、やめて下さい。恥ずかしくて、汗が出てくる」岡本和真がメジャー恒例新人イジリ仮装…カウボーイハットに半ズボン",
+      "sample_sentence": "新人に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "ホンマ",
+        "岡本和真",
+        "メジャー",
+        "恒例新人",
+        "イジリ",
+        "仮装"
+      ]
+    },
+    {
+      "id": "auto_1789643158_7400",
+      "surface": "野球",
+      "reading": "やきゅう",
+      "scope": "contextual",
+      "article_topic": "ド軍激震 先発が19球で緊急降板",
+      "sample_sentence": "野球に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "軍激震",
+        "先発",
+        "19",
+        "緊急降板"
+      ]
+    },
+    {
+      "id": "auto_1789643220_3344",
+      "surface": "B1",
+      "reading": "びーわん",
+      "scope": "global",
+      "article_topic": "Bリーグ2026-27シーズン・B.LEAGUE ONE戦力ランキング - スポーツナビ",
+      "sample_sentence": "B1に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (duckduckgo)"
+    },
+    {
+      "id": "auto_1789643223_8920",
+      "surface": "B2",
+      "reading": "ますか",
+      "scope": "global",
+      "article_topic": "Bリーグ2026-27シーズン・B.LEAGUE ONE戦力ランキング - スポーツナビ",
+      "sample_sentence": "B2に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (duckduckgo)"
+    },
+    {
+      "id": "auto_1789643334_1830",
+      "surface": "平戸太貴",
+      "reading": "ひらとたいき",
+      "scope": "global",
+      "article_topic": "平戸太貴選手 (京都サンガF.C.) 完全移籍にて加入決定のお知らせ",
+      "sample_sentence": "平戸太貴に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789643555_5087",
+      "surface": "秋葉",
+      "reading": "あきばあきは",
+      "scope": "contextual",
+      "article_topic": "［アルビレックス新潟VS磐田］秋葉監督に昨季「勝ち点6」献上、「絶対負けたくない」OB監督対決！",
+      "sample_sentence": "秋葉に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "アルビレックス",
+        "新潟",
+        "VS",
+        "磐田",
+        "秋葉監督",
+        "昨季"
+      ]
+    },
+    {
+      "id": "auto_1789643834_6492",
+      "surface": "女子",
+      "reading": "じょせい",
+      "scope": "contextual",
+      "article_topic": "渋野日向子は「TOTOジャパン」出場に滑り込み 米女子ツアーのアジアシリーズエントリー終了",
+      "sample_sentence": "女子に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "渋野日向子",
+        "TOTO",
+        "ジャパン",
+        "出場",
+        "米女子",
+        "ツアー"
+      ]
+    },
+    {
+      "id": "auto_1789647110_3234",
+      "surface": "学術会議",
+      "reading": "にほんがくじゅつかいぎ",
+      "scope": "global",
+      "article_topic": "歴史的な転換点…学術会議の法人化大詰め、会員選考に残る政府介入の懸念（ニュースイッチ）",
+      "sample_sentence": "学術会議に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
     }
   ]
 }

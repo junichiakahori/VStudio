@@ -644,17 +644,71 @@ def parse_youtube_html_stats(html: str):
         except Exception as pe:
             logging.debug(f"ytInitialPlayerResponse parse error: {pe}")
 
-    # 2. 同接・再生数を抽出
-    patterns = [
-        r'\"runs\":\s*\[\s*\{\"text\":\s*\"([\d,]+)\"\s*\}\s*,\s*\{\"text\":\s*\"\s*(?:人が視聴中|人が待機しています)\"',
-        r'\"runs\":\s*\[\s*\{\"text\":\s*\"([\d,]+)\s*(?:人が視聴中|人が待機しています)\"',
-        r'\"simpleText\":\s*\"([\d,]+)\s*(?:人が視聴中|人が待機しています)\"'
-    ]
-    for pat in patterns:
-        m = re.search(pat, html)
-        if m:
-            concurrent_viewers = m.group(1)
-            break
+    # 2. ytInitialData からメイン動画専用の同接数・再生数を厳格抽出（サイドバーおすすめ動画の誤爆を100%防止）
+    data_match = re.search(r'ytInitialData\s*=\s*(\{.*?\});(?:var|</script>)', html)
+    if data_match:
+        try:
+            data = json.loads(data_match.group(1))
+
+            def _find_key(obj, target):
+                if isinstance(obj, dict):
+                    for k, v in obj.items():
+                        if k == target:
+                            yield v
+                        yield from _find_key(v, target)
+                elif isinstance(obj, list):
+                    for item in obj:
+                        yield from _find_key(item, target)
+
+            # メイン動画の primaryInfo 内の videoViewCountRenderer から同接数を取得
+            for primary in _find_key(data, "videoPrimaryInfoRenderer"):
+                vcr = primary.get("viewCount", {}).get("videoViewCountRenderer", {})
+                is_live = vcr.get("isLive", False)
+                view_runs = vcr.get("viewCount", {}).get("runs", [])
+                for r in view_runs:
+                    t = r.get("text", "").replace(",", "").strip()
+                    if t.isdigit():
+                        concurrent_viewers = f"{int(t):,}"
+                        break
+                if not concurrent_viewers and is_live:
+                    orig = vcr.get("originalViewCount", "").replace(",", "").strip()
+                    if orig.isdigit():
+                        concurrent_viewers = f"{int(orig):,}"
+                if concurrent_viewers:
+                    break
+
+            # 予備: videoDescriptionHeaderRenderer から同接数を取得
+            if not concurrent_viewers:
+                for desc_hdr in _find_key(data, "videoDescriptionHeaderRenderer"):
+                    views_obj = desc_hdr.get("views", {})
+                    for r in views_obj.get("runs", []):
+                        t = r.get("text", "").replace(",", "").strip()
+                        if t.isdigit():
+                            concurrent_viewers = f"{int(t):,}"
+                            break
+                    if concurrent_viewers:
+                        break
+
+            # チャンネル登録者数 (videoSecondaryInfoRenderer から取得)
+            if not subscribers:
+                for sec in _find_key(data, "videoSecondaryInfoRenderer"):
+                    sub_text = sec.get("subscriberCountText", {}).get("accessibility", {}).get("accessibilityData", {}).get("label") or \
+                               sec.get("subscriberCountText", {}).get("simpleText")
+                    if sub_text:
+                        subscribers = sub_text
+                        break
+        except Exception as de:
+            logging.debug(f"ytInitialData parse error: {de}")
+
+    # 3. フォールバック: videoPrimaryInfoRenderer のスコープ内のみで正規表現検索（関連動画への漏れ出しを完全遮断）
+    if not concurrent_viewers:
+        primary_match = re.search(
+            r'\"videoPrimaryInfoRenderer\":\s*\{.*?(?:\"runs\":\s*\[\s*\{\"text\":\s*\"([\d,]+)\"\s*\}\s*,\s*\{\"text\":\s*\"\s*(?:人が視聴中|人が待機しています)\"|originalViewCount\":\s*\"?(\d+)\"?).*?\"videoSecondaryInfoRenderer\"',
+            html,
+            re.DOTALL
+        )
+        if primary_match:
+            concurrent_viewers = primary_match.group(1) or primary_match.group(2) or ""
 
     if not total_views:
         orig_m = re.search(r'\"originalViewCount\":\s*\"?(\d+)\"?', html)
