@@ -115,18 +115,82 @@ function calculateTitleSimilarity(str1, str2) {
   return (2.0 * intersection) / (bg1.size + bg2.size);
 }
 
-// スマート重複排除
+// 🔤 最長共通部分文字列（LCS）抽出（複合語の形態素境界ズレに対応）
+function longestCommonSubstring(s1, s2) {
+  if (!s1 || !s2) return "";
+  let maxSub = "";
+  for (let i = 0; i < s1.length; i++) {
+    for (let j = 0; j < s2.length; j++) {
+      let sub = "";
+      while (i + sub.length < s1.length && j + sub.length < s2.length && s1[i + sub.length] === s2[j + sub.length]) {
+        sub += s1[i + sub.length];
+      }
+      if (sub.length > maxSub.length) maxSub = sub;
+    }
+  }
+  return maxSub;
+}
+
+// 🧠 高精度トピック類似度判定（助詞の違いやメディア別タイトル揺らぎを吸収）
+function isSimilarNews(t1, t2) {
+  if (!t1 || !t2) return false;
+  const n1 = normalizeNewsTitle(t1);
+  const n2 = normalizeNewsTitle(t2);
+  if (n1 === n2) return true;
+  if (n1.length >= 10 && n2.length >= 10 && (n1.includes(n2) || n2.includes(n1))) return true;
+
+  // 1. Bi-gram Dice係数 (0.40以上で重複判定)
+  const sim = calculateTitleSimilarity(n1, n2);
+  if (sim >= 0.40) return true;
+
+  // 2. 核心キーワード抽出（ストップワードを除外）
+  const STOP_WORDS = new Set(["ニュース", "速報", "更新", "共同通信", "読売新聞", "朝日新聞", "産経新聞", "毎日新聞", "日本", "発表", "決定", "開始", "報告", "登場", "公開", "開催", "中止", "検討", "表明", "方針", "予定", "日程", "理由", "背景", "影響", "注目"]);
+  const extractWords = (s) => {
+    const matches = s.match(/([\u4E00-\u9FFF]{2,}|[\u30A1-\u30F6ー]{2,}|[a-zA-Z0-9]{3,})/g) || [];
+    return matches.filter(w => !STOP_WORDS.has(w));
+  };
+
+  const words1 = extractWords(n1);
+  const words2 = extractWords(n2);
+
+  const matchedTokens = new Set();
+  for (const w1 of words1) {
+    for (const w2 of words2) {
+      if (w1 === w2) {
+        matchedTokens.add(w1);
+      } else if (w1.length >= 2 && w2.length >= 2 && (w1.includes(w2) || w2.includes(w1))) {
+        matchedTokens.add(w1.length < w2.length ? w1 : w2);
+      } else {
+        const lcs = longestCommonSubstring(w1, w2);
+        if (lcs.length >= 3 && !STOP_WORDS.has(lcs)) {
+          matchedTokens.add(lcs);
+        }
+      }
+    }
+  }
+
+  // 共通重要語句が2つ以上、かつ合計重複文字数が4文字以上、または1つの固有語句で5文字以上一致
+  const totalChars = Array.from(matchedTokens).reduce((sum, w) => sum + w.length, 0);
+  const maxTokenLen = Math.max(0, ...Array.from(matchedTokens).map(w => w.length));
+
+  if ((matchedTokens.size >= 2 && totalChars >= 4) || maxTokenLen >= 5) {
+    return true;
+  }
+
+  return false;
+}
+window.isSimilarNews = isSimilarNews;
+
+// スマート重複排除（全カテゴリ横断・類似記事統合）
 function smartDeduplicateNewsItems(items) {
   const uniqueList = [];
   let dupCount = 0;
   for (const item of items) {
     if (!item.title) continue;
-    const normTitle = normalizeNewsTitle(item.title);
     let duplicateIndex = -1;
     for (let i = 0; i < uniqueList.length; i++) {
       const existing = uniqueList[i];
-      const existingNorm = normalizeNewsTitle(existing.title);
-      if (normTitle === existingNorm || calculateTitleSimilarity(normTitle, existingNorm) >= 0.65) {
+      if (isSimilarNews(item.title, existing.title)) {
         duplicateIndex = i;
         break;
       }
@@ -295,17 +359,9 @@ async function fetchNewsWithOptions(categoryKey = "cat_all", maxPerCategory = In
   };
 
   const isTopicDuplicate = (itemTitle, existingTitles) => {
-    const norm = normalizeNewsTitle(itemTitle);
-    const keywords = extractTopicKeywords(norm);
+    if (!itemTitle || !existingTitles || existingTitles.length === 0) return false;
     for (const ex of existingTitles) {
-      const exNorm = normalizeNewsTitle(ex);
-      if (calculateTitleSimilarity(norm, exNorm) >= 0.45) return true;
-      const exKeywords = extractTopicKeywords(exNorm);
-      let common = 0;
-      for (const kw of keywords) {
-        if (exKeywords.has(kw)) common++;
-      }
-      if (common >= 2 && keywords.size >= 2) return true;
+      if (isSimilarNews(itemTitle, ex)) return true;
     }
     return false;
   };
@@ -387,9 +443,9 @@ async function fetchNewsWithOptions(categoryKey = "cat_all", maxPerCategory = In
           count++;
         }
       }
-      // もし上限に達しなかった場合でもスクレイピング可能な記事のみを探して補完
+      // もし上限に達しなかった場合でもスクレイピング可能な記事のみを探して補完（トピック重複排除も完全適用）
       if (count === 0 && categorized[catKey].length > 0) {
-        const fallbackItem = categorized[catKey].find(it => isItemScrapeable(it) && !selectedTitles.includes(it.title));
+        const fallbackItem = categorized[catKey].find(it => isItemScrapeable(it) && !isTopicDuplicate(it.title, selectedTitles));
         if (fallbackItem) {
           finalItems.push(fallbackItem);
           selectedTitles.push(fallbackItem.title);
@@ -400,11 +456,14 @@ async function fetchNewsWithOptions(categoryKey = "cat_all", maxPerCategory = In
 
   Object.keys(categorized).forEach(k => {
     if (!CATEGORY_ORDER.includes(k)) {
+      let count = 0;
       for (const item of categorized[k]) {
+        if (count >= maxPerCategory) break;
         if (!isItemScrapeable(item)) continue;
         if (!isTopicDuplicate(item.title, selectedTitles)) {
           finalItems.push(item);
           selectedTitles.push(item.title);
+          count++;
         }
       }
     }

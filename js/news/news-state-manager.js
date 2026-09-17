@@ -58,7 +58,17 @@ function markNewsTitleAsRead(title) {
 
 function isNewsTitleRead(title) {
   if (!title) return false;
-  return readNewsTitles.has(title.trim());
+  const t = title.trim();
+  if (readNewsTitles.has(t)) return true;
+  // 🧠 既読タイトル一覧とのトピック類似度判定（朝・昼に読んだ同一話題の続報・別メディア版を重複除外）
+  if (typeof window.isSimilarNews === "function") {
+    for (const readTitle of readNewsTitles) {
+      if (window.isSimilarNews(t, readTitle)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 function saveNewsBroadcastState() {

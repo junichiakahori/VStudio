@@ -1321,7 +1321,13 @@ function getNewsConfig() {
           return new Date(a.pubDate || 0).getTime() - new Date(b.pubDate || 0).getTime();
         });
 
-        const firstUnreadIdx = sorted.findIndex(n => !readTitles.has(n.title));
+        const checkIsRead = (t) => {
+          if (!t) return false;
+          if (readTitles.has(t)) return true;
+          if (typeof window.isNewsTitleRead === "function") return window.isNewsTitleRead(t);
+          return false;
+        };
+        const firstUnreadIdx = sorted.findIndex(n => !checkIsRead(n.title));
         if (firstUnreadIdx !== -1 && firstUnreadIdx < sorted.length) {
           const startIdxInput = document.getElementById("news-broadcast-start-index");
           if (startIdxInput) {

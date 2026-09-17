@@ -491,7 +491,16 @@
                 return;
             }
 
-            const unreadCount = sortedNews.filter(n => !readTitles.has(n.title)).length;
+            const checkRead = (title) => {
+                if (!title) return false;
+                if (readTitles.has(title)) return true;
+                if (window.opener && typeof window.opener.isNewsTitleRead === "function") {
+                    return window.opener.isNewsTitleRead(title);
+                }
+                return false;
+            };
+
+            const unreadCount = sortedNews.filter(n => !checkRead(n.title)).length;
             const readCount = sortedNews.length - unreadCount;
             badge.textContent = `全 ${sortedNews.length} 件 (未読: ${unreadCount} / 既読: ${readCount})`;
 
@@ -502,7 +511,7 @@
             let isFirstUnreadMarked = false;
 
             sortedNews.forEach((item, idx) => {
-                const isRead = readTitles.has(item.title);
+                const isRead = checkRead(item.title);
                 const isPlaying = currentPlayingTitle && item.title.includes(currentPlayingTitle);
                 const catKey = item.categoryKey || "cat_top";
                 const catName = CATEGORY_NAMES[catKey] || item.category || "ニュース";

@@ -182,10 +182,18 @@
     }
 
     const readTitles = window.openerWin.readNewsTitles || new Set();
+    const checkRead = (t) => {
+      if (!t) return false;
+      if (readTitles.has(t)) return true;
+      if (typeof window.openerWin?.isNewsTitleRead === "function") {
+        return window.openerWin.isNewsTitleRead(t);
+      }
+      return false;
+    };
 
     listEl.innerHTML = "";
     newsItems.forEach((item, idx) => {
-      const isRead = readTitles.has(item.title);
+      const isRead = checkRead(item.title);
       const itemDiv = document.createElement("div");
       itemDiv.style.display = "flex";
       itemDiv.style.alignItems = "center";

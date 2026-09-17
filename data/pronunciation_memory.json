@@ -822,6 +822,52 @@
         "歳長友佑都",
         "今夏移籍"
       ]
+    },
+    {
+      "id": "auto_1789676840_2955",
+      "surface": "橋上",
+      "reading": "はしがみ",
+      "scope": "contextual",
+      "article_topic": "巨人】橋上監督代行「彼の野球人生にも影響しかねない」浦田俊輔が右肘靱帯損傷で登録抹消 盗塁王争い１個差も…スライディングのリスク考慮で代走限定も断念（スポーツ報知）",
+      "sample_sentence": "橋上に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (duckduckgo)",
+      "context_keywords": [
+        "巨人",
+        "橋上監督代行",
+        "野球人生",
+        "影響",
+        "浦田俊輔",
+        "右肘靱帯損傷"
+      ]
+    },
+    {
+      "id": "auto_1789676970_9823",
+      "surface": "大内拓実",
+      "reading": "があります",
+      "scope": "global",
+      "article_topic": "水戸女性殺害 動機は「リセット",
+      "sample_sentence": "大内拓実に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (duckduckgo)"
+    },
+    {
+      "id": "auto_1789676973_8747",
+      "surface": "大内",
+      "reading": "おおうち",
+      "scope": "contextual",
+      "article_topic": "水戸女性殺害 動機は「リセット",
+      "sample_sentence": "大内に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (duckduckgo)",
+      "context_keywords": [
+        "水戸女性殺害",
+        "動機",
+        "リセット"
+      ]
     }
   ]
 }
