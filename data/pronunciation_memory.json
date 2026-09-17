@@ -381,23 +381,6 @@
       "note": "Web自動解決 (wikipedia)"
     },
     {
-      "id": "auto_1789615266_8122",
-      "surface": "生徒",
-      "reading": "ざいせきしゃ",
-      "scope": "contextual",
-      "article_topic": "次にくるマンガ大賞 2026」1位に「さむわんへるつ」、「おかえり水平線",
-      "sample_sentence": "生徒に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)",
-      "context_keywords": [
-        "マンガ",
-        "大賞",
-        "2026",
-        "水平線"
-      ]
-    },
-    {
       "id": "auto_1789616033_1237",
       "surface": "新庄",
       "reading": "しんじょう",
@@ -515,66 +498,6 @@
       "note": "Web自動解決 (wikipedia)"
     },
     {
-      "id": "auto_1789617128_7356",
-      "surface": "R8",
-      "reading": "レーシングカー",
-      "scope": "global",
-      "article_topic": "角張ったデザインの狙いは？　ボディ内手ブレ補正も搭載したキヤノン「EOS R8 Mark II」を触ってきた",
-      "sample_sentence": "R8に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
-    },
-    {
-      "id": "auto_1789617800_2956",
-      "surface": "厚生労働",
-      "reading": "こうせいろうどうしょう",
-      "scope": "global",
-      "article_topic": "エーザイ認知症薬承認 自ら注射可",
-      "sample_sentence": "厚生労働に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
-    },
-    {
-      "id": "auto_1789618161_9419",
-      "surface": "J1655",
-      "reading": "ます",
-      "scope": "global",
-      "article_topic": "天の川銀河を時速40万kmで移動するブラックホール連星「GRO J1655-40」 【今日の宇宙画像】 - sorae 宇宙へのポータルサイト",
-      "sample_sentence": "J1655に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-17",
-      "note": "Web自動解決 (duckduckgo)"
-    },
-    {
-      "id": "auto_1789618348_2398",
-      "surface": "元総務副",
-      "reading": "すがよしひで",
-      "scope": "global",
-      "article_topic": "赤い羽根募金 さらに7000万円不明",
-      "sample_sentence": "元総務副に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-17",
-      "note": "Web自動解決 (duckduckgo)"
-    },
-    {
-      "id": "auto_1789618469_8904",
-      "surface": "相原貴",
-      "reading": "まとめ",
-      "scope": "contextual",
-      "article_topic": "10年前に性的暴行疑い",
-      "sample_sentence": "相原貴に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-17",
-      "note": "Web自動解決 (duckduckgo)",
-      "context_keywords": [
-        "10",
-        "年前",
-        "性的暴行疑"
-      ]
-    },
-    {
       "id": "auto_1789618469_9743",
       "surface": "相原",
       "reading": "あいはら",
@@ -611,13 +534,13 @@
     {
       "id": "auto_1789635810_9211",
       "surface": "自民党",
-      "reading": "じゆうみんしゅとう",
+      "reading": "じみんとう",
       "scope": "contextual",
       "article_topic": "簗和生氏を農水相に起用へ 裏金関与では初入閣 1746万円不記載 [高市早苗首相 自民党総裁",
       "sample_sentence": "自民党に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)",
+      "note": "基本政党名マスター修正",
       "context_keywords": [
         "簗和生氏",
         "農水相",
@@ -649,7 +572,7 @@
     {
       "id": "auto_1789637071_5726",
       "surface": "衆院",
-      "reading": "しゅうぎいん",
+      "reading": "しゅういん",
       "scope": "contextual",
       "article_topic": "内閣支持44%で過去最低更新",
       "sample_sentence": "衆院に関する最新情報です。",
@@ -688,17 +611,6 @@
       "scope": "global",
       "article_topic": "校外活動の自粛続く同志社国際 京都府の私学助成金の減額検討に保護者懸念広がる",
       "sample_sentence": "西脇隆俊に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
-    },
-    {
-      "id": "auto_1789637908_9550",
-      "surface": "F15",
-      "reading": "ボーイング",
-      "scope": "global",
-      "article_topic": "独自】自衛隊F15 嘉手納基地に緊急着陸 油圧系に不具合か 4時間後にけん引 沖縄＜動画あり＞",
-      "sample_sentence": "F15に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
       "note": "Web自動解決 (wikipedia)"
@@ -801,17 +713,6 @@
       ]
     },
     {
-      "id": "auto_1789641256_305",
-      "surface": "農林水産",
-      "reading": "だいいちじさんぎょう",
-      "scope": "global",
-      "article_topic": "速報】農林水産大臣に簗和生衆院議員(47)を起用",
-      "sample_sentence": "農林水産に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
-    },
-    {
       "id": "auto_1789641346_4537",
       "surface": "裏金",
       "reading": "うらがね",
@@ -852,59 +753,12 @@
       "note": "Web自動解決 (wikipedia)"
     },
     {
-      "id": "auto_1789643051_2425",
-      "surface": "新人",
-      "reading": "しんじん",
-      "scope": "contextual",
-      "article_topic": "ホンマ、やめて下さい。恥ずかしくて、汗が出てくる」岡本和真がメジャー恒例新人イジリ仮装…カウボーイハットに半ズボン",
-      "sample_sentence": "新人に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)",
-      "context_keywords": [
-        "ホンマ",
-        "岡本和真",
-        "メジャー",
-        "恒例新人",
-        "イジリ",
-        "仮装"
-      ]
-    },
-    {
-      "id": "auto_1789643158_7400",
-      "surface": "野球",
-      "reading": "やきゅう",
-      "scope": "contextual",
-      "article_topic": "ド軍激震 先発が19球で緊急降板",
-      "sample_sentence": "野球に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)",
-      "context_keywords": [
-        "軍激震",
-        "先発",
-        "19",
-        "緊急降板"
-      ]
-    },
-    {
       "id": "auto_1789643220_3344",
       "surface": "B1",
       "reading": "びーわん",
       "scope": "global",
       "article_topic": "Bリーグ2026-27シーズン・B.LEAGUE ONE戦力ランキング - スポーツナビ",
       "sample_sentence": "B1に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-17",
-      "note": "Web自動解決 (duckduckgo)"
-    },
-    {
-      "id": "auto_1789643223_8920",
-      "surface": "B2",
-      "reading": "ますか",
-      "scope": "global",
-      "article_topic": "Bリーグ2026-27シーズン・B.LEAGUE ONE戦力ランキング - スポーツナビ",
-      "sample_sentence": "B2に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
       "note": "Web自動解決 (duckduckgo)"
@@ -923,13 +777,13 @@
     {
       "id": "auto_1789643555_5087",
       "surface": "秋葉",
-      "reading": "あきばあきは",
+      "reading": "あきば",
       "scope": "contextual",
       "article_topic": "［アルビレックス新潟VS磐田］秋葉監督に昨季「勝ち点6」献上、「絶対負けたくない」OB監督対決！",
       "sample_sentence": "秋葉に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)",
+      "note": "人名・監督名修正",
       "context_keywords": [
         "アルビレックス",
         "新潟",
@@ -938,36 +792,6 @@
         "秋葉監督",
         "昨季"
       ]
-    },
-    {
-      "id": "auto_1789643834_6492",
-      "surface": "女子",
-      "reading": "じょせい",
-      "scope": "contextual",
-      "article_topic": "渋野日向子は「TOTOジャパン」出場に滑り込み 米女子ツアーのアジアシリーズエントリー終了",
-      "sample_sentence": "女子に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)",
-      "context_keywords": [
-        "渋野日向子",
-        "TOTO",
-        "ジャパン",
-        "出場",
-        "米女子",
-        "ツアー"
-      ]
-    },
-    {
-      "id": "auto_1789647110_3234",
-      "surface": "学術会議",
-      "reading": "にほんがくじゅつかいぎ",
-      "scope": "global",
-      "article_topic": "歴史的な転換点…学術会議の法人化大詰め、会員選考に残る政府介入の懸念（ニュースイッチ）",
-      "sample_sentence": "学術会議に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
     }
   ]
 }

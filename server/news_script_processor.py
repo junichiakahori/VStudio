@@ -2083,7 +2083,13 @@ def generate_news_item_script_data(payload, custom_dict=None):
                     if k not in news_context_map:
                         news_context_map[k] = v
                     else:
-                        print(f"{tag} 🛡️ [AI発音上書き防止] '{k}' は既存の信頼できる読み '{news_context_map[k]}' を維持（AI判定 '{v}' を破棄）", flush=True)
+                        existing_v = news_context_map[k]
+                        # 既存の読みが不自然に長い（リダイレクト過剰展開等）場合、妥当なAI判定で自己修復
+                        if len(existing_v) >= len(v) * 1.5 and is_plausible_reading(k, v):
+                            print(f"{tag} 🔄 [AI発音自己修復] '{k}' の過剰な既存読み '{existing_v}' をAI判定 '{v}' で是正", flush=True)
+                            news_context_map[k] = v
+                        else:
+                            print(f"{tag} 🛡️ [AI発音上書き防止] '{k}' は既存の信頼できる読み '{existing_v}' を維持（AI判定 '{v}' を破棄）", flush=True)
     
             candidate_items = inspect_and_correct_pronunciation(
                 raw_sentences,

@@ -61,8 +61,8 @@ def is_plausible_reading(term, yomi):
         return True
 
     kanji_chars = [c for c in term if "\u4e00" <= c <= "\u9fa5"]
-    NON_NAME_ENDINGS = ("供給", "施設", "基地", "会社", "組織", "政府", "停滞", "混乱", "攻撃", "需要", "発表", "決定", "計画", "問題", "対応", "対策", "支援", "規制")
-    NON_NAME_SUFFIX_CHARS = "給金部的人化法案賞権率線点戦界隊団機館所署室駅器品物料費額数量値度業車網道"
+    NON_NAME_ENDINGS = ("供給", "施設", "基地", "会社", "組織", "政府", "停滞", "混乱", "攻撃", "需要", "発表", "決定", "計画", "問題", "対応", "対策", "支援", "規制", "会議", "連盟", "協会", "学会")
+    NON_NAME_SUFFIX_CHARS = "給金部的人化法案賞権率線点戦界隊団機館所署室駅器品物料費額数量値度業車網道党院省庁会"
 
     is_general_compound = term.endswith(NON_NAME_ENDINGS) or (bool(kanji_chars) and term[-1] in NON_NAME_SUFFIX_CHARS)
 
@@ -458,10 +458,23 @@ def _validate_wiki_reading(term, yomi):
     if re.match(r'^[A-Za-z0-9\s\-_]+$', term) and len(yomi) > len(term) * 2.5:
         print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi}' は過剰展開のため破棄")
         return None
-    # 漢字熟語に対して異常に長すぎる読み（作品名・ドラマ名等の混入）を確実に除外
-    if re.search(r'[\u4e00-\u9fa5]', term) and len(yomi) > max(len(term) * 3, 8):
-        print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi}' は漢字文字数に対して長すぎるため破棄")
-        return None
+    # 漢字熟語に対して異常に長すぎる読み（作品名・ドラマ名等の混入、漢字2文字に5文字以上等）を確実に除外
+    kanji_len = len([c for c in term if '\u4e00' <= c <= '\u9fa5'])
+    if kanji_len > 0:
+        if kanji_len <= 2 and len(yomi) >= 5:
+            print(f"[Wikipedia誤読防止] 🚫 '{term}' (漢字{kanji_len}文字) の読み '{yomi}' は長すぎるため破棄")
+            return None
+        if len(yomi) > max(kanji_len * 3, 8):
+            print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi}' は漢字文字数に対して長すぎるため破棄")
+            return None
+
+    # 曖昧さ回避ページ等での複数読み連結（例: あきばあきは、あきばあきば、おおさかおおざか）の除外
+    if len(yomi) >= 6:
+        half = len(yomi) // 2
+        p1, p2 = yomi[:half], yomi[half:]
+        if p1 == p2 or p1[:2] == p2[:2] or re.search(r'^(..+?)\1', yomi):
+            print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi}' は曖昧さ回避の重複連結のため破棄")
+            return None
     if not is_plausible_reading(term, yomi):
         print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi}' は漢字表記と乖離しているため破棄")
         return None
@@ -1221,12 +1234,18 @@ def build_context_pronunciation_map(full_context, custom_dict=None):
     t = normalize_fullwidth_alphanumeric(full_context)
     context_map = {}
 
-    # 1. 政治家・著名人マスター（data/tts_rules.json より）
-    prominent = load_tts_rules().get("prominent_people", {})
+    # 1. 政治家・著名人・主要政党マスター（data/tts_rules.json より）
+    rules = load_tts_rules()
+    prominent = rules.get("prominent_people", {})
     if prominent and isinstance(prominent, dict):
         for name, yomi in prominent.items():
             if name and yomi and name in t:
                 context_map[name] = yomi
+    parties = rules.get("political_parties", {})
+    if parties and isinstance(parties, dict):
+        for party, yomi in parties.items():
+            if party and yomi and party in t:
+                context_map[party] = yomi
 
     # 2. 過去の誤読記憶台帳（data/pronunciation_memory.json）からの文脈判定抽出
     pm_data = load_pronunciation_memory()
