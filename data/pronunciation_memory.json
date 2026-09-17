@@ -327,6 +327,17 @@
       "category": "brand",
       "registered_date": "2026-09-17",
       "note": "「ウフジ」誤読の防止（正しい読み: ユーエフジェイ）"
+    },
+    {
+      "id": "auto_1789613637_1536",
+      "surface": "斎藤元彦",
+      "reading": "さいとうもとひこ",
+      "scope": "global",
+      "article_topic": "財政難の兵庫県に匿名の人物から8億円相当の金の延べ棒寄付 斎藤知事「ご厚意に感謝",
+      "sample_sentence": "斎藤元彦に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
     }
   ]
 }

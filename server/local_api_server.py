@@ -134,6 +134,7 @@ from server.news_cache_manager import (
     clear_cache_by_date,
     delete_cache_item
 )
+from server.pronunciation_audit_service import get_pronunciation_audit_service
 
 # ポート番号（引数 --port または環境変数 PORT、デフォルト 8001）
 PORT = 8001
@@ -313,6 +314,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             '/api/youtube/oauth_status': lambda: self._send_json(youtube_api_helper.get_oauth_status()),
             '/api/youtube/auth_status': lambda: self._send_json(youtube_api_helper.get_oauth_status()),
             '/api/pronunciation_memory': lambda: self._send_json(load_json(PRONUNCIATION_MEMORY_FILE, default={"records": []})),
+            '/api/pronunciation_audit/status': lambda: self._send_json(get_pronunciation_audit_service().get_status()),
         }
 
 
@@ -678,6 +680,17 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 return self.wfile.write(wav_bytes)
 
+            # ── 誤字・誤読監視サービス制御 ──
+            if self.path == '/api/pronunciation_audit/start':
+                audit_service = get_pronunciation_audit_service()
+                started = audit_service.start()
+                return self._send_json({"success": True, "is_running": audit_service.is_running, "message": "誤字・誤読監視サービスを開始しました" if started else "既に稼働中です"})
+
+            if self.path == '/api/pronunciation_audit/stop':
+                audit_service = get_pronunciation_audit_service()
+                stopped = audit_service.stop()
+                return self._send_json({"success": True, "is_running": audit_service.is_running, "message": "誤字・誤読監視サービスを停止しました" if stopped else "既に停止しています"})
+
             self.send_response(404)
             self.end_headers()
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
@@ -690,6 +703,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 def run():
     start_log_rotation_scheduler()
     init_preload_all_rss_urls()
+    get_pronunciation_audit_service().start()
     socketserver.ThreadingTCPServer.allow_reuse_address = True
     while True:
         try:

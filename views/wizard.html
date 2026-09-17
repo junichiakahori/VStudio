@@ -238,6 +238,13 @@
                     <span>OBS WebSocket 接続</span>
                     <span id="status-obs" style="font-weight: bold; color: #ff7675;">🔴 未接続</span>
                 </div>
+                <div class="status-row">
+                    <span>🛡️ 誤字・誤読監視サービス</span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span id="status-pronunciation-audit" style="font-weight: bold; color: #ff7675;">🔴 確認中...</span>
+                        <button id="btn-start-pronunciation-audit" type="button" class="btn" style="display: none; background: #00b894; color: #fff; font-size: 0.72rem; padding: 2px 8px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; white-space: nowrap;">🚀 起動</button>
+                    </div>
+                </div>
             </div>
 
             <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
@@ -747,7 +754,7 @@
 
     <!-- 📦 ウィザード専任外部モジュール群 -->
     <script src="/js/wizard/wizard-logger.js?v=22.1"></script>
-    <script src="/js/wizard/wizard-core.js?v=22.5"></script>
+    <script src="/js/wizard/wizard-core.js?v=22.6"></script>
 
     <script src="/js/wizard/wizard-time-picker.js?v=22.1"></script>
     <script src="/js/wizard/wizard-news-settings.js?v=22.1"></script>

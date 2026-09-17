@@ -446,9 +446,9 @@ function getNewsConfig() {
     currentList = sortNewsItemsByBroadcastOrder(currentList);
     window.latestFetchedNews = currentList;
 
-    // 🛡️ プール上限ガード: 未消費の先読みが既に3件以上あれば、それ以上は一切先読みしない
-    // 💡 準備中は「第1記事目」「第2記事目」「第3記事目」の最大3件まで先行プールを許可
-    if (preloadedNewsMap.size >= 3) {
+    // 🛡️ プール上限ガード: 未消費の先読みが既に4件以上あれば、それ以上は一切先読みしない
+    // 💡 準備中・放送中は「次の記事」「その次の記事」を含めた2重バッファを先行プール
+    if (preloadedNewsMap.size >= 4) {
       return;
     }
 
@@ -458,8 +458,14 @@ function getNewsConfig() {
       const isRunning = (typeof newsBroadcastState !== "undefined" && newsBroadcastState.isRunning);
 
       if (isRunning && newsBroadcastState.currentIndex > 0) {
-        // 放送進行中: 現在再生中の次の記事（currentIndexは1-basedなので配列上はcurrentIndex番目）
-        targetIdx = newsBroadcastState.currentIndex;
+        // 放送進行中: 2重バッファを維持（currentIndex: 次の記事、currentIndex + 1: その次の記事）
+        const idx1 = newsBroadcastState.currentIndex;
+        const idx2 = newsBroadcastState.currentIndex + 1;
+        if (idx1 < currentList.length && !preloadedNewsMap.has(currentList[idx1].title) && !consumedNewsTitles.has(currentList[idx1].title)) {
+          targetIdx = idx1;
+        } else if (idx2 < currentList.length && !preloadedNewsMap.has(currentList[idx2].title) && !consumedNewsTitles.has(currentList[idx2].title)) {
+          targetIdx = idx2;
+        }
       } else {
         // 放送準備中: 第1記事(0), 第2記事(1), 第3記事(2) を順番に先読みして序盤の待ち時間を恒久ゼロ化
         if (currentList[0] && !preloadedNewsMap.has(currentList[0].title) && !consumedNewsTitles.has(currentList[0].title)) {
@@ -490,7 +496,7 @@ function getNewsConfig() {
 
   function triggerNewsPrefetch(item, isFirst = false, isCategoryChanged = false) {
     if (!item || !item.title) return;
-    if (preloadedNewsMap.size >= 3) return; // 既に3件プール中なら重複追加を防止
+    if (preloadedNewsMap.size >= 4) return; // 既に4件プール中なら重複追加を防止
     if (!preloadedNewsMap.has(item.title) && !consumedNewsTitles.has(item.title)) {
       executeNewsPrefetch(item, isFirst, isCategoryChanged);
     }
@@ -607,7 +613,7 @@ function getNewsConfig() {
 
   window.processNewsInterludeComments = processNewsInterludeComments;
 
-  async function readOneNewsItem(item, config, isCategoryChanged, isFirst, nextItem = null, nextIsCatChanged = false, expectedSessionId = null) {
+  async function readOneNewsItem(item, config, isCategoryChanged, isFirst, nextItem = null, nextIsCatChanged = false, expectedSessionId = null, nextNextItem = null, nextNextIsCatChanged = false) {
     if (!newsBroadcastState.isRunning) return false;
     if (expectedSessionId !== null && expectedSessionId !== window._currentNewsBroadcastSessionId) return false;
 
@@ -796,9 +802,12 @@ function getNewsConfig() {
           }
         }
 
-        // 🚀 ③ 次の記事の裏側先読みをトリガー（発話中に先読み）
+        // 🚀 ③ 2重バッファ先読みトリガー（次の記事 i+1 ＆ 次々の記事 i+2 を裏側で先行生成）
         if (nextItem) {
           triggerNewsPrefetch(nextItem, false, nextIsCatChanged);
+        }
+        if (nextNextItem) {
+          triggerNewsPrefetch(nextNextItem, false, nextNextIsCatChanged);
         }
 
         // 📝 ④ AIが生成したニュース本文の解説・感想を発話
@@ -1027,9 +1036,10 @@ function getNewsConfig() {
       console.log(`[ニュース番組] 🔄 カテゴリ切り替えSE: ${config.useTransition ? '有効' : '無効'}`);
       console.log("[ニュース番組] 📰 ==========================================");
 
-      // 💡 配信準備中に先読みしたキャッシュ（第1記事目など）は破棄せずそのまま活用
+      // 💡 配信準備中に先読みしたキャッシュ（第1記事目など）は破棄せずそのまま活用（第3記事目まで先行トリガー）
       if (startIndex < sortedNews.length) triggerNewsPrefetch(sortedNews[startIndex], startIndex === 0, false);
       if (startIndex + 1 < sortedNews.length) triggerNewsPrefetch(sortedNews[startIndex + 1], false, (sortedNews[startIndex + 1].categoryKey || "") !== (sortedNews[startIndex].categoryKey || ""));
+      if (startIndex + 2 < sortedNews.length) triggerNewsPrefetch(sortedNews[startIndex + 2], false, (sortedNews[startIndex + 2].categoryKey || "") !== (sortedNews[startIndex + 1].categoryKey || ""));
 
       // OP挨拶（途中再開でない場合のみ再生）
       if (startIndex === 0) {
@@ -1076,6 +1086,8 @@ function getNewsConfig() {
 
         const nextItem = (i + 1 < sortedNews.length) ? sortedNews[i + 1] : null;
         const nextIsCatChanged = nextItem ? ((nextItem.categoryKey || "") !== (item.categoryKey || "")) : false;
+        const nextNextItem = (i + 2 < sortedNews.length) ? sortedNews[i + 2] : null;
+        const nextNextIsCatChanged = (nextNextItem && nextItem) ? ((nextNextItem.categoryKey || "") !== (nextItem.categoryKey || "")) : false;
 
         if (isCategoryChanged && config.useTransition) {
           console.log(`[ニュース番組] 🚀 [STEP 9] カテゴリ切り替え検知: [${item.categoryName || item.categoryKey}] シーン切り替えSE再生`);
@@ -1086,7 +1098,7 @@ function getNewsConfig() {
 
         console.log(`[ニュース番組] 🚀 [STEP 10] 記事 #${i + 1}/${sortedNews.length} 「${item.title}」の読み上げを開始します (Session: #${thisSessionId})`);
         const reader = window.readOneNewsItem || readOneNewsItem;
-        const success = await reader(item, config, isCategoryChanged, isFirst, nextItem, nextIsCatChanged, thisSessionId);
+        const success = await reader(item, config, isCategoryChanged, isFirst, nextItem, nextIsCatChanged, thisSessionId, nextNextItem, nextNextIsCatChanged);
         if (thisSessionId !== window._currentNewsBroadcastSessionId || !newsBroadcastState.isRunning) {
           console.log(`[ニュース番組] ⏹️ 世代交代（旧セッション #${thisSessionId}）のため記事読み上げ完了後に破棄します`);
           break;

@@ -231,6 +231,38 @@
         elObs.style.color = "var(--text-muted, #888)";
       }
     }
+
+    // 誤字・誤読監視サービス (Pronunciation Audit Service)
+    const elAudit = document.getElementById("status-pronunciation-audit");
+    const btnStartAudit = document.getElementById("btn-start-pronunciation-audit");
+    try {
+      const auditRes = await fetch("/api/pronunciation_audit/status", { cache: "no-store" });
+      if (auditRes.ok) {
+        const auditData = await auditRes.json();
+        if (auditData.is_running) {
+          if (elAudit) {
+            const count = auditData.repaired_count || 0;
+            elAudit.textContent = count > 0 ? `🟢 稼働中 (修復: ${count}件)` : "🟢 稼働中";
+            elAudit.style.color = "#00e676";
+          }
+          if (btnStartAudit) btnStartAudit.style.display = "none";
+        } else {
+          if (elAudit) {
+            elAudit.textContent = "⚪ 停止中";
+            elAudit.style.color = "#ff7675";
+          }
+          if (btnStartAudit) btnStartAudit.style.display = "inline-block";
+        }
+      } else {
+        throw new Error("status error");
+      }
+    } catch (e) {
+      if (elAudit) {
+        elAudit.textContent = "⚪ 停止中";
+        elAudit.style.color = "#ff7675";
+      }
+      if (btnStartAudit) btnStartAudit.style.display = "inline-block";
+    }
   }
   window.checkSystemHealth = checkSystemHealth;
 
@@ -379,6 +411,35 @@
         window.openerWin.focus();
       }
     });
+
+    // 誤字・誤読監視サービスの起動ボタン
+    const btnStartAudit = document.getElementById("btn-start-pronunciation-audit");
+    if (btnStartAudit) {
+      btnStartAudit.onclick = async () => {
+        btnStartAudit.disabled = true;
+        btnStartAudit.textContent = "起動中...";
+        try {
+          const res = await fetch("/api/pronunciation_audit/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
+          });
+          const data = await res.json();
+          if (typeof window.showWizardToast === "function") {
+            window.showWizardToast(data.message || "誤字・誤読監視サービスを起動しました", true);
+          }
+        } catch (e) {
+          if (typeof window.showWizardToast === "function") {
+            window.showWizardToast("起動に失敗しました: " + e.message, false);
+          }
+        } finally {
+          btnStartAudit.disabled = false;
+          btnStartAudit.textContent = "🚀 起動";
+          if (typeof checkSystemHealth === "function") {
+            await checkSystemHealth();
+          }
+        }
+      };
+    }
   }
 
   if (document.readyState === "loading") {
