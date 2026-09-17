@@ -916,6 +916,21 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
 
     return audit_and_heal_news_script(corrected_items, title="", article_context=article_context)
 
+def clean_headline_character_tone(text: str) -> str:
+    """
+    ニュース見出し（表示用・音声用）から、カギ括弧内外・引用符内外・末尾を問わず
+    混入したキャラクター語尾（にゃ、のだ、なのだ、だにゃ、のにゃ等）を100%完全切除する。
+    """
+    if not text:
+        return ""
+    t = text
+    # 1. カギ括弧閉じ（」』））、引用符、読点、末尾の直前にあるキャラクター語尾を切除
+    t = re.sub(r'(?:です|だ|だった|んだ|のに)?[\s　]*(?:とろろ)?(?:にゃ|のだ|なのだ)[！!。？?\s　]*(?=[」』）\)\"\'、,\s]|$)', '', t)
+    t = re.sub(r'[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*(?=[」』）\)\"\'、,\s]|$)', '', t)
+    # 2. 残存する末尾のキャラクター語尾・感嘆符を切除
+    t = re.sub(r'[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', t)
+    return t.strip()
+
 AUTHENTIC_SPORTS_KEYWORDS = {
     "プロ野球", "高校野球", "甲子園", "MLB", "メジャーリーグ", "セ・リーグ", "パ・リーグ",
     "サッカー", "Jリーグ", "プレミアリーグ", "日本代表", "ワールドカップ", "W杯",
@@ -1794,9 +1809,8 @@ def generate_news_item_script_data(payload, custom_dict=None):
             if headline_match:
                 ai_headline_raw = headline_match.group(1).strip()
                 ai_headline_raw = re.sub(r'^(?:とろろ|ずんだもん|ひじき|キャスター|AITuber|VTuber|配信者)[\s　]*[：:\-ー]\s*', '', ai_headline_raw).strip()
-                # 🛡️ 見出しにはキャラクター語尾（にゃ、のだ等）を絶対に付けない（客観的な報道タイトルのため完全切除）
-                ai_headline_raw = re.sub(r'(?:です|だ|だった|された|した|ある|いる|なる|こと)?[\s　]*(?:とろろ)?(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', ai_headline_raw).strip()
-                ai_headline_raw = re.sub(r'[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', ai_headline_raw).strip()
+                # 🛡️ 見出しにはキャラクター語尾（にゃ、のだ等）を絶対に付けない（カギ括弧内外問わず完全切除）
+                ai_headline_raw = clean_headline_character_tone(ai_headline_raw)
                 clean_text = re.sub(r'(?:\[(?:HEADLINE|見出し):\s*|【(?:ニュース)?見出し】[\s:：]*|見出し[\s:：]+).*?(?:\]|\n|$)', '', clean_text).strip()
     
             # ✂️ 【記事本文】【要約】【解説台本】【感想】等のセクションタグ行・見出し行を一括完全消去
@@ -2223,17 +2237,16 @@ def generate_news_item_script_data(payload, custom_dict=None):
             headline_speech = re.sub(r'^[、,\s　]+', '', headline_speech)
             headline_speech = re.sub(r'[、,\s　]+$', '', headline_speech)
     
-            # 🛡️ 見出しにはキャラクター語尾（にゃ、のだ等）を絶対に付けない（客観的見出しのため完全切除）
-            headline_display = re.sub(r'(?:です|だ|だった|された|した|ある|いる|なる|こと)?[\s　]*(?:とろろ)?(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', headline_display).strip()
-            headline_display = re.sub(r'[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', headline_display).strip()
-            headline_speech = re.sub(r'(?:です|だ|だった|された|した|ある|いる|なる|こと)?[\s　]*(?:とろろ)?(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', headline_speech).strip()
-            headline_speech = re.sub(r'[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', headline_speech).strip()
+            # 🛡️ 見出しにはキャラクター語尾（にゃ、のだ等）を絶対に付けない（カギ括弧内外・引用符内外問わず完全切除）
+            headline_display = clean_headline_character_tone(headline_display)
+            headline_speech = clean_headline_character_tone(headline_speech)
     
             print(f"{tag} 🗣️ 文脈校正見出し生成成功: 表示='{headline_display}' / 発音='{headline_speech}'", flush=True)
         else:
             # 元タイトル全文を一文字も省略せずに文脈読みを付与してTTS音声化
             headline_display = title.replace("「", "").replace("」", "").strip()
             headline_speech = normalize_for_tts(headline_display, custom_dict=custom_dict, context_map=news_context_map)
+            headline_speech = clean_headline_character_tone(headline_speech)
             headline_speech = re.sub(r'^[、,\s　]+', '', headline_speech)
             headline_speech = re.sub(r'[、,\s　]+$', '', headline_speech)
             print(f"{tag} 🗣️ 元タイトル全文から文脈読み生成 (省略ゼロ): 発音='{headline_speech}'", flush=True)

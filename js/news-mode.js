@@ -794,9 +794,10 @@ function getNewsConfig() {
             } else {
               speakHeadline = headlineText.replace(/[（\(]([^）\)]*より)[）\)]/g, "、$1");
             }
-            // 🛡️ 見出しには「にゃ」「のだ」を付けない（客観的見出しのため切除）
-            speakHeadline = speakHeadline.replace(/(?:です|だ|だった|された|した|ある|いる|なる|こと)?[\s　]*(?:とろろ)?(?:にゃ|のだ|なのだ)[！!。？?\s　]*(?=、[^、]*より|$)/g, "");
-            speakHeadline = speakHeadline.replace(/[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*(?=、[^、]*より|$)/g, "");
+            // 🛡️ 見出しには「にゃ」「のだ」を付けない（カギ括弧内外・引用符内外・メディア表記直前問わず完全切除）
+            speakHeadline = speakHeadline.replace(/(?:です|だ|だった|んだ|のに)?[\s　]*(?:とろろ)?(?:にゃ|のだ|なのだ)[！!。？?\s　]*(?=[」』）\)\"\'、,\s]|、[^、]*より|$)/g, "");
+            speakHeadline = speakHeadline.replace(/[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*(?=[」』）\)\"\'、,\s]|、[^、]*より|$)/g, "");
+            speakHeadline = speakHeadline.replace(/[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*$/g, "");
             console.log(`[原稿] [見出し] "${headlineText}" ➔ [音声] "${speakHeadline}"`);
             await queueVoicevoxAudio(headlineText, true, speakHeadline, false, true);
           }
