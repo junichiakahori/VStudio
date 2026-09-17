@@ -403,46 +403,33 @@
 
         function getFetchedNews() {
             try {
-                // 1. 自分自身のメモリ
-                let selfNews = (window.latestFetchedNews && window.latestFetchedNews.length > 0) ? window.latestFetchedNews : [];
-
-                // 2. 親画面のメモリ
-                let openerNews = [];
+                // 1. 親画面が存在する場合は親画面の最新データを最優先で参照（子窓による親画面逆汚染を恒久防止）
                 if (window.opener && !window.opener.closed) {
+                    if (window.opener.latestFetchedNews && window.opener.latestFetchedNews.length > 0) {
+                        window.latestFetchedNews = window.opener.latestFetchedNews;
+                        return window.latestFetchedNews;
+                    }
                     if (window.opener.newsBroadcastState && window.opener.newsBroadcastState.newsList && window.opener.newsBroadcastState.newsList.length > 0) {
-                        openerNews = window.opener.newsBroadcastState.newsList;
-                    } else if (window.opener.latestFetchedNews && window.opener.latestFetchedNews.length > 0) {
-                        openerNews = window.opener.latestFetchedNews;
+                        window.latestFetchedNews = window.opener.newsBroadcastState.newsList;
+                        return window.latestFetchedNews;
                     }
                 }
 
-                // 3. localStorage
-                let localNews = [];
+                // 2. 親画面がない単独起動時のみ localStorage を参照
                 const saved = localStorage.getItem("latestFetchedNews");
                 if (saved) {
-                    try { localNews = JSON.parse(saved); } catch (e) { }
+                    try {
+                        const parsed = JSON.parse(saved);
+                        if (parsed && parsed.length > 0) {
+                            window.latestFetchedNews = parsed;
+                            return parsed;
+                        }
+                    } catch (e) { }
                 }
 
-                // 全候補の中で最も件数の多い（最新・完全な）リストを無条件で最優先採用
-                let candidates = [
-                    { list: selfNews, desc: `自身のメモリ (${selfNews.length}件)` },
-                    { list: openerNews, desc: `親画面 (${openerNews.length}件)` },
-                    { list: localNews, desc: `localStorage (${localNews.length}件)` }
-                ];
-                candidates.sort((a, b) => b.list.length - a.list.length);
-
-                let best = candidates[0];
-                if (best.list.length > 0) {
-                    // 親画面と自身のメモリを最新リストで完全同期
-                    window.latestFetchedNews = best.list;
-                    if (window.opener && !window.opener.closed) {
-                        window.opener.latestFetchedNews = best.list;
-                    }
-                    if (window._lastLoggedCandidateDesc !== best.desc) {
-                        window._lastLoggedCandidateDesc = best.desc;
-                        console.log(`[記事一覧POPUP] ${best.desc} を採用しました`);
-                    }
-                    return best.list;
+                // 3. 自分自身のメモリ
+                if (window.latestFetchedNews && window.latestFetchedNews.length > 0) {
+                    return window.latestFetchedNews;
                 }
                 logDiag("ニュースデータが存在しません (0件)", "warn");
             } catch (e) {
