@@ -1125,8 +1125,8 @@ def audit_and_heal_news_script(items, title="", article_context=""):
             "OECD", "GDP", "GNP", "CEO", "COO", "CFO", "CTO", "CIO", "CM", "PV", "MV",
             "BGM", "SE", "MC", "DJ", "CD", "DVD", "BD", "SD", "IC", "ID", "IT", "IP",
             "LTE", "SIM", "PIN", "QR", "VIP", "PTA", "JAL", "ANA", "JR", "NPO", "NGO",
-            "JRA", "NPB", "JFA", "WBC", "FIFA", "IOC", "JOC", "MUFG", "SMBC", "FRB",
-            "CPI", "SMR", "TNO", "LLM"
+            "JRA", "NPB", "JFA", "WBC", "FIFA", "IOC", "JOC", "MUFG", "UFJ", "SMBC", "FRB",
+            "CPI", "SMR", "TNO", "LLM", "NTT", "KDDI", "JCB", "SBI"
         }
         def _fix_uppercase_word(m):
             w = m.group(0)

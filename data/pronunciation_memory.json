@@ -304,6 +304,29 @@
       "category": "person",
       "registered_date": "2026-09-17",
       "note": "「しんでん」誤読の防止（正しい読み: かんだ）"
+    },
+    {
+      "id": "auto_1789612912_900",
+      "surface": "iPhone17",
+      "reading": "アイフォーンセブンティーン",
+      "scope": "global",
+      "article_topic": "レビュー】iPhone18 Proテックウーブンケースを17 Proに装着してみた - iPhone Mania - iPhone Mania",
+      "sample_sentence": "iPhone17に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-17",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "ufj_bank",
+      "surface": "UFJ",
+      "reading": "ユーエフジェイ",
+      "wrong_reading": "ウフジ",
+      "scope": "global",
+      "article_topic": "経済・金融・三菱UFJ銀行",
+      "sample_sentence": "三菱UFJ銀行が融資方針を発表しました。",
+      "category": "brand",
+      "registered_date": "2026-09-17",
+      "note": "「ウフジ」誤読の防止（正しい読み: ユーエフジェイ）"
     }
   ]
 }
