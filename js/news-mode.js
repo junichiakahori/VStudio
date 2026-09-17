@@ -73,7 +73,32 @@ function hideNewsSetlist() {
 }
 
 
-// 🚫 動画視聴前提のダイジェスト記事（Pickup NEWS等）や無意味なサイトヘッダーを除外する判定 (ユニバーサル互換)
+// 🚫 動画視聴前提、写真一覧、株価データ羅列、情報量不足記事を除外する判定 (ユニバーサル互換)
+const INVALID_NEWS_TITLE_PATTERNS_MODE = [
+  /【動画】|\[動画\]|\(動画\)/i, /【ライブ】/i, /【生中継】/i, /【ノーカット】/i,
+  /【ハイライト】/i, /【まとめ】/i, /【会見】/i, /【独自】.*動画/i,
+  /Pickup\s*NEWS/i, /ピックアップ\s*ニュース/i, /動画で見る/i,
+  /動画ニュース/i, /ニュース動画/i, /LIVE配信/i, /ニュース速報LIVE/i,
+  /今日のトピックス/i, /今週のまとめ/i, /主要ニュース一覧/i,
+  /フォトギャラリー/i, /写真特集/i, /写真ニュース/i, /写真ギャラリー/i,
+  /【写真まとめ】/i, /【写真多数】/i, /【写真】/i, /【画像】/i, /【フォト】/i,
+  /画像ギャラリー/i, /写真で見る/i, /グラビア/i,
+  // 📉 株価・市況・ランキングデータ羅列記事（文章情報量ゼロ・極小）
+  /【成行注文】/i, /買い越しランキング/i, /売り越しランキング/i,
+  /【ストップ高／ストップ安】/i, /ストップ高/i, /ストップ安/i,
+  /値上がり率ランキング/i, /値下がり率ランキング/i, /出来高上位/i,
+  /信用取引残高/i, /寄り付き/i, /大引け/i, /市況概況/i,
+  /^(ニュース|Google\s*ニュース|Yahoo!\s*ニュース|トップニュース|主要ニュース|トピックス)$/i
+];
+
+const INVALID_NEWS_DESC_PATTERNS_MODE = [
+  /動画をご覧ください/i, /動画で詳しく/i, /動画はこちら/i,
+  /映像をご覧ください/i, /映像はこちら/i, /YouTubeで見る/i,
+  /動画配信中/i, /詳しくは動画で/i, /動画ニュース/i,
+  /まとめて.*分の動画でお伝えします/i, /データ放送では動画をご覧いただけません/i,
+  /動画をご視聴ください/i, /写真はこちら/i, /詳細はリンク先/i, /画像はこちら/i
+];
+
 function isInvalidNewsVideoArticle(arg1, arg2) {
   let title = "";
   let desc = "";
@@ -86,29 +111,16 @@ function isInvalidNewsVideoArticle(arg1, arg2) {
   }
   if (!title) return true;
 
-  // 1. タイトル判定
-  const VIDEO_TITLE_PATTERNS = [
-    /【動画】|\[動画\]|\(動画\)/i,
-    /Pickup\s*NEWS|ピックアップニュース/i,
-    /1分でわかる|まるわかり|ダイジェスト/i,
-    /動画で見る|動画ニュース|動画配信/i,
-    /Live配信|ライブ配信|生中継|ライブ中継/i,
-    /^(ニュース|Google\s*ニュース|Yahoo!\s*ニュース|トップニュース|主要ニュース|トピックス)$/i
-  ];
-  for (const pat of VIDEO_TITLE_PATTERNS) {
+  for (const pat of INVALID_NEWS_TITLE_PATTERNS_MODE) {
     if (pat.test(title)) return true;
   }
-
-  // 2. 本文（description）判定
-  const VIDEO_DESC_PATTERNS = [
-    /まとめて.*分の動画でお伝えします/i,
-    /動画でお伝えします/i,
-    /動画をご覧ください/i,
-    /データ放送では動画をご覧いただけません/i,
-    /動画をご視聴ください/i
-  ];
-  for (const pat of VIDEO_DESC_PATTERNS) {
+  for (const pat of INVALID_NEWS_DESC_PATTERNS_MODE) {
     if (pat.test(desc)) return true;
+  }
+
+  // 🛡️ 概要文（description）が極端に短く（15文字未満）、かつ本文情報が皆無の短報を除外
+  if (desc.length > 0 && desc.length < 15 && /^(?:速報|短報|更新|【速報】)/.test(title)) {
+    return true;
   }
 
   return false;

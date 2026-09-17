@@ -462,14 +462,25 @@ def fetch_article_body(url):
         print(f"[本文取得スキップ] URL: {url[:30]}... ({e})")
     return ""
 
+MIN_ARTICLE_BODY_LEN = 150  # 🛡️ 深掘り原稿生成に耐えうる最低本文文字数（150文字）
+
+# 🚫 バックエンド二重防壁: 市況データ羅列・写真特集等の低情報量タイトルパターン
+INVALID_DATA_TITLE_PATTERNS = [
+    re.compile(r'成行注文', re.IGNORECASE),
+    re.compile(r'買い越しランキング|売り越しランキング', re.IGNORECASE),
+    re.compile(r'ストップ高|ストップ安', re.IGNORECASE),
+    re.compile(r'値上がり率ランキング|値下がり率ランキング', re.IGNORECASE),
+    re.compile(r'出来高上位|信用取引残高', re.IGNORECASE),
+    re.compile(r'写真まとめ|写真多数|写真特集|フォトギャラリー|写真ニュース|グラビア', re.IGNORECASE),
+]
+
 def check_and_filter_scrapeable_news(items):
     """
-    複数のニュース項目について、スクレイピング可能（本文が40文字以上取得可能）かを並行検証する。
-    毎日新聞等の遮断サイトや有料限定で本文が取れない記事は scrapeable=False となり除外対象となる。
+    複数のニュース項目について、スクレイピング可能（本文が150文字以上取得可能）かを並行検証する。
+    毎日新聞等の遮断サイト、有料限定、短文速報、株価データ羅列、動画前提記事は scrapeable=False となり除外対象となる。
     """
     results = {}
     scrapeable_titles = []
-    threads = []
     lock = threading.Lock()
 
     def _worker(item):
@@ -477,6 +488,17 @@ def check_and_filter_scrapeable_news(items):
         url = item.get('url', item.get('link', '')).strip()
         if not title:
             return
+
+        # 🚫 0. 市況・株価データ羅列や写真特集の即時除外（文章情報量ゼロ・極小）
+        for pat in INVALID_DATA_TITLE_PATTERNS:
+            if pat.search(title):
+                with lock:
+                    results[title] = {
+                        "scrapeable": False,
+                        "url": url,
+                        "reason": "市況データ羅列・写真特集等の低情報量記事"
+                    }
+                return
 
         # 1. URLの解決（キャッシュ、検索、Googleデコード）
         resolved = url
@@ -509,24 +531,25 @@ def check_and_filter_scrapeable_news(items):
 
         # 4. 実際に本文を取得（キャッシュも効く）
         body = fetch_article_body(resolved) if resolved else ""
-        # もし本文が取れず、まだミラー探索を行っていない場合もミラー探索を試行
-        if (not body or len(body) < 40):
+        # 🛡️ 本文が情報量不足（150文字未満）の場合、Yahoo!ニュース等のミラー探索で救済を試みる
+        if (not body or len(body) < MIN_ARTICLE_BODY_LEN):
             mirror_url = search_yahoo_mirror_url(clean_search_title or title)
             if mirror_url and mirror_url != resolved and not is_known_blocked_domain(mirror_url):
                 mirror_body = fetch_article_body(mirror_url)
-                if mirror_body and len(mirror_body) >= 40:
-                    print(f"[ミラー救済] 🎯 本文不足URL({resolved[:30]}...)をYahooミラーで救済: {mirror_url[:50]}...", flush=True)
+                if mirror_body and len(mirror_body) >= MIN_ARTICLE_BODY_LEN:
+                    print(f"[ミラー救済] 🎯 本文不足URL({resolved[:30]}...)をYahooミラーで救済 ({len(mirror_body)}文字): {mirror_url[:50]}...", flush=True)
                     resolved = mirror_url
                     body = mirror_body
 
-        if body and len(body) >= 40:
+        # 🛡️ 本文が 150文字以上取得できた場合のみ「合格（取得可能）」とする！
+        if body and len(body) >= MIN_ARTICLE_BODY_LEN:
             if resolved:
                 register_cached_url(title, resolved)
                 set_cached_article_body(resolved, body)
-            resolved_source = it.get("source", "")
+            resolved_source = item.get("source", "")
             if resolved and "news.yahoo.co.jp" in resolved:
                 resolved_source = "Yahoo!ニュース"
-                it["source"] = "Yahoo!ニュース"
+                item["source"] = "Yahoo!ニュース"
             with lock:
                 scrapeable_titles.append(title)
                 results[title] = {
@@ -541,16 +564,18 @@ def check_and_filter_scrapeable_news(items):
                 results[title] = {
                     "scrapeable": False,
                     "url": resolved,
-                    "reason": f"本文取得不可または文字数不足 ({len(body)}文字)"
+                    "reason": f"本文情報量不足 ({len(body)}文字 < {MIN_ARTICLE_BODY_LEN}文字)"
                 }
 
-    for it in items:
-        th = threading.Thread(target=_worker, args=(it,))
-        th.start()
-        threads.append(th)
-
-    for th in threads:
-        th.join(timeout=8.0)
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    max_workers = min(20, max(4, len(items)))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_worker, it): it for it in items}
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as e:
+                pass
 
     # タイムアウト等で未完了の項目があれば安全に不可判定を補填
     for it in items:
@@ -559,7 +584,7 @@ def check_and_filter_scrapeable_news(items):
             results[t] = {
                 "scrapeable": False,
                 "url": it.get('url', it.get('link', '')),
-                "reason": "タイムアウトにより本文取得をスキップ"
+                "reason": "検証未完了により本文取得をスキップ"
             }
 
     return {

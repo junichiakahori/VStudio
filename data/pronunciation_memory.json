@@ -803,6 +803,25 @@
       "category": "web_auto_resolved",
       "registered_date": "2026-09-18",
       "note": "Web自動解決 (duckduckgo)"
+    },
+    {
+      "id": "auto_1789676452_5968",
+      "surface": "海那",
+      "reading": "があります",
+      "scope": "contextual",
+      "article_topic": "日本代表W杯メンバーからの選外は5名…40歳長友佑都、今夏移籍の菅原由勢や小川航基らが外れる",
+      "sample_sentence": "海那に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (duckduckgo)",
+      "context_keywords": [
+        "日本代表",
+        "メンバー",
+        "選外",
+        "40",
+        "歳長友佑都",
+        "今夏移籍"
+      ]
     }
   ]
 }

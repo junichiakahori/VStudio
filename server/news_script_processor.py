@@ -1748,10 +1748,10 @@ def generate_news_item_script_data(payload, custom_dict=None):
                 "sentences": [it["display"] for it in items]
             }
     
-        # 🛡️ 本文が完全に欠落している場合（40文字未満かつ詳細本文なし）は、LLM妄想創作を物理的に遮断して安全フォールバックへ直行
-        has_valid_body = (fetched_body and len(fetched_body) >= 30) or (full_article_content and len(full_article_content) >= 50)
+        # 🛡️ 本文が情報量不足の場合（120文字未満）は、LLM妄想創作（市区町村名捏造等）を物理的に遮断して安全フォールバックへ直行
+        has_valid_body = (fetched_body and len(fetched_body) >= 120) or (full_article_content and len(full_article_content) >= 140)
         if not has_valid_body:
-            print(f"{tag} 🛡️ 記事本文がスクレイピングできないため、ハルシネーションを防止し安全な定型原稿を自動構築します", flush=True)
+            print(f"{tag} 🛡️ 記事本文の情報量が不足しているため（{len(fetched_body) if fetched_body else 0}文字 < 120文字）、ハルシネーションを防止し安全な定型原稿を自動構築します", flush=True)
             items = build_safe_fallback_sentences(title, full_article_content, char_desc, custom_dict=custom_dict)
             raw_text = "\n".join([it["display"] for it in items])
             headline_dict = {"display": title, "speech": title}
