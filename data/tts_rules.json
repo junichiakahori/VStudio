@@ -8,6 +8,9 @@
     "OpenAI": "オープンエーアイ",
     "SiC": "エスアイシー",
     "UFJ": "ユーエフジェイ",
+    "F-16V": "F-16ブイ",
+    "F-35V": "F-35ブイ",
+    "UH-60V": "UH-60ブイ",
     "Switch": "スイッチ",
     "Nintendo": "ニンテンドー",
     "AI": "エーアイ",
@@ -74,19 +77,7 @@
     "NMB": "エヌエムビー",
     "HKT": "エイチケーティー",
     "NGT": "エヌジーティー",
-    "STU": "エスティーユー",
-    "MITSUI": "Mアイティーエスユーアイ",
-    "OCEAN": "OCEAエヌ",
-    "SAKURA": "エスAケーユーRA",
-    "CAPCOM": "CAPCOM",
-    "ONLINE": "OエヌLアイエヌE",
-    "PROGRAM": "PROGRAM",
-    "TOKYO": "ティーOケーYO",
-    "TAIYAKI": "ティーAアイYAケーアイ",
-    "LIVE": "LアイVE",
-    "TOUR": "ティーOユーR",
-    "ROG": "ROG",
-    "XBOX": "XビーOX"
+    "STU": "エスティーユー"
   },
   "imperial_proper_nouns": [
     {

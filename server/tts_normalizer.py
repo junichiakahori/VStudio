@@ -1151,6 +1151,37 @@ def apply_idol_group_rules(text):
             t = re.sub(pat, rep, t)
     return t
 
+
+def apply_model_suffix_rules(text):
+    """
+    航空機・戦闘機・兵器・機器の型番における単位誤認（V➔ボルト, A➔アンペア, W➔ワット, N➔ノルマル）を解消
+    例: F-16V ➔ F-16ブイ (「16ボルト」と誤読される事故を恒久防止)
+        F-16V型 ➔ F-16ブイ型
+        F-35A ➔ F-35エー (「35アンペア」防止)
+        F-2A  ➔ F-2エー  (「2アンペア」防止)
+        UH-60V ➔ UH-60ブイ (「60ボルト」防止)
+        F-16W ➔ F-16ダブリュー (「16ワット」防止)
+        F-16N ➔ F-16エヌ (「16ノルマル」防止)
+    ※ 単なる数値単位（例: 100V電源, 5V充電）は誤爆せず保持
+    """
+    if not text:
+        return ""
+    SUFFIX_MAP = {
+        'V': 'ブイ',
+        'A': 'エー',
+        'W': 'ダブリュー',
+        'N': 'エヌ'
+    }
+    def repl(m):
+        prefix_num = m.group(1)
+        suffix = m.group(2).upper()
+        yomi = SUFFIX_MAP.get(suffix, suffix)
+        return f'{prefix_num}{yomi}'
+
+    pattern = r'(?<![A-Za-z0-9])([A-Za-z]{1,4}(?:/[A-Za-z]+)?-?\d+)([VAWNvawn])(?![A-Za-z0-9])'
+    return re.sub(pattern, repl, text)
+
+
 def apply_age_and_counter_rules(text):
     """年齢・助数詞に対する誤読・誤ルビの修復（data/tts_rules.json より動的適用）"""
     if not text:
@@ -1331,6 +1362,9 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
 
     # -1. 全角英数字を半角に統一（「ＶＩＶＡＮＴ」や「ＡＩ」等のチェックすり抜け・スペル読みを防止）
     t = normalize_fullwidth_alphanumeric(text)
+
+    # -0.5 航空機・戦闘機・機器の型番サフィックス単位誤読（F-16V ➔ 16ボルト 等）を修復
+    t = apply_model_suffix_rules(t)
 
     # 0. 記事全体から構築された文脈読みマップ（context_map）を最優先適用（前後の文脈・フルネームの共有）
     if context_map and isinstance(context_map, dict):
