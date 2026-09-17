@@ -2117,6 +2117,9 @@ def generate_news_item_script_data(payload, custom_dict=None):
                     # 敬称や肩書を除去したコア名（例: 高橋選手 ➔ 高橋、服部知事 ➔ 服部）
                     core_name = re.sub(r'(?:選手|知事|市長|首相|大臣|総理|総裁|議員|前議長|議長|社長|会長|監督|コーチ|投手|捕手|棋士|容疑者|被告|氏|さん|くん|君|様|さま)$', '', pname).strip()
                     target_name = core_name if len(core_name) >= 2 else pname
+                    # カタカナのみの外国人名（例: ダチ、ゴーン）はVOICEVOX自身が読めるため照合不要（誤爆防止）
+                    if re.match(r'^[\u30A0-\u30FFー]+$', target_name):
+                        continue
                     w_yomi = lookup_wikipedia_person_reading(target_name, context_hint=full_context_text)
                     if w_yomi:
                         news_context_map[pname] = w_yomi

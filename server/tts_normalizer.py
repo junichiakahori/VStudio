@@ -536,6 +536,10 @@ def lookup_wikipedia_person_reading(name, context_hint=""):
     if not name or len(name) < 2:
         return None
 
+    # カタカナのみの語（例: 「ダチ」「ゴーン」）はVOICEVOX自身がそのまま発音できるため、人名Wikipedia照合は不要（誤爆防止）
+    if re.match(r'^[\u30A0-\u30FFー]+$', name):
+        return None
+
     # キャッシュチェック
     cache_key = f"person:{name}:{context_hint[:60] if context_hint else ''}"
     if cache_key in _wiki_reading_cache:
@@ -566,7 +570,8 @@ def lookup_wikipedia_person_reading(name, context_hint=""):
                 p_data = json.loads(r_p.read().decode("utf-8"))
                 for res in p_data.get("query", {}).get("prefixsearch", [])[:3]:
                     t_title = res.get("title", "")
-                    if t_title and t_title not in titles_to_query:
+                    # prefixsearch の結果が候補文字列で実際に始まっているか厳格チェック（ダチ ➔ ダチョウ等のあいまい誤爆を遮断）
+                    if t_title and t_title not in titles_to_query and any(t_title.startswith(c) for c in candidates):
                         titles_to_query.append(t_title)
         except Exception:
             pass
@@ -605,7 +610,15 @@ def lookup_wikipedia_person_reading(name, context_hint=""):
 
     # 3. 最適な記事を選択
     best_item = None
-    if context_hint and len(found_articles) > 1:
+
+    # 3-1. 完全一致する記事タイトルがあれば最優先
+    for item in found_articles:
+        if item[0] in candidates:
+            best_item = item
+            break
+
+    # 3-2. 文脈照合（同姓同名・前方一致記事）
+    if not best_item and context_hint:
         best_score = -1
         for t_title, extract, hira in found_articles:
             score = 0
@@ -618,10 +631,13 @@ def lookup_wikipedia_person_reading(name, context_hint=""):
                 best_item = (t_title, extract, hira)
         if best_item and best_score > 0:
             print(f"[Wikipedia人名解決] 🎯 文脈一致スコア({best_score})で選択: '{name}' ➔ '{best_item[2]}' (記事: {best_item[0]})", flush=True)
+        else:
+            best_item = None
 
+    # 完全一致も文脈一致もない無関係な前方一致記事は採用しない（無条件フォールバック禁止）
     if not best_item:
-        best_item = found_articles[0]
-        print(f"[Wikipedia人名解決] 🎯 '{name}' ➔ '{best_item[2]}' (記事: {best_item[0]})", flush=True)
+        _wiki_reading_cache[cache_key] = (None, None)
+        return None
 
     selected_hira = best_item[2]
     _wiki_reading_cache[cache_key] = (selected_hira, name)
