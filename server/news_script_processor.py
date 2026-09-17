@@ -916,36 +916,81 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
 
     return audit_and_heal_news_script(corrected_items, title="", article_context=article_context)
 
-SPORTS_KEYWORDS = {
-    "野球", "サッカー", "五輪", "オリンピック", "大会", "試合", "スポーツ", "監督", "コーチ",
-    "チーム", "日本代表", "メダル", "戦", "陸上", "水泳", "バスケ", "バレー", "テニス", "ゴルフ",
-    "卓球", "格闘技", "プロレス", "ボクシング", "相撲", "競馬", "騎手", "投手", "捕手", "打者",
-    "安打", "セーブ", "本塁打", "ゴール", "得点", "勝利", "敗戦", "優勝", "準優勝", "リーグ",
-    "トーナメント", "クラブ", "選手", "アスリート", "F1", "レーサー", "ドライバー", "大谷", "ドジャース"
+AUTHENTIC_SPORTS_KEYWORDS = {
+    "プロ野球", "高校野球", "甲子園", "MLB", "メジャーリーグ", "セ・リーグ", "パ・リーグ",
+    "サッカー", "Jリーグ", "プレミアリーグ", "日本代表", "ワールドカップ", "W杯",
+    "バスケットボール", "Bリーグ", "NBA", "バレーボール", "Vリーグ",
+    "テニス", "ゴルフ", "米女子ツアー", "PGA", "LPGA",
+    "陸上競技", "マラソン", "駅伝", "水泳", "競泳", "卓球", "バドミントン",
+    "フィギュアスケート", "スピードスケート", "スケートボード", "スケボー",
+    "ボクシング", "プロレス", "格闘技", "柔道", "剣道", "空手", "レスリング",
+    "大相撲", "競馬", "騎手", "モータースポーツ", "F1",
+    "投手", "捕手", "内野手", "外野手", "打者", "本塁打", "ホームラン", "防御率", "打率", "安打",
+    "ゴールキーパー", "シュート", "フリーキック", "オフサイド",
+    "五輪", "オリンピック", "パラリンピック", "アスリート", "大谷翔平", "ドジャース"
 }
 
-def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, has_sports_context):
-    """相撲・非スポーツ文脈における『選手』誤爆の自己修復（最大深さ2階層）"""
+ENTERTAINMENT_KEYWORDS = {
+    "ドラマ", "映画", "アニメ", "声優", "俳優", "女優", "アイドル", "歌手", "アーティスト",
+    "タレント", "芸人", "お笑い", "劇場", "公開", "上映", "放送", "主演", "出演", "脚本",
+    "原作", "アルバム", "シングル", "コンサート", "ライブツアー", "ステージ", "バラエティ",
+    "舞台", "ミュージカル", "制作発表", "心理テスト", "公認心理士", "ゲーム", "新作ゲーム",
+    "スタジオ代表", "開発者", "プロデューサー", "ディレクター"
+}
+
+NON_ATHLETE_PROMINENT_PEOPLE = [
+    "山田涼介", "松山ケンイチ", "猪狩蒼弥", "横山昌義", "麻生太郎", "麻生",
+    "草彅剛", "木村拓哉", "中居正広", "二宮和也", "櫻井翔", "相葉雅紀", "松本潤", "大野智",
+    "目黒蓮", "道枝駿佑", "平野紫耀", "永瀬廉", "高橋海人", "岸優太", "神宮寺勇太",
+    "佐藤健", "菅田将暉", "吉沢亮", "山﨑賢人", "横浜流星", "神木隆之介", "阿部寛",
+    "堺雅人", "役所広司", "小栗旬", "妻夫木聡", "綾野剛", "星野源",
+    "新垣結衣", "綾瀬はるか", "長澤まさみ", "石原さとみ", "橋本環奈", "広瀬すず", "今田美桜",
+    "浜辺美波", "有村架純", "吉高由里子", "北川景子", "芦田愛菜"
+]
+
+def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports):
+    """相撲・エンタメ・非スポーツ文脈における『選手』誤爆の完全自己修復"""
+    # 0. 著名俳優・アイドル・クリエイターへの「選手」誤爆を100%「さん」へ強制是正
+    for name in NON_ATHLETE_PROMINENT_PEOPLE:
+        target = f"{name}選手"
+        if target in disp:
+            print(f"[敬称自己修復] 🚫 非アスリート著名人 '{name}' への「選手」誤爆を是正: '{target}' ➔ '{name}さん'", flush=True)
+            disp = disp.replace(target, f"{name}さん")
+        if target in healed_sp:
+            healed_sp = healed_sp.replace(target, f"{name}さん")
+
+        # 名字のみの「山田選手」「松山選手」「猪狩選手」も是正
+        if len(name) >= 3:
+            surname = name[:2]
+            surname_target = f"{surname}選手"
+            if surname_target in disp:
+                disp = disp.replace(surname_target, f"{surname}さん")
+            if surname_target in healed_sp:
+                healed_sp = healed_sp.replace(surname_target, f"{surname}さん")
+
+    # 1. 監督・コーチに対する「選手」誤爆の是正
+    disp = re.sub(r'([A-Za-z\u4e00-\u9fa5ぁ-んァ-ヶー]{2,10})監督選手', r'\1監督', disp)
+    healed_sp = re.sub(r'([A-Za-z\u4e00-\u9fa5ぁ-んァ-ヶー]{2,10})監督選手', r'\1監督', healed_sp)
+    disp = re.sub(r'(?:新監督|次期監督|名将|ヘッドコーチ|コーチ)の?([A-Za-z\u4e00-\u9fa5ぁ-んァ-ヶー]{2,10})選手', r'\1監督', disp)
+    healed_sp = re.sub(r'(?:新監督|次期監督|名将|ヘッドコーチ|コーチ)の?([A-Za-z\u4e00-\u9fa5ぁ-んァ-ヶー]{2,10})選手', r'\1監督', healed_sp)
+
+    # 2. 相撲文脈での「選手」除去
     if has_sumo_context:
-        if "選手" in disp:
-            disp_fixed = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1', disp)
-            if disp_fixed != disp:
-                print(f"[敬称自己修復] 🩹 相撲記事での「選手」誤爆を検知・除去: '{disp}' ➔ '{disp_fixed}'", flush=True)
-                disp = disp_fixed
-        if "選手" in healed_sp:
-            disp_sp_fixed = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1', healed_sp)
-            if disp_sp_fixed != healed_sp:
-                healed_sp = disp_sp_fixed
+        disp = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1', disp)
+        healed_sp = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1', healed_sp)
         return disp, healed_sp
 
-    if not has_sports_context:
+    # 3. 非スポーツ記事（またはエンタメ記事）での「選手」誤爆を100%「さん」へ是正
+    if not is_pure_sports:
         if "選手" in disp:
             disp_fixed = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1さん', disp)
+            disp_fixed = re.sub(r'(?<![ぁ-んァ-ヶー\u4e00-\u9fa5])選手([はがにもでの])', r'ご本人\1', disp_fixed)
             if disp_fixed != disp:
-                print(f"[敬称自己修復] 🩹 非スポーツ記事での「選手」誤爆を検知: '{disp}' ➔ '{disp_fixed}'", flush=True)
+                print(f"[敬称自己修復] 🩹 非スポーツ/エンタメ記事での「選手」誤爆を検知・是正: '{disp}' ➔ '{disp_fixed}'", flush=True)
                 disp = disp_fixed
         if "選手" in healed_sp:
             disp_sp_fixed = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1さん', healed_sp)
+            disp_sp_fixed = re.sub(r'(?<![ぁ-んァ-ヶー\u4e00-\u9fa5])選手([はがにもでの])', r'ご本人\1', disp_sp_fixed)
             if disp_sp_fixed != healed_sp:
                 healed_sp = disp_sp_fixed
 
@@ -961,7 +1006,9 @@ def audit_and_heal_news_script(items, title="", article_context=""):
         return items
 
     full_context = f"{title} {article_context}"
-    has_sports_context = any(kw in full_context for kw in SPORTS_KEYWORDS)
+    has_ent = any(kw in full_context for kw in ENTERTAINMENT_KEYWORDS)
+    has_authentic_sports = any(kw in full_context for kw in AUTHENTIC_SPORTS_KEYWORDS)
+    is_pure_sports = has_authentic_sports and not has_ent
 
     # 相撲文脈キーワード（力士に対して「選手」と呼ぶ誤爆を検知・除去）
     SUMO_KEYWORDS = [
@@ -999,7 +1046,7 @@ def audit_and_heal_news_script(items, title="", article_context=""):
         healed_sp = heal_sentence_reading(disp, sp)
 
         # 2. 「選手」の文脈適正チェック
-        disp, healed_sp = _heal_athlete_honorific(disp, healed_sp, has_sumo_context, has_sports_context)
+        disp, healed_sp = _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports)
 
         # 3. 普通名詞・国名・組織名への「さん」誤爆の最終除去
         for noun in INVALID_SAN_NOUNS:
