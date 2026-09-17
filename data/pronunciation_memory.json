@@ -1,0 +1,146 @@
+{
+  "version": "1.0",
+  "description": "過去に誤読を起こした単語・表現の記憶台帳。TTS正規化エンジンで最優先適用され、回帰テスト（再発防止テスト）のマスターデータになります。",
+  "records": [
+    {
+      "id": "kikohi",
+      "surface": "紀子妃",
+      "reading": "きこひ",
+      "wrong_reading": "のりこひ",
+      "sample_sentence": "紀子妃殿下は式典にご出席されました。",
+      "category": "imperial_proper_noun",
+      "registered_date": "2026-09-17",
+      "note": "OpenJTalkが「のりこひ」と誤読するのを防止"
+    },
+    {
+      "id": "iphone",
+      "surface": "iPhone",
+      "reading": "アイフォン",
+      "wrong_reading": "アイホーン",
+      "sample_sentence": "新型iPhoneの予約受付が始まりました。",
+      "category": "tech_brand",
+      "registered_date": "2026-09-17",
+      "note": "英語短縮語・製品名の誤読防止"
+    },
+    {
+      "id": "ipad",
+      "surface": "iPad",
+      "reading": "アイパッド",
+      "wrong_reading": "アイパド",
+      "sample_sentence": "新しいiPadが発表されました。",
+      "category": "tech_brand",
+      "registered_date": "2026-09-17",
+      "note": "英語短縮語・製品名の誤読防止"
+    },
+    {
+      "id": "kata_arukata",
+      "surface": "計画がある方",
+      "reading": "計画があるかた",
+      "wrong_reading": "計画があるほう",
+      "sample_sentence": "旅行の計画がある方はお早めにお申し込みください。",
+      "category": "homophone_kata",
+      "registered_date": "2026-09-17",
+      "note": "動詞連体形＋方の誤読防止（人物を指す「かた」）"
+    },
+    {
+      "id": "kata_ayumaretakata",
+      "surface": "歩まれた方",
+      "reading": "歩まれたかた",
+      "wrong_reading": "歩まれたほう",
+      "sample_sentence": "激動の時代を歩まれた方でした。",
+      "category": "homophone_kata",
+      "registered_date": "2026-09-17",
+      "note": "動詞連体形＋方の誤読防止（人物を指す「かた」）"
+    },
+    {
+      "id": "kata_awaretakata",
+      "surface": "遭われた方",
+      "reading": "遭われたかた",
+      "wrong_reading": "遭われたほう",
+      "sample_sentence": "事故に遭われた方にお見舞い申し上げます。",
+      "category": "homophone_kata",
+      "registered_date": "2026-09-17",
+      "note": "動詞連体形＋方の誤読防止（人物を指す「かた」）"
+    },
+    {
+      "id": "kata_tantosaretakata",
+      "surface": "担当された方",
+      "reading": "担当されたかた",
+      "wrong_reading": "担当されたほう",
+      "sample_sentence": "今回の開発を担当された方に話を伺いました。",
+      "category": "homophone_kata",
+      "registered_date": "2026-09-17",
+      "note": "受身・敬語連体形＋方の誤読防止（人物を指す「かた」）"
+    },
+    {
+      "id": "kisho_yoho_shi",
+      "surface": "気象予報士",
+      "reading": "きしょうよほうし",
+      "wrong_reading": "きしょうよほうさむらい",
+      "sample_sentence": "気象予報士の解説によると明日は晴れそうです。",
+      "category": "qualification",
+      "registered_date": "2026-09-17",
+      "note": "「士」が「さむらい」と誤読されるのを防止"
+    },
+    {
+      "id": "nogizaka46",
+      "surface": "乃木坂46",
+      "reading": "乃木坂フォーティーシックス",
+      "wrong_reading": "乃木坂46",
+      "sample_sentence": "アイドルグループ乃木坂46の最新シングルが発売されました。",
+      "category": "idol_group",
+      "registered_date": "2026-09-17",
+      "note": "坂道シリーズ46の誤読（よんじゅうろく）防止"
+    },
+    {
+      "id": "sakurazaka46",
+      "surface": "櫻坂46",
+      "reading": "櫻坂フォーティーシックス",
+      "wrong_reading": "櫻坂46",
+      "sample_sentence": "櫻坂46の全国ツアー日程が発表されました。",
+      "category": "idol_group",
+      "registered_date": "2026-09-17",
+      "note": "坂道シリーズ46の誤読（よんじゅうろく）防止"
+    },
+    {
+      "id": "hinatazaka46",
+      "surface": "日向坂46",
+      "reading": "日向坂フォーティーシックス",
+      "wrong_reading": "日向坂46",
+      "sample_sentence": "日向坂46の冠番組がリニューアルされます。",
+      "category": "idol_group",
+      "registered_date": "2026-09-17",
+      "note": "坂道シリーズ46の誤読（よんじゅうろく）防止"
+    },
+    {
+      "id": "akb48",
+      "surface": "AKB48",
+      "reading": "エーケービーフォーティーエイト",
+      "wrong_reading": "AKB48",
+      "sample_sentence": "AKB48の新曲選抜メンバーが発表されました。",
+      "category": "idol_group",
+      "registered_date": "2026-09-17",
+      "note": "48グループの誤読（よんじゅうはち）防止"
+    },
+    {
+      "id": "uesaka_sumire",
+      "surface": "上坂すみれ",
+      "reading": "うえさかすみれ",
+      "wrong_reading": "かみさかすみれ",
+      "sample_sentence": "声優の上坂すみれさんが出演を辞退しました。",
+      "category": "voice_actor",
+      "registered_date": "2026-09-17",
+      "note": "「かみさか」誤読の防止（正しい読み: うえさか）"
+    },
+    {
+      "id": "uesaka_san",
+      "surface": "上坂さん",
+      "reading": "うえさかさん",
+      "wrong_reading": "かみさかさん",
+      "sample_sentence": "上坂さんの所属事務所がコメントを発表しました。",
+      "category": "voice_actor",
+      "registered_date": "2026-09-17",
+      "note": "苗字「上坂」の「かみさか」誤読防止"
+    }
+  ]
+}

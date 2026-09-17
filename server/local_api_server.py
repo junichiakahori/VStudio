@@ -158,6 +158,7 @@ if "PORT" in os.environ:
 # ── データファイルパス定義 ──
 DATA_FILE = os.path.join(BASE_DIR, "data", "custom_idle_phrases.json")
 HIRAGANA_FILE = os.path.join(BASE_DIR, "data", "hiragana_data.json")
+PRONUNCIATION_MEMORY_FILE = os.path.join(BASE_DIR, "data", "pronunciation_memory.json")
 
 # ── ニュース原稿サーバーキャッシュ（重複リクエスト防止・10分保持・最大200件）──
 NEWS_SCRIPT_CACHE = {}  # { title_key: (result_dict, expire_timestamp) }
@@ -311,6 +312,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             '/api/news/get_all_urls': lambda: self._send_json(get_all_cached_urls()),
             '/api/youtube/oauth_status': lambda: self._send_json(youtube_api_helper.get_oauth_status()),
             '/api/youtube/auth_status': lambda: self._send_json(youtube_api_helper.get_oauth_status()),
+            '/api/pronunciation_memory': lambda: self._send_json(load_json(PRONUNCIATION_MEMORY_FILE, default={"records": []})),
         }
 
 
@@ -422,6 +424,78 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 from server.rule_tuner_service import tune_tts_rule
                 result = tune_tts_rule(instruction)
                 return self._send_json(result)
+
+            # ── 誤読記憶台帳の追加・更新 ──
+            if self.path == '/api/pronunciation_memory':
+                payload = self._read_json()
+                surface = payload.get('surface', '').strip()
+                reading = payload.get('reading', '').strip()
+                if not surface or not reading:
+                    return self._send_error("surface and reading are required", status=400)
+                wrong_reading = payload.get('wrong_reading', '').strip()
+                sample_sentence = payload.get('sample_sentence', '').strip() or f"{surface}についてお伝えします。"
+                note = payload.get('note', '').strip()
+                category = payload.get('category', 'custom_user')
+
+                mem_data = load_json(PRONUNCIATION_MEMORY_FILE, default={"version": "1.0", "records": []})
+                records = mem_data.setdefault("records", [])
+
+                # 既存エントリの更新または新規追加
+                updated = False
+                for r in records:
+                    if r.get("surface") == surface:
+                        r["reading"] = reading
+                        if wrong_reading:
+                            r["wrong_reading"] = wrong_reading
+                        if sample_sentence:
+                            r["sample_sentence"] = sample_sentence
+                        if note:
+                            r["note"] = note
+                        r["updated_date"] = datetime.datetime.now().strftime("%Y-%m-%d")
+                        updated = True
+                        break
+
+                if not updated:
+                    records.append({
+                        "id": f"rec_{int(time.time())}",
+                        "surface": surface,
+                        "reading": reading,
+                        "wrong_reading": wrong_reading,
+                        "sample_sentence": sample_sentence,
+                        "category": category,
+                        "registered_date": datetime.datetime.now().strftime("%Y-%m-%d"),
+                        "note": note
+                    })
+
+                save_json(PRONUNCIATION_MEMORY_FILE, mem_data)
+                return self._send_json({
+                    "status": "ok",
+                    "action": "updated" if updated else "added",
+                    "surface": surface,
+                    "reading": reading,
+                    "message": f"「{surface}」の読みを「{reading}」として記憶・保存しました。"
+                })
+
+            # ── 🌐 Webからの読み方自動解決 ──
+            if self.path == '/api/web_resolve_reading':
+                payload = self._read_json()
+                term = payload.get('term', '').strip()
+                if not term:
+                    return self._send_error("term is required", status=400)
+                from server.web_pronunciation_resolver import resolve_unknown_reading_online
+                reading = resolve_unknown_reading_online(term, auto_save=True)
+                if reading:
+                    return self._send_json({
+                        "status": "ok",
+                        "term": term,
+                        "reading": reading,
+                        "message": f"Web検索により「{term}」の読み方を「{reading}」と特定・記憶しました。"
+                    })
+                return self._send_json({
+                    "status": "not_found",
+                    "term": term,
+                    "message": f"「{term}」の読み方はWebから特定できませんでした。"
+                })
 
             # ── 残存漢字の一括ひらがな変換 ──
             if self.path == '/convert_remaining_kanji':

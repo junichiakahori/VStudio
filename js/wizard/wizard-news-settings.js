@@ -575,6 +575,7 @@
     // ニュース取得ボタン
     document.getElementById("wizard-fetch-news-btn")?.addEventListener("click", async () => {
       if (!window.openerWin) return;
+      syncWizardHiddenFromInputs();
       const btn = document.getElementById("wizard-fetch-news-btn");
       if (catSelect) localStorage.setItem("savedNewsCategory", catSelect.value);
       if (countSelect) localStorage.setItem("savedNewsCountSelect", countSelect.value);

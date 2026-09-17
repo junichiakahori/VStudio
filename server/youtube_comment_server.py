@@ -131,6 +131,16 @@ def save_user_cache():
 
 load_user_cache()
 
+def _extract_channel_name_from_html(html: str) -> Optional[str]:
+    """HTMLからog:titleまたはtitleタグのチャンネル名を抽出"""
+    og_match = re.search(r'<meta property="og:title" content="([^"]+)">', html)
+    if og_match:
+        return og_match.group(1).strip()
+    title_match = re.search(r'<title>([^<]+?)(?: - YouTube)?</title>', html)
+    if title_match:
+        return title_match.group(1).strip()
+    return None
+
 async def resolve_author_name(author_name: str, channel_id: str = None) -> str:
     """ハンドル名（例: @drone.akahori）や channel_id から YouTube チャンネル正式表示名（例: ドローン赤堀）を解決"""
     if not author_name:
@@ -163,21 +173,11 @@ async def resolve_author_name(author_name: str, channel_id: str = None) -> str:
 
     for target_url in urls_to_try:
         try:
-            def _fetch():
-                return requests.get(target_url, headers=headers, timeout=3).text
-            html = await asyncio.to_thread(_fetch)
-            og_match = re.search(r'<meta property="og:title" content="([^"]+)">', html)
-            if og_match:
-                candidate = og_match.group(1).strip()
-                if candidate and candidate != clean_handle:
-                    resolved_name = candidate
-                    break
-            title_match = re.search(r'<title>([^<]+?)(?: - YouTube)?</title>', html)
-            if title_match:
-                candidate = title_match.group(1).strip()
-                if candidate and candidate != clean_handle:
-                    resolved_name = candidate
-                    break
+            html = await asyncio.to_thread(lambda: requests.get(target_url, headers=headers, timeout=3).text)
+            candidate = _extract_channel_name_from_html(html)
+            if candidate and candidate != clean_handle:
+                resolved_name = candidate
+                break
         except Exception as e:
             logging.debug(f"Fetch channel title failed for {target_url}: {e}")
 
@@ -374,44 +374,51 @@ class ReactionItem:
         self.timestamp = int(time.time() * 1000)
 
 class VStudioChatProcessor(DefaultProcessor):
+    def _parse_action_item(self, action):
+        """単一のアクションを解析して ReactionItem または ChatItem を返す"""
+        if not action:
+            return None
+        if action.get('vstudioLiveReaction') is not None:
+            rx = action['vstudioLiveReaction']
+            return ReactionItem(emoji=rx.get('emoji', '❤️'), count=rx.get('count', 1))
+
+        if action.get('addChatItemAction') is None:
+            return None
+
+        item = action['addChatItemAction'].get('item')
+        chat = self._parse(item) if item else None
+        if chat:
+            return chat
+
+        try:
+            action_str = json.dumps(action, ensure_ascii=False)
+            found_emojis = re.findall(r'[❤️💖💕💓💗💘✨🌟🎉🥳👍😻🐾🔥🥰😍🙌⭐💯👏😭😂]', action_str)
+            is_reaction = found_emojis and any(k in action_str.lower() for k in ["viewerreaction", "livechatreaction", "reactionaction"])
+            if is_reaction:
+                emoji = found_emojis[0]
+                logging.info(f"[YouTube Live Reaction Raw Match] {emoji} (Payload: {action_str[:160]})")
+                return ReactionItem(emoji=emoji, count=1)
+            logging.debug(f"[YouTube Other Action] {action_str[:120]}")
+        except Exception as parse_err:
+            logging.debug(f"[YouTube Action Parse Err] {parse_err}")
+        return None
+
     def process(self, chat_components: list):
+        """YouTube Live Chat の未加工ペイロードから通常のコメントとライブリアクション（ハート等）を同時に抽出"""
         chatlist = []
         timeout = 0
         if not chat_components:
             return Chatdata(chatlist, float(timeout), self.abs_diff)
 
         for component in chat_components:
-            if component is None:
+            if not component:
                 continue
             timeout += component.get('timeout', 0)
-            chatdata = component.get('chatdata')
-            if not chatdata:
-                continue
-            for action in chatdata:
-                if action is None:
-                    continue
-                if action.get('vstudioLiveReaction') is not None:
-                    rx = action['vstudioLiveReaction']
-                    chatlist.append(ReactionItem(emoji=rx.get('emoji', '❤️'), count=rx.get('count', 1)))
-                elif action.get('addChatItemAction') is not None:
-                    item = action['addChatItemAction'].get('item')
-                    chat = self._parse(item) if item else None
-                    if chat:
-                        chatlist.append(chat)
-                    else:
-                        try:
-                            action_str = json.dumps(action, ensure_ascii=False)
-                            # 高評価(Like)や通知パネル等の無関係なイベントをハートリアクションとして誤検知しないようガード
-                            # 絵文字が明示的に含まれるリアクションイベント（例: viewerReaction, liveChatReaction）のみ対象とする
-                            found_emojis = re.findall(r'[❤️💖💕💓💗💘✨🌟🎉🥳👍😻🐾🔥🥰😍🙌⭐💯👏😭😂]', action_str)
-                            if found_emojis and any(k in action_str.lower() for k in ["viewerreaction", "livechatreaction", "reactionaction"]):
-                                emoji = found_emojis[0]
-                                logging.info(f"[YouTube Live Reaction Raw Match] {emoji} (Payload: {action_str[:160]})")
-                                chatlist.append(ReactionItem(emoji=emoji, count=1))
-                            else:
-                                logging.debug(f"[YouTube Other Action] {action_str[:120]}")
-                        except Exception as parse_err:
-                            logging.debug(f"[YouTube Action Parse Err] {parse_err}")
+            for action in component.get('chatdata') or []:
+                parsed = self._parse_action_item(action)
+                if parsed:
+                    chatlist.append(parsed)
+
         if self.first and chatlist:
             self.abs_diff = time.time() - (getattr(chatlist[0], 'timestamp', time.time() * 1000) / 1000)
             self.first = False
@@ -430,23 +437,25 @@ def get_authenticated_service():
         if os.path.exists(TOKEN_PATH):
             with open(TOKEN_PATH, 'rb') as token:
                 creds = pickle.load(token)
-                
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                try:
-                    creds.refresh(Request())
-                    with open(TOKEN_PATH, 'wb') as token:
-                        pickle.dump(creds, token)
-                except Exception as e:
-                    logging.warning(f"OAuth Token refresh failed: {e}. Removing stale token.")
-                    if os.path.exists(TOKEN_PATH):
-                        os.remove(TOKEN_PATH)
-                    return None
-            else:
-                logging.info("有効なトークンがないため、スクレイピングモードで即時起動します。")
-                return None
-                
-        return build('youtube', 'v3', credentials=creds)
+
+        if creds and creds.valid:
+            return build('youtube', 'v3', credentials=creds)
+
+        if not (creds and creds.expired and creds.refresh_token):
+            logging.info("有効なトークンがないため、スクレイピングモードで即時起動します。")
+            return None
+
+        # トークンの自動更新
+        try:
+            creds.refresh(Request())
+            with open(TOKEN_PATH, 'wb') as token:
+                pickle.dump(creds, token)
+            return build('youtube', 'v3', credentials=creds)
+        except Exception as e:
+            logging.warning(f"OAuth Token refresh failed: {e}. Removing stale token.")
+            if os.path.exists(TOKEN_PATH):
+                os.remove(TOKEN_PATH)
+            return None
     except Exception as e:
         logging.warning(f"YouTube OAuth initialization failed ({e}). Running in scraping mode.")
         return None
@@ -467,6 +476,27 @@ chat = None
 recent_comments = []
 comment_history = [] # 実際のメッセージJSONを保持する履歴 (最大100件)
 
+async def _dispatch_ws_message(data: dict, websocket):
+    """WebSocketメッセージの種類に応じたハンドラを呼び出し"""
+    msg_type = data.get('type')
+    video_id = data.get('video_id') or data.get('videoId')
+
+    if msg_type == 'connect_youtube' and video_id:
+        await start_youtube_client(video_id, websocket)
+        return
+    if msg_type == 'disconnect_youtube':
+        await stop_youtube_client()
+        return
+    if msg_type == 'end_youtube_stream' and video_id:
+        await handle_end_stream(video_id, websocket)
+        return
+    if msg_type == 'start_youtube_stream' and video_id:
+        await handle_start_stream(video_id, websocket)
+        return
+    if msg_type == 'check_stream_status' and video_id:
+        await check_youtube_stream_status(video_id, websocket)
+        return
+
 async def ws_handler(websocket):
     """WebSocketのハンドラ。ブラウザからの接続を受け付ける"""
     connected_clients.add(websocket)
@@ -474,24 +504,7 @@ async def ws_handler(websocket):
     try:
         async for message in websocket:
             data = json.loads(message)
-            if data.get('type') == 'connect_youtube':
-                video_id = data.get('video_id')
-                if video_id:
-                    await start_youtube_client(video_id, websocket)
-            elif data.get('type') == 'disconnect_youtube':
-                await stop_youtube_client()
-            elif data.get('type') == 'end_youtube_stream':
-                video_id = data.get('videoId')
-                if video_id:
-                    await handle_end_stream(video_id, websocket)
-            elif data.get('type') == 'start_youtube_stream':
-                video_id = data.get('videoId')
-                if video_id:
-                    await handle_start_stream(video_id, websocket)
-            elif data.get('type') == 'check_stream_status':
-                video_id = data.get('videoId')
-                if video_id:
-                    await check_youtube_stream_status(video_id, websocket)
+            await _dispatch_ws_message(data, websocket)
     except websockets.exceptions.ConnectionClosed:
         logging.info(f"WebSocket client disconnected: {websocket.remote_address}")
     finally:
@@ -605,123 +618,135 @@ async def send_history(websocket):
         except websockets.exceptions.ConnectionClosed:
             break
 
+def parse_youtube_html_stats(html: str):
+    """YouTube HTMLソースから (concurrent_viewers, total_views, likes, subscribers) を高精度抽出"""
+    concurrent_viewers = ""
+    total_views = ""
+    subscribers = ""
+    likes = ""
+
+    # 1. ytInitialPlayerResponse から再生数・高評価を抽出
+    player_match = re.search(r'ytInitialPlayerResponse\s*=\s*(\{.*?\});(?:var|</script>)', html)
+    if player_match:
+        try:
+            player = json.loads(player_match.group(1))
+            videoDetails = player.get("videoDetails", {})
+            raw_vc = videoDetails.get("viewCount")
+            if raw_vc is not None and str(raw_vc).isdigit():
+                total_views = f"{int(raw_vc):,}"
+
+            # microformat からのフォールバック
+            mf = player.get("microformat", {}).get("playerMicroformatRenderer", {})
+            if not total_views and mf.get("viewCount") is not None and str(mf.get("viewCount")).isdigit():
+                total_views = f"{int(mf['viewCount']):,}"
+            if not likes and "likeCount" in mf:
+                likes = f"{int(mf['likeCount']):,}"
+        except Exception as pe:
+            logging.debug(f"ytInitialPlayerResponse parse error: {pe}")
+
+    # 2. 同接・再生数を抽出
+    patterns = [
+        r'\"runs\":\s*\[\s*\{\"text\":\s*\"([\d,]+)\"\s*\}\s*,\s*\{\"text\":\s*\"\s*(?:人が視聴中|人が待機しています)\"',
+        r'\"runs\":\s*\[\s*\{\"text\":\s*\"([\d,]+)\s*(?:人が視聴中|人が待機しています)\"',
+        r'\"simpleText\":\s*\"([\d,]+)\s*(?:人が視聴中|人が待機しています)\"'
+    ]
+    for pat in patterns:
+        m = re.search(pat, html)
+        if m:
+            concurrent_viewers = m.group(1)
+            break
+
+    if not total_views:
+        orig_m = re.search(r'\"originalViewCount\":\s*\"?(\d+)\"?', html)
+        if orig_m:
+            total_views = f"{int(orig_m.group(1)):,}"
+
+    # 3. 高評価の抽出
+    if not likes:
+        like_lbl_m = re.search(r'\"accessibilityData\":\{\"label\":\"([\d,]+)\s*(?:件の|人による)?高評価\"\}', html)
+        like_cnt_m = re.search(r'\"likeCount\":\s*\"?(\d+)\"?', html)
+        if like_lbl_m:
+            likes = like_lbl_m.group(1)
+        elif like_cnt_m:
+            likes = f"{int(like_cnt_m.group(1)):,}"
+
+    # 4. チャンネル登録者数の抽出
+    if not subscribers:
+        sub_sec_m = re.search(r'\"videoSecondaryInfoRenderer\":.*?\"subscriberCountText\":\s*\{.*?\"label\":\s*\"([^\"]+)\"', html, re.DOTALL)
+        sub_m1 = re.search(r'\"subscriberCountText\":\s*\{.*?\"label\":\s*\"([^\"]+)\"', html)
+        if sub_sec_m:
+            subscribers = sub_sec_m.group(1)
+        elif sub_m1:
+            subscribers = sub_m1.group(1)
+
+    return concurrent_viewers, total_views, likes, subscribers
+
+async def _update_live_stats(url: str, headers: dict, video_id: str, stats_state: dict):
+    """単一回のLive統計情報取得とクライアントへの配信"""
+    try:
+        html = await asyncio.to_thread(lambda: requests.get(url, headers=headers, timeout=8).text)
+        c_v, t_v, l_k, s_b = parse_youtube_html_stats(html)
+        if c_v:
+            stats_state["viewers"] = c_v
+        if t_v:
+            stats_state["totalViews"] = t_v
+        if l_k:
+            stats_state["likes"] = l_k
+        if s_b:
+            stats_state["subscribers"] = s_b
+    except Exception as e:
+        logging.error(f"Error fetching stats via scraping: {e}")
+
+    cv_display = stats_state.get("viewers") or "-"
+    tv_display = stats_state.get("totalViews") or "-"
+    likes_display = stats_state.get("likes") or "-"
+    sub_display = stats_state.get("subscribers") or "-"
+
+    logging.info(f"📊 [YouTube Live 統計] 👁️ 同接: {cv_display} | ▶️ 累計再生数: {tv_display} | 👍 高評価: {likes_display} | 👤 登録者数: {sub_display} (動画ID: {video_id})")
+
+    await broadcast_to_clients({
+        "type": "stats",
+        "videoId": video_id,
+        "viewers": cv_display,
+        "concurrentViewers": cv_display,
+        "totalViews": tv_display,
+        "subscribers": sub_display,
+        "likes": likes_display
+    })
+
 async def fetch_live_stats_loop(video_id):
-    """
-    配信中の同時接続者数・高評価数・チャンネル登録者数を定期更新するループタスク
-    """
-    global _youtube_quota_exceeded_until
-    
+    """YouTube Liveのリアルタイム統計（同接、再生数、高評価、登録者数）を定期取得してWebSocketクライアントに配信"""
+    logging.info(f"Starting YouTube Live stats loop for video: {video_id}")
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "ja,en-US;q=0.9,en;q=0.8"
+    }
+
+    stats_state = {"viewers": "", "totalViews": "", "likes": "", "subscribers": ""}
+
     try:
         while current_video_id == video_id:
-            viewers = ""
-            concurrent_viewers = ""
-            total_views = ""
-            subscribers = ""
-            likes = ""
-
-            # 🛡️ 【YouTube API クォータ完全保護（永久温存設計）】
-            # 10秒ごとのリアルタイム統計取得（同接・再生数・高評価・登録者数）で貴重なAPI枠(1日10,000ユニット)を
-            # 浪費しないため、クォータ消費ゼロの「Webスクレイピング方式」を100%専任で活用します。
-            url = f"https://www.youtube.com/watch?v={video_id}"
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept-Language": "ja,en-US;q=0.9,en;q=0.8"
-            }
-
-            try:
-                html = await asyncio.to_thread(lambda: requests.get(url, headers=headers, timeout=8).text)
-                
-                # 1. 対象動画自身の ytInitialPlayerResponse を解析（再生数・高評価の確実な情報源）
-                player_match = re.search(r'ytInitialPlayerResponse\s*=\s*(\{.*?\});(?:var|</script>)', html)
-                if player_match:
-                    try:
-                        player = json.loads(player_match.group(1))
-                        videoDetails = player.get("videoDetails", {})
-                        raw_vc = videoDetails.get("viewCount")
-                        if raw_vc is not None and str(raw_vc).isdigit():
-                            total_views = f"{int(raw_vc):,}"
-                        
-                        # microformat からのフォールバック
-                        mf = player.get("microformat", {}).get("playerMicroformatRenderer", {})
-                        if not total_views:
-                            mf_vc = mf.get("viewCount")
-                            if mf_vc is not None and str(mf_vc).isdigit():
-                                total_views = f"{int(mf_vc):,}"
-                        if not likes and "likeCount" in mf:
-                            likes = f"{int(mf['likeCount']):,}"
-                    except Exception as pe:
-                        logging.debug(f"ytInitialPlayerResponse parse error: {pe}")
-
-                # 2. 対象動画自身の videoViewCountRenderer をピンポイント解析（おすすめ動画欄の誤爆を100%防止）
-                vvcr_match = re.search(r'\"videoViewCountRenderer\":\s*(\{.*?\}(?=\}\}\}))', html)
-                if vvcr_match:
-                    try:
-                        vvcr_text = vvcr_match.group(1)
-                        # 「12 人が視聴中」または「1 人が待機しています」
-                        live_run_match = re.search(r'\"runs\":\s*\[\s*\{\"text\":\s*\"([\d,]+)\"\s*\}\s*,\s*\{\"text\":\s*\"\s*(?:人が視聴中|人が待機しています)\"', vvcr_text)
-                        if live_run_match:
-                            concurrent_viewers = live_run_match.group(1)
-                        else:
-                            single_run = re.search(r'\"runs\":\s*\[\s*\{\"text\":\s*\"([\d,]+)\s*(?:人が視聴中|人が待機しています)\"', vvcr_text)
-                            if single_run:
-                                concurrent_viewers = single_run.group(1)
-                            else:
-                                simple_m = re.search(r'\"simpleText\":\s*\"([\d,]+)\s*(?:人が視聴中|人が待機しています)\"', vvcr_text)
-                                if simple_m:
-                                    concurrent_viewers = simple_m.group(1)
-                        
-                        # originalViewCount がある場合（動画の再生数）
-                        if not total_views:
-                            orig_m = re.search(r'\"originalViewCount\":\s*\"?(\d+)\"?', vvcr_text)
-                            if orig_m:
-                                total_views = f"{int(orig_m.group(1)):,}"
-                    except Exception as ve:
-                        logging.debug(f"videoViewCountRenderer parse error: {ve}")
-
-                # 3. 高評価の抽出（未取得時のみ、動画アクションボタンから抽出）
-                if not likes:
-                    like_lbl_match = re.search(r'\"accessibilityData\":\{\"label\":\"([\d,]+)\s*(?:件の|人による)?高評価\"\}', html)
-                    if like_lbl_match:
-                        likes = like_lbl_match.group(1)
-                    else:
-                        like_cnt_match = re.search(r'\"likeCount\":\s*\"?(\d+)\"?', html)
-                        if like_cnt_match:
-                            likes = f"{int(like_cnt_match.group(1)):,}"
-
-                # 4. チャンネル登録者数の抽出
-                if not subscribers:
-                    sub_sec_match = re.search(r'\"videoSecondaryInfoRenderer\":.*?\"subscriberCountText\":\{.*?\"label\":\"([^\"]+)\"', html)
-                    if sub_sec_match:
-                        subscribers = sub_sec_match.group(1)
-                    else:
-                        sub_match1 = re.search(r'\"subscriberCountText\":\{.*?\"label\":\"([^\"]+)\"', html)
-                        if sub_match1:
-                            subscribers = sub_match1.group(1)
-            except Exception as e:
-                logging.error(f"Error fetching stats via scraping: {e}")
-
-            cv_display = concurrent_viewers or viewers or "-"
-            tv_display = total_views or "-"
-            if not viewers:
-                viewers = "-"
-            if not likes:
-                likes = "-"
-
-            logging.info(f"📊 [YouTube Live 統計] 👁️ 同接: {cv_display} | ▶️ 累計再生数: {tv_display} | 👍 高評価: {likes} | 👤 登録者数: {subscribers} (動画ID: {video_id})")
-
-            await broadcast_to_clients({
-                "type": "stats",
-                "videoId": video_id,
-                "viewers": cv_display,
-                "concurrentViewers": cv_display,
-                "totalViews": tv_display,
-                "subscribers": subscribers,
-                "likes": likes
-            })
-                
+            await _update_live_stats(url, headers, video_id, stats_state)
             await asyncio.sleep(10) # 10秒ごとに更新
     except asyncio.CancelledError:
         pass
+
+def _detect_broadcast_via_api(client) -> Optional[tuple[str, str]]:
+    """YouTube APIから進行中または準備完了の配信枠を検出"""
+    if not client:
+        return None
+    try:
+        b_req = client.liveBroadcasts().list(part="id,status", mine=True, maxResults=10)
+        b_res = b_req.execute()
+        for b in b_res.get("items", []):
+            st = b.get("status", {}).get("lifeCycleStatus")
+            if st in ["live", "testStarting", "liveStarting", "ready"]:
+                logging.info(f"[AutoDetect] Found active broadcast via API: {b['id']} ({st})")
+                return b["id"], f"Authenticated Live Stream: {b['id']} ({st})"
+    except Exception as e:
+        logging.debug(f"API live broadcast check: {e}")
+    return None
 
 def resolve_youtube_video_id(input_str: str) -> tuple[str, str]:
     """
@@ -739,16 +764,9 @@ def resolve_youtube_video_id(input_str: str) -> tuple[str, str]:
     # 0. API認証済みの場合、進行中/予約枠から自動解決
     global youtube_api_client
     if youtube_api_client and (input_str.startswith("@") or len(input_str) != 11):
-        try:
-            b_req = youtube_api_client.liveBroadcasts().list(part="id,status", mine=True, maxResults=10)
-            b_res = b_req.execute()
-            for b in b_res.get("items", []):
-                st = b.get("status", {}).get("lifeCycleStatus")
-                if st in ["live", "testStarting", "liveStarting", "ready"]:
-                    logging.info(f"[AutoDetect] Found active broadcast via API: {b['id']} ({st})")
-                    return b["id"], f"Authenticated Live Stream: {b['id']} ({st})"
-        except Exception as e:
-            logging.debug(f"API live broadcast check: {e}")
+        detected = _detect_broadcast_via_api(youtube_api_client)
+        if detected:
+            return detected
 
     # 2. 通常の動画URL（watch?v=... / youtu.be/... / live/...）
     v_match = re.search(r'(?:v=|\/live\/|\/embed\/|youtu\.be\/)([a-zA-Z0-9_-]{11})', input_str)
@@ -834,6 +852,218 @@ async def start_youtube_client(video_id_or_channel: str, websocket):
         await send_history(websocket)
         return
 
+async def _parse_scraped_chat_action(action: dict) -> Optional[tuple[str, dict]]:
+    """スクレイピングされた単一チャットアクションからコメントデータを抽出"""
+    item = action.get("addChatItemAction", {}).get("item", {})
+    if "liveChatTextMessageRenderer" not in item:
+        return None
+    renderer = item["liveChatTextMessageRenderer"]
+    raw_author = renderer.get("authorName", {}).get("simpleText", "")
+    ch_id = renderer.get("authorExternalChannelId", "")
+    author = await resolve_author_name(raw_author, ch_id)
+    message = "".join([r.get("text", "") for r in renderer.get("message", {}).get("runs", [])])
+    icon_url = ""
+    thumbnails = renderer.get("authorPhoto", {}).get("thumbnails", [])
+    if thumbnails:
+        icon_url = thumbnails[0].get("url", "")
+    comment_sig = f"{author}:{message}"
+    msg = {
+        "type": "comment",
+        "nickname": author,
+        "comment": message,
+        "iconUrl": icon_url
+    }
+    return comment_sig, msg
+
+async def _load_initial_chat_history(video_id: str, websocket):
+    """初期接続時に直近のチャット履歴をスクレイピングして送信"""
+    chat_url = f"https://www.youtube.com/live_chat?is_popout=1&v={video_id}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
+    }
+    try:
+        html = await asyncio.to_thread(lambda: requests.get(chat_url, headers=headers, timeout=10).text)
+        match = re.search(r'window\["ytInitialData"\]\s*=\s*(\{.*?\});\s*</script>', html)
+        if not match:
+            logging.warning("ytInitialData not found during initial scrape.")
+            return
+
+        data = json.loads(match.group(1))
+        actions = data.get("contents", {}).get("liveChatRenderer", {}).get("actions", [])
+        for action in actions:
+            parsed = await _parse_scraped_chat_action(action)
+            if parsed:
+                comment_sig, msg = parsed
+                recent_comments.append(comment_sig)
+                comment_history.append(msg)
+
+        logging.info(f"Scraped {len(comment_history)} initial comments from history.")
+        await send_history(websocket)
+    except Exception as e:
+        logging.error(f"Error scraping initial history: {e}")
+
+def safe_terminate_chat(chat_obj):
+    """pytchat インスタンスを安全に終了"""
+    if not chat_obj:
+        return
+    try:
+        chat_obj.terminate()
+    except Exception:
+        pass
+
+async def _create_pytchat_session(video_id, loop):
+    """pytchatセッションの生成を非同期実行"""
+    import httpx
+    timeout_cfg = httpx.Timeout(10.0, connect=10.0)
+    return await asyncio.wait_for(
+        loop.run_in_executor(
+            None, 
+            lambda: pytchat.create(
+                video_id=video_id, 
+                processor=VStudioChatProcessor(),
+                interruptable=False, 
+                client=httpx.Client(timeout=timeout_cfg, http2=False)
+            )
+        ),
+        timeout=15.0
+    )
+
+async def _ensure_chat_session(video_id, loop, current_chat, status_tracker):
+    """pytchatセッションが有効であることを確認し、未接続なら接続を試みる"""
+    if current_chat is not None and current_chat.is_alive():
+        return current_chat
+
+    new_chat = None
+    try:
+        new_chat = await _create_pytchat_session(video_id, loop)
+        if new_chat.is_alive():
+            if status_tracker.get("last_status") != "connected":
+                status_tracker["last_status"] = "connected"
+                await broadcast_to_clients({
+                    "type": "status",
+                    "status": "connected",
+                    "message": f"Connected to YouTube Live (ID: {video_id})"
+                })
+            return new_chat
+
+        if status_tracker.get("last_status") != "waiting":
+            status_tracker["last_status"] = "waiting"
+            await broadcast_to_clients({
+                "type": "status",
+                "status": "waiting",
+                "message": f"待機中... 配信開始またはチャットの有効化を待っています (ID: {video_id})"
+            })
+    except asyncio.TimeoutError:
+        logging.warning(f"pytchat creation timed out (15s) ➔ will retry (ID: {video_id})")
+    except Exception as e:
+        logging.warning(f"pytchat creation failed (might not be live yet): {e}")
+        if status_tracker.get("last_status") != "waiting":
+            status_tracker["last_status"] = "waiting"
+            await broadcast_to_clients({
+                "type": "status",
+                "status": "waiting",
+                "message": f"待機中... 配信開始またはチャットの有効化を待っています (ID: {video_id})"
+            })
+    return new_chat
+
+async def _handle_single_live_chat_item(c, recent_comments, comment_history, current_video_id):
+    """1件のチャットまたはリアクションアイテムを処理"""
+    # ライブリアクション (YouTube Live Reactions)
+    if getattr(c, 'type', None) == 'reaction':
+        logging.info(f"[YouTube Live Reaction] {c.emoji} x {c.count} ({c.nickname})")
+        await broadcast_to_clients({
+            "type": "reaction",
+            "emoji": c.emoji,
+            "nickname": c.nickname,
+            "count": c.count
+        })
+        return
+
+    # 投稿者表示名（ハンドル名からチャンネル正式名）の解決
+    author_disp = await resolve_author_name(c.author.name, getattr(c.author, 'channelId', None))
+    comment_sig = f"{author_disp}:{c.message}"
+    if comment_sig in recent_comments:
+        return
+
+    recent_comments.append(comment_sig)
+    if len(recent_comments) > 100:
+        recent_comments.pop(0)
+
+    logging.info(f"[YouTube] {author_disp}: {c.message}")
+
+    if c.amountValue > 0:
+        logging.info(f"[SuperChat] {author_disp} sent {c.amountString}")
+        gift_msg = {
+            "type": "gift",
+            "nickname": author_disp,
+            "amount": c.amountString,
+            "iconUrl": c.author.imageUrl
+        }
+        comment_history.append(gift_msg)
+        if len(comment_history) > 100:
+            comment_history.pop(0)
+        await broadcast_to_clients(gift_msg)
+
+    clean_msg = decode_youtube_emojis(c.message)
+    crm_info = record_listener_comment(
+        platform="youtube",
+        user_id=getattr(c.author, 'channelId', None) or author_disp,
+        display_name=author_disp,
+        handle=getattr(c.author, 'name', '') if str(getattr(c.author, 'name', '')).startswith('@') else '',
+        comment=clean_msg,
+        stream_id=current_video_id,
+        is_superchat=(c.amountValue > 0),
+        amount=c.amountString
+    )
+    comment_msg = {
+        "type": "comment",
+        "nickname": author_disp,
+        "comment": clean_msg,
+        "iconUrl": c.author.imageUrl,
+        "isFirstTime": crm_info.get("isFirstTime", False),
+        "visitDaysCount": crm_info.get("visitDaysCount", 1)
+    }
+    comment_history.append(comment_msg)
+    if len(comment_history) > 100:
+        comment_history.pop(0)
+    await broadcast_to_clients(comment_msg)
+
+    # リアクション絵文字の検知とブロードキャスト
+    rx_emojis = re.findall(r'[❤️💖💕💓💗💘✨🌟🎉🥳👍😻🐾🔥🥰😍🙌⭐💯👏]', c.message)
+    if rx_emojis:
+        await broadcast_to_clients({
+            "type": "reaction",
+            "emoji": rx_emojis[0],
+            "nickname": author_disp,
+            "count": len(rx_emojis)
+        })
+
+async def _poll_chat_once(local_chat, loop, video_id, recent_comments, comment_history):
+    """1回のチャットデータ取得と処理"""
+    try:
+        chat_data = await asyncio.wait_for(
+            loop.run_in_executor(None, local_chat.get),
+            timeout=12.0
+        )
+        for c in chat_data.sync_items():
+            await _handle_single_live_chat_item(c, recent_comments, comment_history, video_id)
+        await asyncio.sleep(1)
+        return local_chat
+    except asyncio.TimeoutError:
+        logging.warning(f"[YouTube] チャット取得タイムアウト (12秒) ➔ 接続切断を検知し再接続します (ID: {video_id})")
+        safe_terminate_chat(local_chat)
+        await asyncio.sleep(3)
+        return None
+    except Exception as e:
+        logging.error(f"Chat fetch error: {e}")
+        safe_terminate_chat(local_chat)
+        await asyncio.sleep(5)
+        return None
+
+async def start_youtube_client(video_id, websocket=None):
+    """YouTubeのコメント取得クライアントを開始"""
+    global chat_task, stats_task, current_video_id
     # 既存の接続・統計タスクを確実に停止
     await stop_youtube_client(broadcast=False)
 
@@ -843,48 +1073,8 @@ async def start_youtube_client(video_id_or_channel: str, websocket):
     logging.info(f"Connecting to YouTube Live video: {video_id}")
     current_video_id = video_id
     
-    # --- ここで初期履歴をスクレイピング ---
-    try:
-        chat_url = f"https://www.youtube.com/live_chat?is_popout=1&v={video_id}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9"
-        }
-        html = requests.get(chat_url, headers=headers, timeout=10).text
-        match = re.search(r'window\["ytInitialData"\]\s*=\s*(\{.*?\});\s*</script>', html)
-        if match:
-            data = json.loads(match.group(1))
-            actions = data.get("contents", {}).get("liveChatRenderer", {}).get("actions", [])
-            for action in actions:
-                item = action.get("addChatItemAction", {}).get("item", {})
-                if "liveChatTextMessageRenderer" in item:
-                    renderer = item["liveChatTextMessageRenderer"]
-                    raw_author = renderer.get("authorName", {}).get("simpleText", "")
-                    ch_id = renderer.get("authorExternalChannelId", "")
-                    author = await resolve_author_name(raw_author, ch_id)
-                    message = "".join([r.get("text", "") for r in renderer.get("message", {}).get("runs", [])])
-                    icon_url = ""
-                    thumbnails = renderer.get("authorPhoto", {}).get("thumbnails", [])
-                    if thumbnails:
-                        icon_url = thumbnails[0].get("url", "")
-                    
-                    comment_sig = f"{author}:{message}"
-                    recent_comments.append(comment_sig)
-                    msg = {
-                        "type": "comment",
-                        "nickname": author,
-                        "comment": message,
-                        "iconUrl": icon_url
-                    }
-                    comment_history.append(msg)
-            
-            logging.info(f"Scraped {len(comment_history)} initial comments from history.")
-            await send_history(websocket)
-        else:
-            logging.warning("ytInitialData not found during initial scrape.")
-    except Exception as e:
-        logging.error(f"Error scraping initial history: {e}")
-    # ----------------------------------
+    # --- 初期履歴をスクレイピング ---
+    await _load_initial_chat_history(video_id, websocket)
 
     await broadcast_to_clients({
         "type": "status",
@@ -893,162 +1083,23 @@ async def start_youtube_client(video_id_or_channel: str, websocket):
     })
 
     async def fetch_chat():
-        global recent_comments, comment_history, chat_task, current_video_id
         local_chat = None
-        last_status_sent = None
+        status_tracker = {"last_status": None}
+        loop = asyncio.get_event_loop()
+
         try:
-            loop = asyncio.get_event_loop()
             while chat_task is not None and current_video_id == video_id:
+                local_chat = await _ensure_chat_session(video_id, loop, local_chat, status_tracker)
                 if local_chat is None or not local_chat.is_alive():
-                    try:
-                        import httpx
-                        timeout_cfg = httpx.Timeout(10.0, connect=10.0)
-                        local_chat = await asyncio.wait_for(
-                            loop.run_in_executor(
-                                None, 
-                                lambda: pytchat.create(
-                                    video_id=video_id, 
-                                    processor=VStudioChatProcessor(),
-                                    interruptable=False, 
-                                    client=httpx.Client(timeout=timeout_cfg, http2=False)
-                                )
-                            ),
-                            timeout=15.0
-                        )
-                        if local_chat.is_alive():
-                            if last_status_sent != "connected":
-                                last_status_sent = "connected"
-                                await broadcast_to_clients({
-                                    "type": "status",
-                                    "status": "connected",
-                                    "message": f"Connected to YouTube Live (ID: {video_id})"
-                                })
-                        else:
-                            if last_status_sent != "waiting":
-                                last_status_sent = "waiting"
-                                await broadcast_to_clients({
-                                    "type": "status",
-                                    "status": "waiting",
-                                    "message": f"待機中... 配信開始またはチャットの有効化を待っています (ID: {video_id})"
-                                })
-                    except asyncio.TimeoutError:
-                        logging.warning(f"pytchat creation timed out (15s) ➔ will retry (ID: {video_id})")
-                        local_chat = None
-                    except Exception as e:
-                        logging.warning(f"pytchat creation failed (might not be live yet): {e}")
-                        local_chat = None
-                        if last_status_sent != "waiting":
-                            last_status_sent = "waiting"
-                            await broadcast_to_clients({
-                                "type": "status",
-                                "status": "waiting",
-                                "message": f"待機中... 配信開始またはチャットの有効化を待っています (ID: {video_id})"
-                            })
-                    
-                    if local_chat is None or not local_chat.is_alive():
-                        await asyncio.sleep(10) # 10秒ごとに再試行
-                        continue
-
-                try:
-                    chat_data = await asyncio.wait_for(
-                        loop.run_in_executor(None, local_chat.get),
-                        timeout=12.0
-                    )
-                    for c in chat_data.sync_items():
-                        # ライブリアクション (YouTube Live Reactions)
-                        if getattr(c, 'type', None) == 'reaction':
-                            logging.info(f"[YouTube Live Reaction] {c.emoji} x {c.count} ({c.nickname})")
-                            await broadcast_to_clients({
-                                "type": "reaction",
-                                "emoji": c.emoji,
-                                "nickname": c.nickname,
-                                "count": c.count
-                            })
-                            continue
-
-                        # 投稿者表示名（ハンドル名からチャンネル正式名）の解決
-                        author_disp = await resolve_author_name(c.author.name, getattr(c.author, 'channelId', None))
-                        comment_sig = f"{author_disp}:{c.message}"
-                        if comment_sig in recent_comments:
-                            continue
-                        
-                        recent_comments.append(comment_sig)
-                        if len(recent_comments) > 100:
-                            recent_comments.pop(0)
-
-                        logging.info(f"[YouTube] {author_disp}: {c.message}")
-                        
-                        if c.amountValue > 0:
-                            logging.info(f"[SuperChat] {author_disp} sent {c.amountString}")
-                            msg = {
-                                "type": "gift",
-                                "nickname": author_disp,
-                                "amount": c.amountString,
-                                "iconUrl": c.author.imageUrl
-                            }
-                            comment_history.append(msg)
-                            if len(comment_history) > 100: comment_history.pop(0)
-                            await broadcast_to_clients(msg)
-                        
-                        clean_msg = decode_youtube_emojis(c.message)
-                        crm_info = record_listener_comment(
-                            platform="youtube",
-                            user_id=getattr(c.author, 'channelId', None) or author_disp,
-                            display_name=author_disp,
-                            handle=getattr(c.author, 'name', '') if str(getattr(c.author, 'name', '')).startswith('@') else '',
-                            comment=clean_msg,
-                            stream_id=current_video_id,
-                            is_superchat=(c.amountValue > 0),
-                            amount=c.amountString
-                        )
-                        msg = {
-                            "type": "comment",
-                            "nickname": author_disp,
-                            "comment": clean_msg,
-                            "iconUrl": c.author.imageUrl,
-                            "isFirstTime": crm_info.get("isFirstTime", False),
-                            "visitDaysCount": crm_info.get("visitDaysCount", 1)
-                        }
-                        comment_history.append(msg)
-                        if len(comment_history) > 100: comment_history.pop(0)
-                        await broadcast_to_clients(msg)
-
-                        # リアクション絵文字の検知とブロードキャスト
-                        rx_emojis = re.findall(r'[❤️💖💕💓💗💘✨🌟🎉🥳👍😻🐾🔥🥰😍🙌⭐💯👏]', c.message)
-                        if rx_emojis:
-                            await broadcast_to_clients({
-                                "type": "reaction",
-                                "emoji": rx_emojis[0],
-                                "nickname": author_disp,
-                                "count": len(rx_emojis)
-                            })
-                    
-                    await asyncio.sleep(1) # wait 1 second before polling again
-                except asyncio.TimeoutError:
-                    logging.warning(f"[YouTube] チャット取得タイムアウト (12秒) ➔ 接続切断を検知しセッションを再生成します (ID: {video_id})")
-                    try:
-                        if local_chat:
-                            local_chat.terminate()
-                    except Exception:
-                        pass
-                    local_chat = None
-                    await asyncio.sleep(3)
-                except Exception as e:
-                    logging.error(f"Chat fetch error: {e}")
-                    try:
-                        if local_chat:
-                            local_chat.terminate()
-                    except Exception:
-                        pass
-                    local_chat = None # エラー時は次回ループで再接続
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(10)
+                    continue
+                local_chat = await _poll_chat_once(local_chat, loop, video_id, recent_comments, comment_history)
         except asyncio.CancelledError:
             pass
         except Exception as e:
             logging.error(f"Chat loop fatal error: {e}")
 
     chat_task = asyncio.create_task(fetch_chat())
-    global stats_task
     stats_task = asyncio.create_task(fetch_live_stats_loop(video_id))
 
 async def stop_youtube_client(broadcast=True):
@@ -1073,25 +1124,37 @@ async def stop_youtube_client(broadcast=True):
             "message": "Disconnected from YouTube Live"
         })
 
+def _extract_port_from_arg(arg: str, next_arg: Optional[str]) -> Optional[int]:
+    """引数からポート番号の候補を抽出"""
+    val_str = None
+    if arg == "--port" and next_arg:
+        val_str = next_arg
+    elif arg.startswith("--port="):
+        val_str = arg.split("=", 1)[1]
+    if not val_str:
+        return None
+    try:
+        return int(val_str)
+    except ValueError:
+        return None
+
+def _parse_cli_port(argv: list, env: dict, default_port: int = 8768) -> int:
+    """コマンドライン引数および環境変数からポート番号をパース"""
+    port = default_port
+    for i, arg in enumerate(argv):
+        next_arg = argv[i + 1] if i + 1 < len(argv) else None
+        p = _extract_port_from_arg(arg, next_arg)
+        if p is not None:
+            port = p
+
+    env_port = env.get("PORT")
+    if env_port and env_port.isdigit():
+        port = int(env_port)
+    return port
+
 async def main():
     host = "localhost"
-    port = 8768
-    for _i, _arg in enumerate(sys.argv):
-        if _arg == "--port" and _i + 1 < len(sys.argv):
-            try:
-                port = int(sys.argv[_i + 1])
-            except ValueError:
-                pass
-        elif _arg.startswith("--port="):
-            try:
-                port = int(_arg.split("=", 1)[1])
-            except ValueError:
-                pass
-    if "PORT" in os.environ:
-        try:
-            port = int(os.environ["PORT"])
-        except ValueError:
-            pass
+    port = _parse_cli_port(sys.argv, os.environ, default_port=8768)
     logging.info(f"Starting YouTube WebSocket server on ws://{host}:{port}")
     
     server = await websockets.serve(ws_handler, host, port)

@@ -136,10 +136,12 @@ def is_plausible_reading(term, yomi):
         return True
 
     # 3〜4文字の漢字ブロック（人名フルネーム候補: 角田裕毅, 麻生太郎, 悠仁さま等）
-    # ※人名は音訓や名乗りが極めて多様なため、妥当な文字数比率（3〜8文字程度）かつ既知の異常単語でなければ許容
-    if len(term) in (3, 4) and len(kanji_chars) == len(term):
+    # ※一般熟語（末尾が「金」「部」「的」「性」「化」「法」「案」等）は人名ではないため除外
+    if len(term) in (3, 4, 5) and len(kanji_chars) == len(term):
+        if term[-1] in "金部的人化法案賞権率線点戦界隊団機館所署室駅":
+            return False
         if 3 <= len(yomi) <= len(term) * 2.5:
-            SUSPICIOUS_WORDS = {"すもう", "ふな", "ぐらんぷり", "おりこん", "へいさ", "うんよう", "しけん"}
+            SUSPICIOUS_WORDS = {"すもう", "ふな", "ぐらんぷり", "おりこん", "へいさ", "うんよう", "しけん", "しょと", "ふも"}
             if not any(sw in yomi for sw in SUSPICIOUS_WORDS):
                 return True
 
@@ -147,9 +149,13 @@ def is_plausible_reading(term, yomi):
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TTS_RULES_PATH = os.path.join(BASE_DIR, "data", "tts_rules.json")
+PRONUNCIATION_MEMORY_PATH = os.path.join(BASE_DIR, "data", "pronunciation_memory.json")
 
 _tts_rules_cache = None
 _tts_rules_mtime = 0
+
+_pronunciation_memory_cache = None
+_pronunciation_memory_mtime = 0
 
 def load_tts_rules():
     """data/tts_rules.json を自動ロード（ファイルの更新を検知して動的リロード）"""
@@ -168,6 +174,51 @@ def load_tts_rules():
         if _tts_rules_cache is None:
             _tts_rules_cache = {}
     return _tts_rules_cache or {}
+
+def load_pronunciation_memory():
+    """data/pronunciation_memory.json を自動ロード（ファイルの更新を検知して動的リロード）"""
+    global _pronunciation_memory_cache, _pronunciation_memory_mtime
+    try:
+        if os.path.exists(PRONUNCIATION_MEMORY_PATH):
+            mtime = os.path.getmtime(PRONUNCIATION_MEMORY_PATH)
+            if _pronunciation_memory_cache is None or mtime != _pronunciation_memory_mtime:
+                with open(PRONUNCIATION_MEMORY_PATH, "r", encoding="utf-8") as f:
+                    _pronunciation_memory_cache = json.load(f)
+                _pronunciation_memory_mtime = mtime
+        else:
+            _pronunciation_memory_cache = {"records": []}
+    except Exception as e:
+        print(f"[Pronunciation Memory] ロード失敗: {e}", flush=True)
+        if _pronunciation_memory_cache is None:
+            _pronunciation_memory_cache = {"records": []}
+    return _pronunciation_memory_cache or {"records": []}
+
+def apply_pronunciation_memory(text: str) -> str:
+    """
+    過去の誤読記憶台帳（data/pronunciation_memory.json）の記録を適用。
+    表面表記（surface）を正しい読み（reading）へ置換する。
+    長い語句から優先的にマッチさせることで、部分一致の誤爆を防止。
+    """
+    if not text:
+        return ""
+    data = load_pronunciation_memory()
+    records = data.get("records", [])
+    if not records:
+        return text
+
+    sorted_records = sorted(
+        [r for r in records if r.get("surface") and r.get("reading")],
+        key=lambda r: len(r["surface"]),
+        reverse=True
+    )
+
+    res = text
+    for r in sorted_records:
+        surface = r["surface"]
+        reading = r["reading"]
+        if surface in res:
+            res = res.replace(surface, reading)
+    return res
 
 # 後方互換性用エクスポート
 def get_tech_acronyms():
@@ -214,10 +265,103 @@ COUNTRY_PREFIX_MAP = {
     '伊': 'い', '豪': 'ごう', '韓': 'かん', '中': 'ちゅう', '日': 'にち',
 }
 
-# ── 皇族・著名人等の文脈固有名詞・尊称マップ（data/tts_rules.json より動的取得） ──
+# ── 皇族・皇室専用マスター定義（恒久保護・100%誤読根絶） ──
+IMPERIAL_ANCHOR_KEYWORDS = {
+    "皇室", "皇族", "宮内庁", "宮家", "秋篠宮", "秋篠宮家", "天皇家", "常陸宮", "三笠宮", "高円宮",
+    "天皇", "皇后", "上皇", "上皇后", "親王", "内親王", "親王妃", "殿下", "妃殿下",
+    "皇居", "赤坂御用地", "御所", "成年式", "宮中", "立皇嗣", "退位", "即位"
+}
+
+DEFAULT_IMPERIAL_PROPER_NOUNS = [
+    # 尊称・敬称付き（名字なし）
+    (r'(?<![\u4e00-\u9fa5])文仁親王妃紀子(?:さま|様)?殿下', 'ふみひとしんのうひきこひでんか'),
+    (r'(?<![\u4e00-\u9fa5])文仁親王妃紀子(?:さま|様)', 'ふみひとしんのうひきこさま'),
+    (r'(?<![\u4e00-\u9fa5])文仁親王妃紀子', 'ふみひとしんのうひきこ'),
+    (r'(?<![\u4e00-\u9fa5])紀子妃殿下', 'きこひでんか'),
+    (r'(?<![\u4e00-\u9fa5])紀子妃(?:さま|様)', 'きこひさま'),
+    (r'(?<![\u4e00-\u9fa5])紀子妃', 'きこひ'),
+    (r'(?<![\u4e00-\u9fa5])紀子殿下', 'きこでんか'),
+    (r'(?<![\u4e00-\u9fa5])紀子(?:さま|様)', 'きこさま'),
+    (r'(?<![\u4e00-\u9fa5])親王妃', 'しんのうひ'),
+    (r'(?<![\u4e00-\u9fa5])妃殿下', 'ひでんか'),
+    (r'(?<![\u4e00-\u9fa5])悠仁(?:さま|様)', 'ひさひとさま'),
+    (r'(?<![\u4e00-\u9fa5])佳子(?:さま|様)', 'かこさま'),
+    (r'(?<![\u4e00-\u9fa5])愛子(?:さま|様)', 'あいこさま'),
+    (r'(?<![\u4e00-\u9fa5])秋篠宮(?:さま|様)', 'あきしののみやさま'),
+    (r'(?<![\u4e00-\u9fa5])秋篠宮ご夫妻', 'あきしののみやごふさい'),
+    (r'(?<![\u4e00-\u9fa5])秋篠宮家', 'あきしののみやけ'),
+    (r'(?<![\u4e00-\u9fa5])秋篠宮', 'あきしののみや'),
+    (r'(?<![\u4e00-\u9fa5])天皇陛下', 'てんのうへいか'),
+    (r'(?<![\u4e00-\u9fa5])皇后雅子(?:さま|様)', 'こうごうまさこさま'),
+    (r'(?<![\u4e00-\u9fa5])雅子皇后', 'まさここうごう'),
+    (r'(?<![\u4e00-\u9fa5])皇后陛下', 'こうごうへいか'),
+    (r'(?<![\u4e00-\u9fa5])皇后(?:さま|様)', 'こうごうさま'),
+    (r'(?<![\u4e00-\u9fa5])雅子(?:さま|様)', 'まさこさま'),
+    (r'(?<![\u4e00-\u9fa5])上皇陛下', 'じょうこうへいか'),
+    (r'(?<![\u4e00-\u9fa5])上皇(?:さま|様)', 'じょうこうさま'),
+    (r'(?<![\u4e00-\u9fa5])上皇后美智子(?:さま|様)', 'じょうこうごうみちこさま'),
+    (r'(?<![\u4e00-\u9fa5])上皇后(?:さま|様)', 'じょうこうごうさま'),
+    (r'(?<![\u4e00-\u9fa5])美智子(?:さま|様)', 'みちこさま'),
+    (r'(?<![\u4e00-\u9fa5])悠仁親王', 'ひさひとしんのう'),
+    (r'(?<![\u4e00-\u9fa5])愛子内親王', 'あいこないしんのう'),
+    (r'(?<![\u4e00-\u9fa5])佳子内親王', 'かこないしんのう'),
+    (r'(?<![\u4e00-\u9fa5])文仁親王', 'ふみひとしんのう'),
+    (r'(?<![\u4e00-\u9fa5])徳仁親王', 'なるひとしんのう'),
+    (r'(?<![\u4e00-\u9fa5])彬子(?:さま|様)', 'あきこさま'),
+    (r'(?<![\u4e00-\u9fa5])瑶子(?:さま|様)', 'ようこさま'),
+    (r'(?<![\u4e00-\u9fa5])承子(?:さま|様)', 'つぐこさま'),
+    (r'(?<![\u4e00-\u9fa5])常陸宮(?:さま|様)?', 'ひたちのみや'),
+    (r'(?<![\u4e00-\u9fa5])三笠宮(?:さま|様)?', 'みかさのみや'),
+    (r'(?<![\u4e00-\u9fa5])高円宮(?:さま|様)?', 'たかまどのみや'),
+]
+
+def is_imperial_article_context(text: str, title: str = "") -> bool:
+    """記事タイトルまたは本文全体が皇室トピックであるかを判定"""
+    full = (title + " " + (text or ""))
+    return any(kw in full for kw in IMPERIAL_ANCHOR_KEYWORDS)
+
+def extract_imperial_pronunciations(text: str, title: str = "") -> dict:
+    """
+    記事中の皇族表記を高精度に検出し、正しいひらがな読みマップを返す。
+    - 直前に漢字（名字）がある一般人（佐藤紀子、松本佳子、山田悠仁等）は 100% 除外・保護
+    - 皇室文脈下、または尊称付きの皇族名を確実に捕捉
+    """
+    if not text and not title:
+        return {}
+
+    full_text = f"{title}\n{text}"
+    is_imperial = is_imperial_article_context(text, title)
+
+    pron_map = {}
+    # 1. 尊称付き皇族（直前に漢字なし）
+    for pat, rep in DEFAULT_IMPERIAL_PROPER_NOUNS:
+        for m in re.finditer(pat, full_text):
+            matched = m.group(0)
+            pron_map[matched] = rep
+
+    # 2. 皇室記事内での単独お名前言及（例: 「秋篠宮ご夫妻の長男・悠仁の…」等）
+    if is_imperial:
+        IMPERIAL_SOLO_NAMES = {
+            "悠仁": "ひさひと", "紀子": "きこ", "佳子": "かこ", "愛子": "あいこ",
+            "秋篠宮": "あきしののみや", "文仁": "ふみひと", "徳仁": "なるひと",
+            "彬子": "あきこ", "瑶子": "ようこ", "承子": "つぐこ"
+        }
+        for name, yomi in IMPERIAL_SOLO_NAMES.items():
+            pattern = rf'(?<![\u4e00-\u9fa5]){re.escape(name)}(?=[のはがにをもへと、。\s]|$)'
+            for m in re.finditer(pattern, full_text):
+                matched = m.group(0)
+                if matched not in pron_map:
+                    pron_map[matched] = yomi
+
+    if pron_map:
+        print(f"[皇室マスター発音保護] 👑 皇族読みを安全登録: {pron_map}", flush=True)
+
+    return pron_map
+
 def get_imperial_proper_nouns():
     rules = load_tts_rules()
-    return [(item["pattern"], item["replacement"]) for item in rules.get("imperial_proper_nouns", []) if "pattern" in item and "replacement" in item]
+    custom_rules = [(item["pattern"], item["replacement"]) for item in rules.get("imperial_proper_nouns", []) if "pattern" in item and "replacement" in item]
+    return custom_rules if custom_rules else DEFAULT_IMPERIAL_PROPER_NOUNS
 
 class _ImperialNounsProxy(list):
     def __iter__(self):
@@ -337,7 +481,130 @@ def _extract_person_reading_from_snippet(term, clean_snippet):
     if valid:
         print(f"[Wikipedia人名読み解決] 🎯 '{term}' -> '{valid}'")
         return valid
-    return None
+def extract_article_rubies(text):
+    """
+    ニュース記事本文やタイトルから、括弧書きのふりがな（ルビ）を自動抽出して辞書化する。
+    例:
+      - 甫木元空（ほきもと・そら＝34） ➔ {'甫木元空': 'ほきもとそら'}
+      - 高橋藍（らん） ➔ {'高橋藍': 'らん'}
+      - 安青錦（あおにしき＝22） ➔ {'安青錦': 'あおにしき'}
+    """
+    if not text:
+        return {}
+    rubies = {}
+    matches = re.findall(r'([一-龥]{2,8})\s*[\(（]([ぁ-んァ-ヶー・\s]+)(?:[＝=0-9歳才代\s,、].*?)?[\)）]', text)
+    for term, yomi_raw in matches:
+        term_clean = term.strip()
+        yomi_clean = yomi_raw.replace('・', '').replace(' ', '').strip()
+        yomi_hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in yomi_clean])
+        yomi_hira = re.sub(r'[^ぁ-んー]', '', yomi_hira)
+        if yomi_hira and len(yomi_hira) >= 2:
+            rubies[term_clean] = yomi_hira
+            print(f"[元記事ルビ自動抽出] 🎯 '{term_clean}' ➔ '{yomi_hira}'", flush=True)
+    return rubies
+
+
+def lookup_wikipedia_person_reading(name, context_hint=""):
+    """
+    【人名専用】Wikipediaピンポイント発音解決関数。
+    - 異体字（髙/高、齊/斉など）の自動展開
+    - 前方一致検索（prefixsearch）により、「安青錦」➔「安青錦新大」、「佳子」➔「佳子内親王」等を正確に捕捉
+    - 同姓同名がある場合は context_hint（記事本文・タイトル）との文脈照合で最適な人物記事を自動選択
+    - 冒頭文から公式ふりがな（ひらがな）を安全に抽出
+    """
+    if not name or len(name) < 2:
+        return None
+
+    # キャッシュチェック
+    cache_key = f"person:{name}:{context_hint[:60] if context_hint else ''}"
+    if cache_key in _wiki_reading_cache:
+        return _wiki_reading_cache[cache_key][0]
+
+    candidates = [name]
+    if '高' in name: candidates.append(name.replace('高', '髙'))
+    if '髙' in name: candidates.append(name.replace('髙', '高'))
+    if '斉' in name: candidates.append(name.replace('斉', '齊'))
+    if '齊' in name: candidates.append(name.replace('齊', '斉'))
+    if '斎' in name: candidates.append(name.replace('斎', '齋'))
+    if '齋' in name: candidates.append(name.replace('齋', '斎'))
+
+    ctx = ssl._create_unverified_context()
+    headers = {
+        "User-Agent": "VStudio-TTS-Bot/2.0 (macOS; contact: https://github.com/junichiakahori/VStudio)"
+    }
+
+    found_articles = []
+
+    # 1. 候補記事タイトルを収集（直接タイトル ＋ prefixsearch）
+    titles_to_query = list(candidates)
+    for cand in candidates:
+        try:
+            p_url = f"https://ja.wikipedia.org/w/api.php?action=query&list=prefixsearch&pssearch={urllib.parse.quote(cand)}&format=json"
+            req_p = urllib.request.Request(p_url, headers=headers)
+            with urllib.request.urlopen(req_p, timeout=_WIKI_TIMEOUT, context=ctx) as r_p:
+                p_data = json.loads(r_p.read().decode("utf-8"))
+                for res in p_data.get("query", {}).get("prefixsearch", [])[:3]:
+                    t_title = res.get("title", "")
+                    if t_title and t_title not in titles_to_query:
+                        titles_to_query.append(t_title)
+        except Exception:
+            pass
+
+    # 2. 各タイトルのextractとふりがなを取得
+    for t_title in titles_to_query:
+        try:
+            ext_url = f"https://ja.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&titles={urllib.parse.quote(t_title)}&redirects=1&format=json"
+            req_ext = urllib.request.Request(ext_url, headers=headers)
+            with urllib.request.urlopen(req_ext, timeout=_WIKI_TIMEOUT, context=ctx) as r_ext:
+                data_ext = json.loads(r_ext.read().decode("utf-8"))
+                for pid, pdata in data_ext.get("query", {}).get("pages", {}).items():
+                    if pid == "-1": continue
+                    extract = pdata.get("extract", "")
+                    if any(kw in extract for kw in ("日本の女性名", "日本の男性名", "曖昧さ回避")):
+                        continue
+                    m = re.search(r'[\(（]\s*([ぁ-んァ-ヶゔヴー・\s]+?)(?:[\[、,）\)＝=\d]|$)', extract)
+                    if m:
+                        raw = m.group(1).replace("・", " ").strip()
+                        parts = raw.split()
+                        # プレフィックス一致（例: 「安青錦」に対して記事「安青錦新大」）の場合、名字/四股名部分のみ抽出
+                        if len(parts) >= 2 and t_title not in candidates and len(name) <= 4:
+                            hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in parts[0]])
+                            hira = re.sub(r'[^ぁ-んー]', '', hira)
+                        else:
+                            hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in raw.replace(' ', '')])
+                            hira = re.sub(r'[^ぁ-んー]', '', hira)
+                        if hira:
+                            found_articles.append((t_title, extract, hira))
+        except Exception:
+            pass
+
+    if not found_articles:
+        _wiki_reading_cache[cache_key] = (None, None)
+        return None
+
+    # 3. 最適な記事を選択
+    best_item = None
+    if context_hint and len(found_articles) > 1:
+        best_score = -1
+        for t_title, extract, hira in found_articles:
+            score = 0
+            tokens = re.findall(r'[\u4e00-\u9fff]{2,}|[\u30a0-\u30ff]{3,}|[A-Za-z]{3,}', extract[:200])
+            for tok in set(tokens):
+                if tok in context_hint:
+                    score += 1
+            if score > best_score:
+                best_score = score
+                best_item = (t_title, extract, hira)
+        if best_item and best_score > 0:
+            print(f"[Wikipedia人名解決] 🎯 文脈一致スコア({best_score})で選択: '{name}' ➔ '{best_item[2]}' (記事: {best_item[0]})", flush=True)
+
+    if not best_item:
+        best_item = found_articles[0]
+        print(f"[Wikipedia人名解決] 🎯 '{name}' ➔ '{best_item[2]}' (記事: {best_item[0]})", flush=True)
+
+    selected_hira = best_item[2]
+    _wiki_reading_cache[cache_key] = (selected_hira, name)
+    return selected_hira
 
 
 WIKI_INVALID_READINGS = {"あるいは", "または", "かつて", "えいご", "ちゅうごくご", "ちょうせんご", "かんこくご", "りゃくしょう", "つうしょう", "ほんみょう", "きゅうせい"}
@@ -716,12 +983,93 @@ def apply_it_context_rules(text):
             t = re.sub(pat, rep, t)
     return t
 
+DEFAULT_TECH_ACRONYMS = {
+    "iPhone": "アイフォン",
+    "iPad": "アイパッド",
+    "Apple": "アップル",
+    "Google": "グーグル",
+    "ChatGPT": "チャットジーピーティー",
+    "OpenAI": "オープンエーアイ",
+    "SiC": "エスアイシー",
+    "Switch": "スイッチ",
+    "Nintendo": "ニンテンドー",
+    "AI": "エーアイ",
+    "SNS": "エスエヌエス",
+    "EV": "イーブイ",
+    "IT": "アイティー",
+    "PC": "ピーシー",
+    "OS": "オーエス",
+    "CEO": "シーイーオー",
+    "URL": "ユーアールエル",
+    "Wi-Fi": "ワイファイ",
+    "WiFi": "ワイファイ",
+    "G7": "ジーセブン",
+    "G20": "ジートゥエンティ",
+    "NHK": "エヌエイチケイ",
+    "MLB": "エムエルビー",
+    "MVP": "エムブイピー",
+    "WBC": "ダブリュービーシー",
+    "IPO": "アイピーオー",
+    "FOMC": "エフオーエムシー",
+    "PER": "ピーイーアール",
+    "PBR": "ピービーアール",
+    "PPI": "ピーピーアイ",
+    "CPI": "シーピーアイ",
+    "FRB": "エフアールビー",
+    "ECB": "イーシービー",
+    "USD": "ユーエスディー",
+    "JPY": "ジェイピーワイ",
+    "EUR": "ユーロ",
+    "GBP": "ポンド",
+    "ETF": "イーティーエフ",
+    "TOPIX": "トピックス",
+    "Hub": "ハブ",
+    "iOS": "アイオーエス",
+    "iPadOS": "アイパッドオーエス",
+    "macOS": "マックオーエス",
+    "MacBook": "マックブック",
+    "LRT": "エルアールティー",
+    "Duo": "デュオ",
+    "CPU": "シーピーユー",
+    "GPU": "ジーピーユー",
+    "SSD": "エスエスディー",
+    "HDD": "エイチディーディー",
+    "USB": "ユーエスビー",
+    "HDMI": "エイチディーエムアイ",
+    "LAN": "ラン",
+    "API": "エーピーアイ",
+    "SDK": "エスディーケー",
+    "GUI": "ジーユーアイ",
+    "UI": "ユーアイ",
+    "UX": "ユーエックス",
+    "SaaS": "サース",
+    "ACL": "エーシーエル",
+    "ACLE": "エーシーエルイー",
+    "DF": "ディーエフ",
+    "MF": "エムエフ",
+    "FW": "エフダブリュー",
+    "GK": "ジーケー",
+    "COO": "シーオーオー",
+    "CFO": "シーエフオー",
+    "CTO": "シーティーオー",
+    "DX": "ディーエックス",
+    "GX": "ジーエックス",
+}
+
 def apply_tech_acronyms(text):
-    """大文字・正規表記のテクノロジー略語マップの適用（data/tts_rules.json より動的適用）"""
+    """大文字・正規表記のテクノロジー略語マップの適用（data/tts_rules.json より動的適用、フォールバック付き）"""
     if not text:
         return ""
     t = text
-    acronyms = load_tts_rules().get("tech_acronyms", {})
+    # 🛡️ 1. ブランド名・英字表記の連続重複（iPhoneiPhone, iPhone iPhone等）を単一化して事前吸収
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])(?:iphone[\s　]*)+(?![A-Za-z0-9])', 'アイフォン', t)
+    t = re.sub(r'(?:アイフォン[\s　]*){2,}', 'アイフォン', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])(?:ipad[\s　]*)+(?![A-Za-z0-9])', 'アイパッド', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])(?:chatgpt[\s　]*)+(?![A-Za-z0-9])', 'チャットジーピーティー', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])(?:apple[\s　]*)+(?![A-Za-z0-9])', 'アップル', t)
+    
+    acronyms = dict(DEFAULT_TECH_ACRONYMS)
+    acronyms.update(load_tts_rules().get("tech_acronyms", {}))
     for acronym, yomi in sorted(acronyms.items(), key=lambda x: len(x[0]), reverse=True):
         if acronym in t:
             t = re.sub(rf'(?<![A-Za-z0-9]){re.escape(acronym)}(?![A-Za-z0-9])', yomi, t)
@@ -747,6 +1095,19 @@ def apply_person_kata_rules(text):
     t = text
     rules = load_tts_rules()
     for item in rules.get("person_kata_rules", []):
+        pat = item.get("pattern")
+        rep = item.get("replacement")
+        if pat and rep:
+            t = re.sub(pat, rep, t)
+    return t
+
+def apply_idol_group_rules(text):
+    """アイドルグループ（乃木坂46、櫻坂46、日向坂46、AKB48等）の読み方を解決（data/tts_rules.json より動的適用）"""
+    if not text:
+        return ""
+    t = text
+    rules = load_tts_rules()
+    for item in rules.get("idol_group_rules", []):
         pat = item.get("pattern")
         rep = item.get("replacement")
         if pat and rep:
@@ -937,6 +1298,9 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
     # 1. 文脈考慮型のIT発音解決（映画『IT』 vs 英語代名詞 it vs 情報技術 大文字IT）
     t = apply_it_context_rules(t)
 
+    # 1.5 アイドルグループ（乃木坂46、櫻坂46、日向坂46、AKB48等）の読み方を解決
+    t = apply_idol_group_rules(t)
+
     # 2. テクノロジー大文字略語マップ適用（Case-sensitive）
     t = apply_tech_acronyms(t)
 
@@ -946,6 +1310,9 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
     t = apply_contextual_proper_nouns_rules(t)
     # 送り仮名（し・す・せ・そ・さ・っ）が直後に続く場合は「探す（さがす）」なので置換せず、メディア名「株探」のみ「かぶたん」に置換
     t = re.sub(r'株探(?![しすせそさっ])', 'かぶたん', t)
+
+    # 4.5 過去の誤読記憶台帳（data/pronunciation_memory.json）の適用
+    t = apply_pronunciation_memory(t)
 
     # 5. カスタム辞書適用
     if custom_dict and isinstance(custom_dict, dict):

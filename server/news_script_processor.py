@@ -14,7 +14,9 @@ import urllib.error
 import threading
 from server.tts_normalizer import (
     normalize_for_tts, sanitize_speech_text, build_context_pronunciation_map,
-    heal_sentence_reading, apply_person_kata_rules
+    heal_sentence_reading, apply_person_kata_rules, is_plausible_reading,
+    extract_article_rubies, lookup_wikipedia_person_reading,
+    extract_imperial_pronunciations
 )
 from server.news_crawler import find_cached_url, search_news_url_by_title, register_cached_url, fetch_article_body, decode_google_news_url
 
@@ -212,6 +214,65 @@ def call_llm_backend(provider, prompt, api_key="", model_name="", system_prompt=
     else:
         return call_gemini_backend(prompt, api_key, model=model_name)
 
+def extract_person_names_via_ai(text, title="", article_context="", provider="ollama", model_name=None, api_key=""):
+    """
+    ニュース記事・タイトル・原稿から、登場する人物の名前（氏名、苗字、芸名、力士の四股名等）のみをLLMで抽出する。
+    ※一般名詞（左右対称、一時閉鎖など）や地名・組織名は絶対に含めず、純粋な「人名」のみをJSON配列で返す。
+    """
+    if not text and not title and not article_context:
+        return []
+
+    context_source = ""
+    if article_context:
+        context_source += f"【記事本文】:\n{article_context[:800]}\n\n"
+    context_source += f"【原稿】:\n{text[:600]}"
+
+    prompt = (
+        "あなたはニュース原稿から「人名（登場人物の氏名・芸名・四股名・敬称付き名前）」を正確に抽出する専門AIです。\n\n"
+        "以下の【タイトル】、【記事本文】、【原稿】から、登場する実在の人物名（芸能人、スポーツ選手、政治家、皇族、事件関係者など）を抽出してください。\n\n"
+        "※厳格ルール:\n"
+        "- 一般名詞、熟語（例: 左右対称、一時閉鎖、運行再開、新技術等）は絶対に含めないでください。\n"
+        "- 地名、国名、企業名、製品名、作品名、番組名は含めないでください。\n"
+        "- 記事や原稿に実在する表記そのまま（例: [\"夏帆\", \"高橋藍\", \"安青錦\", \"甫木元空\"]）で抽出してください。\n"
+        "- 人名が一切登場しない記事の場合は、空の配列 [] を出力してください。\n\n"
+        f"【タイトル】: {title}\n"
+        f"{context_source}\n\n"
+        "出力形式（有効なJSON配列のみ、余計な解説文やマークダウンは一切不要）:\n"
+        "[\"人名1\", \"人名2\"]"
+    )
+
+    try:
+        raw_res = call_llm_backend(
+            provider, prompt, api_key=api_key, model_name=model_name,
+            system_prompt="You are a JSON assistant that extracts person names. Output valid JSON array only.",
+            json_mode=True
+        )
+        if not raw_res:
+            return []
+
+        m = re.search(r'\[[\s\S]*?\]', raw_res)
+        if not m:
+            return []
+
+        data = json.loads(m.group(0))
+        if not isinstance(data, list):
+            return []
+
+        all_text = f"{title} {text} {article_context}"
+        names = []
+        for item in data:
+            if not isinstance(item, str):
+                continue
+            name_clean = item.strip()
+            # 2〜10文字程度の人名表記、かつ元テキストに含まれるもの
+            if 2 <= len(name_clean) <= 10 and name_clean in all_text:
+                if name_clean not in names:
+                    names.append(name_clean)
+        return names
+    except Exception as e:
+        print(f"[AI人名抽出 エラー]: {e}", flush=True)
+        return []
+
 def extract_pronunciations_via_ai(text, title="", article_context="", provider="ollama", model_name=None, api_key=""):
     """
     VOICEVOXエンジンによるプレ読み（カタカナ列）を取得し、LLMに誤読箇所のみをピンポイント校正・修正させる。
@@ -275,6 +336,16 @@ def extract_pronunciations_via_ai(text, title="", article_context="", provider="
         if not isinstance(data, dict):
             return {}
 
+        FORBIDDEN_GENERAL_TERMS = {
+            "使途", "使途不明", "使途不明金", "不明金", "役員", "幹部", "全力", "参入", "去就",
+            "執行部", "新執行部", "左右対称", "一時閉鎖", "運行再開", "全面閉鎖", "再発防止",
+            "第三者委員会", "単独最多", "本塁打", "逆転優勝", "貯金生活", "有事", "日米同盟",
+            "安全保障", "経済安全保障", "国家安全保障", "シャワー室", "囚人服", "大晦日",
+            "大統領", "大統領専用機", "記者会見", "関係者", "防犯カメラ", "傷害容疑",
+            "打線", "安打", "連勝", "最多", "過去", "以来", "引退", "移籍", "監督", "顧問",
+            "社長", "会長", "議員", "知事", "市長", "選手", "投手", "捕手"
+        }
+
         pron_map = {}
         all_text = f"{title} {text} {article_context}"
         for term, yomi in data.items():
@@ -287,8 +358,17 @@ def extract_pronunciations_via_ai(text, title="", article_context="", provider="
             if term_clean not in all_text:
                 continue
 
+            # 一般熟語・常用語の破壊を100%防止（VOICEVOXが読める単語の不要なひらがな化を拒絶）
+            if term_clean in FORBIDDEN_GENERAL_TERMS or term_clean.endswith(('不明金', '執行部', '委員会', '本塁打')):
+                print(f"[AI発音チェック 却下] 🛡️ 一般熟語 '{term_clean}' への不要なひらがな化('{yomi_clean}')を拒絶しました", flush=True)
+                continue
+
+            # 音訓・音節乖離チェック（pykakasiと照合して全く無関係なデタラメ読みを弾く）
+            if not is_plausible_reading(term_clean, yomi_clean):
+                print(f"[AI発音チェック 却下] 🚫 不自然・捏造読み検知: '{term_clean}' -> '{yomi_clean}' を破棄しました", flush=True)
+                continue
+
             # 日本語の音韻原則ガード: 漢字かな混じりを全ひらがなに開いた場合、文字数は原則として元の表記以上になる
-            # （例: 「石油パイプライン」に対して「せきゆ」のように一部だけ切り取られた不正な短縮を排除）
             if len(yomi_clean) < len(term_clean) * 0.8:
                 continue
 
@@ -717,6 +797,12 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
     if context_map is None:
         full_context = (article_context or "") + "\n" + "\n".join(raw_sentences)
         context_map = build_context_pronunciation_map(full_context, custom_dict=custom_dict)
+        imp_rubies = extract_imperial_pronunciations(full_context)
+        if imp_rubies:
+            context_map.update(imp_rubies)
+        rubies = extract_article_rubies(full_context)
+        if rubies:
+            context_map.update(rubies)
 
     if context_map:
         sample_keys = list(context_map.keys())[:6]
@@ -1542,6 +1628,17 @@ def generate_news_item_script_data(payload, custom_dict=None):
         # 著名スイーツ・洋菓子ブランド等の誤認（ナイトクラブ等との混同）防止補足
         if "クラブハリエ" in title and "洋菓子" not in full_article_content and "バームクーヘン" not in full_article_content:
             full_article_content += "\n【重要補足】『クラブハリエ』はバームクーヘン等の洋菓子・スイーツで全国的に有名な専門店です。夜のクラブやナイトクラブ・ディスコではありません。"
+
+        # 🌐 未知の固有名詞・グループ名等の読み方をWeb自動検索・事前解決（乃木坂46, AKB48, 人名等）
+        if not is_special_item:
+            try:
+                from server.web_pronunciation_resolver import extract_candidate_terms_from_text, resolve_unknown_reading_online
+                text_for_terms = f"{title} {full_article_content}"
+                candidate_terms = extract_candidate_terms_from_text(text_for_terms)
+                for c_term in candidate_terms[:3]:  # 1記事あたり未知語最大3件まで迅速にチェック
+                    resolve_unknown_reading_online(c_term, auto_save=True)
+            except Exception as e:
+                print(f"{tag} ⚠️ [Web読み方解決エラー] {e}", flush=True)
     
         # コメント返信や特殊アナウンスはニュース台本（5文構成）ではなく1〜2文の返答専用として直接生成
         if is_special_item:
@@ -1930,6 +2027,39 @@ def generate_news_item_script_data(payload, custom_dict=None):
             # 🧠 元記事タイトル ＋ 元記事本文 ＋ AI生成台本全文 を統合して記事全体文脈読みマップを一括構築
             full_context_text = f"{title}\n{full_article_content}\n{clean_text}"
             news_context_map = build_context_pronunciation_map(full_context_text, custom_dict=custom_dict)
+
+            # 👑 0. 皇室専用文脈マスター保護（名字なし＋尊称付きの悠仁さま、紀子妃さま、愛子さま等を100%最優先保護）
+            imperial_rubies = extract_imperial_pronunciations(full_context_text, title=title)
+            if imperial_rubies:
+                print(f"{tag} 👑 [皇室マスター発音保護] {len(imperial_rubies)} 件を登録: {imperial_rubies}", flush=True)
+                news_context_map.update(imperial_rubies)
+
+            # 📖 1. 元記事から直接ルビを自動抽出（例: 甫木元空（ほきもと・そら＝34）等）
+            article_rubies = extract_article_rubies(f"{title}\n{full_article_content}")
+            if article_rubies:
+                print(f"{tag} 📖 [元記事ルビ自動抽出] {len(article_rubies)} 件のルビを登録: {article_rubies}", flush=True)
+                news_context_map.update(article_rubies)
+
+            # 👤 2. AIによる人名限定抽出 ＋ 人名専用Wikipedia照合（案A）
+            # （一般熟語の誤爆を防ぎつつ、夏帆、高橋藍、安青錦等の特殊読みをピンポイント解決）
+            person_names = extract_person_names_via_ai(
+                clean_text, title=title, article_context=full_article_content,
+                provider=provider, model_name=model_name, api_key=api_key
+            )
+            if person_names:
+                print(f"{tag} 👤 [検出人名] {person_names}", flush=True)
+                for pname in person_names:
+                    # 既にルビや辞書で解決済みの場合はスキップ
+                    if pname in news_context_map:
+                        continue
+                    # 敬称や肩書を除去したコア名（例: 高橋選手 ➔ 高橋、服部知事 ➔ 服部）
+                    core_name = re.sub(r'(?:選手|知事|市長|首相|大臣|総理|総裁|議員|前議長|議長|社長|会長|監督|コーチ|投手|捕手|棋士|容疑者|被告|氏|さん|くん|君|様|さま)$', '', pname).strip()
+                    target_name = core_name if len(core_name) >= 2 else pname
+                    w_yomi = lookup_wikipedia_person_reading(target_name, context_hint=full_context_text)
+                    if w_yomi:
+                        news_context_map[pname] = w_yomi
+                        if target_name != pname:
+                            news_context_map[target_name] = w_yomi
     
             # 🤖 AIによる直接発音ダブルチェック（人名・特殊固有名詞のひらがな読みを文脈判定して最優先統合）
             ai_pron_map = extract_pronunciations_via_ai(

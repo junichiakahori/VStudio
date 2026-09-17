@@ -261,9 +261,19 @@ async function fetchNewsWithOptions(categoryKey = "cat_all", maxPerCategory = In
   }
 
   const filteredItems = uniqueItems.filter(item => {
-    if (!item.pubDate) return true;
-    const itemDate = new Date(item.pubDate).getTime();
-    if (isNaN(itemDate)) return true;
+    // rawPubDate (RFC2822 / ISO8601) を最優先して正確なミリ秒判定、フォールバックで pubDate
+    const raw = item.rawPubDate || item.pubDate;
+    if (!raw) return true;
+    let itemDate = new Date(raw).getTime();
+    if (isNaN(itemDate) && item.pubDate) {
+      // ハイフン区切り＋スペースの日時を ISO8601 形式に補正して再試行
+      const isoLike = item.pubDate.replace(" ", "T");
+      itemDate = new Date(isoLike).getTime();
+    }
+    if (isNaN(itemDate)) {
+      console.warn(`[ニュース日時判定] 日付解析不能のため除外: 「${item.title}」 (${raw})`);
+      return false; // 不正日付・判定不能は安全に除外
+    }
     return itemDate >= startTimestamp && itemDate <= endTimestamp;
   });
 
