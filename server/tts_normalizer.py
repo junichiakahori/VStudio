@@ -1604,12 +1604,10 @@ def heal_sentence_reading(display_text, speech_text):
             surf = rec["surface"]
             correct_yomi = rec["reading"]
             wrong_yomi = rec["wrong_reading"]
-            if wrong_yomi in speech_text and surf in display_text:
-                # 既に修正済みの正読に部分一致して重複置換されるのを防止（例: せきゆきょうきゅうの二重置換防止）
-                if correct_yomi not in speech_text:
-                    print(f"[誤読自己修復] 🩹 台帳照合修復: '{surf}' に対する誤読 '{wrong_yomi}' を正読 '{correct_yomi}' へ自動修復", flush=True)
-                    speech_text = speech_text.replace(wrong_yomi, correct_yomi)
-                    healed_surfaces.add(surf)
+            if wrong_yomi in speech_text and surf in display_text and wrong_yomi != correct_yomi:
+                print(f"[誤読自己修復] 🩹 台帳照合修復: '{surf}' に対する誤読 '{wrong_yomi}' を正読 '{correct_yomi}' へ自動修復", flush=True)
+                speech_text = speech_text.replace(wrong_yomi, correct_yomi)
+                healed_surfaces.add(surf)
     except Exception as e:
         pass
 
