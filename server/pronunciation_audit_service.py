@@ -129,8 +129,20 @@ class PronunciationAuditService:
         m_en = re.search(r'\[英単語発音修復\] 🩹 \'([^\']+)\' ➔ \'([^\']+)\'', line)
         if m_en:
             orig, fixed = m_en.group(1), m_en.group(2)
+            IGNORED_ACRONYM_WORDS = {
+                "FINAL", "FANTASY", "CAFE", "COLLABO", "PARADISE", "RING", "CRASH", "BLACK",
+                "WHITE", "GREEN", "BLUE", "RED", "YELLOW", "PINK", "ORANGE", "GOLD", "SILVER",
+                "NEWS", "GAME", "LIVE", "STUDIO", "MUSIC", "WORLD", "JAPAN", "TOKYO", "SUPER",
+                "STAR", "MOON", "SUN", "FIRE", "WATER", "WIND", "EARTH", "LIGHT", "DARK",
+                "KING", "QUEEN", "PRINCE", "HERO", "MONSTER", "DRAGON", "KNIGHT", "MAGIC",
+                "POWER", "SPEED", "FORCE", "BATTLE", "WAR", "FIGHT", "PEACE", "LOVE", "DREAM",
+                "HAPPY", "SMILE", "TEARS", "HEART", "SOUL", "LIFE", "TIME", "SPACE", "FUTURE"
+            }
             if orig.isupper() and len(orig) >= 3 and fixed == orig.capitalize():
-                self._heal_acronym_corruption(orig)
+                if orig.upper() not in IGNORED_ACRONYM_WORDS:
+                    self._heal_acronym_corruption(orig)
+                else:
+                    print(f"[Pronunciation Audit] ℹ️ 一般英単語 '{orig}' は略語破損修復の対象外（VOICEVOX標準発音を維持）", flush=True)
 
         # 2. AI発音ダブルチェックの長音抜け・モーラ欠落検知
         m_ai = re.search(r'\[AI発音ダブルチェック\] 固有名詞の読みをAI判定: (\{.*?\})', line)
@@ -160,13 +172,23 @@ class PronunciationAuditService:
                     rules = json.load(f)
                 tech = rules.setdefault("tech_acronyms", {})
                 if acronym not in tech:
-                    # カナ読み生成
-                    kana_map = {"U":"ユー", "F":"エフ", "J":"ジェイ", "N":"エヌ", "T":"ティー", "K":"ケー", "D":"ディー", "I":"アイ", "S":"エス", "B":"ビー"}
-                    kana_yomi = "".join([kana_map.get(c, c) for c in acronym])
-                    tech[acronym] = kana_yomi
-                    with open(RULES_PATH, "w", encoding="utf-8") as f:
-                        json.dump(rules, f, ensure_ascii=False, indent=2)
-                    self._record_repair(acronym, kana_yomi, "略語のスペル破損防止（大文字保護）")
+                    # A〜Z完全カナ読みマップ（中途半端なキメラ文字化を完全防止）
+                    kana_map = {
+                        "A": "エー", "B": "ビー", "C": "シー", "D": "ディー", "E": "イー",
+                        "F": "エフ", "G": "ジー", "H": "エイチ", "I": "アイ", "J": "ジェイ",
+                        "K": "ケー", "L": "エル", "M": "エム", "N": "エヌ", "O": "オー",
+                        "P": "ピー", "Q": "キュー", "R": "アール", "S": "エス", "T": "ティー",
+                        "U": "ユー", "V": "ブイ", "W": "ダブリュー", "X": "エックス", "Y": "ワイ", "Z": "ゼット"
+                    }
+                    kana_yomi = "".join([kana_map.get(c, c) for c in acronym.upper()])
+                    # 生成された読みが英字を含まない場合のみ安全に登録
+                    if not re.search(r'[A-Za-z]', kana_yomi):
+                        tech[acronym] = kana_yomi
+                        with open(RULES_PATH, "w", encoding="utf-8") as f:
+                            json.dump(rules, f, ensure_ascii=False, indent=2)
+                        self._record_repair(acronym, kana_yomi, "略語のスペル破損防止（大文字保護）")
+                    else:
+                        print(f"[Pronunciation Audit] ⚠️ 読み '{kana_yomi}' に英字が含まれているため自動登録を中断", flush=True)
         except Exception as e:
             print(f"[Pronunciation Audit] ⚠️ tts_rules 更新失敗: {e}", flush=True)
 

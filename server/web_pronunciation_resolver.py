@@ -44,9 +44,10 @@ def is_already_registered(term: str) -> bool:
 def save_to_pronunciation_memory(
     surface: str,
     reading: str,
-    sample_sentence: str = "",
+    wrong_reading: str = "",
     note: str = "",
-    category: str = "web_auto_learned",
+    category: str = "general",
+    sample_sentence: str = "",
     article_topic: str = "",
     context_keywords: Optional[List[str]] = None,
     scope: str = ""
@@ -74,6 +75,8 @@ def save_to_pronunciation_memory(
         for r in records:
             if r.get("surface") == surface:
                 r["reading"] = reading
+                if wrong_reading:
+                    r["wrong_reading"] = wrong_reading
                 r["updated_date"] = datetime.datetime.now().strftime("%Y-%m-%d")
                 if article_topic and not r.get("article_topic"):
                     r["article_topic"] = article_topic
@@ -91,6 +94,7 @@ def save_to_pronunciation_memory(
             "id": f"auto_{int(time.time())}_{abs(hash(surface)) % 10000}",
             "surface": surface,
             "reading": reading,
+            "wrong_reading": wrong_reading,
             "scope": scope,
             "article_topic": article_topic or f"{surface}に関するニュース",
             "sample_sentence": sample_sentence or f"{surface}に関する最新情報です。",
@@ -108,7 +112,7 @@ def save_to_pronunciation_memory(
 
         with open(PRONUNCIATION_MEMORY_PATH, "w", encoding="utf-8") as f:
             json.dump(mem_data, f, ensure_ascii=False, indent=2)
-        print(f"🧠 [自動記憶] 新しい読み方を台帳に保存しました: '{surface}' ➔ '{reading}' (scope: {scope}, topic: {article_topic or '一般'})", flush=True)
+        print(f"🧠 [自動記憶] 新しい読み方を台帳に保存しました: '{surface}' ➔ 正読:'{reading}' 誤読:'{wrong_reading or 'なし'}' (scope: {scope}, topic: {article_topic or '一般'})", flush=True)
         return True
     except Exception as e:
         print(f"⚠️ [自動記憶エラー] 保存失敗: {e}", flush=True)
@@ -173,21 +177,23 @@ def _extract_ruby_from_text(term: str, extract_text: str) -> Optional[str]:
     """Wikipedia本文冒頭から読み仮名（ひらがな・カタカナ）を抽出"""
     if not extract_text:
         return None
-    # 冒頭 150 文字以内に現れる括弧 （...） または (...) を探索
+    # 冒頭 200 文字以内に現れる括弧 （...） または (...) を探索
     head = extract_text[:200]
     m = re.search(r'[\(（]([^\)）]+)[\)）]', head)
     if not m:
         return None
     content = m.group(1).strip()
-    # 英語表記や別名がカンマ等で区切られている場合、最初の読みブロックを取得
-    first_part = re.split(r'[,、，/／;；|｜]', content)[0].strip()
+    # 英語表記や別名、「もしくは」「または」等の注釈表現で分割し、最初の読みブロックを取得
+    first_part = re.split(r'[,、，/／;；|｜]|\s*(?:もしくは|または|あるいは|および)\s*', content)[0].strip()
     # アルファベット併記を除去（例: "のぎざかフォーティーシックス Nogizaka46"）
     first_part = re.sub(r'[A-Za-z0-9\-_.]+', '', first_part).strip()
     
     # ひらがな・カタカナ・長音符のみを抽出
     cleaned = re.sub(r'[^ぁ-んァ-ヶー・]', '', first_part).replace('・', '')
     if len(cleaned) >= 2 and len(cleaned) <= max(len(term) * 5, 20):
-        return cleaned
+        # 助詞切れ・文末語尾ゴミの遮断
+        if not re.search(r'(?:の|が|は|で|を|に|へ|と|です|ます)$', cleaned):
+            return cleaned
     return None
 
 def search_duckduckgo_reading(term: str) -> Optional[str]:
@@ -225,26 +231,35 @@ def _extract_ruby_from_snippet(term: str, snippet: str) -> Optional[str]:
     """検索スニペットから「term（よみ）」や「読み方は『よみ』」等のパターンを抽出"""
     if not snippet:
         return None
+
+    GARBAGE_PATTERNS = {"のページです", "について", "があります", "がもうちょっとで", "一覧", "案内", "検索", "公式", "サイト", "こちら", "クリック", "詳細", "スティレット"}
+    if any(gp in snippet for gp in GARBAGE_PATTERNS):
+        return None
+
+    candidates = []
+
     # パターン1: term（よみ） または term(よみ)
     m1 = re.search(re.escape(term) + r'[\(（]([ぁ-んァ-ヶー・\s]+)[\)）]', snippet)
     if m1:
         c = re.sub(r'[^ぁ-んァ-ヶー]', '', m1.group(1).replace('・', '').replace(' ', ''))
-        if 2 <= len(c) <= max(len(term) * 5, 20):
-            return c
+        candidates.append(c)
 
     # パターン2: 読み方は「よみ」 / 読み方は『よみ』 / 読み：よみ
     m2 = re.search(r'(?:読み方|読み|よみ|発音)(?:は|：|:)?\s*[「『（\(]?([ぁ-んァ-ヶー]+)[」』）\)]?', snippet)
     if m2:
-        c = m2.group(1).strip()
-        if 2 <= len(c) <= max(len(term) * 5, 20):
-            return c
+        candidates.append(m2.group(1).strip())
 
     # パターン3: 「term」の読み方は「よみ」
     m3 = re.search(re.escape(term) + r'[^。]*?(?:読み方|読み)(?:は|：|:)?\s*[「『（\(]?([ぁ-んァ-ヶー]+)[」』）\)]?', snippet)
     if m3:
-        c = m3.group(1).strip()
+        candidates.append(m3.group(1).strip())
+
+    for c in candidates:
         if 2 <= len(c) <= max(len(term) * 5, 20):
-            return c
+            # 助詞切れ・文末語尾ゴミの遮断
+            if not re.search(r'(?:の|が|は|で|を|に|へ|と|です|ます)$', c):
+                if not any(gp in c for gp in GARBAGE_PATTERNS):
+                    return c
 
     return None
 
@@ -259,10 +274,46 @@ def is_valid_reading_for_term(term: str, ruby: str) -> bool:
     # 漢字・英数字を含む単語に対して、読みが異常に長大（3.5倍以上かつ8文字超）な場合は除外
     if len(ruby) > max(len(term) * 3, 8) and len(ruby) > 9:
         return False
+
+    # 助詞切れ・文末ゴミの遮断
+    if re.search(r'(?:の|が|は|で|を|に|へ|と|です|ます)$', ruby):
+        return False
+
     # 明らかに無関係な単語の除外
-    DISALLOWED_READING_KEYWORDS = {"かいきゅう", "しょうさい", "いちらん", "あいまいで", "たいしょう", "しんでん"}
+    DISALLOWED_READING_KEYWORDS = {
+        "かいきゅう", "しょうさい", "いちらん", "あいまいで", "たいしょう", "しんでん",
+        "のぺえじ", "のページ", "について", "あります", "もうちょっと", "スティレット",
+        "もしくは", "または"
+    }
     if any(kw in ruby for kw in DISALLOWED_READING_KEYWORDS):
         return False
+
+    # 短い英数字・型番（例: X3, F1, F15, ROG20）に対して無関係な会社名や架空兵器名が割り当てられるのを防止
+    if re.match(r'^[A-Za-z0-9\-_]+$', term):
+        # 英語・数字の型番なのに、アルファベット音や数字音を含まない日本語名（例: F15 -> ボーイング）は除外
+        if re.search(r'[\u3040-\u30ff]', ruby):
+            ALPHABET_SOUNDS = {"エフ", "エー", "ビー", "シー", "ディー", "イー", "ジー", "エイチ", "アイ", "ジェイ", "ケー", "エル", "エム", "エヌ", "オー", "ピー", "キュー", "アール", "エス", "ティー", "ユー", "ブイ", "ダブリュー", "エックス", "ワイ", "ゼット", "ワン", "ツー", "スリー", "フォー", "ファイブ", "シックス", "セブン", "エイト", "ナイン", "テン"}
+            has_acronym_sound = any(snd in ruby for snd in ALPHABET_SOUNDS)
+            has_number = any(c.isdigit() for c in term)
+            # アルファベットの型番なのにアルファベット音が一切入っていない日本語（例: ボーイング）は除外
+            if not has_acronym_sound:
+                return False
+
+    # 漢字熟語に対して、同義語・第一次産業等のリダイレクト先別名義にすり替わるのを防止
+    kanji_chars = [c for c in term if "\u4e00" <= c <= "\u9fa5"]
+    if len(kanji_chars) >= 2:
+        try:
+            import pykakasi
+            kks = pykakasi.kakasi()
+            std_hira = "".join([it.get("hira", "") for it in kks.convert(term)])
+            # 標準読みと全く一致せず、類似度も著しく低い（同義語リダイレクトの典型例: 農林水産 -> だいいちじさんぎょう 等）
+            import difflib
+            sim = difflib.SequenceMatcher(None, std_hira, ruby).ratio()
+            # 3文字以上の熟語で類似度が0.40未満の場合は同義語リダイレクトとみなして除外
+            if len(kanji_chars) >= 3 and sim < 0.40:
+                return False
+        except Exception:
+            pass
 
     from server.tts_normalizer import is_plausible_reading
     if not is_plausible_reading(term, ruby):
@@ -302,10 +353,26 @@ def resolve_unknown_reading_online(
     if ruby and is_valid_reading_for_term(term, ruby):
         print(f"✨ [Web読み方解決成功] '{term}' ➔ '{ruby}' (情報源: {source})", flush=True)
         if auto_save:
+            # VOICEVOXのデフォルト読みをプレ取得し、正解(ruby)と相違があれば誤読(wrong_reading)としてペア記録
+            wrong_reading = ""
+            try:
+                from server.voicevox_client import get_voicevox_reading_and_kana
+                vv_reading, _ = get_voicevox_reading_and_kana(term)
+                if vv_reading:
+                    import pykakasi
+                    kks = pykakasi.kakasi()
+                    res = kks.convert(vv_reading)
+                    hira_reading = "".join([it.get("hira", "") for it in res]).strip()
+                    if hira_reading and hira_reading != ruby:
+                        wrong_reading = hira_reading
+            except Exception:
+                pass
+
             save_to_pronunciation_memory(
                 surface=term,
                 reading=ruby,
-                note=f"Web自動解決 ({source})",
+                wrong_reading=wrong_reading,
+                note=f"Web自動解決 ({source})" + (f" (VOICEVOX誤読: {wrong_reading})" if wrong_reading else ""),
                 category="web_auto_resolved",
                 article_topic=article_title,
                 context_keywords=context_keywords,

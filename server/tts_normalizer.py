@@ -61,8 +61,8 @@ def is_plausible_reading(term, yomi):
         return True
 
     kanji_chars = [c for c in term if "\u4e00" <= c <= "\u9fa5"]
-    NON_NAME_ENDINGS = ("供給", "施設", "基地", "会社", "組織", "政府", "停滞", "混乱", "攻撃", "需要", "発表", "決定", "計画", "問題", "対応", "対策", "支援", "規制", "会議", "連盟", "協会", "学会")
-    NON_NAME_SUFFIX_CHARS = "給金部的人化法案賞権率線点戦界隊団機館所署室駅器品物料費額数量値度業車網道党院省庁会"
+    NON_NAME_ENDINGS = ("供給", "施設", "基地", "会社", "組織", "政府", "停滞", "混乱", "攻撃", "需要", "発表", "決定", "計画", "問題", "対応", "対策", "支援", "規制", "会議", "連盟", "協会", "学会", "送検", "送致", "容疑")
+    NON_NAME_SUFFIX_CHARS = "給金部的人化法案賞権率線点戦界隊団機館所署室駅器品物料費額数量値度業車網道党院省庁会検致疑罪流種圏"
 
     is_general_compound = term.endswith(NON_NAME_ENDINGS) or (bool(kanji_chars) and term[-1] in NON_NAME_SUFFIX_CHARS)
 
@@ -1217,6 +1217,60 @@ def apply_special_reading_fixes(text):
     return t
 
 
+def apply_game_title_rules(text: str) -> str:
+    """ゲームタイトル（FFシリーズ、ドラゴンクエスト等）のナンバリング・ローマ数字読みルール"""
+    if not text:
+        return ""
+    t = text
+    ROMAN_NUMS = {
+        "XVI": "シックスティーン", "XV": "フィフティーン", "XIV": "フォーティーン", "XIII": "サーティーン",
+        "XII": "トゥエルブ", "XI": "イレブン", "X": "テン", "IX": "ナイン", "VIII": "エイト",
+        "VII": "セブン", "VI": "シックス", "IV": "フォー", "V": "ファイブ", "III": "スリー", "II": "ツー", "I": "ワン"
+    }
+    ARABIC_NUMS = {
+        "16": "シックスティーン", "15": "フィフティーン", "14": "フォーティーン", "13": "サーティーン",
+        "12": "トゥエルブ", "11": "イレブン", "10": "テン", "9": "ナイン", "8": "エイト",
+        "7": "セブン", "6": "シックス", "5": "ファイブ", "4": "フォー", "3": "スリー", "2": "ツー", "1": "ワン"
+    }
+    # 1. FF / FINAL FANTASY + ローマ数字 (FFVII, FF-VII, FINAL FANTASY VII, ファイナルファンタジーVII 等)
+    for rom, yomi in ROMAN_NUMS.items():
+        t = re.sub(r'(?i)(?<![A-Za-z0-9])FF[\s\-_]*' + rom + r'(?![A-Za-z0-9])', f'エフエフ{yomi}', t)
+        t = re.sub(r'(?i)(?:FINAL\s*FANTASY|ファイナルファンタジー)[\s\-_]*' + rom + r'(?![A-Za-z0-9])', f'ファイナルファンタジー{yomi}', t)
+
+    # 2. FF / FINAL FANTASY + アラビア数字 (FF7, FF-7, FINAL FANTASY 7 等)
+    for num, yomi in ARABIC_NUMS.items():
+        t = re.sub(r'(?i)(?<![A-Za-z0-9])FF[\s\-_]*' + num + r'(?![A-Za-z0-9])', f'エフエフ{yomi}', t)
+        t = re.sub(r'(?i)(?:FINAL\s*FANTASY|ファイナルファンタジー)[\s\-_]*' + num + r'(?![A-Za-z0-9])', f'ファイナルファンタジー{yomi}', t)
+
+    # 単体の FINAL FANTASY
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])FINAL\s*FANTASY(?![A-Za-z0-9])', 'ファイナルファンタジー', t)
+    return t
+
+
+def apply_legal_and_general_rules(text: str) -> str:
+    """報道・司法・一般熟語の固定読みルール（LLMや形態素解析の誤読防止）"""
+    if not text:
+        return ""
+    t = text
+    # 1. 刑事司法用語
+    t = re.sub(r'書類送検', 'しょるいそうけん', t)
+    t = re.sub(r'(?<!書類)送検', 'そうけん', t)
+    t = re.sub(r'書類送致', 'しょるいそうち', t)
+
+    # 2. VOICEVOX形態素誤読の補正
+    t = re.sub(r'入境', 'にゅうきょう', t)
+    t = re.sub(r'裏日本', 'うらにほん', t)
+
+    # 3. 熟語「〜章」の人名誤読（章->あきら）防止
+    # 「最終章」「序章」「第一章」「全○章」等の直後に助詞や読点が続く場合
+    t = re.sub(r'最終章', 'さいしゅうしょう', t)
+    t = re.sub(r'序章', 'じょしょう', t)
+    t = re.sub(r'終章', 'しゅうしょう', t)
+    t = re.sub(r'([第全各][一二三四五六七八九十0-9]+)章', r'\1しょう', t)
+
+    return t
+
+
 
 # ── 人名フルネームから「姓」の読み取得キャッシュ ──
 _wiki_surname_cache = {}
@@ -1427,6 +1481,9 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
     # 1.5 アイドルグループ（乃木坂46、櫻坂46、日向坂46、AKB48等）の読み方を解決
     t = apply_idol_group_rules(t)
 
+    # 1.6 ゲームタイトル（FFナンバリング・ローマ数字・FINAL FANTASY）の解決
+    t = apply_game_title_rules(t)
+
     # 2. テクノロジー大文字略語マップ適用（Case-sensitive）
     t = apply_tech_acronyms(t)
 
@@ -1447,10 +1504,11 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
             if orig and yomi and orig != "株探" and orig in t:
                 t = t.replace(orig, yomi)
 
-    # 6. 報道文法・国名プレフィックスと動詞文脈解決
+    # 6. 報道文法・国名プレフィックス・動詞文脈・司法・一般熟語ルール解決
     t = apply_country_prefixes(t)
     t = apply_okonau_context_rules(t)
     t = apply_person_kata_rules(t)
+    t = apply_legal_and_general_rules(t)
 
     # 7. 特殊固有名詞の動的解決
     # ⚠️ context_map（AI発音ダブルチェック）が渡されている場合は、文脈を無視したWikipedia検索による誤読
@@ -1529,6 +1587,32 @@ def heal_sentence_reading(display_text, speech_text):
     if not display_text or not speech_text:
         return speech_text or display_text or ""
 
+    # 🧠 台帳（data/pronunciation_memory.json）に登録された誤読（wrong_reading）の汎用自動修復
+    # 字幕（display_text）に surface が存在し、読み（speech_text）に wrong_reading が含まれている場合、
+    # LLMのハルシネーション・誤読と判定して正しい reading へ自動修復する。
+    healed_surfaces = set()
+    try:
+        pm_data = load_pronunciation_memory()
+        recs_with_wrong = [
+            r for r in pm_data.get("records", [])
+            if r.get("surface") and r.get("reading") and r.get("wrong_reading")
+        ]
+        # 長い wrong_reading から優先してマッチ（部分一致の多重誤爆を完全防止）
+        recs_with_wrong.sort(key=lambda x: len(x.get("wrong_reading", "")), reverse=True)
+
+        for rec in recs_with_wrong:
+            surf = rec["surface"]
+            correct_yomi = rec["reading"]
+            wrong_yomi = rec["wrong_reading"]
+            if wrong_yomi in speech_text and surf in display_text:
+                # 既に修正済みの正読に部分一致して重複置換されるのを防止（例: せきゆきょうきゅうの二重置換防止）
+                if correct_yomi not in speech_text:
+                    print(f"[誤読自己修復] 🩹 台帳照合修復: '{surf}' に対する誤読 '{wrong_yomi}' を正読 '{correct_yomi}' へ自動修復", flush=True)
+                    speech_text = speech_text.replace(wrong_yomi, correct_yomi)
+                    healed_surfaces.add(surf)
+    except Exception as e:
+        pass
+
     matcher = difflib.SequenceMatcher(None, display_text, speech_text)
     healed_parts = []
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
@@ -1537,7 +1621,10 @@ def heal_sentence_reading(display_text, speech_text):
         elif tag == "replace":
             orig = display_text[i1:i2]
             rep = speech_text[j1:j2]
-            if is_plausible_reading(orig, rep):
+            # 台帳で修復された公認語句はロールバックせず採用
+            if any(s in orig or orig in s for s in healed_surfaces):
+                healed_parts.append(rep)
+            elif is_plausible_reading(orig, rep):
                 healed_parts.append(rep)
             else:
                 print(f"[誤読自己修復] 🩹 異常置換検知: '{orig}' -> '{rep}' を元の '{orig}' へロールバック", flush=True)

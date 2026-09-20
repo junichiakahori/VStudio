@@ -39,54 +39,6 @@
       "note": "英語短縮語・製品名の誤読防止"
     },
     {
-      "id": "kata_arukata",
-      "surface": "計画がある方",
-      "reading": "計画があるかた",
-      "wrong_reading": "計画があるほう",
-      "scope": "global",
-      "article_topic": "一般ニュース・日本語文脈",
-      "sample_sentence": "旅行の計画がある方はお早めにお申し込みください。",
-      "category": "homophone_kata",
-      "registered_date": "2026-09-17",
-      "note": "動詞連体形＋方の誤読防止（人物を指す「かた」）"
-    },
-    {
-      "id": "kata_ayumaretakata",
-      "surface": "歩まれた方",
-      "reading": "歩まれたかた",
-      "wrong_reading": "歩まれたほう",
-      "scope": "global",
-      "article_topic": "一般ニュース・日本語文脈",
-      "sample_sentence": "激動の時代を歩まれた方でした。",
-      "category": "homophone_kata",
-      "registered_date": "2026-09-17",
-      "note": "動詞連体形＋方の誤読防止（人物を指す「かた」）"
-    },
-    {
-      "id": "kata_awaretakata",
-      "surface": "遭われた方",
-      "reading": "遭われたかた",
-      "wrong_reading": "遭われたほう",
-      "scope": "global",
-      "article_topic": "一般ニュース・日本語文脈",
-      "sample_sentence": "事故に遭われた方にお見舞い申し上げます。",
-      "category": "homophone_kata",
-      "registered_date": "2026-09-17",
-      "note": "動詞連体形＋方の誤読防止（人物を指す「かた」）"
-    },
-    {
-      "id": "kata_tantosaretakata",
-      "surface": "担当された方",
-      "reading": "担当されたかた",
-      "wrong_reading": "担当されたほう",
-      "scope": "global",
-      "article_topic": "一般ニュース・日本語文脈",
-      "sample_sentence": "今回の開発を担当された方に話を伺いました。",
-      "category": "homophone_kata",
-      "registered_date": "2026-09-17",
-      "note": "受身・敬語連体形＋方の誤読防止（人物を指す「かた」）"
-    },
-    {
       "id": "kisho_yoho_shi",
       "surface": "気象予報士",
       "reading": "きしょうよほうし",
@@ -97,42 +49,6 @@
       "category": "qualification",
       "registered_date": "2026-09-17",
       "note": "「士」が「さむらい」と誤読されるのを防止"
-    },
-    {
-      "id": "nogizaka46",
-      "surface": "乃木坂46",
-      "reading": "乃木坂フォーティーシックス",
-      "wrong_reading": "乃木坂46",
-      "scope": "global",
-      "article_topic": "エンタメ・アイドル",
-      "sample_sentence": "アイドルグループ乃木坂46の最新シングルが発売されました。",
-      "category": "idol_group",
-      "registered_date": "2026-09-17",
-      "note": "坂道シリーズ46の誤読（よんじゅうろく）防止"
-    },
-    {
-      "id": "sakurazaka46",
-      "surface": "櫻坂46",
-      "reading": "櫻坂フォーティーシックス",
-      "wrong_reading": "櫻坂46",
-      "scope": "global",
-      "article_topic": "エンタメ・アイドル",
-      "sample_sentence": "櫻坂46の全国ツアー日程が発表されました。",
-      "category": "idol_group",
-      "registered_date": "2026-09-17",
-      "note": "坂道シリーズ46の誤読（よんじゅうろく）防止"
-    },
-    {
-      "id": "hinatazaka46",
-      "surface": "日向坂46",
-      "reading": "日向坂フォーティーシックス",
-      "wrong_reading": "日向坂46",
-      "scope": "global",
-      "article_topic": "エンタメ・アイドル",
-      "sample_sentence": "日向坂46の冠番組がリニューアルされます。",
-      "category": "idol_group",
-      "registered_date": "2026-09-17",
-      "note": "坂道シリーズ46の誤読（よんじゅうろく）防止"
     },
     {
       "id": "akb48",
@@ -805,25 +721,6 @@
       "note": "Web自動解決 (duckduckgo)"
     },
     {
-      "id": "auto_1789676452_5968",
-      "surface": "海那",
-      "reading": "があります",
-      "scope": "contextual",
-      "article_topic": "日本代表W杯メンバーからの選外は5名…40歳長友佑都、今夏移籍の菅原由勢や小川航基らが外れる",
-      "sample_sentence": "海那に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-18",
-      "note": "Web自動解決 (duckduckgo)",
-      "context_keywords": [
-        "日本代表",
-        "メンバー",
-        "選外",
-        "40",
-        "歳長友佑都",
-        "今夏移籍"
-      ]
-    },
-    {
       "id": "auto_1789676840_2955",
       "surface": "橋上",
       "reading": "はしがみ",
@@ -843,17 +740,6 @@
       ]
     },
     {
-      "id": "auto_1789676970_9823",
-      "surface": "大内拓実",
-      "reading": "があります",
-      "scope": "global",
-      "article_topic": "水戸女性殺害 動機は「リセット",
-      "sample_sentence": "大内拓実に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-18",
-      "note": "Web自動解決 (duckduckgo)"
-    },
-    {
       "id": "auto_1789676973_8747",
       "surface": "大内",
       "reading": "おおうち",
@@ -868,6 +754,1555 @@
         "動機",
         "リセット"
       ]
+    },
+    {
+      "id": "auto_1789678755_37",
+      "surface": "鈴木直道",
+      "reading": "すずきなおみち",
+      "scope": "global",
+      "article_topic": "速報】自民の渡辺孝一衆院議員が死去",
+      "sample_sentence": "鈴木直道に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789681851_2596",
+      "surface": "田沢",
+      "reading": "たざわ",
+      "scope": "contextual",
+      "article_topic": "捜査車両で舌をペロッと出し“ウィンク”も コカイン所持容疑で逮捕のインフルエンサー「ヤマトリノ」こと田沢梨乃容疑者",
+      "sample_sentence": "田沢に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "捜査車両",
+        "ペロッ",
+        "ウィンク",
+        "コカイン",
+        "所持容疑",
+        "逮捕"
+      ]
+    },
+    {
+      "id": "auto_1789682450_278",
+      "surface": "F1",
+      "reading": "エフワン",
+      "scope": "global",
+      "article_topic": "最大の過ちだった」同僚フェルスタッペンを真似て挫折 角田裕毅が打ち明けたレッドブル時代の苦労「人生を楽しめてなかった",
+      "sample_sentence": "F1に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789682509_788",
+      "surface": "高等学校",
+      "reading": "こうとうがっこう",
+      "scope": "global",
+      "article_topic": "プロ志望届】横浜・最速157キロ 右腕、織田翔希のプロ志望届が公示",
+      "sample_sentence": "高等学校に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789683025_2136",
+      "surface": "藤川",
+      "reading": "ふじかわ",
+      "scope": "contextual",
+      "article_topic": "〇虎将トーク】阪神・藤川監督、3日以来の白星に「毎日新しい気持ちでやっています」スタメン木浪「動きにキレがありました",
+      "sample_sentence": "藤川に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "虎将",
+        "トーク",
+        "阪神",
+        "藤川監督",
+        "日以来",
+        "白星"
+      ]
+    },
+    {
+      "id": "auto_1789684387_9954",
+      "surface": "D2",
+      "reading": "ディーツー",
+      "scope": "global",
+      "article_topic": "ADHDの発症メカニズムの一端を解明、「薬が効かない人」への治療の手がかりに",
+      "sample_sentence": "D2に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789722080_7911",
+      "surface": "杉山",
+      "reading": "すぎやま",
+      "scope": "contextual",
+      "article_topic": "えっ！なつかし！」 女子バレー日本と今日対戦、インドネシア監督に注目「あんまり変わってない！？」（THE ANSWER）",
+      "sample_sentence": "杉山に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "女子",
+        "バレー",
+        "日本",
+        "今日対戦",
+        "インドネシア",
+        "監督"
+      ]
+    },
+    {
+      "id": "auto_1789722082_912",
+      "surface": "北朝鮮",
+      "reading": "きたちょうせん",
+      "scope": "contextual",
+      "article_topic": "えっ！なつかし！」 女子バレー日本と今日対戦、インドネシア監督に注目「あんまり変わってない！？」（THE ANSWER）",
+      "sample_sentence": "北朝鮮に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (duckduckgo)",
+      "context_keywords": [
+        "女子",
+        "バレー",
+        "日本",
+        "今日対戦",
+        "インドネシア",
+        "監督"
+      ]
+    },
+    {
+      "id": "auto_1789722266_496",
+      "surface": "野田佳彦",
+      "reading": "のだよしひこ",
+      "scope": "global",
+      "article_topic": "野田さんと安住さんは入れないほうがいいのでは…」 新党「民主改革の会」に早くも不安 「戦犯」2名の“排除”を求める意見",
+      "sample_sentence": "野田佳彦に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789722327_957",
+      "surface": "元英",
+      "reading": "げんえい",
+      "scope": "contextual",
+      "article_topic": "ロシアのウクライナ列車攻撃は暗殺未遂か、警告か？ プーチンの思惑は、とるべき対抗措置は",
+      "sample_sentence": "元英に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "ロシア",
+        "ウクライナ",
+        "列車攻撃",
+        "暗殺未遂",
+        "警告",
+        "プーチン"
+      ]
+    },
+    {
+      "id": "auto_1789722749_3792",
+      "surface": "植田",
+      "reading": "うえだ",
+      "scope": "contextual",
+      "article_topic": "日銀・植田総裁、利上げペース「３か月に１回とか特定のもの念頭にない」…政策の局面「変化した」との認識も示す",
+      "sample_sentence": "植田に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "日銀",
+        "植田総裁",
+        "利上",
+        "ペース",
+        "特定",
+        "念頭"
+      ]
+    },
+    {
+      "id": "auto_1789722750_7365",
+      "surface": "日銀",
+      "reading": "にっぽんぎんこう",
+      "scope": "contextual",
+      "article_topic": "日銀・植田総裁、利上げペース「３か月に１回とか特定のもの念頭にない」…政策の局面「変化した」との認識も示す",
+      "sample_sentence": "日銀に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "日銀",
+        "植田総裁",
+        "利上",
+        "ペース",
+        "特定",
+        "念頭"
+      ]
+    },
+    {
+      "id": "auto_1789723019_9812",
+      "surface": "横浜",
+      "reading": "よこはま",
+      "scope": "contextual",
+      "article_topic": "横浜市長選挙、共産・浅賀氏が立候補の意向固める 県副委員長、衆参で出馬",
+      "sample_sentence": "横浜に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "横浜市長選挙",
+        "共産",
+        "浅賀氏",
+        "立候補",
+        "意向固",
+        "県副委員長"
+      ]
+    },
+    {
+      "id": "auto_1789723315_1446",
+      "surface": "次期",
+      "reading": "じき",
+      "scope": "contextual",
+      "article_topic": "改造内閣 非主流派結集のリスクも",
+      "sample_sentence": "次期に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (duckduckgo)",
+      "context_keywords": [
+        "改造内閣",
+        "非主流派結集",
+        "リスク"
+      ]
+    },
+    {
+      "id": "auto_1789724158_8582",
+      "surface": "野党",
+      "reading": "やとう",
+      "scope": "contextual",
+      "article_topic": "米、サウジへのF35戦闘機売却を承認 野党議員「中国に技術流出」警告",
+      "sample_sentence": "野党に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "サウジ",
+        "F35",
+        "戦闘機売却",
+        "承認",
+        "野党議員",
+        "中国"
+      ]
+    },
+    {
+      "id": "auto_1789724381_8678",
+      "surface": "下院",
+      "reading": "かいん",
+      "scope": "contextual",
+      "article_topic": "トランプ氏のゴルフ場改修、最大76億円に上る可能性 文書で判明",
+      "sample_sentence": "下院に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "トランプ",
+        "ゴルフ",
+        "場改修",
+        "最大",
+        "76",
+        "億円"
+      ]
+    },
+    {
+      "id": "auto_1789725236_823",
+      "surface": "南場智子",
+      "reading": "なんばともこ",
+      "scope": "global",
+      "article_topic": "経営「AIでラクして早く帰って」→社員「帰らない」 工数最大9割減のDeNAも悩むAI効率化の壁（1/3 ページ）",
+      "sample_sentence": "南場智子に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789725693_1725",
+      "surface": "若手",
+      "reading": "わかて",
+      "scope": "contextual",
+      "article_topic": "中国のAI覇権を阻止するために みっともない若手議員の北京詣で 大手町の片隅から",
+      "sample_sentence": "若手に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (duckduckgo)",
+      "context_keywords": [
+        "中国",
+        "AI",
+        "覇権",
+        "阻止",
+        "若手議員",
+        "北京詣"
+      ]
+    },
+    {
+      "id": "auto_1789726385_9386",
+      "surface": "古川政調",
+      "reading": "せいちょう",
+      "scope": "global",
+      "article_topic": "チームみらいが新体制発表 古川政調会長が幹事長に",
+      "sample_sentence": "古川政調に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (duckduckgo)"
+    },
+    {
+      "id": "auto_1789726388_8370",
+      "surface": "政調",
+      "reading": "せいちょう",
+      "scope": "contextual",
+      "article_topic": "チームみらいが新体制発表 古川政調会長が幹事長に",
+      "sample_sentence": "政調に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (duckduckgo)",
+      "context_keywords": [
+        "チーム",
+        "新体制発表",
+        "古川政調会長",
+        "幹事長"
+      ]
+    },
+    {
+      "id": "auto_1789726429_826",
+      "surface": "服部",
+      "reading": "はっとり",
+      "scope": "contextual",
+      "article_topic": "根回しなし宣言の知事へ質問緊迫 議長が「答弁できますか？」 福岡（朝日新聞）",
+      "sample_sentence": "服部に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "根回",
+        "宣言",
+        "知事",
+        "質問緊迫",
+        "議長",
+        "答弁"
+      ]
+    },
+    {
+      "id": "auto_1789727146_3181",
+      "surface": "清水崇",
+      "reading": "しみずたかし",
+      "scope": "contextual",
+      "article_topic": "エンタメGO】 新作映画「八つ墓村」かなり攻めてる！ “金田一×Jホラー”の再構築がアツい",
+      "sample_sentence": "清水崇に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "エンタメ",
+        "GO",
+        "新作映画",
+        "墓村",
+        "金田一",
+        "ホラー"
+      ]
+    },
+    {
+      "id": "auto_1789728216_3830",
+      "surface": "相川",
+      "reading": "あいかわ",
+      "scope": "contextual",
+      "article_topic": "ＤｅＮＡ】４年ぶり破竹８連勝で〝超奇跡〟逆転Ｖが視野…虎と５・５差＆直接対決５試合",
+      "sample_sentence": "相川に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "破竹",
+        "連勝",
+        "超奇跡",
+        "逆転",
+        "視野",
+        "直接対決"
+      ]
+    },
+    {
+      "id": "auto_1789728219_8087",
+      "surface": "相川亮二",
+      "reading": "あいかわりょうじ",
+      "scope": "global",
+      "article_topic": "ＤｅＮＡ】４年ぶり破竹８連勝で〝超奇跡〟逆転Ｖが視野…虎と５・５差＆直接対決５試合",
+      "sample_sentence": "相川亮二に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789728316_4177",
+      "surface": "矢野",
+      "reading": "やの",
+      "scope": "contextual",
+      "article_topic": "“ゾンビたばこ”より悪質…羽月に“根性焼き”報道のカープ選手、合同自主トレでの「不敬発言」が引き金か（週刊女性PRIME）",
+      "sample_sentence": "矢野に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "ゾンビ",
+        "悪質",
+        "羽月",
+        "根性焼",
+        "報道",
+        "カープ"
+      ]
+    },
+    {
+      "id": "auto_1789728317_129",
+      "surface": "前川",
+      "reading": "まえかわ",
+      "scope": "contextual",
+      "article_topic": "“ゾンビたばこ”より悪質…羽月に“根性焼き”報道のカープ選手、合同自主トレでの「不敬発言」が引き金か（週刊女性PRIME）",
+      "sample_sentence": "前川に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "ゾンビ",
+        "悪質",
+        "羽月",
+        "根性焼",
+        "報道",
+        "カープ"
+      ]
+    },
+    {
+      "id": "auto_1789728317_9906",
+      "surface": "先輩",
+      "reading": "せんぱい",
+      "scope": "contextual",
+      "article_topic": "“ゾンビたばこ”より悪質…羽月に“根性焼き”報道のカープ選手、合同自主トレでの「不敬発言」が引き金か（週刊女性PRIME）",
+      "sample_sentence": "先輩に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "ゾンビ",
+        "悪質",
+        "羽月",
+        "根性焼",
+        "報道",
+        "カープ"
+      ]
+    },
+    {
+      "id": "auto_1789728367_1131",
+      "surface": "柳田悠岐",
+      "reading": "やなぎたゆうき",
+      "scope": "global",
+      "article_topic": "柳田悠岐選手独占手記】小久保裕紀監督3年目「初めて力になれたかな",
+      "sample_sentence": "柳田悠岐に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789728443_1517",
+      "surface": "徳本一善",
+      "reading": "とくもとかずよし",
+      "scope": "global",
+      "article_topic": "徳本一善監督率いる芝浦工大「１０位を目指す。来年のために１５位以内に入りたい」あと１か月で箱根駅伝予選会",
+      "sample_sentence": "徳本一善に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789728623_2529",
+      "surface": "日本人",
+      "reading": "にほんじん",
+      "scope": "contextual",
+      "article_topic": "村上宗隆が32号3ラン",
+      "sample_sentence": "日本人に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "村上宗隆",
+        "32",
+        "ラン"
+      ]
+    },
+    {
+      "id": "auto_1789728747_9915",
+      "surface": "G1",
+      "reading": "ジーワン",
+      "scope": "global",
+      "article_topic": "ジョッキークラブGC】「真の王者は試練を越える」ライバル調教師がフォーエバーヤングを絶賛",
+      "sample_sentence": "G1に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789729062_4712",
+      "surface": "選手",
+      "reading": "せんしゅ",
+      "scope": "contextual",
+      "article_topic": "栗原陵矢がアウトカウントを間違えた夜 球場を後にした午後11時半…室内から聞こえた打球音「納得いかない、自分に",
+      "sample_sentence": "選手に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "栗原陵矢",
+        "アウトカウント",
+        "間違",
+        "球場",
+        "午後",
+        "11"
+      ]
+    },
+    {
+      "id": "auto_1789730647_4356",
+      "surface": "平木理化",
+      "reading": "ひらきりか",
+      "scope": "global",
+      "article_topic": "40代巡査長を減給処分 勤務中に約3400回にわたりスマートフォンなどでゲーム、動画を閲覧 さらに巡回の虚偽報告…",
+      "sample_sentence": "平木理化に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789731678_6369",
+      "surface": "松井孝治",
+      "reading": "まついこうじ",
+      "scope": "global",
+      "article_topic": "国際化学オリンピックで、最年少で銀メダル受賞「泣きそうになるくらいうれしかった」 （京都新聞）",
+      "sample_sentence": "松井孝治に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789731678_9880",
+      "surface": "松井",
+      "reading": "まつい",
+      "scope": "contextual",
+      "article_topic": "国際化学オリンピックで、最年少で銀メダル受賞「泣きそうになるくらいうれしかった」 （京都新聞）",
+      "sample_sentence": "松井に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-18",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "国際化学",
+        "オリンピック",
+        "最年少",
+        "メダル",
+        "受賞",
+        "京都新聞"
+      ]
+    },
+    {
+      "id": "auto_1789765585_7155",
+      "surface": "同伴",
+      "reading": "どうはん",
+      "scope": "contextual",
+      "article_topic": "めちゃめちゃ楽しかった」渋野日向子との1年ぶり競演 河本結が納得の3位発進",
+      "sample_sentence": "同伴に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "渋野日向子",
+        "競演",
+        "河本結",
+        "納得",
+        "位発進"
+      ]
+    },
+    {
+      "id": "auto_1789765660_2088",
+      "surface": "沖縄県",
+      "reading": "おきなわけん",
+      "scope": "contextual",
+      "article_topic": "就任辞退し、再選挙を」 沖縄知事選で初当選した古謝氏の子供たち通う学校に爆破予告",
+      "sample_sentence": "沖縄県に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "就任辞退",
+        "再選挙",
+        "沖縄知事選",
+        "初当選",
+        "古謝氏",
+        "子供"
+      ]
+    },
+    {
+      "id": "auto_1789766435_2051",
+      "surface": "鈴木康友",
+      "reading": "すずきやすとも",
+      "scope": "global",
+      "article_topic": "閉山期の富士山、登山届未提出者に50000円以下の過料へ 相次ぐ遭難受け静岡県が方針",
+      "sample_sentence": "鈴木康友に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789768274_841",
+      "surface": "名誉",
+      "reading": "めいよ",
+      "scope": "contextual",
+      "article_topic": "ウォーレン・バフェット氏が会長退任、米バークシャー 名誉会長に",
+      "sample_sentence": "名誉に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "ウォーレン",
+        "バフェット",
+        "会長退任",
+        "バークシャー",
+        "名誉会長"
+      ]
+    },
+    {
+      "id": "auto_1789768337_556",
+      "surface": "福島",
+      "reading": "ふくしま",
+      "scope": "contextual",
+      "article_topic": "速報】福島知事、復興相の兼務で首相に面会要請",
+      "sample_sentence": "福島に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "速報",
+        "福島知事",
+        "復興相",
+        "兼務",
+        "首相",
+        "面会要請"
+      ]
+    },
+    {
+      "id": "auto_1789768337_6887",
+      "surface": "福島県",
+      "reading": "ふくしまけん",
+      "scope": "contextual",
+      "article_topic": "速報】福島知事、復興相の兼務で首相に面会要請",
+      "sample_sentence": "福島県に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "速報",
+        "福島知事",
+        "復興相",
+        "兼務",
+        "首相",
+        "面会要請"
+      ]
+    },
+    {
+      "id": "auto_1789768338_6504",
+      "surface": "内堀雅雄",
+      "reading": "うちぼりまさお",
+      "scope": "global",
+      "article_topic": "速報】福島知事、復興相の兼務で首相に面会要請",
+      "sample_sentence": "内堀雅雄に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789769705_2339",
+      "surface": "中島卓也",
+      "reading": "なかしまたくや",
+      "scope": "global",
+      "article_topic": "中島卓也が明かす西川遥輝のすごさ はるたくコンビの相方は「アイツも頑張る天才",
+      "sample_sentence": "中島卓也に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789769836_5710",
+      "surface": "谷村",
+      "reading": "やむら",
+      "scope": "contextual",
+      "article_topic": "SAMURAI BLUE、9月10月の4連戦に谷村選手、松木選手ら4人が初招集、佐藤選手、熊坂選手らも復帰",
+      "sample_sentence": "谷村に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "SAMURAI",
+        "BLUE",
+        "10",
+        "連戦",
+        "谷村選手",
+        "松木選手"
+      ]
+    },
+    {
+      "id": "auto_1789769836_6712",
+      "surface": "松木",
+      "reading": "まつき",
+      "scope": "contextual",
+      "article_topic": "SAMURAI BLUE、9月10月の4連戦に谷村選手、松木選手ら4人が初招集、佐藤選手、熊坂選手らも復帰",
+      "sample_sentence": "松木に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "SAMURAI",
+        "BLUE",
+        "10",
+        "連戦",
+        "谷村選手",
+        "松木選手"
+      ]
+    },
+    {
+      "id": "auto_1789769931_7069",
+      "surface": "G2",
+      "reading": "ジートゥー",
+      "scope": "global",
+      "article_topic": "オールカマー】台風接近で波乱必至！？道悪で浮上する激走候補",
+      "sample_sentence": "G2に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789770490_9432",
+      "surface": "吉川",
+      "reading": "よしかわ",
+      "scope": "contextual",
+      "article_topic": "巨人・橋上監督代行、吉川尚輝の昇格理由「（浦田に関わらず）ちょうどこのタイミングではあった。『吉川選手を使いなさい』ということなのかなと",
+      "sample_sentence": "吉川に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "巨人",
+        "橋上監督代行",
+        "吉川尚輝",
+        "昇格理由",
+        "浦田",
+        "タイミング"
+      ]
+    },
+    {
+      "id": "auto_1789770490_9200",
+      "surface": "橋上秀樹",
+      "reading": "はしがみひでき",
+      "scope": "global",
+      "article_topic": "巨人・橋上監督代行、吉川尚輝の昇格理由「（浦田に関わらず）ちょうどこのタイミングではあった。『吉川選手を使いなさい』ということなのかなと",
+      "sample_sentence": "橋上秀樹に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789770603_4238",
+      "surface": "船越",
+      "reading": "ふなこし",
+      "scope": "contextual",
+      "article_topic": "［アルビレックス新潟］船越監督「期待しかない」と太鼓判の新加入選手、出番は？…19日ホームで磐田戦【予想先発メンバー付き",
+      "sample_sentence": "船越に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "アルビレックス",
+        "新潟",
+        "船越監督",
+        "期待",
+        "太鼓判",
+        "新加入選手"
+      ]
+    },
+    {
+      "id": "auto_1789770712_499",
+      "surface": "森下",
+      "reading": "もりした",
+      "scope": "contextual",
+      "article_topic": "鳥谷敬】阪神はクリーンアップが失投誘い得点増える流れ戻る うなった広島秋山の外角打つ技術",
+      "sample_sentence": "森下に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "鳥谷敬",
+        "阪神",
+        "クリーンアップ",
+        "失投誘",
+        "得点増",
+        "広島秋山"
+      ]
+    },
+    {
+      "id": "auto_1789809074_5028",
+      "surface": "陸上",
+      "reading": "りくじょう",
+      "scope": "contextual",
+      "article_topic": "競技用車いすに車追突 選手が重体",
+      "sample_sentence": "陸上に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "競技用車",
+        "車追突",
+        "選手",
+        "重体"
+      ]
+    },
+    {
+      "id": "auto_1789809127_8234",
+      "surface": "猪俣周杜",
+      "reading": "いのまたしゅうと",
+      "scope": "global",
+      "article_topic": "県委託撮影ドローン 市役所に衝突",
+      "sample_sentence": "猪俣周杜に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789810050_9261",
+      "surface": "金獅子賞",
+      "reading": "きんじししょう",
+      "scope": "global",
+      "article_topic": "露 金獅子賞監督を「スパイ」指定",
+      "sample_sentence": "金獅子賞に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789810051_2847",
+      "surface": "映画",
+      "reading": "えいが",
+      "scope": "contextual",
+      "article_topic": "露 金獅子賞監督を「スパイ」指定",
+      "sample_sentence": "映画に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "金獅子賞監督",
+        "スパイ",
+        "指定"
+      ]
+    },
+    {
+      "id": "auto_1789810389_4532",
+      "surface": "市場",
+      "reading": "いちば",
+      "scope": "contextual",
+      "article_topic": "硫黄でいぶした違法加工のタケノコ流通 中国、製品差し押さえ 白菜に続き食品安全懸念",
+      "sample_sentence": "市場に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "硫黄",
+        "違法加工",
+        "タケノコ",
+        "流通",
+        "中国",
+        "製品差"
+      ]
+    },
+    {
+      "id": "auto_1789810707_3336",
+      "surface": "労働基準",
+      "reading": "ろうどうきじゅん",
+      "scope": "global",
+      "article_topic": "障害者雇用ビジネス巡り労災認定",
+      "sample_sentence": "労働基準に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789810995_690",
+      "surface": "側近",
+      "reading": "そっきん",
+      "scope": "contextual",
+      "article_topic": "閣外」林氏、総裁選へ始動か 地方行脚継続、高市首相サイド警戒：時事ドットコム",
+      "sample_sentence": "側近に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "閣外",
+        "林氏",
+        "総裁選",
+        "始動",
+        "地方行脚継続",
+        "高市首相"
+      ]
+    },
+    {
+      "id": "auto_1789811341_2508",
+      "surface": "MIU404",
+      "reading": "ミュウヨンマルヨン",
+      "scope": "global",
+      "article_topic": "SWに観たい】ノンストップ作品6選",
+      "sample_sentence": "MIU404に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789811474_2030",
+      "surface": "函館",
+      "reading": "はこだて",
+      "scope": "contextual",
+      "article_topic": "日テレ 「ZIP！」の小泉防衛相の役職希望アンケート巡る報道を謝罪「事実と異なる内容をお伝え」（スポニチアネックス）",
+      "sample_sentence": "函館に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "テレ",
+        "ZIP",
+        "小泉防衛相",
+        "役職希望",
+        "アンケート",
+        "報道"
+      ]
+    },
+    {
+      "id": "auto_1789812480_9710",
+      "surface": "現役",
+      "reading": "げんえき",
+      "scope": "contextual",
+      "article_topic": "阪神・大山 球団歴代１０人目の通算７００打点 今季で１０年目「もっともっと自分を強くしていきたい",
+      "sample_sentence": "現役に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "阪神",
+        "大山",
+        "球団歴代",
+        "人目",
+        "通算",
+        "打点"
+      ]
+    },
+    {
+      "id": "auto_1789813025_2066",
+      "surface": "巨人",
+      "reading": "きょじん",
+      "scope": "contextual",
+      "article_topic": "江川卓」が逃した「巨人監督就任」3度のチャンス それを阻んだ“球界のドン” 【監督になれなかった名選手たち",
+      "sample_sentence": "巨人に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "江川卓",
+        "巨人監督就任",
+        "チャンス",
+        "球界",
+        "ドン",
+        "監督"
+      ]
+    },
+    {
+      "id": "auto_1789813292_7773",
+      "surface": "代表",
+      "reading": "だいひょう",
+      "scope": "contextual",
+      "article_topic": "ジダン新体制が始動！ フランス代表のメンバー23名が決定…エンバペら常連組に加えて5名が初招集",
+      "sample_sentence": "代表に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "ジダン",
+        "新体制",
+        "始動",
+        "フランス",
+        "代表",
+        "メンバー"
+      ]
+    },
+    {
+      "id": "auto_1789813403_3841",
+      "surface": "相手",
+      "reading": "あいて",
+      "scope": "contextual",
+      "article_topic": "初先発で初ゴールのリヨンFW中村敬斗、EL初戦での活躍を振り返る特別映像をクラブが投稿 得点の瞬間、絶妙スルーパスなど",
+      "sample_sentence": "相手に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "初先発",
+        "ゴール",
+        "リヨン",
+        "FW",
+        "中村敬斗",
+        "EL"
+      ]
+    },
+    {
+      "id": "auto_1789814300_7101",
+      "surface": "Web3",
+      "reading": "ウェブスリー",
+      "scope": "global",
+      "article_topic": "AWS Lambda、Amazon S3 Filesの直接読み取り設定に対応",
+      "sample_sentence": "Web3に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-19",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789851886_9653",
+      "surface": "区議会",
+      "reading": "くぎかい",
+      "scope": "contextual",
+      "article_topic": "大阪都構想】特別区の名称として「天満区」「上町区」「新大阪区」など 大阪維新の会が10パターンの案を検討始める",
+      "sample_sentence": "区議会に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "大阪都構想",
+        "特別区",
+        "名称",
+        "天満区",
+        "上町区",
+        "新大阪区"
+      ]
+    },
+    {
+      "id": "auto_1789852482_1282",
+      "surface": "乃木坂46",
+      "reading": "のぎざかフォーティーシックス",
+      "scope": "global",
+      "article_topic": "画像まとめ】若月佑美、タトゥー＆喫煙姿の反響に「安心して下さいという気持ち",
+      "sample_sentence": "乃木坂46に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789852995_5091",
+      "surface": "United24",
+      "reading": "ユナイテッド",
+      "scope": "global",
+      "article_topic": "ロシアの待ち伏せ攻撃ドローンを“お婆さん”がまさかの方法で無力化する動画公開 原始的でありつつも確実な方法だった!?",
+      "sample_sentence": "United24に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789853504_1501",
+      "surface": "Moto2",
+      "reading": "ロードレースせかいせんしゅけん",
+      "scope": "global",
+      "article_topic": "大丈夫かキャデラックF1！ プロジェクトの資金提供元の保険会社とオーナーが集団訴訟に直面 - motorsport.com 日本版",
+      "sample_sentence": "Moto2に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789853781_8047",
+      "surface": "尾花沢",
+      "reading": "おばなざわ",
+      "scope": "contextual",
+      "article_topic": "元参議院議員の星川保松さんが死去",
+      "sample_sentence": "尾花沢に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "元参議院議員",
+        "星川保松",
+        "死去"
+      ]
+    },
+    {
+      "id": "auto_1789853782_3642",
+      "surface": "参議院",
+      "reading": "さんぎいん",
+      "scope": "contextual",
+      "article_topic": "元参議院議員の星川保松さんが死去",
+      "sample_sentence": "参議院に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "元参議院議員",
+        "星川保松",
+        "死去"
+      ]
+    },
+    {
+      "id": "auto_1789853904_1638",
+      "surface": "日向坂46",
+      "reading": "ひなたざかフォーティーシックス",
+      "scope": "global",
+      "article_topic": "日向坂46大野愛実：CanCamモデルとしても活躍中の人気アイドル TGCでガーリーコーデ 大人っぽい表情も",
+      "sample_sentence": "日向坂46に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789855024_2059",
+      "surface": "野球",
+      "reading": "やきゅう",
+      "scope": "contextual",
+      "article_topic": "《岩本勉のガン流Ｆ論》ごっつい野球選手・柴田。またも育成手腕の見せどころ",
+      "sample_sentence": "野球に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "岩本勉",
+        "ガン",
+        "野球選手",
+        "柴田",
+        "育成手腕"
+      ]
+    },
+    {
+      "id": "auto_1789855526_1170",
+      "surface": "人気",
+      "reading": "にんき",
+      "scope": "contextual",
+      "article_topic": "DeNA牧 7回に逆転満塁ホームラン",
+      "sample_sentence": "人気に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "DeNA",
+        "逆転満塁",
+        "ホームラン"
+      ]
+    },
+    {
+      "id": "auto_1789855574_5309",
+      "surface": "西口文也",
+      "reading": "にしぐちふみや",
+      "scope": "global",
+      "article_topic": "西武】隅田知一郎が２年連続で２桁勝利到達　２試合連続で与四球なしの根負けしない投球光る",
+      "sample_sentence": "西口文也に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789855689_2869",
+      "surface": "松橋力蔵",
+      "reading": "まつはしりきぞう",
+      "scope": "global",
+      "article_topic": "9/19名古屋戦 MATCH REVIEW & INTERVIEW - FC東京オフィシャルホームページ",
+      "sample_sentence": "松橋力蔵に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789855690_6734",
+      "surface": "高宇洋",
+      "reading": "こうたかひろ",
+      "scope": "contextual",
+      "article_topic": "9/19名古屋戦 MATCH REVIEW & INTERVIEW - FC東京オフィシャルホームページ",
+      "sample_sentence": "高宇洋に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "19",
+        "名古屋戦",
+        "MATCH",
+        "REVIEW",
+        "INTERVIEW",
+        "FC"
+      ]
+    },
+    {
+      "id": "auto_1789855763_6987",
+      "surface": "新井",
+      "reading": "あらい",
+      "scope": "contextual",
+      "article_topic": "広島・新井監督「当たり前のことだけど」 四回、落球時の中村奨成の三塁進塁を評価「隙を見せない」決勝点につながる",
+      "sample_sentence": "新井に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "広島",
+        "新井監督",
+        "四回",
+        "落球時",
+        "中村奨成",
+        "三塁進塁"
+      ]
+    },
+    {
+      "id": "auto_1789855763_6869",
+      "surface": "新井貴浩",
+      "reading": "あらいたかひろ",
+      "scope": "global",
+      "article_topic": "広島・新井監督「当たり前のことだけど」 四回、落球時の中村奨成の三塁進塁を評価「隙を見せない」決勝点につながる",
+      "sample_sentence": "新井貴浩に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789855810_6490",
+      "surface": "鬼木達",
+      "reading": "おにきとおる",
+      "scope": "contextual",
+      "article_topic": "鬼木達監督「これから絶対に強くなるな、っていう確信めいたものがあるんですが、結果がついてこないと、そこのところに言葉の重みものっかってこない」／【コメント】J1第8節",
+      "sample_sentence": "鬼木達に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "鬼木達監督",
+        "絶対",
+        "確信",
+        "結果",
+        "言葉",
+        "コメント"
+      ]
+    },
+    {
+      "id": "auto_1789855873_2475",
+      "surface": "関口正大",
+      "reading": "せきぐちまさひろ",
+      "scope": "global",
+      "article_topic": "［アルビ試合後リポート］勝利､首位浮上…それでも「僕はいつもあの人の背中を追いかけている」 第７節ホーム磐田戦",
+      "sample_sentence": "関口正大に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789855876_7461",
+      "surface": "船越優蔵",
+      "reading": "ふなこしゆうぞう",
+      "scope": "global",
+      "article_topic": "［アルビ試合後リポート］勝利､首位浮上…それでも「僕はいつもあの人の背中を追いかけている」 第７節ホーム磐田戦",
+      "sample_sentence": "船越優蔵に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789856182_9032",
+      "surface": "H3",
+      "reading": "エイチスリー",
+      "scope": "global",
+      "article_topic": "VRAM容量32GBで30万円未満なIntelグラボ「Intel Arc Pro B70 Creator 32GB」でローカルLLM「Qwen3.8 27B」や動画生成AI「MiniMax H3」を実行して生成速度を確かめてみた",
+      "sample_sentence": "H3に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789856235_2571",
+      "surface": "韓国",
+      "reading": "だいかんみんこく",
+      "scope": "contextual",
+      "article_topic": "北朝鮮選手、行進でスマホ自撮り リラックスし入場（共同通信）",
+      "sample_sentence": "韓国に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "北朝鮮選手",
+        "行進",
+        "スマホ",
+        "自撮",
+        "リラックス",
+        "入場"
+      ]
+    },
+    {
+      "id": "auto_1789898171_9350",
+      "surface": "猪俣",
+      "reading": "いのまた",
+      "scope": "contextual",
+      "article_topic": "timelesz猪俣周杜容疑者を送検 事件当時に使用の車は関係者名義 知人女性の顔を複数回殴りけがさせた疑い",
+      "sample_sentence": "猪俣に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (duckduckgo)",
+      "context_keywords": [
+        "timelesz",
+        "猪俣周杜容疑者",
+        "送検",
+        "事件当時",
+        "使用",
+        "関係者名義"
+      ]
+    },
+    {
+      "id": "auto_1789898275_3822",
+      "surface": "法務",
+      "reading": "ほうむ",
+      "scope": "contextual",
+      "article_topic": "安保法制成立11年、国会前で反対集会 ラサール氏、高市政権の発信を「ナチスそのもの",
+      "sample_sentence": "法務に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "安保法制成立",
+        "11",
+        "国会前",
+        "反対集会",
+        "ラサール",
+        "高市政権"
+      ]
+    },
+    {
+      "id": "auto_1789898428_2389",
+      "surface": "X2",
+      "reading": "ますか",
+      "scope": "global",
+      "article_topic": "旗振り合図が原則だった列車接近「見張り員」、専門家はＧＰＳなど活用の重要性強調…東武事故１か月",
+      "sample_sentence": "X2に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (duckduckgo)"
+    },
+    {
+      "id": "auto_1789898483_6900",
+      "surface": "沖縄",
+      "reading": "つきで",
+      "scope": "contextual",
+      "article_topic": "沖縄知事選で大敗の玉城氏、2期8年の失政 さらば「オール沖縄」県政 日曜に書く",
+      "sample_sentence": "沖縄に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (duckduckgo)",
+      "context_keywords": [
+        "沖縄知事選",
+        "大敗",
+        "玉城氏",
+        "失政",
+        "オール",
+        "沖縄"
+      ]
+    },
+    {
+      "id": "auto_1789898975_6217",
+      "surface": "奈良県",
+      "reading": "ならけん",
+      "scope": "contextual",
+      "article_topic": "2027年春の奈良県知事選 前田原本町長の森氏が自民党奈良県連に推薦願",
+      "sample_sentence": "奈良県に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "2027",
+        "年春",
+        "奈良県知事選",
+        "前田原本町長",
+        "森氏",
+        "自民党奈良県連"
+      ]
+    },
+    {
+      "id": "auto_1789899234_5736",
+      "surface": "佐藤淳",
+      "reading": "さとうじゅん",
+      "scope": "contextual",
+      "article_topic": "犬猫の保護依頼増 飼い主が高齢化",
+      "sample_sentence": "佐藤淳に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "犬猫",
+        "保護依頼増",
+        "高齢化"
+      ]
+    },
+    {
+      "id": "auto_1789899278_962",
+      "surface": "東国原元",
+      "reading": "ひがしこくばる",
+      "scope": "global",
+      "article_topic": "東国原元知事 書類送検 ＳＮＳ投稿 名誉毀損疑い",
+      "sample_sentence": "東国原元に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (duckduckgo)"
+    },
+    {
+      "id": "auto_1789899645_3399",
+      "surface": "F4",
+      "reading": "それぞれ",
+      "scope": "global",
+      "article_topic": "フランス最新戦闘機に「日本のゆるキャラ」が同乗！ 幸運を掴んだマスコットの正体とは？ 雲上の様子が公開",
+      "sample_sentence": "F4に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789901748_1622",
+      "surface": "永山英樹",
+      "reading": "ながやまひでき",
+      "scope": "global",
+      "article_topic": "台湾はチャイニーズ・タイペイではない」日台有志が「正名」訴え会見 28年ロス五輪へ",
+      "sample_sentence": "永山英樹に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789903563_3143",
+      "surface": "田村",
+      "reading": "たむら",
+      "scope": "contextual",
+      "article_topic": "自民・田村憲久氏、熱愛報道のTBS若林有子アナに「ご家族にはしっかりとお伝えを」　父の心境「ちょっと悲しいけどうれしい」　娘は田村真子アナ",
+      "sample_sentence": "田村に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)",
+      "context_keywords": [
+        "自民",
+        "田村憲久氏",
+        "熱愛報道",
+        "TBS",
+        "若林有子",
+        "アナ"
+      ]
+    },
+    {
+      "id": "auto_1789904770_6876",
+      "surface": "井上一樹",
+      "reading": "いのうえかずき",
+      "scope": "global",
+      "article_topic": "中日 サノーと来季契約で大筋合意",
+      "sample_sentence": "井上一樹に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "auto_1789905559_353",
+      "surface": "WIN5",
+      "reading": "ウィンファイブ",
+      "scope": "global",
+      "article_topic": "21日の中山競馬は台風の影響で開催中止…22日に順延 JRAアニバーサリーのイベントなどもスライド",
+      "sample_sentence": "WIN5に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-20",
+      "note": "Web自動解決 (wikipedia)"
+    },
+    {
+      "id": "shorui_soken",
+      "surface": "書類送検",
+      "reading": "しょるいそうけん",
+      "wrong_reading": "しょるいそうち",
+      "scope": "global",
+      "article_topic": "事件・事故・司法ニュース",
+      "sample_sentence": "警察は容疑者を書類送検しました。",
+      "category": "legal_term",
+      "registered_date": "2026-09-21",
+      "note": "LLMによる書類送致（しょるいそうち）への混同誤読を防止"
+    },
+    {
+      "id": "soken_alone",
+      "surface": "送検",
+      "reading": "そうけん",
+      "wrong_reading": "そうち",
+      "scope": "global",
+      "article_topic": "事件・事故・司法ニュース",
+      "sample_sentence": "容疑者の身柄が送検されました。",
+      "category": "legal_term",
+      "registered_date": "2026-09-21",
+      "note": "送致（そうち）への混同誤読を防止"
+    },
+    {
+      "id": "saishu_sho",
+      "surface": "最終章",
+      "reading": "さいしゅうしょう",
+      "wrong_reading": "さいしゅうあきら",
+      "scope": "global",
+      "article_topic": "エンタメ・カルチャーニュース",
+      "sample_sentence": "物語はいよいよ最終章を迎えます。",
+      "category": "general_compound",
+      "registered_date": "2026-09-21",
+      "note": "単漢字「章」の人名誤読（あきら）を防止"
+    },
+    {
+      "id": "nyukyo_term",
+      "surface": "入境",
+      "reading": "にゅうきょう",
+      "wrong_reading": "いれきょう",
+      "scope": "global",
+      "article_topic": "国際・出入国ニュース",
+      "sample_sentence": "香港に入境する手続きが行われました。",
+      "category": "general_compound",
+      "registered_date": "2026-09-21",
+      "note": "VOICEVOX形態素誤読（いれきょう）を防止"
+    },
+    {
+      "id": "f15_fighter",
+      "surface": "F15",
+      "reading": "エフじゅうご",
+      "wrong_reading": "ボーイング",
+      "scope": "global",
+      "article_topic": "軍事・航空ニュース",
+      "sample_sentence": "F15戦闘機がスクランブル発進しました。",
+      "category": "tech_brand",
+      "registered_date": "2026-09-21",
+      "note": "Wikipediaリダイレクト（ボーイング）誤爆防止"
+    },
+    {
+      "id": "norin_suisan",
+      "surface": "農林水産",
+      "reading": "のうりんすいさん",
+      "wrong_reading": "だいいちじさんぎょう",
+      "scope": "global",
+      "article_topic": "政治・農業ニュース",
+      "sample_sentence": "農林水産省が発表しました。",
+      "category": "general_compound",
+      "registered_date": "2026-09-21",
+      "note": "Wikipediaリダイレクト（第一次産業）誤爆防止"
+    },
+    {
+      "id": "joryu_term",
+      "surface": "女流",
+      "reading": "じょりゅう",
+      "wrong_reading": "じょせい",
+      "scope": "global",
+      "article_topic": "将棋・囲碁ニュース",
+      "sample_sentence": "女流タイトル戦が行われました。",
+      "category": "general_compound",
+      "registered_date": "2026-09-21",
+      "note": "Wikipediaリダイレクト（女性）誤爆防止"
     }
   ]
 }
