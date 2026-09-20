@@ -2321,6 +2321,43 @@
       "category": "general_compound",
       "registered_date": "2026-09-21",
       "note": "Wikipediaリダイレクト（女性）誤爆防止"
+    },
+    {
+      "id": "itabitsugawa",
+      "surface": "板櫃川",
+      "reading": "いたびつがわ",
+      "wrong_reading": "はんきがわ",
+      "scope": "global",
+      "article_topic": "事件・事故・河川ニュース",
+      "sample_sentence": "北九州市の板櫃川で男性が流されました。",
+      "category": "geography",
+      "registered_date": "2026-09-21",
+      "note": "AIが「はんきがわ」と誤読するのを防止し「いたびつがわ」に固定"
+    },
+    {
+      "id": "mutsumi_person",
+      "surface": "睦",
+      "reading": "むつみ",
+      "wrong_reading": "あつし",
+      "scope": "contextual",
+      "article_topic": "人名・夫婦ニュース",
+      "context_keywords": ["清水", "妻", "夫妻", "結婚", "がん", "闘病", "旅立ち", "母", "浩司"],
+      "sample_sentence": "清水浩司さんと睦さんの旅立ちの物語です。",
+      "category": "person_name",
+      "registered_date": "2026-09-21",
+      "note": "人名の睦（むつみ）をVOICEVOXが男性名「あつし」と誤読するのを防止"
+    },
+    {
+      "id": "zenpukujigawa",
+      "surface": "ぜんぷくじがわ",
+      "reading": "善福寺川",
+      "wrong_reading": "ぜんぷくじがわ",
+      "scope": "global",
+      "article_topic": "河川・気象・氾濫警報ニュース",
+      "sample_sentence": "善福寺川が氾濫危険水位に達しました。",
+      "category": "geography",
+      "registered_date": "2026-09-21",
+      "note": "ひらがな化されると文節がバラバラになるため漢字表記に復元"
     }
   ]
 }
