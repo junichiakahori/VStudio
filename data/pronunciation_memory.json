@@ -230,7 +230,8 @@
       "sample_sentence": "iPhone17に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "iPhone17"
     },
     {
       "id": "ufj_bank",
@@ -253,7 +254,8 @@
       "sample_sentence": "斎藤元彦に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789614034_9587",
@@ -272,7 +274,8 @@
         "サイバー",
         "防御",
         "首相陣頭指揮"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789614730_7447",
@@ -283,7 +286,8 @@
       "sample_sentence": "福澤克雄に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789614797_2525",
@@ -294,7 +298,8 @@
       "sample_sentence": "本広克行に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789616033_1237",
@@ -313,7 +318,8 @@
         "離脱",
         "ゲーム",
         "復帰"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789616135_4989",
@@ -329,7 +335,8 @@
         "三木谷氏",
         "来季",
         "吉井監督続投方針"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789616136_3053",
@@ -340,7 +347,8 @@
       "sample_sentence": "吉井理人に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789616233_6131",
@@ -351,7 +359,8 @@
       "sample_sentence": "藤川球児に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789616491_6996",
@@ -370,7 +379,8 @@
         "確定",
         "現実",
         "チーム"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789616553_1120",
@@ -389,7 +399,8 @@
         "ミス",
         "決勝打",
         "栗原陵矢"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789616662_8732",
@@ -400,7 +411,8 @@
       "sample_sentence": "新庄剛志に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "しんじょうたけし"
     },
     {
       "id": "auto_1789616962_7395",
@@ -411,7 +423,8 @@
       "sample_sentence": "A1に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "A1"
     },
     {
       "id": "auto_1789618469_9743",
@@ -427,7 +440,8 @@
         "10",
         "年前",
         "性的暴行疑"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789635756_2259",
@@ -445,7 +459,8 @@
         "安定重視",
         "維新",
         "閣内協力"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789635810_9211",
@@ -464,7 +479,8 @@
         "裏金関与",
         "初入閣",
         "1746"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789636840_3860",
@@ -483,7 +499,8 @@
         "影響",
         "浦田俊輔",
         "右肘靱帯損傷"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789637071_5726",
@@ -499,7 +516,8 @@
         "内閣支持",
         "44",
         "過去最低更新"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789637287_2786",
@@ -518,7 +536,8 @@
         "維新公認",
         "出馬表明",
         "自民"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789637405_8158",
@@ -529,7 +548,8 @@
       "sample_sentence": "西脇隆俊に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789638073_8729",
@@ -548,7 +568,8 @@
         "自民党",
         "比例代表北海道",
         "ブロック"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789639604_5563",
@@ -559,7 +580,8 @@
       "sample_sentence": "植田和男に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789640009_9071",
@@ -570,7 +592,8 @@
       "sample_sentence": "欧州議会に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789640874_2803",
@@ -588,7 +611,8 @@
         "クラリティー",
         "法案",
         "超党派協議継続"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789640970_875",
@@ -607,7 +631,8 @@
         "ライフワーク",
         "経済安保",
         "元東大"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789641175_5353",
@@ -626,7 +651,8 @@
         "制裁法案可決",
         "ロシア",
         "エネルギー"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789641346_4537",
@@ -644,7 +670,8 @@
         "裏金議員",
         "入閣",
         "批判"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789641448_3044",
@@ -655,7 +682,8 @@
       "sample_sentence": "是枝裕和に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789642488_8473",
@@ -666,7 +694,8 @@
       "sample_sentence": "Switch2に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "Switch2"
     },
     {
       "id": "auto_1789643220_3344",
@@ -677,7 +706,8 @@
       "sample_sentence": "B1に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
-      "note": "Web自動解決 (duckduckgo)"
+      "note": "Web自動解決 (duckduckgo)",
+      "wrong_reading": "B1"
     },
     {
       "id": "auto_1789643334_1830",
@@ -688,7 +718,8 @@
       "sample_sentence": "平戸太貴に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-17",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "ひらどたたかし"
     },
     {
       "id": "auto_1789643555_5087",
@@ -707,7 +738,8 @@
         "磐田",
         "秋葉監督",
         "昨季"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789675834_7561",
@@ -718,7 +750,8 @@
       "sample_sentence": "高市早苗に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-18",
-      "note": "Web自動解決 (duckduckgo)"
+      "note": "Web自動解決 (duckduckgo)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789676840_2955",
@@ -737,7 +770,8 @@
         "影響",
         "浦田俊輔",
         "右肘靱帯損傷"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789676973_8747",
@@ -753,7 +787,8 @@
         "水戸女性殺害",
         "動機",
         "リセット"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789678755_37",
@@ -764,7 +799,8 @@
       "sample_sentence": "鈴木直道に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-18",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789681851_2596",
@@ -783,7 +819,8 @@
         "コカイン",
         "所持容疑",
         "逮捕"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789682450_278",
@@ -794,18 +831,8 @@
       "sample_sentence": "F1に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-18",
-      "note": "Web自動解決 (wikipedia)"
-    },
-    {
-      "id": "auto_1789682509_788",
-      "surface": "高等学校",
-      "reading": "こうとうがっこう",
-      "scope": "global",
-      "article_topic": "プロ志望届】横浜・最速157キロ 右腕、織田翔希のプロ志望届が公示",
-      "sample_sentence": "高等学校に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-18",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "F1"
     },
     {
       "id": "auto_1789683025_2136",
@@ -824,7 +851,8 @@
         "藤川監督",
         "日以来",
         "白星"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789684387_9954",
@@ -835,7 +863,8 @@
       "sample_sentence": "D2に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-18",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "D2"
     },
     {
       "id": "auto_1789722080_7911",
@@ -854,7 +883,8 @@
         "今日対戦",
         "インドネシア",
         "監督"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789722082_912",
@@ -873,7 +903,8 @@
         "今日対戦",
         "インドネシア",
         "監督"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789722266_496",
@@ -884,7 +915,8 @@
       "sample_sentence": "野田佳彦に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-18",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789722327_957",
@@ -903,7 +935,8 @@
         "暗殺未遂",
         "警告",
         "プーチン"
-      ]
+      ],
+      "wrong_reading": "もとひで"
     },
     {
       "id": "auto_1789722749_3792",
@@ -922,7 +955,8 @@
         "ペース",
         "特定",
         "念頭"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789722750_7365",
@@ -941,7 +975,8 @@
         "ペース",
         "特定",
         "念頭"
-      ]
+      ],
+      "wrong_reading": "にちぎん"
     },
     {
       "id": "auto_1789723019_9812",
@@ -960,7 +995,8 @@
         "立候補",
         "意向固",
         "県副委員長"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789723315_1446",
@@ -976,7 +1012,8 @@
         "改造内閣",
         "非主流派結集",
         "リスク"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789724158_8582",
@@ -995,7 +1032,8 @@
         "承認",
         "野党議員",
         "中国"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789724381_8678",
@@ -1014,7 +1052,8 @@
         "最大",
         "76",
         "億円"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789725236_823",
@@ -1025,7 +1064,8 @@
       "sample_sentence": "南場智子に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-18",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789725693_1725",
@@ -1044,7 +1084,8 @@
         "阻止",
         "若手議員",
         "北京詣"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789726385_9386",
@@ -1055,7 +1096,8 @@
       "sample_sentence": "古川政調に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-18",
-      "note": "Web自動解決 (duckduckgo)"
+      "note": "Web自動解決 (duckduckgo)",
+      "wrong_reading": "ふるかわせいちょう"
     },
     {
       "id": "auto_1789726388_8370",
@@ -1072,7 +1114,8 @@
         "新体制発表",
         "古川政調会長",
         "幹事長"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789726429_826",
@@ -1091,7 +1134,8 @@
         "質問緊迫",
         "議長",
         "答弁"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789727146_3181",
@@ -1110,7 +1154,8 @@
         "墓村",
         "金田一",
         "ホラー"
-      ]
+      ],
+      "wrong_reading": "しみずすう"
     },
     {
       "id": "auto_1789728216_3830",
@@ -1129,7 +1174,8 @@
         "逆転",
         "視野",
         "直接対決"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789728219_8087",
@@ -1140,7 +1186,8 @@
       "sample_sentence": "相川亮二に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-18",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789728316_4177",
@@ -1159,7 +1206,8 @@
         "根性焼",
         "報道",
         "カープ"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789728317_129",
@@ -1178,7 +1226,8 @@
         "根性焼",
         "報道",
         "カープ"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789728317_9906",
@@ -1197,7 +1246,8 @@
         "根性焼",
         "報道",
         "カープ"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789728367_1131",
@@ -1208,7 +1258,8 @@
       "sample_sentence": "柳田悠岐に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-18",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "やなぎだゆうし"
     },
     {
       "id": "auto_1789728443_1517",
@@ -1219,7 +1270,8 @@
       "sample_sentence": "徳本一善に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-18",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789728623_2529",
@@ -1235,7 +1287,8 @@
         "村上宗隆",
         "32",
         "ラン"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789728747_9915",
@@ -1246,7 +1299,8 @@
       "sample_sentence": "G1に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-18",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "G1"
     },
     {
       "id": "auto_1789729062_4712",
@@ -1265,7 +1319,8 @@
         "球場",
         "午後",
         "11"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789730647_4356",
@@ -1276,7 +1331,8 @@
       "sample_sentence": "平木理化に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-18",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789731678_6369",
@@ -1287,7 +1343,8 @@
       "sample_sentence": "松井孝治に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-18",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789731678_9880",
@@ -1306,7 +1363,8 @@
         "メダル",
         "受賞",
         "京都新聞"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789765585_7155",
@@ -1324,7 +1382,8 @@
         "河本結",
         "納得",
         "位発進"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789765660_2088",
@@ -1343,7 +1402,8 @@
         "初当選",
         "古謝氏",
         "子供"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789766435_2051",
@@ -1354,7 +1414,8 @@
       "sample_sentence": "鈴木康友に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-19",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789768274_841",
@@ -1372,7 +1433,8 @@
         "会長退任",
         "バークシャー",
         "名誉会長"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789768337_556",
@@ -1391,7 +1453,8 @@
         "兼務",
         "首相",
         "面会要請"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789768337_6887",
@@ -1410,7 +1473,8 @@
         "兼務",
         "首相",
         "面会要請"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789768338_6504",
@@ -1421,7 +1485,8 @@
       "sample_sentence": "内堀雅雄に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-19",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789769705_2339",
@@ -1432,7 +1497,8 @@
       "sample_sentence": "中島卓也に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-19",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "なかじまたくや"
     },
     {
       "id": "auto_1789769836_5710",
@@ -1451,7 +1517,8 @@
         "連戦",
         "谷村選手",
         "松木選手"
-      ]
+      ],
+      "wrong_reading": "たにむら"
     },
     {
       "id": "auto_1789769836_6712",
@@ -1470,7 +1537,8 @@
         "連戦",
         "谷村選手",
         "松木選手"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789769931_7069",
@@ -1481,7 +1549,8 @@
       "sample_sentence": "G2に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-19",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "G2"
     },
     {
       "id": "auto_1789770490_9432",
@@ -1500,7 +1569,8 @@
         "昇格理由",
         "浦田",
         "タイミング"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789770490_9200",
@@ -1511,7 +1581,8 @@
       "sample_sentence": "橋上秀樹に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-19",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789770603_4238",
@@ -1530,7 +1601,8 @@
         "期待",
         "太鼓判",
         "新加入選手"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789770712_499",
@@ -1549,7 +1621,8 @@
         "失投誘",
         "得点増",
         "広島秋山"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789809074_5028",
@@ -1566,7 +1639,8 @@
         "車追突",
         "選手",
         "重体"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789809127_8234",
@@ -1577,7 +1651,8 @@
       "sample_sentence": "猪俣周杜に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-19",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "いのまたしゅうもり"
     },
     {
       "id": "auto_1789810050_9261",
@@ -1588,7 +1663,8 @@
       "sample_sentence": "金獅子賞に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-19",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "きんしししょう"
     },
     {
       "id": "auto_1789810051_2847",
@@ -1604,7 +1680,8 @@
         "金獅子賞監督",
         "スパイ",
         "指定"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789810389_4532",
@@ -1623,18 +1700,8 @@
         "流通",
         "中国",
         "製品差"
-      ]
-    },
-    {
-      "id": "auto_1789810707_3336",
-      "surface": "労働基準",
-      "reading": "ろうどうきじゅん",
-      "scope": "global",
-      "article_topic": "障害者雇用ビジネス巡り労災認定",
-      "sample_sentence": "労働基準に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-19",
-      "note": "Web自動解決 (wikipedia)"
+      ],
+      "wrong_reading": "しじょう"
     },
     {
       "id": "auto_1789810995_690",
@@ -1653,7 +1720,8 @@
         "始動",
         "地方行脚継続",
         "高市首相"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789811341_2508",
@@ -1664,7 +1732,8 @@
       "sample_sentence": "MIU404に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-19",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "MIU404"
     },
     {
       "id": "auto_1789811474_2030",
@@ -1683,7 +1752,8 @@
         "役職希望",
         "アンケート",
         "報道"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789812480_9710",
@@ -1702,7 +1772,8 @@
         "人目",
         "通算",
         "打点"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789813025_2066",
@@ -1721,7 +1792,8 @@
         "球界",
         "ドン",
         "監督"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789813292_7773",
@@ -1740,7 +1812,8 @@
         "フランス",
         "代表",
         "メンバー"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789813403_3841",
@@ -1759,7 +1832,8 @@
         "FW",
         "中村敬斗",
         "EL"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789814300_7101",
@@ -1770,7 +1844,8 @@
       "sample_sentence": "Web3に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-19",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "Web3"
     },
     {
       "id": "auto_1789851886_9653",
@@ -1789,7 +1864,8 @@
         "天満区",
         "上町区",
         "新大阪区"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789852482_1282",
@@ -1800,7 +1876,8 @@
       "sample_sentence": "乃木坂46に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-20",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "のぎざか46"
     },
     {
       "id": "auto_1789852995_5091",
@@ -1811,18 +1888,8 @@
       "sample_sentence": "United24に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-20",
-      "note": "Web自動解決 (wikipedia)"
-    },
-    {
-      "id": "auto_1789853504_1501",
-      "surface": "Moto2",
-      "reading": "ロードレースせかいせんしゅけん",
-      "scope": "global",
-      "article_topic": "大丈夫かキャデラックF1！ プロジェクトの資金提供元の保険会社とオーナーが集団訴訟に直面 - motorsport.com 日本版",
-      "sample_sentence": "Moto2に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-20",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "United24"
     },
     {
       "id": "auto_1789853781_8047",
@@ -1838,7 +1905,8 @@
         "元参議院議員",
         "星川保松",
         "死去"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789853782_3642",
@@ -1854,7 +1922,8 @@
         "元参議院議員",
         "星川保松",
         "死去"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789853904_1638",
@@ -1865,7 +1934,8 @@
       "sample_sentence": "日向坂46に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-20",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "ひゅうがさか46"
     },
     {
       "id": "auto_1789855024_2059",
@@ -1883,7 +1953,8 @@
         "野球選手",
         "柴田",
         "育成手腕"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789855526_1170",
@@ -1899,7 +1970,8 @@
         "DeNA",
         "逆転満塁",
         "ホームラン"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789855574_5309",
@@ -1910,7 +1982,8 @@
       "sample_sentence": "西口文也に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-20",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789855689_2869",
@@ -1921,7 +1994,8 @@
       "sample_sentence": "松橋力蔵に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-20",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789855690_6734",
@@ -1940,7 +2014,8 @@
         "REVIEW",
         "INTERVIEW",
         "FC"
-      ]
+      ],
+      "wrong_reading": "たかうひろし"
     },
     {
       "id": "auto_1789855763_6987",
@@ -1959,7 +2034,8 @@
         "落球時",
         "中村奨成",
         "三塁進塁"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789855763_6869",
@@ -1970,7 +2046,8 @@
       "sample_sentence": "新井貴浩に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-20",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789855810_6490",
@@ -1989,7 +2066,8 @@
         "結果",
         "言葉",
         "コメント"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789855873_2475",
@@ -2000,7 +2078,8 @@
       "sample_sentence": "関口正大に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-20",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789855876_7461",
@@ -2011,7 +2090,8 @@
       "sample_sentence": "船越優蔵に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-20",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "ふなこしゆうくら"
     },
     {
       "id": "auto_1789856182_9032",
@@ -2022,26 +2102,8 @@
       "sample_sentence": "H3に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-20",
-      "note": "Web自動解決 (wikipedia)"
-    },
-    {
-      "id": "auto_1789856235_2571",
-      "surface": "韓国",
-      "reading": "だいかんみんこく",
-      "scope": "contextual",
-      "article_topic": "北朝鮮選手、行進でスマホ自撮り リラックスし入場（共同通信）",
-      "sample_sentence": "韓国に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-20",
       "note": "Web自動解決 (wikipedia)",
-      "context_keywords": [
-        "北朝鮮選手",
-        "行進",
-        "スマホ",
-        "自撮",
-        "リラックス",
-        "入場"
-      ]
+      "wrong_reading": "H3"
     },
     {
       "id": "auto_1789898171_9350",
@@ -2060,7 +2122,8 @@
         "事件当時",
         "使用",
         "関係者名義"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789898275_3822",
@@ -2079,37 +2142,8 @@
         "反対集会",
         "ラサール",
         "高市政権"
-      ]
-    },
-    {
-      "id": "auto_1789898428_2389",
-      "surface": "X2",
-      "reading": "ますか",
-      "scope": "global",
-      "article_topic": "旗振り合図が原則だった列車接近「見張り員」、専門家はＧＰＳなど活用の重要性強調…東武事故１か月",
-      "sample_sentence": "X2に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-20",
-      "note": "Web自動解決 (duckduckgo)"
-    },
-    {
-      "id": "auto_1789898483_6900",
-      "surface": "沖縄",
-      "reading": "つきで",
-      "scope": "contextual",
-      "article_topic": "沖縄知事選で大敗の玉城氏、2期8年の失政 さらば「オール沖縄」県政 日曜に書く",
-      "sample_sentence": "沖縄に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-20",
-      "note": "Web自動解決 (duckduckgo)",
-      "context_keywords": [
-        "沖縄知事選",
-        "大敗",
-        "玉城氏",
-        "失政",
-        "オール",
-        "沖縄"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789898975_6217",
@@ -2128,7 +2162,8 @@
         "前田原本町長",
         "森氏",
         "自民党奈良県連"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789899234_5736",
@@ -2144,29 +2179,8 @@
         "犬猫",
         "保護依頼増",
         "高齢化"
-      ]
-    },
-    {
-      "id": "auto_1789899278_962",
-      "surface": "東国原元",
-      "reading": "ひがしこくばる",
-      "scope": "global",
-      "article_topic": "東国原元知事 書類送検 ＳＮＳ投稿 名誉毀損疑い",
-      "sample_sentence": "東国原元に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-20",
-      "note": "Web自動解決 (duckduckgo)"
-    },
-    {
-      "id": "auto_1789899645_3399",
-      "surface": "F4",
-      "reading": "それぞれ",
-      "scope": "global",
-      "article_topic": "フランス最新戦闘機に「日本のゆるキャラ」が同乗！ 幸運を掴んだマスコットの正体とは？ 雲上の様子が公開",
-      "sample_sentence": "F4に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-20",
-      "note": "Web自動解決 (wikipedia)"
+      ],
+      "wrong_reading": "さとうあつし"
     },
     {
       "id": "auto_1789901748_1622",
@@ -2177,7 +2191,8 @@
       "sample_sentence": "永山英樹に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-20",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789903563_3143",
@@ -2196,7 +2211,8 @@
         "TBS",
         "若林有子",
         "アナ"
-      ]
+      ],
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789904770_6876",
@@ -2207,7 +2223,8 @@
       "sample_sentence": "井上一樹に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-20",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": ""
     },
     {
       "id": "auto_1789905559_353",
@@ -2218,7 +2235,8 @@
       "sample_sentence": "WIN5に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-20",
-      "note": "Web自動解決 (wikipedia)"
+      "note": "Web自動解決 (wikipedia)",
+      "wrong_reading": "WIN5"
     },
     {
       "id": "shorui_soken",
