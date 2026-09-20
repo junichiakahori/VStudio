@@ -2518,14 +2518,14 @@
     {
       "id": "aituber_term",
       "surface": "AITuber",
-      "reading": "エーアイチューバー",
-      "wrong_reading": "アイチュウバア",
+      "reading": "アイチューバー",
+      "wrong_reading": "エーアイチューバー",
       "scope": "global",
       "article_topic": "配信・バーチャルタレント用語",
       "sample_sentence": "AITuberのとろろがニュースをお届けします。",
       "category": "tech_brand",
       "registered_date": "2026-09-21",
-      "note": "AITuberを「アイチュウバア」と誤読するのを防止"
+      "note": "番組公式の読みとして「アイチューバー」に固定（エーアイチューバー誤読防止）"
     },
     {
       "id": "himon_water",
