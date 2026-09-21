@@ -1004,6 +1004,31 @@
       "category": "general_compound",
       "registered_date": "2026-09-21",
       "note": "東・南部を「ひがしなんぶ」と訓読みするのを防止"
+    },
+    {
+      "id": "oguri_shun",
+      "surface": "小栗旬",
+      "reading": "おぐりしゅん",
+      "wrong_reading": "ささぐりしゅん",
+      "scope": "global",
+      "article_topic": "芸能・エンタメ・ドラマニュース",
+      "sample_sentence": "ドラマ最終回に小栗旬が登場しました。",
+      "category": "person_name",
+      "registered_date": "2026-09-22",
+      "note": "助詞「に」の直後等でVOICEVOXが「ささぐりしゅん」と誤読するのを防止し「おぐりしゅん」に固定"
+    },
+    {
+      "id": "oguri_surname",
+      "surface": "小栗",
+      "reading": "おぐり",
+      "wrong_reading": "ささぐり",
+      "scope": "contextual",
+      "article_topic": "芸能・エンタメ・ドラマニュース",
+      "context_keywords": ["旬", "俳優", "GTO", "ドラマ", "映画", "反町", "芸能", "出演"],
+      "sample_sentence": "作品に小栗さんが出演しています。",
+      "category": "person_name",
+      "registered_date": "2026-09-22",
+      "note": "助詞「に」直後等でVOICEVOXが「ささぐり」と誤読するのを防止"
     }
   ]
 }
