@@ -585,22 +585,42 @@ def lookup_wikipedia_person_reading(name, context_hint=""):
                 data_ext = json.loads(r_ext.read().decode("utf-8"))
                 for pid, pdata in data_ext.get("query", {}).get("pages", {}).items():
                     if pid == "-1": continue
+                    real_title = pdata.get("title", "")
                     extract = pdata.get("extract", "")
-                    if any(kw in extract for kw in ("日本の女性名", "日本の男性名", "曖昧さ回避")):
+                    if any(kw in real_title for kw in ("一覧", "年表", "歴史", "目録", "事件", "事故")):
                         continue
+                    if any(kw in extract for kw in ("日本の女性名", "日本の男性名", "曖昧さ回避", "の一覧", "に関する一覧")):
+                        continue
+
+                    # リダイレクト先タイトルが元の候補文字列で始まっていない場合は別物（例: 土砂崩 ➔ 土砂災害）なので除外
+                    if not any(real_title.startswith(c) for c in candidates):
+                        continue
+
+                    # 【人物記事の厳格判定】災害・気象・一般事物・施設等の誤爆を100%遮断
+                    is_person = False
+                    # シグナル1: 括弧内に生年・生年月日・没年等の記載がある（人物記事の典型的書式: 例「1982年12月26日 - 」）
+                    if re.search(r'[\(（][^\)）]*?(?:\d{3,4}年(?:\d{1,2}月\d{1,2}日)?\s*[-〜–—]|[-〜–—]\s*\d{3,4}年|生年不詳|没年不詳|年生|年没)[^\)）]*?[\)）]', extract[:300]):
+                        is_person = True
+                    # シグナル2: 人物の職業・身分・属性が明記されている
+                    elif re.search(r'(?:日本の|元)?(?:俳優|女優|タレント|歌手|芸人|お笑い|声優|モデル|アイドル|プロ野球|野球|サッカー|選手|政治家|議員|大臣|知事|市長|アナウンサー|キャスター|小説家|作家|漫画家|映画監督|演出家|実業家|学者|教授|研究者|医師|弁護士|皇族|力士|大相撲|騎手|棋士|プロレスラー|音楽家|作曲家|作詞家|写真家|YouTuber|人物|武将|大名)', extract[:300]):
+                        is_person = True
+
+                    if not is_person:
+                        continue
+
                     m = re.search(r'[\(（]\s*([ぁ-んァ-ヶゔヴー・\s]+?)(?:[\[、,）\)＝=\d]|$)', extract)
                     if m:
                         raw = m.group(1).replace("・", " ").strip()
                         parts = raw.split()
                         # プレフィックス一致（例: 「安青錦」に対して記事「安青錦新大」）の場合、名字/四股名部分のみ抽出
-                        if len(parts) >= 2 and t_title not in candidates and len(name) <= 4:
+                        if len(parts) >= 2 and real_title not in candidates and len(name) <= 4:
                             hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in parts[0]])
                             hira = re.sub(r'[^ぁ-んー]', '', hira)
                         else:
                             hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in raw.replace(' ', '')])
                             hira = re.sub(r'[^ぁ-んー]', '', hira)
                         if hira:
-                            found_articles.append((t_title, extract, hira))
+                            found_articles.append((real_title, extract, hira))
         except Exception:
             pass
 
@@ -617,14 +637,18 @@ def lookup_wikipedia_person_reading(name, context_hint=""):
             best_item = item
             break
 
-    # 3-2. 文脈照合（同姓同名・前方一致記事）
+    # 3-2. 前方一致が1件だけで、かつ記事タイトルが検索語で始まる確実な人物記事（例: 「安青錦」➔「安青錦新大」、「悠仁」➔「悠仁親王」）
+    if not best_item and len(found_articles) == 1 and any(found_articles[0][0].startswith(c) for c in candidates):
+        best_item = found_articles[0]
+
+    # 3-3. 複数候補がある場合の文脈照合（同姓同名・複数前方一致）
     if not best_item and context_hint:
         best_score = -1
         for t_title, extract, hira in found_articles:
             score = 0
-            tokens = re.findall(r'[\u4e00-\u9fff]{2,}|[\u30a0-\u30ff]{3,}|[A-Za-z]{3,}', extract[:200])
+            tokens = re.findall(r'[\u4e00-\u9fff]{2,}|[\u30a0-\u30ff]{3,}|[A-Za-z]{3,}', extract[:400])
             for tok in set(tokens):
-                if tok in context_hint:
+                if tok in context_hint or (len(tok) >= 3 and any(tok[i:i+2] in context_hint for i in range(len(tok)-1))):
                     score += 1
             if score > best_score:
                 best_score = score

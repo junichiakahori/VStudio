@@ -2220,6 +2220,9 @@ def generate_news_item_script_data(payload, custom_dict=None):
             auto_kanji_names = set(re.findall(r'(?<![\u4e00-\u9fa5])([\u4e00-\u9fa5]{3,4})(?![\u4e00-\u9fa5])', scan_corpus))
             for kn in auto_kanji_names:
                 if kn not in news_context_map:
+                    # 後続に送り仮名（れ、る、け、ろ、せ、た、て等）がある複合語（例: 土砂崩れ、受け取り）は人名ではないため除外
+                    if re.search(re.escape(kn) + r'[れるろけせてためげぜべっ]', scan_corpus):
+                        continue
                     w_y = lookup_wikipedia_person_reading(kn, context_hint=full_context_text)
                     if w_y:
                         news_context_map[kn] = w_y

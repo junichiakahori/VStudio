@@ -1038,6 +1038,30 @@
       "category": "person_name",
       "registered_date": "2026-09-22",
       "note": "助詞「に」の直後等でVOICEVOXが「ささぐりしゅん」と誤読するのを防止し「おぐりしゅん」に固定"
+    },
+    {
+      "id": "dosha_kuzure",
+      "surface": "土砂崩れ",
+      "reading": "どしゃくずれ",
+      "wrong_reading": "どしゃさいがいれ",
+      "scope": "global",
+      "article_topic": "災害・台風・気象ニュース",
+      "sample_sentence": "各地で土砂崩れが発生しました。",
+      "category": "disaster_term",
+      "registered_date": "2026-09-22",
+      "note": "「土砂崩れ」が「どしゃさいがいれ」と誤置換・誤読されるのを防止し「どしゃくずれ」に固定"
+    },
+    {
+      "id": "dosha_kuzure_stem",
+      "surface": "土砂崩",
+      "reading": "どしゃくず",
+      "wrong_reading": "どしゃさいがい",
+      "scope": "global",
+      "article_topic": "災害・台風・気象ニュース",
+      "sample_sentence": "土砂崩れが発生しました。",
+      "category": "disaster_term",
+      "registered_date": "2026-09-22",
+      "note": "「土砂崩」が「どしゃさいがい」と誤置換されるのを防止"
     }
   ]
 }
