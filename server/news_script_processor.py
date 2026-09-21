@@ -1285,6 +1285,94 @@ def audit_and_heal_news_script(items, title="", article_context=""):
     return healed_items
 
 
+def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=None):
+    """
+    ニュース原稿全文（文脈そのまま）をVOICEVOXに渡してアクセント句・カタカナ列を取得し、
+    文脈による助詞融合（例: 「に小栗旬」➔「ササグリシュン」）等の誤読を
+    機械的に100%確定検知して、原稿側のspeechを自動ルビ補正する。
+    """
+    if not items:
+        return items
+
+    terms_map = dict(known_terms_map) if known_terms_map else {}
+
+    # 台帳からも誤読防止語句を統合
+    try:
+        from server.tts_normalizer import load_pronunciation_memory
+        pm = load_pronunciation_memory()
+        for r in pm.get("records", []):
+            s = r.get("surface")
+            y = r.get("reading")
+            if s and y and s not in terms_map:
+                terms_map[s] = y
+    except Exception:
+        pass
+
+    if not terms_map:
+        return items
+
+    try:
+        from server.voicevox_client import get_voicevox_reading_and_kana
+        full_speech = (title + "。" if title else "") + "。".join([it.get("speech", "") for it in items if it.get("speech")]).strip()
+        if not full_speech:
+            return items
+
+        # 全文のVOICEVOXプレ読みを取得（文脈そのまま）
+        vv_reading, _ = get_voicevox_reading_and_kana(full_speech)
+        if not vv_reading:
+            return items
+
+        # カタカナ列をクリーンアップ
+        clean_vv_kana = re.sub(r'[^ァ-ヶー]', '', vv_reading)
+
+        import pykakasi
+        kks = pykakasi.kakasi()
+
+        for term, expected_hira in terms_map.items():
+            if not term or not expected_hira or len(term) < 2:
+                continue
+            # 漢字を含む固有名詞のみを対象
+            if not any("\u4e00" <= c <= "\u9fa5" for c in term):
+                continue
+
+            # 原稿（または見出し）にこの単語が含まれているか確認
+            has_term_in_items = any(term in it.get("speech", "") for it in items)
+            if not has_term_in_items:
+                continue
+
+            # 期待される正しい読み（カタカナ）
+            conv = kks.convert(expected_hira)
+            expected_kana = "".join([c.get("kana", "") for c in conv]).strip()
+            if not expected_kana or len(expected_kana) < 2:
+                continue
+
+            # 全文読みの中に、期待するカタカナが含まれているか検証
+            if expected_kana not in clean_vv_kana:
+                print(f"[VOICEVOX全文照合] 🚨 誤読検知: '{term}' の正読 '{expected_hira}'({expected_kana}) が全文音声読みの中に存在しません（文脈誤読）", flush=True)
+                for it in items:
+                    if term in it.get("speech", ""):
+                        it["speech"] = it["speech"].replace(term, expected_hira)
+                        print(f"[VOICEVOX全文照合修復] 🩹 '{term}' を正読 '{expected_hira}' に直接ルビ補正しました: {it['speech']}", flush=True)
+
+                try:
+                    from server.web_pronunciation_resolver import save_to_pronunciation_memory
+                    save_to_pronunciation_memory(
+                        surface=term,
+                        reading=expected_hira,
+                        wrong_reading="文脈助詞融合誤読",
+                        category="context_fusion_misreading",
+                        note=f"VOICEVOX全文照合により文脈誤読を検知・自動補正",
+                        scope="global"
+                    )
+                except Exception:
+                    pass
+
+    except Exception as e:
+        print(f"[VOICEVOX全文照合エラー]: {e}", flush=True)
+
+    return items
+
+
 GENERIC_TITLE_WORDS = {
     'ニュース', '速報', '発表', '開始', '決定', '予定', '実施', '検討', '注意', '情報', '対策',
     '対応', '確認', '政府', '方針', '問題', '報告', '理由', '影響', '結果', '状況',
@@ -2135,21 +2223,21 @@ def generate_news_item_script_data(payload, custom_dict=None):
                                 news_context_map[surname_k] = s_yomi
                                 print(f"{tag} 👤 [人名文脈継承] '{target_name}'({w_yomi}) ➔ 姓 '{surname_k}' = '{s_yomi}'", flush=True)
 
-            # 👤 2.5 タイトル・原稿・本文からの4文字人名自動スキャン＆姓の文脈継承（AI抽出漏れ完全フォールバック）
+            # 👤 2.5 タイトル・原稿・本文からの3〜4文字人名自動スキャン＆姓の文脈継承（小栗旬等の3文字人名も完全救済）
             scan_corpus = f"{title}\n{clean_text}"
-            auto_kanji_4names = set(re.findall(r'(?<![\u4e00-\u9fa5])([\u4e00-\u9fa5]{4})(?![\u4e00-\u9fa5])', scan_corpus))
-            for k4 in auto_kanji_4names:
-                if k4 not in news_context_map:
-                    w_y = lookup_wikipedia_person_reading(k4, context_hint=full_context_text)
+            auto_kanji_names = set(re.findall(r'(?<![\u4e00-\u9fa5])([\u4e00-\u9fa5]{3,4})(?![\u4e00-\u9fa5])', scan_corpus))
+            for kn in auto_kanji_names:
+                if kn not in news_context_map:
+                    w_y = lookup_wikipedia_person_reading(kn, context_hint=full_context_text)
                     if w_y:
-                        news_context_map[k4] = w_y
-                        sur_k = k4[:2]
-                        s_y = get_wikipedia_surname_reading(k4)
-                        if not s_y and len(w_y) >= 4:
+                        news_context_map[kn] = w_y
+                        sur_k = kn[:2]
+                        s_y = get_wikipedia_surname_reading(kn)
+                        if not s_y and len(w_y) >= 3:
                             s_y = w_y[:(len(w_y)+1)//2]
                         if s_y and sur_k not in news_context_map:
                             news_context_map[sur_k] = s_y
-                            print(f"{tag} 👤 [自動人名スキャン文脈継承] '{k4}'({w_y}) ➔ 姓 '{sur_k}' = '{s_y}'", flush=True)
+                            print(f"{tag} 👤 [自動人名スキャン文脈継承] '{kn}'({w_y}) ➔ 姓 '{sur_k}' = '{s_y}'", flush=True)
 
             # 🤖 AIによる直接発音ダブルチェック（人名・特殊固有名詞のひらがな読みを文脈判定して統合）
             ai_pron_map = extract_pronunciations_via_ai(
@@ -2178,6 +2266,8 @@ def generate_news_item_script_data(payload, custom_dict=None):
                 context_map=news_context_map
             )
             candidate_items = audit_and_heal_news_script(candidate_items, title=title, article_context=full_article_content)
+            # 🎙️ VOICEVOX全文プレ読み照合（文脈助詞融合による「に小栗旬➔ササグリシュン」等の誤読を機械的100%自動是正）
+            candidate_items = audit_and_heal_via_voicevox_full_reading(candidate_items, title=title, known_terms_map=news_context_map)
     
             # 粗チェック（品質・トピック整合性・ファクト照合・キャラクター感想の有無）
             is_valid, reason = validate_news_script_quality(clean_text, title, full_article_content, char_desc)
