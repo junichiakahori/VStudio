@@ -1328,14 +1328,19 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
         import pykakasi
         kks = pykakasi.kakasi()
 
+        from server.tts_normalizer import is_plausible_reading
+
         for term, expected_hira in terms_map.items():
             if not term or not expected_hira or len(term) < 2:
                 continue
             # 漢字を含む固有名詞のみを対象
             if not any("\u4e00" <= c <= "\u9fa5" for c in term):
                 continue
+            # 異常に長い読みやWikipedia同義語リダイレクトは完全に除外
+            if len(expected_hira) > max(len(term) * 3, 6) or not is_plausible_reading(term, expected_hira):
+                continue
 
-            # 原稿（または見出し）にこの単語が含まれているか確認
+            # 原稿のいずれかの文の speech にこの単語が含まれているか確認
             has_term_in_items = any(term in it.get("speech", "") for it in items)
             if not has_term_in_items:
                 continue
@@ -1353,19 +1358,6 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
                     if term in it.get("speech", ""):
                         it["speech"] = it["speech"].replace(term, expected_hira)
                         print(f"[VOICEVOX全文照合修復] 🩹 '{term}' を正読 '{expected_hira}' に直接ルビ補正しました: {it['speech']}", flush=True)
-
-                try:
-                    from server.web_pronunciation_resolver import save_to_pronunciation_memory
-                    save_to_pronunciation_memory(
-                        surface=term,
-                        reading=expected_hira,
-                        wrong_reading="文脈助詞融合誤読",
-                        category="context_fusion_misreading",
-                        note=f"VOICEVOX全文照合により文脈誤読を検知・自動補正",
-                        scope="global"
-                    )
-                except Exception:
-                    pass
 
     except Exception as e:
         print(f"[VOICEVOX全文照合エラー]: {e}", flush=True)
