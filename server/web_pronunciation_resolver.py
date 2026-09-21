@@ -55,6 +55,14 @@ def save_to_pronunciation_memory(
     """判明した読み方を pronunciation_memory.json に文脈情報付きで永続追加・保存"""
     if not surface or not reading or surface == reading:
         return False
+
+    # 🚨 誤読防止台帳の絶対規約:
+    # 誤読（wrong_reading）が存在しない（空・None、または正読と完全に同一）単語は、
+    # 誤読防止台帳（pronunciation_memory.json）への保存を永久に拒絶・遮断する。
+    if not wrong_reading or not wrong_reading.strip() or wrong_reading.strip() == reading.strip():
+        print(f"ℹ️ [台帳保存スキップ] '{surface}' は誤読（wrong_reading）が存在しないため台帳へは保存しません。", flush=True)
+        return False
+
     try:
         mem_data = {"version": "2.0", "records": []}
         if os.path.exists(PRONUNCIATION_MEMORY_PATH):
@@ -368,6 +376,11 @@ def resolve_unknown_reading_online(
             except Exception:
                 pass
 
+            # 🚨 誤読（wrong_reading）が検出されなかった単語は台帳に保存しない（誤読防止台帳の汚染防止）
+            if not wrong_reading:
+                print(f"ℹ️ [台帳保存スキップ] '{term}' はVOICEVOXのデフォルト読みと一致（誤読なし）のため台帳へは保存しません。", flush=True)
+                return ruby
+
             save_to_pronunciation_memory(
                 surface=term,
                 reading=ruby,
@@ -407,8 +420,11 @@ def extract_candidate_terms_from_text(text: str) -> List[str]:
         candidates.append(m.group(1))
 
     # 2. 英字＋数字の固有名詞（AKB48, SKE48, F15, iPhone16, PS5等）
-    for m in re.finditer(r'(?<![A-Za-z0-9])([A-Za-z]{1,8}\d{1,4})(?![A-Za-z0-9])', text):
+    # ※ eriko0922 などのSNSアカウント名やID誤爆を防ぐため、大文字英字を含むものに限定
+    for m in re.finditer(r'(?<![A-Za-z0-9@/._])([A-Za-z]{1,8}\d{1,4})(?![A-Za-z0-9])', text):
         w = m.group(1)
+        if not any(c.isupper() for c in w):
+            continue
         if not re.match(r'^(?:v\d+|p\d+|s\d+|ch\d+|no\d+|\d+)$', w.lower()):
             candidates.append(w)
 
