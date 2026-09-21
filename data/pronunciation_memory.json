@@ -1037,7 +1037,8 @@
       "sample_sentence": "ドラマ最終回に小栗旬が登場しました。",
       "category": "person_name",
       "registered_date": "2026-09-22",
-      "note": "助詞「に」の直後等でVOICEVOXが「ささぐりしゅん」と誤読するのを防止し「おぐりしゅん」に固定"
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'ささぐりしゅん' ➔ 正読: 'おぐりしゅん'）",
+      "updated_date": "2026-09-22"
     },
     {
       "id": "dosha_kuzure",

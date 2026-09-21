@@ -1351,13 +1351,72 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
             if not expected_kana or len(expected_kana) < 2:
                 continue
 
-            # 全文読みの中に、期待するカタカナが含まれているか検証
-            if expected_kana not in clean_vv_kana:
+            def _norm_k(k):
+                return k.replace('オ', 'ウ').replace('エ', 'イ').replace('ー', '')
+
+            # 全文読みの中に、期待するカタカナが含まれているか検証（長音表記揺らぎを吸収）
+            if _norm_k(expected_kana) not in _norm_k(clean_vv_kana):
                 print(f"[VOICEVOX全文照合] 🚨 誤読検知: '{term}' の正読 '{expected_hira}'({expected_kana}) が全文音声読みの中に存在しません（文脈誤読）", flush=True)
+                sample_sent = ""
                 for it in items:
                     if term in it.get("speech", ""):
+                        if not sample_sent:
+                            sample_sent = it.get("speech", "")
                         it["speech"] = it["speech"].replace(term, expected_hira)
                         print(f"[VOICEVOX全文照合修復] 🩹 '{term}' を正読 '{expected_hira}' に直接ルビ補正しました: {it['speech']}", flush=True)
+
+                # 🎓 実際の誤読（wrong_reading）を特定して台帳に安全に自動登録
+                # （接尾辞・一般語の誤爆を防ぐため、2〜4文字の漢字固有名詞/人名のみを対象）
+                if sample_sent and 2 <= len(term) <= 4 and re.match(r'^[\u4e00-\u9fa5]+$', term):
+                    if not term.endswith(('的', '対', '化', '製', '感', '性', '度')):
+                        try:
+                            # 出現位置から前後の文脈スニペットを切り出して実際の誤読を特定
+                            pos = sample_sent.find(term)
+                            prefix = sample_sent[max(0, pos-2):pos]
+                            suffix = sample_sent[pos+len(term):pos+len(term)+2]
+                            snippet = prefix + term + suffix
+                            
+                            snip_kana, _ = get_voicevox_reading_and_kana(snippet)
+                            if snip_kana:
+                                prefix_k = ""
+                                if prefix:
+                                    pk, _ = get_voicevox_reading_and_kana(prefix)
+                                    prefix_k = re.sub(r'[^ァ-ヶー]', '', pk or "")
+                                suffix_k = ""
+                                if suffix:
+                                    sk, _ = get_voicevox_reading_and_kana(suffix)
+                                    suffix_k = re.sub(r'[^ァ-ヶー]', '', sk or "")
+
+                                cl_kana = re.sub(r'[^ァ-ヶー]', '', snip_kana)
+                                if prefix_k and cl_kana.startswith(prefix_k):
+                                    cl_kana = cl_kana[len(prefix_k):]
+                                if suffix_k and cl_kana.endswith(suffix_k):
+                                    cl_kana = cl_kana[:-len(suffix_k)]
+
+                                wrong_hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in cl_kana]).strip()
+
+                                def _norm_h(h):
+                                    return h.replace('お', 'う').replace('え', 'い').replace('ー', '')
+
+                                # 厳格な自動登録条件:
+                                # 1. 誤読が取得できている
+                                # 2. 発音上明らかに異なる（長音のオ/ウ、エ/イ揺らぎではない本物の誤読）
+                                # 3. 極端な長さの乖離がない
+                                if wrong_hira and _norm_h(wrong_hira) != _norm_h(expected_hira) and abs(len(wrong_hira) - len(expected_hira)) <= 4:
+                                    from server.web_pronunciation_resolver import save_to_pronunciation_memory
+                                    saved = save_to_pronunciation_memory(
+                                        surface=term,
+                                        reading=expected_hira,
+                                        wrong_reading=wrong_hira,
+                                        category="person_name" if len(term) in (3, 4) else "proper_noun",
+                                        article_topic=title or "ニュース音声照合",
+                                        sample_sentence=sample_sent[:60],
+                                        note=f"VOICEVOX文脈誤読から自動特定（誤読: '{wrong_hira}' ➔ 正読: '{expected_hira}'）"
+                                    )
+                                    if saved:
+                                        print(f"[誤読自動学習] 🎓 '{term}' の誤読 '{wrong_hira}' ➔ 正読 '{expected_hira}' を台帳に新規自動登録しました", flush=True)
+                        except Exception as auto_err:
+                            print(f"[誤読自動学習エラー] {auto_err}", flush=True)
 
     except Exception as e:
         print(f"[VOICEVOX全文照合エラー]: {e}", flush=True)
