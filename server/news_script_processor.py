@@ -2464,6 +2464,20 @@ def generate_news_item_script_data(payload, custom_dict=None):
             headline_speech = re.sub(r'^[、,\s　]+', '', headline_speech)
             headline_speech = re.sub(r'[、,\s　]+$', '', headline_speech)
             print(f"{tag} 🗣️ 元タイトル全文から文脈読み生成 (省略ゼロ): 発音='{headline_speech}'", flush=True)
+
+        # 🛡️ 見出しにも本文と同様にVOICEVOX全文照合自己修復エンジンを適用し、タイトルの誤読・アクセント融合を100%防止
+        try:
+            temp_hl = [{"display": headline_display, "speech": headline_speech}]
+            healed_hl = audit_and_heal_via_voicevox_full_reading(
+                temp_hl, title=title, known_terms_map=news_context_map
+            )
+            if healed_hl and len(healed_hl) > 0:
+                healed_speech = healed_hl[0].get("speech")
+                if healed_speech and healed_speech != headline_speech:
+                    print(f"{tag} 🩹 見出しのVOICEVOX全文照合修復適用: '{headline_speech}' ➔ '{healed_speech}'", flush=True)
+                    headline_speech = healed_speech
+        except Exception as e:
+            print(f"{tag} ⚠️ 見出し発音修復スキップ (非致命的): {e}", flush=True)
     
         total_speech_chars = sum(len(it.get('speech', '')) for it in (items or []))
         print(f"{tag} ✅ 原稿生成完了！ (計 {len(items or [])}文, {total_speech_chars}文字)", flush=True)
