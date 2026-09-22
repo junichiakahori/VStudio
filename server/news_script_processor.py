@@ -1308,6 +1308,39 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
     except Exception:
         pass
 
+    # 🔍 原稿全文に含まれる名詞・固有名詞・複合漢字語をJanomeで網羅抽出（台帳未登録の未知語誤読も完全捕捉）
+    try:
+        from janome.tokenizer import Tokenizer
+        tokenizer = Tokenizer()
+        import pykakasi
+        kks = pykakasi.kakasi()
+        for it in items:
+            sp = it.get("speech", "")
+            tokens = list(tokenizer.tokenize(sp))
+            for i, token in enumerate(tokens):
+                pos = token.part_of_speech.split(",")
+                surf = token.surface
+                # 2文字以上の漢字名詞
+                if len(surf) >= 2 and any('\u4e00' <= c <= '\u9fa5' for c in surf):
+                    if pos[0] == "名詞" and token.reading and token.reading != "*":
+                        hira = "".join([c.get("hira", "") for c in kks.convert(token.reading)]).strip()
+                        if hira and surf not in terms_map:
+                            terms_map[surf] = hira
+                # 連続する名詞の結合（例: 小栗 + 旬 ➔ 小栗旬、土砂 + 崩れ ➔ 土砂崩れ）
+                if i + 1 < len(tokens):
+                    next_tok = tokens[i+1]
+                    next_pos = next_tok.part_of_speech.split(",")
+                    if pos[0] == "名詞" and next_pos[0] == "名詞":
+                        combo_surf = surf + next_tok.surface
+                        if 2 <= len(combo_surf) <= 6 and any('\u4e00' <= c <= '\u9fa5' for c in combo_surf):
+                            if token.reading and next_tok.reading and token.reading != "*" and next_tok.reading != "*":
+                                h1 = "".join([c.get("hira", "") for c in kks.convert(token.reading)]).strip()
+                                h2 = "".join([c.get("hira", "") for c in kks.convert(next_tok.reading)]).strip()
+                                if h1 and h2 and combo_surf not in terms_map:
+                                    terms_map[combo_surf] = h1 + h2
+    except Exception:
+        pass
+
     if not terms_map:
         return items
 
