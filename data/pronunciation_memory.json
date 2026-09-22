@@ -1085,6 +1085,238 @@
         "鬼塚",
         "主演"
       ]
+    },
+    {
+      "id": "auto_1790037924_9621",
+      "surface": "上島拓巳",
+      "reading": "かみじまたくみ",
+      "wrong_reading": "うえしまたくみ",
+      "scope": "global",
+      "article_topic": "J1第8節で一発退場の町田MF下田北斗&福岡DF上島拓巳、2試合出場停止&罰金20万円",
+      "sample_sentence": "町田のエムエフ下田北斗選手と福岡のディーエフ上島拓巳選手、2試合のしゅつじょうていしと罰金20万円の処分が決まったにゃ。",
+      "category": "person_name",
+      "registered_date": "2026-09-22",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'うえしまたくみ' ➔ 正読: 'かみじまたくみ'）"
+    },
+    {
+      "id": "auto_1790067688_9769",
+      "surface": "上坂樹里",
+      "reading": "こうさかじゅり",
+      "wrong_reading": "かみさかいつき",
+      "scope": "global",
+      "article_topic": "朝ドラ「風、薫る」ツヤ（東野絢香）、セツ（村上穂乃佳）らと運命の試験に挑む 第128回あらすじ",
+      "sample_sentence": "そんなツヤを支えるため、りん見上愛と直美上坂樹里もどのようにサポートすべきか考えていたにゃ。",
+      "category": "person_name",
+      "registered_date": "2026-09-22",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'かみさかいつき' ➔ 正読: 'こうさかじゅり'）"
+    },
+    {
+      "id": "auto_1790067896_5329",
+      "surface": "新井貴浩",
+      "reading": "あらいたかひろ",
+      "wrong_reading": "あらい たかひろ",
+      "scope": "global",
+      "article_topic": "広島】新井貴浩監督が続投へ シーズン中に３度、球団に辞意伝える…「ゾンビたばこ」を巡る激動シーズン 来季５年目は高い求心力で根本的な立て直しを目指す（スポーツ報知）",
+      "sample_sentence": "新井貴浩に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-22",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: あらい たかひろ)"
+    },
+    {
+      "id": "auto_1790068074_9910",
+      "surface": "大規",
+      "reading": "だいきぼげ",
+      "wrong_reading": "だいきぼな",
+      "scope": "contextual",
+      "article_topic": "土砂崩れや浸水の被害相次ぐ 広範囲で冠水…千葉・佐倉市から中継（2026年9月21日掲載）",
+      "sample_sentence": "千葉県さくらしでは、大規模な冠水や土砂災害が発生していますにゃ。",
+      "category": "proper_noun",
+      "registered_date": "2026-09-22",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'だいきぼな' ➔ 正読: 'だいきぼげ'）",
+      "context_keywords": [
+        "土砂崩",
+        "浸水",
+        "被害相次",
+        "広範囲",
+        "冠水",
+        "千葉"
+      ],
+      "updated_date": "2026-09-22"
+    },
+    {
+      "id": "auto_1790068208_8025",
+      "surface": "被害",
+      "reading": "ひがいしゃさ",
+      "wrong_reading": "ひがい",
+      "scope": "contextual",
+      "article_topic": "松村北斗、映画「白鳥とコウモリ」ラストシーンにひと苦労「◯◯を見て安心できたんです",
+      "sample_sentence": "この作品は、作家・ひがしのけいごさんの同名小説を原作としており、弁護士刺殺事件の容疑者の息子と被害者の娘が事件の真相を追",
+      "category": "proper_noun",
+      "registered_date": "2026-09-22",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'ひがい' ➔ 正読: 'ひがいしゃさ'）",
+      "context_keywords": [
+        "松村北斗",
+        "映画",
+        "白鳥",
+        "コウモリ",
+        "ラストシーン",
+        "苦労"
+      ],
+      "updated_date": "2026-09-22"
+    },
+    {
+      "id": "auto_1790068208_17",
+      "surface": "不思",
+      "reading": "ふしぎのく",
+      "wrong_reading": "ふし",
+      "scope": "contextual",
+      "article_topic": "松村北斗、映画「白鳥とコウモリ」ラストシーンにひと苦労「◯◯を見て安心できたんです",
+      "sample_sentence": "舞台挨拶では、まつむらさんが観客の反響が大きくて、それぞれ違った視点から作品を捉えていて、不思議な魅力を感じましたと語っ",
+      "category": "proper_noun",
+      "registered_date": "2026-09-22",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'ふし' ➔ 正読: 'ふしぎのく'）",
+      "context_keywords": [
+        "松村北斗",
+        "映画",
+        "白鳥",
+        "コウモリ",
+        "ラストシーン",
+        "苦労"
+      ]
+    },
+    {
+      "id": "auto_1790068331_6587",
+      "surface": "皇后",
+      "reading": "ごうきょ",
+      "wrong_reading": "こおごお",
+      "scope": "contextual",
+      "article_topic": "皇后さま、バッグや靴までロイヤルブルー　天皇陛下のネクタイとの“おそろいコーデ”【23万いいね】（1/2） | ニュース ねとらぼ",
+      "sample_sentence": "天皇皇后両陛下は9月19日から20日まで、愛知県を訪問されましたにゃ。",
+      "category": "proper_noun",
+      "registered_date": "2026-09-22",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'こおごお' ➔ 正読: 'ごうきょ'）",
+      "context_keywords": [
+        "皇后",
+        "バッグ",
+        "ロイヤルブルー",
+        "天皇陛下",
+        "ネクタイ",
+        "コーデ"
+      ]
+    },
+    {
+      "id": "auto_1790069099_3868",
+      "surface": "木村敬",
+      "reading": "きむらたかし",
+      "wrong_reading": "きむら たかし",
+      "scope": "contextual",
+      "article_topic": "八代海の赤潮で養殖苦境、ブリなど１５３万匹死に被害額３７億円超…漁協組合長「ひどすぎて続けてと言えない",
+      "sample_sentence": "木村敬に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-22",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: きむら たかし)",
+      "context_keywords": [
+        "八代海",
+        "赤潮",
+        "養殖苦境",
+        "ブリ",
+        "万匹死",
+        "被害額"
+      ]
+    },
+    {
+      "id": "auto_1790069171_9413",
+      "surface": "元副",
+      "reading": "フク",
+      "wrong_reading": "もと ふく",
+      "scope": "contextual",
+      "article_topic": "国民・玉木氏ウクライナ訪問「滞在中に何度も空襲警報」 同行の深作議員がSNS報告 「首脳会談の実現を後押し",
+      "sample_sentence": "元副に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-22",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: もと ふく)",
+      "context_keywords": [
+        "国民",
+        "玉木氏",
+        "ウクライナ",
+        "訪問",
+        "滞在中",
+        "何度"
+      ]
+    },
+    {
+      "id": "auto_1790071905_6784",
+      "surface": "高市",
+      "reading": "がある",
+      "wrong_reading": "たかいち",
+      "scope": "contextual",
+      "article_topic": "改造、５閣僚が出身省庁に 高市首相、経験・答弁力重視",
+      "sample_sentence": "高市に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-22",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: たかいち)",
+      "context_keywords": [
+        "改造",
+        "閣僚",
+        "出身省庁",
+        "高市首相",
+        "経験",
+        "答弁力重視"
+      ]
+    },
+    {
+      "id": "auto_1790073238_3809",
+      "surface": "欅坂46",
+      "reading": "けやきざか",
+      "wrong_reading": "けやきざか よんじゅう ろく",
+      "scope": "global",
+      "article_topic": "コンセプトは“道中”櫻坂46「愛MUST BE」ジャケットアートワーク公開、BACKSセンターも発表に",
+      "sample_sentence": "欅坂46に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-22",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: けやきざか よんじゅう ろく)"
+    },
+    {
+      "id": "auto_1790073677_4610",
+      "surface": "東野絢香",
+      "reading": "ひがしのあやか",
+      "wrong_reading": "とおのあやか",
+      "scope": "global",
+      "article_topic": "風、薫る』“シマケン”佐野晶哉と“寛太”藤原季節が迎えた終着点　りんと直美の選択",
+      "sample_sentence": "看護婦試験を目指して実習に励むツヤ東野絢香は、りん（見上愛）に同行して佳枝相田翔子の家を訪れたにゃ。",
+      "category": "person_name",
+      "registered_date": "2026-09-22",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'とおのあやか' ➔ 正読: 'ひがしのあやか'）"
+    },
+    {
+      "id": "auto_1790074499_4300",
+      "surface": "狩野倫久",
+      "reading": "かのうみちひさ",
+      "wrong_reading": "かの みちひさ",
+      "scope": "global",
+      "article_topic": "なでしこOG大竹七未が見たなでしこジャパン対チャイニーズ・タイペイ戦「北朝鮮とかとやってみないと…」「澤穂希はもう…",
+      "sample_sentence": "狩野倫久に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-22",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: かの みちひさ)"
+    },
+    {
+      "id": "auto_1790075632_5082",
+      "surface": "諸橋愛",
+      "reading": "もろはしめぐむ",
+      "wrong_reading": "もろはし あい",
+      "scope": "contextual",
+      "article_topic": "速報】競輪選手の諸橋愛さんが死去",
+      "sample_sentence": "諸橋愛に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-22",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: もろはし あい)",
+      "context_keywords": [
+        "速報",
+        "競輪選手",
+        "諸橋愛",
+        "死去"
+      ]
     }
   ]
 }

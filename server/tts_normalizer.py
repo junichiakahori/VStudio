@@ -1058,6 +1058,13 @@ DEFAULT_TECH_ACRONYMS = {
     "SNS": "エスエヌエス",
     "EV": "イーブイ",
     "IT": "アイティー",
+    "ITmedia": "アイティメディア",
+    "ITMedia": "アイティメディア",
+    "itmedia": "アイティメディア",
+    "ITpro": "アイティプロ",
+    "itpro": "アイティプロ",
+    "ITnews": "アイティニュース",
+    "itnews": "アイティニュース",
     "PC": "ピーシー",
     "OS": "オーエス",
     "CEO": "シーイーオー",
@@ -1117,6 +1124,18 @@ DEFAULT_TECH_ACRONYMS = {
     "GX": "ジーエックス",
 }
 
+def apply_symbol_plus_rules(text):
+    """記号『+』『＋』の誤読（たす）を自然な『プラス』に統一（90++、NP50%+、ビジネス+IT等）"""
+    if not text:
+        return ""
+    t = text
+    # 1. 連続するプラス記号（90++、C++、+++ 等）
+    t = re.sub(r'[+＋]{3,}', 'プラスプラスプラス', t)
+    t = re.sub(r'[+＋]{2}', 'プラスプラス', t)
+    # 2. 単独プラス記号（前後の空白の有無に関わらず「プラス」に統一）
+    t = re.sub(r'[\s　]*[+＋][\s　]*', 'プラス', t)
+    return t
+
 def apply_tech_acronyms(text):
     """大文字・正規表記のテクノロジー略語マップの適用（data/tts_rules.json より動的適用、フォールバック付き）"""
     if not text:
@@ -1129,6 +1148,11 @@ def apply_tech_acronyms(text):
     t = re.sub(r'(?i)(?<![A-Za-z0-9])(?:chatgpt[\s　]*)+(?![A-Za-z0-9])', 'チャットジーピーティー', t)
     t = re.sub(r'(?i)(?<![A-Za-z0-9])(?:apple[\s　]*)+(?![A-Za-z0-9])', 'アップル', t)
     
+    # 🛡️ 1.2 ITmedia、ITpro、ITnews の確実な正規化（大文字小文字問わず事前吸収）
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])itmedia(?![A-Za-z0-9])', 'アイティメディア', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])itpro(?![A-Za-z0-9])', 'アイティプロ', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])itnews(?![A-Za-z0-9])', 'アイティニュース', t)
+
     acronyms = dict(DEFAULT_TECH_ACRONYMS)
     acronyms.update(load_tts_rules().get("tech_acronyms", {}))
     for acronym, yomi in sorted(acronyms.items(), key=lambda x: len(x[0]), reverse=True):
@@ -1440,6 +1464,9 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
 
     # -1. 全角英数字を半角に統一（「ＶＩＶＡＮＴ」や「ＡＩ」等のチェックすり抜け・スペル読みを防止）
     t = normalize_fullwidth_alphanumeric(text)
+
+    # -0.8 記号「+」「＋」の誤読（たす）を自然な「プラス」に統一（90++、NP50%+、ビジネス+IT等）
+    t = apply_symbol_plus_rules(t)
 
     # -0.5 航空機・戦闘機・機器の型番サフィックス単位誤読（F-16V ➔ 16ボルト 等）を修復
     t = apply_model_suffix_rules(t)
