@@ -1012,6 +1012,66 @@
       "category": "disaster_term",
       "registered_date": "2026-09-22",
       "note": "「土砂崩」が「どしゃさいがい」と誤置換されるのを防止"
+    },
+    {
+      "id": "auto_1790037290_4585",
+      "surface": "反町",
+      "reading": "たんまち",
+      "wrong_reading": "そりまち",
+      "scope": "contextual",
+      "article_topic": "GTO』最終回に小栗旬、徳山秀典ら登場　鬼塚のピンチに“かつての教え子たち”が再集結",
+      "sample_sentence": "このドラマは、反町隆史主演で28年ぶりに連続ドラマとして復活し、50代となった鬼塚の姿が描かれています。",
+      "category": "proper_noun",
+      "registered_date": "2026-09-22",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'そりまち' ➔ 正読: 'たんまち'）",
+      "context_keywords": [
+        "GTO",
+        "最終回",
+        "小栗旬",
+        "徳山秀典",
+        "登場",
+        "鬼塚"
+      ]
+    },
+    {
+      "id": "auto_1790037290_3694",
+      "surface": "鬼塚",
+      "reading": "おにづか",
+      "wrong_reading": "おにずか",
+      "scope": "contextual",
+      "article_topic": "GTO』最終回に小栗旬、徳山秀典ら登場　鬼塚のピンチに“かつての教え子たち”が再集結",
+      "sample_sentence": "このドラマは、たんまち隆史主演で28年ぶりに連続ドラマとして復活し、50代となった鬼塚の姿が描かれています。",
+      "category": "proper_noun",
+      "registered_date": "2026-09-22",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'おにずか' ➔ 正読: 'おにづか'）",
+      "context_keywords": [
+        "GTO",
+        "最終回",
+        "小栗旬",
+        "徳山秀典",
+        "登場",
+        "鬼塚"
+      ]
+    },
+    {
+      "id": "auto_1790037452_4654",
+      "surface": "内藤寛",
+      "reading": "ないとうひろし",
+      "wrong_reading": "ないとおかん",
+      "scope": "contextual",
+      "article_topic": "44歳での待望の1勝を運んできた“カメ” 内藤寛太郎「本当にパターのおかげ",
+      "sample_sentence": "内藤寛太郎選手、44歳で待望のツアー初優勝を果たしたにゃ。",
+      "category": "person_name",
+      "registered_date": "2026-09-22",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'ないとおかん' ➔ 正読: 'ないとうひろし'）",
+      "context_keywords": [
+        "44",
+        "待望",
+        "カメ",
+        "内藤寛太郎",
+        "本当",
+        "パター"
+      ]
     }
   ]
 }
