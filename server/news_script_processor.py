@@ -1314,12 +1314,16 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
         tokenizer = Tokenizer()
         import pykakasi
         kks = pykakasi.kakasi()
+        NUM_CHARS = set("一二三四五六七八九十百千万億兆0123456789０１２３４５６７８９")
         for it in items:
             sp = it.get("speech", "")
             tokens = list(tokenizer.tokenize(sp))
             for i, token in enumerate(tokens):
                 pos = token.part_of_speech.split(",")
                 surf = token.surface
+                # 数詞・助数詞を含むものは除外（一軒、一課、1件等）
+                if any(c in NUM_CHARS for c in surf) or pos[1] == "数":
+                    continue
                 # 2文字以上の漢字名詞
                 if len(surf) >= 2 and any('\u4e00' <= c <= '\u9fa5' for c in surf):
                     if pos[0] == "名詞" and token.reading and token.reading != "*":
@@ -1330,6 +1334,8 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
                 if i + 1 < len(tokens):
                     next_tok = tokens[i+1]
                     next_pos = next_tok.part_of_speech.split(",")
+                    if any(c in NUM_CHARS for c in next_tok.surface) or next_pos[1] == "数":
+                        continue
                     if pos[0] == "名詞" and next_pos[0] == "名詞":
                         combo_surf = surf + next_tok.surface
                         if 2 <= len(combo_surf) <= 6 and any('\u4e00' <= c <= '\u9fa5' for c in combo_surf):
@@ -1385,9 +1391,12 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
                 continue
 
             def _norm_k(k):
-                return k.replace('オ', 'ウ').replace('エ', 'イ').replace('ー', '')
+                # 長音・促音便の等価正規化（オ/ウ、エ/イ、ッ/チ/ツ/ク/キを同一視し、いっか/いっけん等の正常な音便を保護）
+                k = k.replace('オ', 'ウ').replace('エ', 'イ').replace('ー', '')
+                k = re.sub(r'[ッチツクキッ]', '●', k)
+                return k
 
-            # 全文読みの中に、期待するカタカナが含まれているか検証（長音表記揺らぎを吸収）
+            # 全文読みの中に、期待するカタカナが含まれているか検証（長音・促音便の音韻変化を吸収）
             if _norm_k(expected_kana) not in _norm_k(clean_vv_kana):
                 print(f"[VOICEVOX全文照合] 🚨 誤読検知: '{term}' の正読 '{expected_hira}'({expected_kana}) が全文音声読みの中に存在しません（文脈誤読）", flush=True)
                 sample_sent = ""
@@ -1429,11 +1438,13 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
                                 wrong_hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in cl_kana]).strip()
 
                                 def _norm_h(h):
-                                    return h.replace('お', 'う').replace('え', 'い').replace('ー', '')
+                                    h = h.replace('お', 'う').replace('え', 'い').replace('ー', '')
+                                    h = re.sub(r'[っちつくきっ]', '●', h)
+                                    return h
 
                                 # 厳格な自動登録条件:
                                 # 1. 誤読が取得できている
-                                # 2. 発音上明らかに異なる（長音のオ/ウ、エ/イ揺らぎではない本物の誤読）
+                                # 2. 発音上明らかに異なる（長音のオ/ウ、促音便のチ/ッ揺らぎではない本物の誤読）
                                 # 3. 極端な長さの乖離がない
                                 if wrong_hira and _norm_h(wrong_hira) != _norm_h(expected_hira) and abs(len(wrong_hira) - len(expected_hira)) <= 4:
                                     from server.web_pronunciation_resolver import save_to_pronunciation_memory

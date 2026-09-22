@@ -973,7 +973,8 @@
       "sample_sentence": "作品に小栗さんが出演しています。",
       "category": "person_name",
       "registered_date": "2026-09-22",
-      "note": "助詞「に」直後等でVOICEVOXが「ささぐり」と誤読するのを防止"
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'ささぐり' ➔ 正読: 'おぐり'）",
+      "updated_date": "2026-09-22"
     },
     {
       "id": "oguri_shun",

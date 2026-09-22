@@ -376,7 +376,11 @@ def resolve_unknown_reading_online(
                     kks = pykakasi.kakasi()
                     res = kks.convert(vv_reading)
                     hira_reading = "".join([it.get("hira", "") for it in res]).strip()
-                    if hira_reading and hira_reading != ruby:
+                    def _norm(s):
+                        s = s.replace("お", "う").replace("え", "い").replace("ー", "")
+                        s = re.sub(r'[っちつくきっ]', '●', s)
+                        return s
+                    if hira_reading and _norm(hira_reading) != _norm(ruby):
                         wrong_reading = hira_reading
             except Exception:
                 pass
