@@ -1014,26 +1014,6 @@
       "note": "「土砂崩」が「どしゃさいがい」と誤置換されるのを防止"
     },
     {
-      "id": "auto_1790037290_4585",
-      "surface": "反町",
-      "reading": "たんまち",
-      "wrong_reading": "そりまち",
-      "scope": "contextual",
-      "article_topic": "GTO』最終回に小栗旬、徳山秀典ら登場　鬼塚のピンチに“かつての教え子たち”が再集結",
-      "sample_sentence": "このドラマは、反町隆史主演で28年ぶりに連続ドラマとして復活し、50代となった鬼塚の姿が描かれています。",
-      "category": "proper_noun",
-      "registered_date": "2026-09-22",
-      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'そりまち' ➔ 正読: 'たんまち'）",
-      "context_keywords": [
-        "GTO",
-        "最終回",
-        "小栗旬",
-        "徳山秀典",
-        "登場",
-        "鬼塚"
-      ]
-    },
-    {
       "id": "auto_1790037290_3694",
       "surface": "鬼塚",
       "reading": "おにづか",
@@ -1071,6 +1051,39 @@
         "内藤寛太郎",
         "本当",
         "パター"
+      ]
+    },
+    {
+      "id": "sorimachi_takashi",
+      "surface": "反町隆史",
+      "reading": "そりまちたかし",
+      "wrong_reading": "たんまちたかし",
+      "scope": "global",
+      "article_topic": "芸能・エンタメ・ドラマニュース",
+      "sample_sentence": "反町隆史主演で連続ドラマとして復活しました。",
+      "category": "person_name",
+      "registered_date": "2026-09-22",
+      "note": "「反町隆史」を駅名由来の「たんまち」と誤読するのを防止し「そりまちたかし」に固定"
+    },
+    {
+      "id": "sorimachi_surname",
+      "surface": "反町",
+      "reading": "そりまち",
+      "wrong_reading": "たんまち",
+      "scope": "contextual",
+      "article_topic": "芸能・エンタメ・ドラマニュース",
+      "sample_sentence": "反町さんが主演を務めます。",
+      "category": "person_name",
+      "registered_date": "2026-09-22",
+      "note": "芸能文脈で「反町」を「たんまち」と誤読するのを防止し「そりまち」に固定",
+      "context_keywords": [
+        "隆史",
+        "俳優",
+        "GTO",
+        "ドラマ",
+        "相棒",
+        "鬼塚",
+        "主演"
       ]
     }
   ]

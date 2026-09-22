@@ -1308,7 +1308,9 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
     except Exception:
         pass
 
-    # 🔍 原稿全文に含まれる名詞・固有名詞・複合漢字語をJanomeで網羅抽出（台帳未登録の未知語誤読も完全捕捉）
+    trusted_terms = set(terms_map.keys())
+
+    # 🔍 原稿全文に含まれる一般名詞・複合漢字語をJanomeで網羅抽出（※固有名詞はJanomeの地名誤爆「反町=たんまち」等を防ぐため除外）
     try:
         from janome.tokenizer import Tokenizer
         tokenizer = Tokenizer()
@@ -1324,17 +1326,20 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
                 # 数詞・助数詞を含むものは除外（一軒、一課、1件等）
                 if any(c in NUM_CHARS for c in surf) or pos[1] == "数":
                     continue
-                # 2文字以上の漢字名詞
+                # 固有名詞はJanome辞書読み（反町=たんまち、麻生=あそ等）が不正確なため除外（Wikipedia/AI解決を信頼）
+                if pos[1] == "固有名詞":
+                    continue
+                # 2文字以上の漢字一般名詞
                 if len(surf) >= 2 and any('\u4e00' <= c <= '\u9fa5' for c in surf):
                     if pos[0] == "名詞" and token.reading and token.reading != "*":
                         hira = "".join([c.get("hira", "") for c in kks.convert(token.reading)]).strip()
                         if hira and surf not in terms_map:
                             terms_map[surf] = hira
-                # 連続する名詞の結合（例: 小栗 + 旬 ➔ 小栗旬、土砂 + 崩れ ➔ 土砂崩れ）
+                # 連続する一般名詞の結合
                 if i + 1 < len(tokens):
                     next_tok = tokens[i+1]
                     next_pos = next_tok.part_of_speech.split(",")
-                    if any(c in NUM_CHARS for c in next_tok.surface) or next_pos[1] == "数":
+                    if any(c in NUM_CHARS for c in next_tok.surface) or next_pos[1] == "数" or next_pos[1] == "固有名詞":
                         continue
                     if pos[0] == "名詞" and next_pos[0] == "名詞":
                         combo_surf = surf + next_tok.surface
@@ -1408,9 +1413,11 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
                         print(f"[VOICEVOX全文照合修復] 🩹 '{term}' を正読 '{expected_hira}' に直接ルビ補正しました: {it['speech']}", flush=True)
 
                 # 🎓 実際の誤読（wrong_reading）を特定して台帳に安全に自動登録
-                # （接尾辞・一般語の誤爆を防ぐため、2〜4文字の漢字固有名詞/人名のみを対象）
+                # （接尾辞・一般語の誤爆を防ぐため、2〜4文字の漢字固有名詞/人名、かつ正読ソースの裏付けがあるものに限定）
                 if sample_sent and 2 <= len(term) <= 4 and re.match(r'^[\u4e00-\u9fa5]+$', term):
-                    if not term.endswith(('的', '対', '化', '製', '感', '性', '度')):
+                    # 信頼できる正読ソース（Wikipedia人名解決・AI発音チェック・台帳）の裏付けがあるもののみ自動登録
+                    # （Janomeの未確認地名読み「反町=たんまち」等による誤登録を100%遮断）
+                    if term in trusted_terms and not term.endswith(('的', '対', '化', '製', '感', '性', '度')):
                         try:
                             # 出現位置から前後の文脈スニペットを切り出して実際の誤読を特定
                             pos = sample_sent.find(term)
