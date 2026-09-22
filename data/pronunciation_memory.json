@@ -350,38 +350,6 @@
       "wrong_reading": "もとひで"
     },
     {
-      "id": "auto_1789722750_7365",
-      "surface": "日銀",
-      "reading": "にっぽんぎんこう",
-      "scope": "contextual",
-      "article_topic": "日銀・植田総裁、利上げペース「３か月に１回とか特定のもの念頭にない」…政策の局面「変化した」との認識も示す",
-      "sample_sentence": "日銀に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-18",
-      "note": "Web自動解決 (wikipedia)",
-      "context_keywords": [
-        "日銀",
-        "植田総裁",
-        "利上",
-        "ペース",
-        "特定",
-        "念頭"
-      ],
-      "wrong_reading": "にちぎん"
-    },
-    {
-      "id": "auto_1789726385_9386",
-      "surface": "古川政調",
-      "reading": "せいちょう",
-      "scope": "global",
-      "article_topic": "チームみらいが新体制発表 古川政調会長が幹事長に",
-      "sample_sentence": "古川政調に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-18",
-      "note": "Web自動解決 (duckduckgo)",
-      "wrong_reading": "ふるかわせいちょう"
-    },
-    {
       "id": "auto_1789727146_3181",
       "surface": "清水崇",
       "reading": "しみずたかし",
@@ -492,26 +460,6 @@
       "registered_date": "2026-09-19",
       "note": "Web自動解決 (wikipedia)",
       "wrong_reading": "きんしししょう"
-    },
-    {
-      "id": "auto_1789810389_4532",
-      "surface": "市場",
-      "reading": "いちば",
-      "scope": "contextual",
-      "article_topic": "硫黄でいぶした違法加工のタケノコ流通 中国、製品差し押さえ 白菜に続き食品安全懸念",
-      "sample_sentence": "市場に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-09-19",
-      "note": "Web自動解決 (wikipedia)",
-      "context_keywords": [
-        "硫黄",
-        "違法加工",
-        "タケノコ",
-        "流通",
-        "中国",
-        "製品差"
-      ],
-      "wrong_reading": "しじょう"
     },
     {
       "id": "auto_1789811341_2508",

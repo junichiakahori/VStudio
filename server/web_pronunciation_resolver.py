@@ -149,6 +149,11 @@ def fetch_wikipedia_ruby(term: str) -> Optional[str]:
             for pid, pdata in pages.items():
                 if pid == "-1":
                     continue
+                real_title = pdata.get("title", "")
+                # リダイレクト先タイトルが元の語句と異なる場合（例: 衆院 ➔ 衆議院、日銀 ➔ 日本銀行、友好 ➔ 友情）、
+                # リダイレクト先別記事の読みを元の語句の読みとして採用するのは禁止（略称の誤置換・逆転誤読防止）
+                if real_title != term and not real_title.startswith(f"{term} (") and not real_title.startswith(f"{term}（"):
+                    continue
                 extract = pdata.get("extract", "")
                 ruby = _extract_ruby_from_text(term, extract)
                 if ruby:
