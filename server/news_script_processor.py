@@ -16,7 +16,8 @@ from server.tts_normalizer import (
     normalize_for_tts, sanitize_speech_text, build_context_pronunciation_map,
     heal_sentence_reading, apply_person_kata_rules, is_plausible_reading,
     extract_article_rubies, lookup_wikipedia_person_reading,
-    extract_imperial_pronunciations, get_wikipedia_surname_reading
+    extract_imperial_pronunciations, get_wikipedia_surname_reading,
+    is_imperial_article_context
 )
 from server.news_crawler import find_cached_url, search_news_url_by_title, register_cached_url, fetch_article_body, decode_google_news_url
 
@@ -463,20 +464,38 @@ def normalize_celebrity_honorifics(text, title, article_content=""):
             pat = re.compile(rf'({re.escape(name)})(?!{HONORIFICS})([のはがにもへと])')
             result = pat.sub(r'\1さん\2', result)
 
-    # 2. ── 皇族名の「さん」→「さま」強制変換（炎上防止・最重要） ──
-    # 固定の完全一致ホワイトリストのみを対象とし、一般名詞に誤爆することは絶対にない
-    IMPERIAL_NAMES = [
-        '悠仁', '佳子', '愛子', '眞子', '彬子', '承子',    # 現役皇族（お名前）
-        '紀子', '雅子', '文仁', '徳仁',                    # 宮家・天皇皇后
+    # 2. ── 皇族名の「さん」→「さま」変換（炎上防止・最重要） ──
+    # ※【最重要原則】
+    # 皇室・皇族トピック（タイトルまたは本文に皇室関連キーワードが存在する）でない限り、
+    # 「愛子」「紀子」「佳子」「雅子」等の単独お名前を一般記事で「さま」に変換してはならない！
+    # （例: 柏木由紀子さん、杉原愛子さん、一般の紀子さん等の記事を皇室記事と誤認して「さま」にする事故を100%根絶）
+    
+    # 常に皇室と確定できる宮号・称号
+    ROYAL_TITLES = [
         '秋篠宮', '常陸宮', '三笠宮', '高円宮',            # 宮号
         '天皇', '皇后', '上皇', '上皇后', '皇太子', '皇太后',  # 称号
     ]
-    for imperial in IMPERIAL_NAMES:
+    for royal in ROYAL_TITLES:
         result = re.sub(
-            rf'({re.escape(imperial)})さん(?!ま|様|殿|親王|内親王)',
+            rf'(?<![一-龥ぁ-んァ-ヶA-Za-z])({re.escape(royal)})さん(?!ま|様|殿|親王|内親王|陛下)',
             r'\1さま',
             result
         )
+
+    # 一般名としても実在する皇族のお名前（悠仁、佳子、愛子、紀子、雅子等）は、
+    # 【皇室記事である場合のみ】かつ【名字が付いていない単独表記】に限定して「さま」変換を行う
+    is_imperial = is_imperial_article_context(article_content or text, title)
+    if is_imperial:
+        IMPERIAL_GIVEN_NAMES = [
+            '悠仁', '佳子', '愛子', '眞子', '彬子', '承子',
+            '紀子', '雅子', '文仁', '徳仁',
+        ]
+        for imperial in IMPERIAL_GIVEN_NAMES:
+            result = re.sub(
+                rf'(?<![一-龥ぁ-んァ-ヶA-Za-z])({re.escape(imperial)})さん(?!ま|様|殿|親王|内親王)',
+                r'\1さま',
+                result
+            )
 
     return result
 
@@ -937,11 +956,15 @@ AUTHENTIC_SPORTS_KEYWORDS = {
     "バスケットボール", "Bリーグ", "NBA", "バレーボール", "Vリーグ",
     "テニス", "ゴルフ", "米女子ツアー", "PGA", "LPGA",
     "陸上競技", "マラソン", "駅伝", "水泳", "競泳", "卓球", "バドミントン",
+    "体操", "体操競技", "新体操", "トランポリン", "種目別", "個人総合",
     "フィギュアスケート", "スピードスケート", "スケートボード", "スケボー",
     "ボクシング", "プロレス", "格闘技", "柔道", "剣道", "空手", "レスリング",
     "大相撲", "競馬", "騎手", "モータースポーツ", "F1",
     "投手", "捕手", "内野手", "外野手", "打者", "本塁打", "ホームラン", "防御率", "打率", "安打",
     "ゴールキーパー", "シュート", "フリーキック", "オフサイド",
+    "ウエイトリフティング", "重量挙げ", "フェンシング", "アーチェリー", "カヌー", "セーリング",
+    "近代五種", "スポーツクライミング", "サーフィン", "ブレイキン", "スキー", "スノーボード", "スノボ", "カーリング", "アイスホッケー",
+    "金メダル", "銀メダル", "銅メダル", "世界選手権", "アジア大会", "インターハイ", "全日本選手権", "日本選手権",
     "五輪", "オリンピック", "パラリンピック", "アスリート", "大谷翔平", "ドジャース"
 }
 
@@ -2325,24 +2348,39 @@ def generate_news_item_script_data(payload, custom_dict=None):
                                 news_context_map[surname_k] = s_yomi
                                 print(f"{tag} 👤 [人名文脈継承] '{target_name}'({w_yomi}) ➔ 姓 '{surname_k}' = '{s_yomi}'", flush=True)
 
-            # 👤 2.5 タイトル・原稿・本文からの3〜4文字人名自動スキャン＆姓の文脈継承（小栗旬等の3文字人名も完全救済）
+            # 👤 2.5 タイトル・原稿・本文からの人名自動スキャン＆姓の文脈継承
+            # ※【最重要】一般単語（日本食、食文化、農林水産等）を無差別に人名検索して会社名（日本食研等）を誤爆させる事故を100%防止するため、
+            # 敬称（さん・氏・選手等）が後続する人名候補、または明らかな4文字人名漢字のみをスキャン対象とする。
             scan_corpus = f"{title}\n{clean_text}"
-            auto_kanji_names = set(re.findall(r'(?<![\u4e00-\u9fa5])([\u4e00-\u9fa5]{3,4})(?![\u4e00-\u9fa5])', scan_corpus))
+            EXCLUDE_KANJI_TERMS = {
+                '日本食', '食文化', '農林水産', '東南アジア', '大統領', '総理大臣', '新製品', '経済効果', '自動運転',
+                '最高裁', '高等裁判所', '地方裁判所', '家庭裁判所', '簡易裁判所', '検察庁', '警察庁', '警視庁',
+                '防衛省', '外務省', '財務省', '法務省', '総務省', '厚生労働省', '農林水産省', '国土交通省', '環境省',
+                '文部科学省', '経済産業省', '消費者庁', '復興庁', '消防庁', '気象庁', '海上保安庁', '観光庁'
+            }
+            # 敬称付きの人名候補（例: 小栗旬さん、角田選手、茂木大臣）
+            honorific_names = set(re.findall(r'(?<![\u4e00-\u9fa5])([\u4e00-\u9fa5]{2,4})(?=(?:さん|氏|選手|監督|知事|市長|首相|大臣|総理|総裁|議員|社長|会長|容疑者|被告|先生|教授))', scan_corpus))
+            # 4文字漢字の人名候補（2文字姓＋2文字名）
+            four_char_names = set(re.findall(r'(?<![\u4e00-\u9fa5])([\u4e00-\u9fa5]{4})(?![\u4e00-\u9fa5])', scan_corpus))
+            auto_kanji_names = (honorific_names | four_char_names) - EXCLUDE_KANJI_TERMS
+
             for kn in auto_kanji_names:
                 if kn not in news_context_map:
-                    # 後続に送り仮名（れ、る、け、ろ、せ、た、て等）がある複合語（例: 土砂崩れ、受け取り）は人名ではないため除外
+                    # 後続に送り仮名（れ、る、け、ろ、せ、た、て等）がある複合語は人名ではないため除外
                     if re.search(re.escape(kn) + r'[れるろけせてためげぜべっ]', scan_corpus):
                         continue
                     w_y = lookup_wikipedia_person_reading(kn, context_hint=full_context_text)
                     if w_y:
                         news_context_map[kn] = w_y
-                        sur_k = kn[:2]
-                        s_y = get_wikipedia_surname_reading(kn)
-                        if not s_y and len(w_y) >= 3:
-                            s_y = w_y[:(len(w_y)+1)//2]
-                        if s_y and sur_k not in news_context_map:
-                            news_context_map[sur_k] = s_y
-                            print(f"{tag} 👤 [自動人名スキャン文脈継承] '{kn}'({w_y}) ➔ 姓 '{sur_k}' = '{s_y}'", flush=True)
+                        # 姓の導出は4文字漢字（2文字姓＋2文字名）の人名に厳格限定！3文字語からの姓導出は完全禁止！
+                        if len(kn) == 4:
+                            sur_k = kn[:2]
+                            s_y = get_wikipedia_surname_reading(kn)
+                            if not s_y and len(w_y) >= 4:
+                                s_y = w_y[:(len(w_y)+1)//2]
+                            if s_y and sur_k not in news_context_map:
+                                news_context_map[sur_k] = s_y
+                                print(f"{tag} 👤 [自動人名スキャン文脈継承] '{kn}'({w_y}) ➔ 姓 '{sur_k}' = '{s_y}'", flush=True)
 
             # 🤖 AIによる直接発音ダブルチェック（人名・特殊固有名詞のひらがな読みを文脈判定して統合）
             ai_pron_map = extract_pronunciations_via_ai(
