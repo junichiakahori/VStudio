@@ -1252,6 +1252,8 @@ def apply_age_and_counter_rules(text):
     if not text:
         return ""
     t = text
+    # 第○回 / ○回の直後に「り」等が続く場合の「回り（まわり）」誤読を確実に防止（例: 第129回りん ➔ 第129回、りん）
+    t = re.sub(r'((?:第)?[0-9０-９一二三四五六七八九十百千万]+回)(?=[らりるれろ])', r'\1、', t)
     rules = load_tts_rules()
     for item in rules.get("age_and_counter_rules", []):
         pat = item.get("pattern")
