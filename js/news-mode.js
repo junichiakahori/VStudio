@@ -445,72 +445,124 @@ function getNewsConfig() {
   window.sortNewsItemsByBroadcastOrder = sortNewsItemsByBroadcastOrder;
 
   /**
-   * 🔄 バックグラウンド先読みワーカー
-   * 💡 重要: 全159記事を巡回してVOICEVOXをパンクさせる過剰先読みを恒久禁止！
-   * 常に「次の1記事（直近の次記事）」のみを先読みプールし、最大プール数を1件に厳格制限する。
+  const MAX_PRELOAD_BUFFER = 8; // 🛡️ 先読みバッファ上限（配信準備中・進行中ともに最大8件を常時先行プール）
+  const failedPrefetchTitles = new Set(); // 生成スキップ・失敗記事の除外キャッシュ
+  let _prefetchLoopTimer = null;
+
+  function updatePrefetchUIBadge() {
+    const statsEl = document.getElementById("ui-batch-gen-stats");
+    const barEl = document.getElementById("ui-batch-gen-bar");
+    const labelEl = document.getElementById("ui-batch-gen-label");
+    if (!statsEl || !barEl) return;
+    const count = preloadedNewsMap ? preloadedNewsMap.size : 0;
+    const max = MAX_PRELOAD_BUFFER;
+    const pct = Math.min(100, Math.round((count / max) * 100));
+    barEl.style.width = `${pct}%`;
+    if (isPrefetchWorkerRunning) {
+      statsEl.textContent = `⏳ 先読み中 (${count}/${max}件)`;
+      statsEl.style.color = "#00d2d3";
+    } else if (count >= max) {
+      statsEl.textContent = `✅ 準備完了 (${count}/${max}件)`;
+      statsEl.style.color = "#00e676";
+    } else if (count > 0) {
+      statsEl.textContent = `📦 バッファ: ${count}/${max}件`;
+      statsEl.style.color = "#81ecec";
+    } else {
+      statsEl.textContent = "待機中";
+      statsEl.style.color = "var(--text-muted)";
+    }
+  }
+  window.updatePrefetchUIBadge = updatePrefetchUIBadge;
+
+  /**
+   * 🔄 バックグラウンド先読みワーカー（自律直列ループ）
+   * - 配信準備中（0件目〜）から直列で1件ずつ安全に生成し、最大8件までバッファを先行蓄積
+   * - 配信進行中も再生と同期して常に先読みバッファ8件を維持（途中の食い潰し・無音停止を完全防止）
+   * - 並列リクエストによるOllamaやVOICEVOXのパンクを100%防止（直列＋1.0秒クールダウン）
    */
   async function startBackgroundNewsPrefetcher() {
     if (isPrefetchWorkerRunning) return;
-    let currentList = window.latestFetchedNews || [];
-    if (!currentList || currentList.length === 0) return;
+    if (_prefetchLoopTimer) {
+      clearTimeout(_prefetchLoopTimer);
+      _prefetchLoopTimer = null;
+    }
 
-    // 💡 放送順（カテゴリ順＋時系列順）と100%完全同期して先読みを実行
+    let currentList = window.latestFetchedNews || [];
+    if (!currentList || currentList.length === 0) {
+      updatePrefetchUIBadge();
+      return;
+    }
+
+    // 💡 放送順（カテゴリ順＋時系列順）と100%完全同期
     currentList = sortNewsItemsByBroadcastOrder(currentList);
     window.latestFetchedNews = currentList;
 
-    // 🛡️ プール上限ガード: 未消費の先読みが既に4件以上あれば、それ以上は一切先読みしない
-    // 💡 準備中・放送中は「次の記事」「その次の記事」を含めた2重バッファを先行プール
-    if (preloadedNewsMap.size >= 4) {
+    // 🛡️ プール上限ガード: 未消費の先読みが既にMAX_PRELOAD_BUFFER件以上あれば待機
+    if (preloadedNewsMap.size >= MAX_PRELOAD_BUFFER) {
+      updatePrefetchUIBadge();
+      // バッファ満杯時は4秒後に再チェック（放送が進んで空きができたら即再開）
+      _prefetchLoopTimer = setTimeout(() => startBackgroundNewsPrefetcher(), 4000);
+      return;
+    }
+
+    const isRunning = (typeof newsBroadcastState !== "undefined" && newsBroadcastState.isRunning);
+    const startIdx = isRunning ? Math.max(0, (newsBroadcastState.currentIndex || 1) - 1) : 0;
+
+    // 🎯 放送順に未消費＆未プール＆未失敗の記事を探索
+    let targetIdx = -1;
+    let targetItem = null;
+    for (let idx = startIdx; idx < currentList.length; idx++) {
+      const candidate = currentList[idx];
+      if (
+        candidate && candidate.title &&
+        !consumedNewsTitles.has(candidate.title) &&
+        !preloadedNewsMap.has(candidate.title) &&
+        !failedPrefetchTitles.has(candidate.title)
+      ) {
+        targetIdx = idx;
+        targetItem = candidate;
+        break;
+      }
+    }
+
+    if (!targetItem) {
+      updatePrefetchUIBadge();
+      // すべて先読み完了、または未処理なし（10秒後に再チェック）
+      _prefetchLoopTimer = setTimeout(() => startBackgroundNewsPrefetcher(), 10000);
       return;
     }
 
     isPrefetchWorkerRunning = true;
+    updatePrefetchUIBadge();
     try {
-      let targetIdx = -1;
-      const isRunning = (typeof newsBroadcastState !== "undefined" && newsBroadcastState.isRunning);
-
-      if (isRunning && newsBroadcastState.currentIndex > 0) {
-        // 放送進行中: 2重バッファを維持（currentIndex: 次の記事、currentIndex + 1: その次の記事）
-        const idx1 = newsBroadcastState.currentIndex;
-        const idx2 = newsBroadcastState.currentIndex + 1;
-        if (idx1 < currentList.length && !preloadedNewsMap.has(currentList[idx1].title) && !consumedNewsTitles.has(currentList[idx1].title)) {
-          targetIdx = idx1;
-        } else if (idx2 < currentList.length && !preloadedNewsMap.has(currentList[idx2].title) && !consumedNewsTitles.has(currentList[idx2].title)) {
-          targetIdx = idx2;
-        }
-      } else {
-        // 放送準備中: 第1記事(0), 第2記事(1), 第3記事(2) を順番に先読みして序盤の待ち時間を恒久ゼロ化
-        if (currentList[0] && !preloadedNewsMap.has(currentList[0].title) && !consumedNewsTitles.has(currentList[0].title)) {
-          targetIdx = 0;
-        } else if (currentList[1] && !preloadedNewsMap.has(currentList[1].title) && !consumedNewsTitles.has(currentList[1].title)) {
-          targetIdx = 1;
-        } else if (currentList[2] && !preloadedNewsMap.has(currentList[2].title) && !consumedNewsTitles.has(currentList[2].title)) {
-          targetIdx = 2;
-        }
-      }
-
-      if (targetIdx >= 0 && targetIdx < currentList.length) {
-        const targetItem = currentList[targetIdx];
-        if (targetItem && targetItem.title && !preloadedNewsMap.has(targetItem.title) && !consumedNewsTitles.has(targetItem.title)) {
-          const isFirst = (targetIdx === 0);
-          console.log(`[ニュース先読み] 🎯 ${isFirst ? '第1記事目' : '次記事'}をピンポイント先読み:「${targetItem.title.substring(0, 20)}...」`);
-          const prevCat = (targetIdx > 0 && currentList[targetIdx - 1]) ? currentList[targetIdx - 1].categoryName : "";
-          const isCatChanged = (targetItem.categoryName !== prevCat);
-          await executeNewsPrefetch(targetItem, isFirst, isCatChanged);
-        }
+      const isFirst = (targetIdx === 0);
+      const currentBufferCount = preloadedNewsMap.size;
+      const modeLabel = isRunning ? "📡 放送中" : "準備中";
+      console.log(`[ニュース先読みワーカー] 🎯 [${modeLabel} バッファ:${currentBufferCount + 1}/${MAX_PRELOAD_BUFFER}件] 「${targetItem.title.substring(0, 22)}...」を直列先行生成`);
+      const prevCat = (targetIdx > 0 && currentList[targetIdx - 1]) ? currentList[targetIdx - 1].categoryName : "";
+      const isCatChanged = (targetItem.categoryName !== prevCat);
+      const result = await executeNewsPrefetch(targetItem, isFirst, isCatChanged);
+      if (!result) {
+        failedPrefetchTitles.add(targetItem.title);
       }
     } catch (err) {
-      console.warn("[ニュース先読みワーカー] 停止またはエラー:", err);
+      console.warn("[ニュース先読みワーカー] 生成エラー:", err);
+      if (targetItem && targetItem.title) failedPrefetchTitles.add(targetItem.title);
     } finally {
       isPrefetchWorkerRunning = false;
+      updatePrefetchUIBadge();
+      // 💡 次の記事へ直列に継続（CPU/GPU・Ollama負荷を平準化するため1.0秒のクールダウンを挟む）
+      _prefetchLoopTimer = setTimeout(() => startBackgroundNewsPrefetcher(), 1000);
     }
   }
 
   function triggerNewsPrefetch(item, isFirst = false, isCategoryChanged = false) {
     if (!item || !item.title) return;
-    if (preloadedNewsMap.size >= 4) return; // 既に4件プール中なら重複追加を防止
+    if (preloadedNewsMap.size >= MAX_PRELOAD_BUFFER) return;
     if (!preloadedNewsMap.has(item.title) && !consumedNewsTitles.has(item.title)) {
-      executeNewsPrefetch(item, isFirst, isCategoryChanged);
+      executeNewsPrefetch(item, isFirst, isCategoryChanged).then(() => {
+        updatePrefetchUIBadge();
+      });
     }
   }
 
@@ -690,6 +742,9 @@ function getNewsConfig() {
         const cached = preloadedNewsMap.get(item.title);
         consumedNewsTitles.add(item.title);
         preloadedNewsMap.delete(item.title);
+        updatePrefetchUIBadge();
+        // 🚀 キャッシュを1件消費したため、直ちに次の先読みをキックして8件バッファを補給
+        setTimeout(() => startBackgroundNewsPrefetcher(), 100);
         try {
           data = await cached.promise; // 先読みが完了するまでここで待つ（最大180秒）
           if (data && data.status === "ok") {
@@ -815,12 +870,9 @@ function getNewsConfig() {
           }
         }
 
-        // 🚀 ③ 2重バッファ先読みトリガー（次の記事 i+1 ＆ 次々の記事 i+2 を裏側で先行生成）
-        if (nextItem) {
-          triggerNewsPrefetch(nextItem, false, nextIsCatChanged);
-        }
-        if (nextNextItem) {
-          triggerNewsPrefetch(nextNextItem, false, nextNextIsCatChanged);
+        // 🚀 ③ 先読みバッファ補充キック（常時MAX 8件のプールを自動維持）
+        if (typeof startBackgroundNewsPrefetcher === "function") {
+          setTimeout(() => startBackgroundNewsPrefetcher(), 200);
         }
 
         // 📝 ④ AIが生成したニュース本文の解説・感想を発話

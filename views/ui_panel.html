@@ -1221,17 +1221,17 @@
                     1件読んで感想を言う</button>
             </div>
 
-            <!-- 原稿事前生成コンテナ（ルール1準拠: 幅260px対応） -->
+            <!-- 先読みバッファコンテナ（ルール1準拠: 幅260px対応） -->
             <div id="news-batch-gen-container" style="margin-top:8px; padding:8px 10px; background:rgba(0,210,211,0.06); border:1px solid rgba(0,210,211,0.25); border-radius:6px; width:100%; box-sizing:border-box;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                    <span id="ui-batch-gen-label" style="font-size:0.75rem; font-weight:bold; color:#81ecec; white-space:nowrap;">📝 原稿事前生成</span>
+                    <span id="ui-batch-gen-label" style="font-size:0.75rem; font-weight:bold; color:#81ecec; white-space:nowrap;">⚡ 先読みバッファ</span>
                     <span id="ui-batch-gen-stats" style="font-size:0.7rem; color:var(--text-muted);">待機中</span>
                 </div>
                 <div style="width:100%; height:5px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden; margin-bottom:6px;">
                     <div id="ui-batch-gen-bar" style="width:0%; height:100%; background:linear-gradient(90deg, #00d2d3, #00e676); transition:width 0.3s ease;"></div>
                 </div>
                 <div id="ui-batch-gen-controls" style="display:grid; grid-template-columns:1fr 1fr; gap:6px; width:100%; box-sizing:border-box;">
-                    <button type="button" id="ui-batch-gen-main-btn" onclick="window.toggleBatchGeneration && window.toggleBatchGeneration()" class="btn" style="background:rgba(0,210,211,0.15); border:1px solid #00d2d3; color:#81ecec; padding:0.4rem; font-size:0.72rem; font-weight:bold; border-radius:4px; cursor:pointer; white-space:nowrap;">▶️ 事前生成</button>
+                    <button type="button" id="ui-batch-gen-main-btn" onclick="window.startBackgroundNewsPrefetcher && window.startBackgroundNewsPrefetcher()" class="btn" style="background:rgba(0,210,211,0.15); border:1px solid #00d2d3; color:#81ecec; padding:0.4rem; font-size:0.72rem; font-weight:bold; border-radius:4px; cursor:pointer; white-space:nowrap;">⚡ 今すぐ先読み</button>
                     <button type="button" id="ui-batch-gen-stop-btn" onclick="window.stopBatchGeneration && window.stopBatchGeneration()" class="btn" style="background:rgba(255,71,87,0.12); border:1px solid rgba(255,71,87,0.4); color:#ff6b81; padding:0.4rem; font-size:0.72rem; font-weight:bold; border-radius:4px; cursor:pointer; white-space:nowrap;" disabled>⏹️ 中止</button>
                 </div>
             </div>
