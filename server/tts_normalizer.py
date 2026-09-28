@@ -1262,6 +1262,10 @@ DEFAULT_TECH_ACRONYMS = {
     "AI": "エーアイ",
     "SNS": "エスエヌエス",
     "EV": "イーブイ",
+    "iDeCo": "イデコ",
+    "iDeco": "イデコ",
+    "IDECO": "イデコ",
+    "ideco": "イデコ",
     "IT": "アイティー",
     "ITmedia": "アイティメディア",
     "ITMedia": "アイティメディア",
@@ -1357,6 +1361,9 @@ def apply_tech_acronyms(text):
     t = re.sub(r'(?i)(?<![A-Za-z0-9])itmedia(?![A-Za-z0-9])', 'アイティメディア', t)
     t = re.sub(r'(?i)(?<![A-Za-z0-9])itpro(?![A-Za-z0-9])', 'アイティプロ', t)
     t = re.sub(r'(?i)(?<![A-Za-z0-9])itnews(?![A-Za-z0-9])', 'アイティニュース', t)
+    
+    # 🛡️ 1.3 iDeCo（個人型確定拠出年金: イデコ）の確実な正規化（「アイデコ」誤読防止）
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])ideco(?![A-Za-z0-9])', 'イデコ', t)
 
     acronyms = dict(DEFAULT_TECH_ACRONYMS)
     acronyms.update(load_tts_rules().get("tech_acronyms", {}))
