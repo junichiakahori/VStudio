@@ -1366,18 +1366,25 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
         import pykakasi
         kks = pykakasi.kakasi()
         NUM_CHARS = set("一二三四五六七八九十百千万億兆0123456789０１２３４５６７８９")
+        DATE_COUNTER_WORDS = {"月末", "月上旬", "月中旬", "月下旬", "月初", "月半ば", "月", "日", "年", "週", "時", "分", "秒", "度", "回", "戦", "便", "人", "名", "個", "台", "件", "歳", "才"}
         for it in items:
             sp = it.get("speech", "")
             tokens = list(tokenizer.tokenize(sp))
             for i, token in enumerate(tokens):
                 pos = token.part_of_speech.split(",")
                 surf = token.surface
-                # 数詞・助数詞を含むものは除外（一軒、一課、1件等）
-                if any(c in NUM_CHARS for c in surf) or pos[1] == "数":
+                # 数詞・助数詞・接尾辞を含むもの、および日付・暦・助数詞語句は除外（一軒、1件、月、末等）
+                if any(c in NUM_CHARS for c in surf) or pos[1] in ("数", "接尾", "助数詞") or surf in DATE_COUNTER_WORDS:
                     continue
                 # 固有名詞はJanome辞書読み（反町=たんまち、麻生=あそ等）が不正確なため除外（Wikipedia/AI解決を信頼）
                 if pos[1] == "固有名詞":
                     continue
+                # 直前が数詞の場合、この名詞も数詞と結合している（例: 10月末、3月、5日など）ため単体抽出を禁止
+                if i > 0:
+                    prev_tok = tokens[i-1]
+                    prev_pos = prev_tok.part_of_speech.split(",")
+                    if any(c in NUM_CHARS for c in prev_tok.surface) or prev_pos[1] in ("数", "助数詞"):
+                        continue
                 # 2文字以上の漢字一般名詞
                 if len(surf) >= 2 and any('\u4e00' <= c <= '\u9fa5' for c in surf):
                     if pos[0] == "名詞" and token.reading and token.reading != "*":
@@ -1388,7 +1395,7 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
                 if i + 1 < len(tokens):
                     next_tok = tokens[i+1]
                     next_pos = next_tok.part_of_speech.split(",")
-                    if any(c in NUM_CHARS for c in next_tok.surface) or next_pos[1] == "数" or next_pos[1] == "固有名詞":
+                    if any(c in NUM_CHARS for c in next_tok.surface) or next_pos[1] in ("数", "接尾", "助数詞", "固有名詞") or next_tok.surface in DATE_COUNTER_WORDS:
                         continue
                     if pos[0] == "名詞" and next_pos[0] == "名詞":
                         combo_surf = surf + next_tok.surface
@@ -1454,11 +1461,14 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
             if _norm_k(expected_kana) not in _norm_k(clean_vv_kana):
                 print(f"[VOICEVOX全文照合] 🚨 誤読検知: '{term}' の正読 '{expected_hira}'({expected_kana}) が全文音声読みの中に存在しません（文脈誤読）", flush=True)
                 sample_sent = ""
+                # 直前が数字・漢数字の場合は置換しない（10月末、3月などを誤爆破壊しない）
+                term_pattern = re.compile(rf'(?<![0-9０-９一二三四五六七八九十百千万])({re.escape(term)})')
                 for it in items:
-                    if term in it.get("speech", ""):
+                    current_sp = it.get("speech", "")
+                    if term in current_sp and term_pattern.search(current_sp):
                         if not sample_sent:
-                            sample_sent = it.get("speech", "")
-                        it["speech"] = it["speech"].replace(term, expected_hira)
+                            sample_sent = current_sp
+                        it["speech"] = term_pattern.sub(expected_hira, current_sp)
                         print(f"[VOICEVOX全文照合修復] 🩹 '{term}' を正読 '{expected_hira}' に直接ルビ補正しました: {it['speech']}", flush=True)
 
                 # 🎓 実際の誤読（wrong_reading）を特定して台帳に安全に自動登録
