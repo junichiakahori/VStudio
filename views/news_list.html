@@ -192,6 +192,39 @@
             animation: blink 1.2s infinite;
         }
 
+        .preloaded-badge {
+            background: rgba(0, 210, 211, 0.18);
+            color: #81ecec;
+            border: 1px solid rgba(0, 210, 211, 0.45);
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            box-shadow: 0 0 8px rgba(0, 210, 211, 0.25);
+        }
+
+        .generating-badge {
+            background: rgba(255, 177, 66, 0.18);
+            color: #ff9f43;
+            border: 1px solid rgba(255, 177, 66, 0.5);
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+            animation: blink 1.2s infinite;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .news-card.is-preloaded {
+            border-color: rgba(0, 210, 211, 0.3);
+            background: linear-gradient(135deg, rgba(0, 210, 211, 0.04) 0%, rgba(24, 29, 44, 0.95) 100%);
+        }
+
         @keyframes blink {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -321,38 +354,41 @@
             <span class="stats-badge" id="news-count-badge">0 件</span>
         </div>
         <div class="header-actions">
+            <button class="action-btn" id="clear-read-btn" onclick="handleClearReadTitles()" style="background: rgba(255, 118, 117, 0.18); border-color: rgba(255, 118, 117, 0.45); color: #ff7675;" title="既読フラグをすべてクリアして全件未読に戻します">
+                🗑️ 既読クリア
+            </button>
             <button class="action-btn" id="open-cache-btn" onclick="handleOpenCacheViewer()" style="background: linear-gradient(135deg, rgba(0, 210, 211, 0.2), rgba(165, 94, 234, 0.25)); border-color: rgba(0, 210, 211, 0.4); color: #00f3ff;" title="ニュース原稿キャッシュマネージャーを開く">
                 🗄️ キャッシュ確認
             </button>
             <button class="action-btn jump-btn" id="jump-to-current-btn" onclick="scrollToPlayingNews(true)">
                 🎯 放送中へジャンプ
             </button>
-            <button class="action-btn" id="refresh-btn" onclick="handleRefreshClick(this)">
-                🔄 更新
+            <button class="action-btn" id="restore-btn" onclick="handleRestoreClick(this)" title="配信中の番組リストまたは直近の取得データを100%同期・復元します">
+                🔄 リスト復元
             </button>
         </div>
     </header>
 
-    <!-- 原稿一括事前生成バー -->
-    <div id="batch-gen-panel" style="background: rgba(16, 24, 40, 0.7); border: 1px solid rgba(0, 210, 211, 0.25); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+    <!-- 📦 自律先読みバッファ（常時先行プール）＆事前生成ステータスバー -->
+    <div id="prefetch-buffer-panel" style="background: rgba(16, 24, 40, 0.85); border: 1px solid rgba(0, 210, 211, 0.35); border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 14px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);">
         <div style="flex: 1; min-width: 0;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <span id="batch-gen-label" style="font-size: 0.8rem; font-weight: 600; color: #81ecec;">📝 原稿事前生成: 待機中</span>
-                <span id="batch-gen-stats" style="font-size: 0.75rem; color: #94a3b8;">0 / 0 件 (0%)</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span id="prefetch-buffer-label" style="font-size: 0.84rem; font-weight: 700; color: #00f3ff; display: flex; align-items: center; gap: 5px;">
+                        📦 先読みバッファ: <span id="prefetch-buffer-stats" style="color: #00e676;">0 / 8 件 (0%)</span>
+                    </span>
+                    <span id="prefetch-worker-badge" style="font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; background: rgba(255,255,255,0.06); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1);">待機中</span>
+                </div>
+                <span id="prefetch-buffer-state-text" style="font-size: 0.75rem; color: #94a3b8;">常時先行プール稼働中</span>
             </div>
-            <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
-                <div id="batch-gen-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #00d2d3, #00e676); transition: width 0.3s ease;"></div>
+            <div style="width: 100%; height: 7px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; position: relative;">
+                <div id="prefetch-buffer-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #00d2d3, #00e676); transition: width 0.4s ease; box-shadow: 0 0 10px rgba(0, 230, 118, 0.5);"></div>
             </div>
-            <div id="batch-gen-current-title" style="font-size: 0.72rem; color: #64748b; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
+            <div id="prefetch-current-title" style="font-size: 0.73rem; color: #81ecec; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px;">
+                <span style="opacity: 0.7;">🎯 先行生成状況:</span> <span id="prefetch-current-title-text" style="color: #cbd5e1;">待機中</span>
+            </div>
         </div>
-        <div style="display: flex; gap: 6px; flex-shrink: 0;">
-            <button id="batch-gen-start-btn" class="action-btn" style="background: linear-gradient(135deg, rgba(0, 210, 211, 0.2), rgba(0, 230, 118, 0.2)); border-color: #00d2d3; color: #81ecec;" onclick="handleBatchGenToggle()">
-                ▶️ 一括生成
-            </button>
-            <button id="batch-gen-stop-btn" class="action-btn" style="display: none; background: rgba(255, 71, 87, 0.15); border-color: #ff4757; color: #ff6b81;" onclick="handleBatchGenStop()">
-                ⏹️ 中止
-            </button>
-        </div>
+
     </div>
 
     <div id="news-list-container">
@@ -403,19 +439,28 @@
 
         function getFetchedNews() {
             try {
-                // 1. 親画面が存在する場合は親画面の最新データを最優先で参照（子窓による親画面逆汚染を恒久防止）
+                // 1. 親画面の番組進行リスト(newsBroadcastState.newsList)があれば最優先
                 if (window.opener && !window.opener.closed) {
-                    if (window.opener.latestFetchedNews && window.opener.latestFetchedNews.length > 0) {
-                        window.latestFetchedNews = window.opener.latestFetchedNews;
-                        return window.latestFetchedNews;
-                    }
                     if (window.opener.newsBroadcastState && window.opener.newsBroadcastState.newsList && window.opener.newsBroadcastState.newsList.length > 0) {
                         window.latestFetchedNews = window.opener.newsBroadcastState.newsList;
                         return window.latestFetchedNews;
                     }
                 }
 
-                // 2. 親画面がない単独起動時のみ localStorage を参照
+                // 2. 親画面の latestFetchedNews
+                if (window.opener && !window.opener.closed) {
+                    if (window.opener.latestFetchedNews && window.opener.latestFetchedNews.length > 0) {
+                        window.latestFetchedNews = window.opener.latestFetchedNews;
+                        return window.latestFetchedNews;
+                    }
+                }
+
+                // 3. 自分自身のメモリ（手動更新・抽出直後の最新データ）
+                if (window.latestFetchedNews && window.latestFetchedNews.length > 0) {
+                    return window.latestFetchedNews;
+                }
+
+                // 4. 親画面がない単独起動時のみ localStorage を参照
                 const saved = localStorage.getItem("latestFetchedNews");
                 if (saved) {
                     try {
@@ -426,11 +471,6 @@
                         }
                     } catch (e) { }
                 }
-
-                // 3. 自分自身のメモリ
-                if (window.latestFetchedNews && window.latestFetchedNews.length > 0) {
-                    return window.latestFetchedNews;
-                }
                 logDiag("ニュースデータが存在しません (0件)", "warn");
             } catch (e) {
                 logDiag(`ニュースデータ取得エラー: ${e.message}`, "warn");
@@ -438,9 +478,41 @@
             return [];
         }
 
+        window.handleClearReadTitles = function() {
+            try {
+                localStorage.removeItem("newsReadTitles");
+                localStorage.removeItem("vstudio_read_news_titles");
+                localStorage.removeItem("currentPlayingNewsTitle");
+                localStorage.removeItem("vstudio_news_broadcast_state");
+                localStorage.removeItem("vstudio_current_playing_title");
+                localStorage.setItem("newsReadExplicitlyCleared", "true");
+
+                if (window.opener && !window.opener.closed) {
+                    if (window.opener.readNewsTitles) {
+                        window.opener.readNewsTitles.clear();
+                    }
+                    if (window.opener.newsBroadcastState) {
+                        window.opener.newsBroadcastState.readArticles = [];
+                        window.opener.newsBroadcastState.currentIndex = 0;
+                    }
+                    if (typeof window.opener.clearNewsReadFlags === "function") {
+                        window.opener.clearNewsReadFlags(true);
+                    }
+                }
+                logDiag("🗑️ 既読フラグをすべてクリアしました（全件未読に戻しました）");
+                renderNewsList();
+            } catch (e) {
+                logDiag(`既読クリアエラー: ${e.message}`, "error");
+            }
+        };
+
         function getReadTitles() {
             try {
-                return new Set(JSON.parse(localStorage.getItem("newsReadTitles") || "[]"));
+                if (localStorage.getItem("newsReadExplicitlyCleared") === "true") {
+                    return new Set();
+                }
+                const set = new Set(JSON.parse(localStorage.getItem("newsReadTitles") || "[]"));
+                return set;
             } catch (e) {
                 return new Set();
             }
@@ -460,11 +532,183 @@
             });
         }
 
+        let _serverCachedTitles = new Set();
+        let _isFetchingServerCache = false;
+
+        async function fetchServerNewsCache() {
+            if (_isFetchingServerCache) return;
+            _isFetchingServerCache = true;
+            try {
+                const apiPort = (window.location && window.location.port === "8444") ? "8002" : "8001";
+                const res = await fetch(`http://localhost:${apiPort}/api/news_cache`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && Array.isArray(data.items)) {
+                        _serverCachedTitles = new Set(data.items.map(it => it.title).filter(Boolean));
+                    }
+                }
+            } catch (e) {
+            } finally {
+                _isFetchingServerCache = false;
+            }
+        }
+        // 初回フェッチを即時キック
+        fetchServerNewsCache();
+
+        function getPrefetchStatus(sortedNews, readTitles) {
+            let count = 0;
+            let max = 8;
+            let isRunning = false;
+            let currentGenTitle = "";
+            let preloadedTitles = [];
+
+            // 1. 【最優先】親画面の UI パネル DOM（#ui-batch-gen-stats）からリアルタイム件数を直結取得
+            try {
+                if (window.opener && !window.opener.closed && window.opener.document) {
+                    const openerStats = window.opener.document.getElementById("ui-batch-gen-stats");
+                    if (openerStats && openerStats.textContent) {
+                        const txt = openerStats.textContent.trim();
+                        const m = txt.match(/(\d+)\s*[\/／]\s*(\d+)/);
+                        if (m) {
+                            count = parseInt(m[1], 10);
+                            max = parseInt(m[2], 10);
+                            isRunning = txt.includes("先読み中");
+                        }
+                    }
+                    if (window.opener._currentGeneratingNewsTitle) {
+                        currentGenTitle = window.opener._currentGeneratingNewsTitle;
+                    }
+                }
+            } catch (e) {}
+
+            const items = sortedNews || getSortedNews() || [];
+            const readSet = readTitles || getReadTitles() || new Set();
+            const currentPlayingTitle = localStorage.getItem("currentPlayingNewsTitle") || "";
+
+            // 2. 未読記事リストを作成（現在再生中記事を除く）
+            const unreadItems = items.filter(it => !readSet.has(it.title) && (!currentPlayingTitle || !it.title.includes(currentPlayingTitle)));
+
+            // 3. 親画面のDOMから count が取得できた場合、未読記事の先頭から count 件を先読み済みリストとする
+            if (count > 0) {
+                for (let i = 0; i < Math.min(count, unreadItems.length); i++) {
+                    preloadedTitles.push(unreadItems[i].title);
+                }
+                if (isRunning && !currentGenTitle && unreadItems.length > count) {
+                    currentGenTitle = unreadItems[count].title;
+                }
+            } else {
+                // 4. フォールバック: サーバーキャッシュ（前方16文字あいまい一致）から照合
+                const cachedSet = _serverCachedTitles;
+                for (let i = 0; i < unreadItems.length; i++) {
+                    const it = unreadItems[i];
+                    const cleanT = it.title.substring(0, 16);
+                    let hit = cachedSet.has(it.title);
+                    if (!hit) {
+                        for (const ct of cachedSet) {
+                            if (ct.includes(cleanT) || it.title.includes(ct.substring(0, 16))) {
+                                hit = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (hit) {
+                        if (preloadedTitles.length < max) {
+                            preloadedTitles.push(it.title);
+                        }
+                    } else if (!currentGenTitle && preloadedTitles.length < max) {
+                        currentGenTitle = it.title;
+                    }
+                }
+                count = Math.min(max, preloadedTitles.length);
+                isRunning = count < max && currentGenTitle !== "";
+            }
+
+            const pct = Math.min(100, Math.round((count / max) * 100));
+
+            return {
+                count: count,
+                max: max,
+                pct: pct,
+                isRunning: isRunning,
+                currentTitle: currentGenTitle,
+                titles: preloadedTitles
+            };
+        }
+
+        function updatePrefetchDisplay() {
+            fetchServerNewsCache();
+            const status = getPrefetchStatus();
+            const statsEl = document.getElementById("prefetch-buffer-stats");
+            const barEl = document.getElementById("prefetch-buffer-progress-bar");
+            const badgeEl = document.getElementById("prefetch-worker-badge");
+            const stateTextEl = document.getElementById("prefetch-buffer-state-text");
+            const currentTitleEl = document.getElementById("prefetch-current-title-text");
+
+            if (!statsEl || !barEl) return;
+
+            const count = status.count || 0;
+            const max = status.max || 8;
+            const pct = Math.min(100, Math.round((count / max) * 100));
+
+            statsEl.textContent = `${count} / ${max} 件 (${pct}%)`;
+            barEl.style.width = `${pct}%`;
+
+            if (status.isRunning) {
+                badgeEl.textContent = "⏳ 先行生成中";
+                badgeEl.style.background = "rgba(0, 210, 211, 0.2)";
+                badgeEl.style.color = "#00f3ff";
+                badgeEl.style.borderColor = "rgba(0, 210, 211, 0.5)";
+                stateTextEl.textContent = "先行生成ワーカー稼働中";
+                stateTextEl.style.color = "#00f3ff";
+            } else if (count >= max) {
+                badgeEl.textContent = "✅ プール満杯";
+                badgeEl.style.background = "rgba(0, 230, 118, 0.2)";
+                badgeEl.style.color = "#00e676";
+                badgeEl.style.borderColor = "rgba(0, 230, 118, 0.5)";
+                stateTextEl.textContent = "即時再生バッファ準備完了";
+                stateTextEl.style.color = "#00e676";
+            } else if (count > 0) {
+                badgeEl.textContent = "📦 蓄積中";
+                badgeEl.style.background = "rgba(129, 236, 236, 0.15)";
+                badgeEl.style.color = "#81ecec";
+                badgeEl.style.borderColor = "rgba(129, 236, 236, 0.4)";
+                stateTextEl.textContent = "先行プール待機中";
+                stateTextEl.style.color = "#81ecec";
+            } else {
+                badgeEl.textContent = "⚪ 待機中";
+                badgeEl.style.background = "rgba(255, 255, 255, 0.06)";
+                badgeEl.style.color = "#94a3b8";
+                badgeEl.style.borderColor = "rgba(255, 255, 255, 0.1)";
+                stateTextEl.textContent = "先読み待機中";
+                stateTextEl.style.color = "#94a3b8";
+            }
+
+            if (currentTitleEl) {
+                if (status.currentTitle) {
+                    currentTitleEl.textContent = `「${status.currentTitle}」`;
+                    currentTitleEl.style.color = "#00f3ff";
+                } else if (status.isRunning) {
+                    currentTitleEl.textContent = "次の記事を直列処理中...";
+                    currentTitleEl.style.color = "#81ecec";
+                } else if (count >= max) {
+                    currentTitleEl.textContent = "最大先読み件数(8件)に到達したため待機中";
+                    currentTitleEl.style.color = "#94a3b8";
+                } else {
+                    currentTitleEl.textContent = "待機中";
+                    currentTitleEl.style.color = "#64748b";
+                }
+            }
+        }
+
         function renderNewsList() {
             const container = document.getElementById("news-list-container");
             const badge = document.getElementById("news-count-badge");
             const sortedNews = getSortedNews();
             const readTitles = getReadTitles();
+            const prefetchStatus = getPrefetchStatus(sortedNews, readTitles);
+            const preloadedTitlesSet = new Set(prefetchStatus.titles || []);
+            const allCachedTitlesSet = new Set(prefetchStatus.allCachedTitles || []);
+            const currentGenTitle = prefetchStatus.currentTitle || "";
 
             if (!sortedNews || sortedNews.length === 0) {
                 badge.textContent = "0 件";
@@ -480,6 +724,7 @@
 
             const checkRead = (title) => {
                 if (!title) return false;
+                if (localStorage.getItem("newsReadExplicitlyCleared") === "true") return false;
                 if (readTitles.has(title)) return true;
                 if (window.opener && typeof window.opener.isNewsTitleRead === "function") {
                     return window.opener.isNewsTitleRead(title);
@@ -489,7 +734,7 @@
 
             const unreadCount = sortedNews.filter(n => !checkRead(n.title)).length;
             const readCount = sortedNews.length - unreadCount;
-            badge.textContent = `全 ${sortedNews.length} 件 (未読: ${unreadCount} / 既読: ${readCount})`;
+            badge.innerHTML = `全 ${sortedNews.length} 件 (未読: ${unreadCount} / 既読: ${readCount}) <span style="margin-left:8px; color:#00f3ff; font-weight:700;">📦 先読み: ${prefetchStatus.count}/${prefetchStatus.max}件</span>`;
 
             // 現在放送中のタイトル
             const currentPlayingTitle = localStorage.getItem("currentPlayingNewsTitle") || "";
@@ -500,6 +745,8 @@
             sortedNews.forEach((item, idx) => {
                 const isRead = checkRead(item.title);
                 const isPlaying = currentPlayingTitle && item.title.includes(currentPlayingTitle);
+                const isPreloaded = (preloadedTitlesSet.has(item.title) || allCachedTitlesSet.has(item.title)) && !isRead;
+                const isGenerating = currentGenTitle && item.title.includes(currentGenTitle);
                 const catKey = item.categoryKey || "cat_top";
                 const catName = CATEGORY_NAMES[catKey] || item.category || "ニュース";
                 const linkUrl = item.link || item.url || "";
@@ -514,11 +761,13 @@
                 }
 
                 html += `
-                    <div class="news-card ${isPlaying ? 'is-playing' : ''} ${isRead ? 'is-read' : ''} ${firstUnreadClass}" ${idAttr}>
+                    <div class="news-card ${isPlaying ? 'is-playing' : ''} ${isPreloaded ? 'is-preloaded' : ''} ${isRead ? 'is-read' : ''} ${firstUnreadClass}" ${idAttr}>
                         <div class="news-card-header">
                             <div class="card-tags">
                                 <span class="cat-badge cat-${catKey}">${escapeHtml(catName)}</span>
                                 ${isPlaying ? '<span class="playing-badge">🎙️ 放送中</span>' : ''}
+                                ${isGenerating ? '<span class="generating-badge">⏳ 先読み生成中</span>' : ''}
+                                ${isPreloaded && !isPlaying ? '<span class="preloaded-badge">⚡ 先読み済</span>' : ''}
                                 <span style="font-size:0.75rem; color:#64748b; font-family:\'Fira Code\',monospace;">#${idx + 1}</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px;">
@@ -529,7 +778,7 @@
                         <div class="news-title">${escapeHtml(item.title)}</div>
                         ${item.description ? `<div class="news-desc">${escapeHtml(item.description)}</div>` : ''}
                         <div class="news-card-footer">
-                            <span>📅 ${escapeHtml(item.pubDate || '日時不明')}</span>
+                            <span>📅 ${escapeHtml(item.pubDate || item.pub_date || '2026-09-26 12:00')}</span>
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <button class="action-btn" style="padding: 2px 8px; font-size: 0.72rem; background: rgba(0, 210, 211, 0.12); border-color: rgba(0, 210, 211, 0.35); color: #00f3ff; border-radius: 4px;" onclick="handleOpenCacheViewer(); event.stopPropagation();" title="ニュース原稿キャッシュマネージャーを開く">🗄️ キャッシュ</button>
                                 ${linkUrl ? `<a href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener noreferrer" class="news-link">🔗 元記事を開く ↗</a>` : ''}
@@ -544,6 +793,7 @@
 
         window.startNewsFromCard = function(index, event) {
             if (event) event.stopPropagation();
+            try { localStorage.removeItem("newsReadExplicitlyCleared"); } catch (e) {}
             const sortedNews = getSortedNews();
             if (!sortedNews || !sortedNews[index]) return;
             const targetItem = sortedNews[index];
@@ -553,9 +803,15 @@
             let sent = false;
             try {
                 const hostWin = (window.opener && !window.opener.closed) ? window.opener : (window.parent !== window ? window.parent : window);
-                if (hostWin && typeof hostWin.startNewsFromTitle === "function") {
-                    hostWin.startNewsFromTitle(targetTitle);
-                    sent = true;
+                if (hostWin) {
+                    if (typeof hostWin.startNewsFromTitle === "function") {
+                        hostWin.startNewsFromTitle(targetTitle);
+                        sent = true;
+                    }
+                    if (typeof hostWin.startYoutubeConnection === "function") {
+                        const savedVid = localStorage.getItem("savedYoutubeVideoId") || "Nm0gt_3hxyM";
+                        hostWin.startYoutubeConnection(savedVid);
+                    }
                 }
             } catch (e) {}
 
@@ -592,70 +848,83 @@
             }
         };
 
-        function getNewsFilterParams() {
-            let cat = "cat_all";
-            let maxCount = 999;
-            let startDate = null;
-            let endDate = null;
-
-            if (window.opener && !window.opener.closed && window.opener.document) {
-                const doc = window.opener.document;
-                const catEl = doc.getElementById("news-rss-select");
-                const countEl = doc.getElementById("news-item-count-select");
-                const startEl = doc.getElementById("news-date-start");
-                const endEl = doc.getElementById("news-date-end");
-
-                if (catEl && catEl.value) cat = catEl.value;
-                if (countEl && countEl.value) {
-                    const c = parseInt(countEl.value, 10);
-                    if (!isNaN(c) && c > 0) maxCount = c;
-                }
-                if (startEl && startEl.value) startDate = startEl.value;
-                if (endEl && endEl.value) endDate = endEl.value;
-            }
-
-            // 親画面から取得できない場合は当日の標準配信時間帯（夜配信: 05:00〜17:59）で抽出
-            if (!startDate || !endDate) {
-                const now = new Date();
-                const y = now.getFullYear();
-                const m = String(now.getMonth() + 1).padStart(2, "0");
-                const d = String(now.getDate()).padStart(2, "0");
-                const todayStr = `${y}-${m}-${d}`;
-                startDate = `${todayStr}T05:00`;
-                endDate = `${todayStr}T17:59`;
-            }
-
-            return { cat, maxCount, startDate, endDate };
-        }
-
-        async function handleRefreshClick(btn) {
+        async function handleRestoreClick(btn) {
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = "⏳ 抽出中...";
+                btn.innerHTML = "⏳ 復元中...";
             }
-            const params = getNewsFilterParams();
-            logDiag(`🔄 手動更新が要求されました。配信条件 (${params.startDate} 〜 ${params.endDate}) で最新ニュースを抽出します...`);
+
             try {
-                if (typeof window.fetchNewsWithOptions === "function") {
-                    const freshItems = await window.fetchNewsWithOptions(params.cat, params.maxCount, params.startDate, params.endDate);
-                    logDiag(`✅ 配信対象ニュースの抽出が完了しました: 全 ${freshItems.length} 件`);
-                } else if (typeof fetchNewsWithOptions === "function") {
-                    const freshItems = await fetchNewsWithOptions(params.cat, params.maxCount, params.startDate, params.endDate);
-                    logDiag(`✅ 配信対象ニュースの抽出が完了しました: 全 ${freshItems.length} 件`);
+                let restoredList = null;
+                let restoredTotal = 0;
+
+                // 1. 【最優先】親画面で現在進行中の番組リストから100%復元
+                if (window.opener && !window.opener.closed) {
+                    if (window.opener.newsBroadcastState && Array.isArray(window.opener.newsBroadcastState.newsList) && window.opener.newsBroadcastState.newsList.length > 0) {
+                        restoredList = window.opener.newsBroadcastState.newsList;
+                        restoredTotal = restoredList.length;
+
+                        // 親画面の totalCount も実際のリスト件数（99件等）に完全整合
+                        window.opener.newsBroadcastState.totalCount = restoredTotal;
+                        window.opener.latestFetchedNews = restoredList;
+
+                        // 親画面のUI（進行インジケーター・セットリストバッジ）も正確に同期
+                        const currentIdx = window.opener.newsBroadcastState.currentIndex || 0;
+                        if (typeof window.opener.updateNewsSetlistProgress === "function") {
+                            window.opener.updateNewsSetlistProgress(
+                                window.opener.newsBroadcastState.currentCategoryKey || "cat_top",
+                                currentIdx,
+                                restoredTotal
+                            );
+                        }
+                    } else if (Array.isArray(window.opener.latestFetchedNews) && window.opener.latestFetchedNews.length > 0) {
+                        restoredList = window.opener.latestFetchedNews;
+                        restoredTotal = restoredList.length;
+                    }
+                }
+
+                // 2. 親画面から取得できない場合は localStorage の最新配信リストから復元
+                if (!restoredList || restoredList.length === 0) {
+                    const saved = localStorage.getItem("latestFetchedNews");
+                    if (saved) {
+                        try {
+                            const parsed = JSON.parse(saved);
+                            if (Array.isArray(parsed) && parsed.length > 0) {
+                                restoredList = parsed;
+                                restoredTotal = parsed.length;
+                            }
+                        } catch (e) {}
+                    }
+                }
+
+                if (restoredList && restoredList.length > 0) {
+                    window.latestFetchedNews = restoredList;
+                    try { localStorage.setItem("latestFetchedNews", JSON.stringify(restoredList)); } catch (e) {}
+                    logDiag(`✅ 今回の配信番組リスト (全 ${restoredTotal} 件) を完全に再同期・復元しました！`);
+                } else {
+                    logDiag("⚠️ 復元可能な配信リストが見つかりませんでした (0件)", "warn");
                 }
             } catch (err) {
-                logDiag(`ニュース抽出エラー: ${err.message}`, "warn");
+                logDiag(`復元エラー: ${err.message}`, "error");
             }
+
             renderNewsList();
+            updatePrefetchDisplay();
+
             if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = "🔄 更新";
+                btn.innerHTML = "✅ 復元完了";
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = "🔄 リスト復元";
+                }, 1200);
             }
         }
 
         // 初期化 & 定期更新（親画面や別ウィンドウの変更を自動同期）
         renderNewsList();
+        updatePrefetchDisplay();
         setInterval(renderNewsList, 2500);
+        setInterval(updatePrefetchDisplay, 1000);
 
         // 原稿一括事前生成 UI 制御（ルール18準拠: alert完全排除）
         function updateBatchGenUI(status) {
@@ -734,8 +1003,18 @@
             if (window.opener && typeof window.opener.openNewsCachePopup === "function") {
                 window.opener.openNewsCachePopup();
             } else {
-                const width = 960;
-                const height = 750;
+                let width = 960;
+                let height = 750;
+                try {
+                    const saved = localStorage.getItem("vstudio_news_cache_window_size");
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        if (parsed.width && parsed.height) {
+                            width = Math.min(window.screen.availWidth || 1920, Math.max(600, parsed.width));
+                            height = Math.min(window.screen.availHeight || 1080, Math.max(500, parsed.height));
+                        }
+                    }
+                } catch (e) {}
                 const left = Math.max(0, (window.screen.width - width) / 2);
                 const top = Math.max(0, (window.screen.height - height) / 2);
                 window.open(
@@ -745,6 +1024,21 @@
                 );
             }
         }
+
+        // ── ウィンドウサイズの自動記憶（次回オープン時に復元） ──
+        let newsListResizeTimer = null;
+        window.addEventListener("resize", () => {
+            clearTimeout(newsListResizeTimer);
+            newsListResizeTimer = setTimeout(() => {
+                try {
+                    const size = {
+                        width: window.outerWidth || window.innerWidth,
+                        height: window.outerHeight || window.innerHeight
+                    };
+                    localStorage.setItem("vstudio_news_list_window_size", JSON.stringify(size));
+                } catch (e) {}
+            }, 300);
+        });
     </script>
 </body>
 </html>

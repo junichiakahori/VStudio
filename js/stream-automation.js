@@ -640,4 +640,165 @@ window.executeStreamEndProcess = executeStreamEndProcess;
   }
 
   initPrepareWaitSliders();
+
+  // =====================================================================
+  // 🚀 常時最上部「クイック配信開始」ボタンの制御（前倒しスタート & 通常スタート）
+  // =====================================================================
+  function updateQuickBroadcastButtonState() {
+    const container = document.getElementById("quick-broadcast-start-container");
+    const btn = document.getElementById("quick-broadcast-start-btn");
+    const txt = document.getElementById("quick-broadcast-start-text");
+    const icon = document.getElementById("quick-broadcast-start-icon");
+    if (!container || !btn || !txt) return;
+
+    const isNewsRunning = (typeof newsBroadcastState !== "undefined" && newsBroadcastState && newsBroadcastState.isRunning);
+    const isSeqRunning = !!window.isScheduledSequenceRunning;
+    const isRunning = isNewsRunning || isSeqRunning;
+    const isPrep = !!window.isPreparing;
+
+    if (isRunning) {
+      // 配信中（進行中）は誤操作防止のため非表示
+      container.style.display = "none";
+    } else {
+      container.style.display = "block";
+      if (isPrep) {
+        // 配信準備中（前倒し開始可能）
+        btn.style.background = "linear-gradient(135deg, #00cec9, #0984e3)";
+        btn.style.boxShadow = "0 0 14px rgba(0, 206, 201, 0.45)";
+        if (icon) icon.textContent = "⚡";
+        txt.textContent = "今すぐ配信を開始（前倒し）";
+        btn.title = "待機を終了し、今すぐOBS連動・BGM・ニュース番組を即座に開始します";
+      } else {
+        // 通常スタンバイ
+        btn.style.background = "linear-gradient(135deg, #00b894, #00cec9)";
+        btn.style.boxShadow = "0 0 10px rgba(0, 184, 148, 0.35)";
+        if (icon) icon.textContent = "🚀";
+        txt.textContent = "配信をスタート";
+        btn.title = "ワンクリックでOBS連動・BGM・ニュース番組を即座に開始します";
+      }
+    }
+  }
+  window.updateQuickBroadcastButtonState = updateQuickBroadcastButtonState;
+
+  window.startBroadcastNow = async function () {
+    const btn = document.getElementById("quick-broadcast-start-btn");
+    const txt = document.getElementById("quick-broadcast-start-text");
+    if (btn) {
+      btn.disabled = true;
+      btn.style.opacity = "0.7";
+    }
+    if (txt) txt.textContent = "起動シーケンス実行中...";
+
+    try {
+      console.log("[Quick Start] 🚀 クイック配信開始がトリガーされました！");
+
+      // 1. 自動開始タイマーが動いていればクリア＆停止
+      if (localScheduleTimerId) {
+        clearInterval(localScheduleTimerId);
+        localScheduleTimerId = null;
+      }
+      const schedToggle = document.getElementById("local-schedule-toggle");
+      if (schedToggle && schedToggle.checked) {
+        schedToggle.checked = false;
+        if (typeof updateLocalScheduleTimer === "function") {
+          updateLocalScheduleTimer();
+        }
+      }
+
+      // 2. OBS配信の自動開始（連動ON時）
+      const isObsAutoStream = (function () {
+        const el = document.getElementById("news-obs-auto-stream-toggle") || document.getElementById("obs-auto-start-toggle");
+        if (el) return el.checked;
+        const saved = localStorage.getItem("savedObsStreamAutoStart");
+        if (saved !== null) return saved === "true";
+        if (typeof window.isObsStreamAutoStart !== "undefined") return !!window.isObsStreamAutoStart;
+        return false;
+      })();
+
+      if (isObsAutoStream && typeof window.ensureObsStreamingStarted === "function") {
+        console.log("[Quick Start] 📡 OBS配信連動を送信中...");
+        if (txt) txt.textContent = "📡 OBS配信接続中...";
+        try {
+          await window.ensureObsStreamingStarted();
+        } catch (e) {
+          console.warn("[Quick Start] OBS連動警告:", e);
+        }
+      }
+
+      // 3. 画面オーバーレイ（配信準備中）の即時解除
+      console.log("[Quick Start] 🔓 配信準備中オーバーレイを即時解除します");
+      if (typeof window.executeOverlayClearProcess === "function") {
+        window.executeOverlayClearProcess();
+      } else {
+        const streamOverlayEl = document.getElementById("stream-overlay");
+        if (streamOverlayEl) streamOverlayEl.classList.remove("active");
+        if (typeof isPreparing !== "undefined") isPreparing = false;
+      }
+
+      const prepToggle = document.getElementById("preparing-mode-toggle");
+      if (prepToggle && prepToggle.checked) prepToggle.checked = false;
+
+      // 4. BGM開始（フェードイン）
+      if (typeof bgmIsPlaying !== "undefined" && !bgmIsPlaying) {
+        if (typeof fadeInBgm === "function") {
+          console.log("[Quick Start] 🎵 BGMフェードイン再生スタート");
+          fadeInBgm(2000);
+        } else {
+          const bgmPlayBtn = document.getElementById("bgm-play-btn");
+          if (bgmPlayBtn && typeof window.bgmBuffer !== "undefined" && window.bgmBuffer) {
+            bgmPlayBtn.click();
+          }
+        }
+      }
+
+      // 5. ニュース番組（またはアクティブモード）を開始
+      setTimeout(() => {
+        const activeTab = localStorage.getItem("activeTab");
+        let mode = window.currentBroadcastMode;
+        if (!mode) {
+          if (activeTab === "tab-radio") mode = "radio";
+          else if (activeTab === "tab-chat") mode = "chat";
+          else mode = "news";
+        }
+
+        if (mode === "news") {
+          console.log("[Quick Start] 📰 ニュース番組を開始");
+          if (typeof window.startNewsBroadcast === "function") {
+            window.startNewsBroadcast(0);
+          } else {
+            const newsBtn = document.getElementById("news-broadcast-start-btn");
+            if (newsBtn) newsBtn.click();
+          }
+        } else if (mode === "radio") {
+          console.log("[Quick Start] 📻 ラジオ番組を開始");
+          const radioBtn = document.getElementById("radio-script-play-btn");
+          if (radioBtn) radioBtn.click();
+        } else {
+          console.log("[Quick Start] 💬 雑談配信を開始");
+          if (typeof window.resetIdleTimer === "function") window.resetIdleTimer();
+        }
+      }, 500);
+
+      if (typeof window.showNotification === "function") {
+        window.showNotification("🚀 配信を開始しました！", "success");
+      }
+    } catch (err) {
+      console.error("[Quick Start] 配信開始エラー:", err);
+      if (typeof window.showNotification === "function") {
+        window.showNotification("⚠️ 配信開始でエラーが発生しました", "error");
+      }
+    } finally {
+      setTimeout(() => {
+        if (btn) {
+          btn.disabled = false;
+          btn.style.opacity = "1";
+        }
+        updateQuickBroadcastButtonState();
+      }, 1500);
+    }
+  };
+
+  // 定期タイマーでボタン表示状態を同期（1秒間隔）
+  setInterval(updateQuickBroadcastButtonState, 1000);
+  updateQuickBroadcastButtonState();
 });

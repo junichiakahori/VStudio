@@ -629,26 +629,41 @@
 
     // 既読フラグクリアボタン
     document.getElementById("wizard-clear-read-btn")?.addEventListener("click", () => {
+      try {
+        localStorage.removeItem("newsReadTitles");
+        localStorage.removeItem("vstudio_read_news_titles");
+        localStorage.removeItem("currentPlayingNewsTitle");
+        localStorage.removeItem("vstudio_news_broadcast_state");
+        localStorage.removeItem("vstudio_current_playing_title");
+        localStorage.setItem("newsReadExplicitlyCleared", "true");
+      } catch (e) {}
       if (window.openerWin && typeof window.openerWin.clearNewsReadFlags === "function") {
         window.openerWin.clearNewsReadFlags(false);
-        renderWizardNewsList();
-      } else {
-        localStorage.removeItem("newsReadTitles");
-        renderWizardNewsList();
-        if (typeof window.showWizardToast === "function") {
-          window.showWizardToast("✅ 既読フラグをすべてクリアしました！", true);
-        }
+      }
+      renderWizardNewsList();
+      if (typeof window.showWizardToast === "function") {
+        window.showWizardToast("✅ 既読フラグをすべてクリアしました！", true);
       }
     });
 
     // ニュース一覧別窓ポップアップ
     document.getElementById("open-news-list-popup-btn")?.addEventListener("click", () => {
-      const width = 850;
-      const height = 700;
-      const left = (window.screen.width - width) / 2;
-      const top = (window.screen.height - height) / 2;
+      let width = 850;
+      let height = 700;
+      try {
+        const saved = localStorage.getItem("vstudio_news_list_window_size");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.width && parsed.height) {
+            width = Math.min(window.screen.availWidth || 1920, Math.max(600, parsed.width));
+            height = Math.min(window.screen.availHeight || 1080, Math.max(450, parsed.height));
+          }
+        }
+      } catch (e) {}
+      const left = Math.max(0, (window.screen.width - width) / 2);
+      const top = Math.max(0, (window.screen.height - height) / 2);
       window.open(
-        "/views/news_list.html",
+        `/views/news_list.html?t=${Date.now()}`,
         "VStudioNewsListWindow",
         `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes`
       );

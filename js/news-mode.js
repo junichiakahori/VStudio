@@ -444,19 +444,33 @@ function getNewsConfig() {
   }
   window.sortNewsItemsByBroadcastOrder = sortNewsItemsByBroadcastOrder;
 
-  /**
   const MAX_PRELOAD_BUFFER = 8; // 🛡️ 先読みバッファ上限（配信準備中・進行中ともに最大8件を常時先行プール）
   const failedPrefetchTitles = new Set(); // 生成スキップ・失敗記事の除外キャッシュ
   let _prefetchLoopTimer = null;
 
   function updatePrefetchUIBadge() {
+    const count = preloadedNewsMap ? preloadedNewsMap.size : 0;
+    const max = MAX_PRELOAD_BUFFER;
+    const pct = Math.min(100, Math.round((count / max) * 100));
+
+    // 📡 記事一覧ポップアップ（news_list.html）や他ウィンドウ向けに先読み状態を共有
+    const prefetchStatus = {
+      count: count,
+      max: max,
+      pct: pct,
+      isRunning: isPrefetchWorkerRunning,
+      currentTitle: window._currentGeneratingNewsTitle || "",
+      titles: preloadedNewsMap ? Array.from(preloadedNewsMap.keys()) : []
+    };
+    window.newsPrefetchStatus = prefetchStatus;
+    try {
+      localStorage.setItem("newsPrefetchStatus", JSON.stringify(prefetchStatus));
+    } catch (e) {}
+
     const statsEl = document.getElementById("ui-batch-gen-stats");
     const barEl = document.getElementById("ui-batch-gen-bar");
     const labelEl = document.getElementById("ui-batch-gen-label");
     if (!statsEl || !barEl) return;
-    const count = preloadedNewsMap ? preloadedNewsMap.size : 0;
-    const max = MAX_PRELOAD_BUFFER;
-    const pct = Math.min(100, Math.round((count / max) * 100));
     barEl.style.width = `${pct}%`;
     if (isPrefetchWorkerRunning) {
       statsEl.textContent = `⏳ 先読み中 (${count}/${max}件)`;
@@ -497,6 +511,28 @@ function getNewsConfig() {
     currentList = sortNewsItemsByBroadcastOrder(currentList);
     window.latestFetchedNews = currentList;
 
+    // 🧹 [孤児キャッシュ自動パージ] 記事一覧更新で不要になった古い先読みキャッシュを一掃
+    const validTitleSet = new Set(currentList.map(x => x.title));
+    for (const cachedTitle of Array.from(preloadedNewsMap.keys())) {
+      if (!validTitleSet.has(cachedTitle)) {
+        console.log(`[ニュース先読み] 🧹 記事一覧更新に伴い古い孤児キャッシュを破棄: 「${cachedTitle.substring(0, 20)}...」`);
+        preloadedNewsMap.delete(cachedTitle);
+      }
+    }
+
+    const isRunning = (typeof newsBroadcastState !== "undefined" && newsBroadcastState.isRunning);
+    const startIdx = isRunning ? Math.max(0, (newsBroadcastState.currentIndex || 1) - 1) : 0;
+
+    // 🧹 [過去記事パージ] 放送進行中に通り過ぎた過去記事の先読みキャッシュを回収しバッファ枠を確保
+    if (isRunning && startIdx > 0) {
+      for (let pIdx = 0; pIdx < startIdx; pIdx++) {
+        const pastItem = currentList[pIdx];
+        if (pastItem && pastItem.title && preloadedNewsMap.has(pastItem.title)) {
+          preloadedNewsMap.delete(pastItem.title);
+        }
+      }
+    }
+
     // 🛡️ プール上限ガード: 未消費の先読みが既にMAX_PRELOAD_BUFFER件以上あれば待機
     if (preloadedNewsMap.size >= MAX_PRELOAD_BUFFER) {
       updatePrefetchUIBadge();
@@ -504,9 +540,6 @@ function getNewsConfig() {
       _prefetchLoopTimer = setTimeout(() => startBackgroundNewsPrefetcher(), 4000);
       return;
     }
-
-    const isRunning = (typeof newsBroadcastState !== "undefined" && newsBroadcastState.isRunning);
-    const startIdx = isRunning ? Math.max(0, (newsBroadcastState.currentIndex || 1) - 1) : 0;
 
     // 🎯 放送順に未消費＆未プール＆未失敗の記事を探索
     let targetIdx = -1;
@@ -533,6 +566,7 @@ function getNewsConfig() {
     }
 
     isPrefetchWorkerRunning = true;
+    window._currentGeneratingNewsTitle = targetItem.title;
     updatePrefetchUIBadge();
     try {
       const isFirst = (targetIdx === 0);
@@ -550,6 +584,7 @@ function getNewsConfig() {
       if (targetItem && targetItem.title) failedPrefetchTitles.add(targetItem.title);
     } finally {
       isPrefetchWorkerRunning = false;
+      window._currentGeneratingNewsTitle = "";
       updatePrefetchUIBadge();
       // 💡 次の記事へ直列に継続（CPU/GPU・Ollama負荷を平準化するため1.0秒のクールダウンを挟む）
       _prefetchLoopTimer = setTimeout(() => startBackgroundNewsPrefetcher(), 1000);
@@ -1006,7 +1041,11 @@ function getNewsConfig() {
         await new Promise(r => setTimeout(r, 3000));
       }
 
-      const allNews = window.latestFetchedNews || [];
+      let allNews = Array.isArray(items) && items.length > 0
+        ? items
+        : ((startIndex > 0 && newsBroadcastState && Array.isArray(newsBroadcastState.newsList) && newsBroadcastState.newsList.length > 0)
+          ? newsBroadcastState.newsList
+          : (window.latestFetchedNews || []));
       console.log(`[ニュース番組] 🚀 [STEP 2.1] 保持ニュース記事の確認: 合計 ${allNews.length} 件`);
       if (allNews.length === 0) {
         console.warn("[ニュース番組] ⚠️ [STEP 2.2] ニュース記事が0件のため番組を開始できません");
@@ -1165,8 +1204,8 @@ function getNewsConfig() {
         const reader = window.readOneNewsItem || readOneNewsItem;
         const success = await reader(item, config, isCategoryChanged, isFirst, nextItem, nextIsCatChanged, thisSessionId, nextNextItem, nextNextIsCatChanged);
         if (thisSessionId !== window._currentNewsBroadcastSessionId || !newsBroadcastState.isRunning) {
-          console.log(`[ニュース番組] ⏹️ 世代交代（旧セッション #${thisSessionId}）のため記事読み上げ完了後に破棄します`);
-          break;
+          console.log(`[ニュース番組] ⏹️ 世代交代（旧セッション #${thisSessionId}）を検知したため即座に破棄・終了します`);
+          return;
         }
         if (!success && newsBroadcastState.isRunning) {
           const retryKey = item.title;
@@ -1185,10 +1224,10 @@ function getNewsConfig() {
           // 成功した記事のカウンタをリセット（後続で同タイトルが来た場合のクリーン化）
           delete articleRetryCounter[item.title];
         }
-        if (!newsBroadcastState.isRunning) break;
+        if (!newsBroadcastState.isRunning || thisSessionId !== window._currentNewsBroadcastSessionId) return;
       }
 
-      if (!newsBroadcastState.isRunning) {
+      if (thisSessionId !== window._currentNewsBroadcastSessionId || !newsBroadcastState.isRunning) {
         if (startBtn) startBtn.style.display = "block";
         if (stopBtn) stopBtn.style.display = "none";
         return;

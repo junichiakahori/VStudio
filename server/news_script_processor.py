@@ -17,7 +17,7 @@ from server.tts_normalizer import (
     heal_sentence_reading, apply_person_kata_rules, is_plausible_reading,
     extract_article_rubies, lookup_wikipedia_person_reading,
     extract_imperial_pronunciations, get_wikipedia_surname_reading,
-    is_imperial_article_context
+    is_imperial_article_context, apply_athlete_honorific_repairs
 )
 from server.news_crawler import find_cached_url, search_news_url_by_title, register_cached_url, fetch_article_body, decode_google_news_url
 
@@ -307,6 +307,8 @@ def extract_pronunciations_via_ai(text, title="", article_context="", provider="
         "文脈、人名（芸能人・皇族・政治家など）、固有名詞を考慮し、現在の読みに「明らかな誤読」がある単語だけを特定し、"
         "元の単語（漢字等の表記）と正しい「ひらがな読み」のペアをJSONで出力してください。\n\n"
         "※最重要ルール:\n"
+        "- 外来語・カタカナ単語（例: エネルギー、バトル、ナスダック等）は音声エンジンが正確に読めるため、絶対に出力に含めないでください。\n"
+        "- 常用漢字熟語（例: 火星、表面、警告、終了、日本、大統領等）や日常語・動詞は絶対に出力に含めないでください。\n"
         "- 音声合成エンジンが既に正しく読めている単語（例: 一般的な苗字の蔵内＝クラウチ、服部＝ハットリ、松本若菜＝マツモトワカナ等）は絶対に出力に含めないでください。\n"
         "- 皇族名（例: 佳子さま＝かこさま、悠仁さま＝ひさひとさま）や芸能人名（例: 志尊淳＝しそんじゅん）、多音語の誤読（例: ケエコサマ、ココロザシミコト、サンヤ等）を最優先で修正してください。\n"
         "- 原稿テキストやタイトルに実在しない単語は絶対に出力しないでください（ハルシネーションの禁止）。\n"
@@ -345,7 +347,8 @@ def extract_pronunciations_via_ai(text, title="", article_context="", provider="
             "大統領", "大統領専用機", "記者会見", "関係者", "防犯カメラ", "傷害容疑",
             "打線", "安打", "連勝", "最多", "過去", "以来", "引退", "移籍", "監督", "顧問",
             "社長", "会長", "議員", "知事", "市長", "選手", "投手", "捕手",
-            "供給", "石油供給", "電力供給", "需要", "施設", "基地", "空軍基地", "停滞", "混乱", "攻撃"
+            "供給", "石油供給", "電力供給", "需要", "施設", "基地", "空軍基地", "停滞", "混乱", "攻撃",
+            "火星", "表面", "警告", "終了", "日本", "阪神", "主席", "連覇", "下半身不随", "手に入れてしまう"
         }
 
         pron_map = {}
@@ -360,8 +363,13 @@ def extract_pronunciations_via_ai(text, title="", article_context="", provider="
             if term_clean not in all_text:
                 continue
 
+            # 外来語・カタカナ単語はVOICEVOX自身が最も正確に読めるためAI置換を完全禁止
+            if not any('\u4e00' <= c <= '\u9fa5' for c in term_clean):
+                print(f"[AI発音チェック 却下] 🛡️ 漢字を含まない単語 '{term_clean}' への不要な置換('{yomi_clean}')を拒絶しました", flush=True)
+                continue
+
             # 一般熟語・常用語の破壊を100%防止（VOICEVOXが読める単語の不要なひらがな化を拒絶）
-            if term_clean in FORBIDDEN_GENERAL_TERMS or term_clean.endswith(('不明金', '執行部', '委員会', '本塁打', '供給', '施設', '基地', '停滞', '需要')):
+            if term_clean in FORBIDDEN_GENERAL_TERMS or term_clean.endswith(('不明金', '執行部', '委員会', '本塁打', '供給', '施設', '基地', '停滞', '需要', '終了', '表面', '警告')):
                 print(f"[AI発音チェック 却下] 🛡️ 一般熟語 '{term_clean}' への不要なひらがな化('{yomi_clean}')を拒絶しました", flush=True)
                 continue
 
@@ -871,6 +879,10 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
         display_s = sanitize_speech_text(display_s)
         s = sanitize_speech_text(s)
 
+        # 🛡️ トランプ大統領の現職呼称正規化（前米大統領・前大統領・米大統領 ➔ トランプ大統領）
+        display_s = re.sub(r'トランプ(?:前米大統領|前大統領|米大統領)', 'トランプ大統領', display_s)
+        s = re.sub(r'トランプ(?:前米大統領|前大統領|米大統領)', 'トランプ大統領', s)
+
         if article_context:
             invented_titles = re.findall(r'『(.*?)』', display_s)
             has_invented = False
@@ -901,6 +913,9 @@ def inspect_and_correct_pronunciation(raw_sentences, article_context="", custom_
             continue
 
         speech_s = re.sub(RUBY_SEP_PATTERN, r'\2', s)
+        # 🛡️ 誤ったルビ「まいだいとうりょう」を「べいだいとうりょう」へ即座に補正
+        speech_s = re.sub(r'まいだいとうりょう', 'べいだいとうりょう', speech_s)
+        speech_s = re.sub(r'トランプ(?:前米大統領|前大統領|米大統領)', 'トランプ大統領', speech_s)
         speech_s = normalize_for_tts(speech_s, custom_dict=custom_dict, context_map=context_map)
 
         if is_chinese_sentence(display_s) or is_chinese_sentence(speech_s):
@@ -965,7 +980,10 @@ AUTHENTIC_SPORTS_KEYWORDS = {
     "ウエイトリフティング", "重量挙げ", "フェンシング", "アーチェリー", "カヌー", "セーリング",
     "近代五種", "スポーツクライミング", "サーフィン", "ブレイキン", "スキー", "スノーボード", "スノボ", "カーリング", "アイスホッケー",
     "金メダル", "銀メダル", "銅メダル", "世界選手権", "アジア大会", "インターハイ", "全日本選手権", "日本選手権",
-    "五輪", "オリンピック", "パラリンピック", "アスリート", "大谷翔平", "ドジャース"
+    "五輪", "オリンピック", "パラリンピック", "アスリート", "大谷翔平", "ドジャース",
+    "バレー", "SVリーグ", "J1", "J2", "J3", "スタジアム", "アウェー", "ホーム戦", "先発メンバー",
+    "キックオフ", "PK", "接触プレー", "球際", "得点", "失点", "勝点", "勝ち点", "順位表",
+    "アルビレックス", "グランパス", "フロンターレ", "アントラーズ", "レッズ", "マリノス", "エスパルス", "サンフレッチェ", "ガンバ", "セレッソ", "ヴィッセル"
 }
 
 ENTERTAINMENT_KEYWORDS = {
@@ -986,7 +1004,7 @@ NON_ATHLETE_PROMINENT_PEOPLE = [
     "浜辺美波", "有村架純", "吉高由里子", "北川景子", "芦田愛菜"
 ]
 
-def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports):
+def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, has_authentic_sports=False, is_sports=True):
     """相撲・エンタメ・非スポーツ文脈における『選手』誤爆の完全自己修復"""
     # 0. 著名俳優・アイドル・クリエイターへの「選手」誤爆を100%「さん」へ強制是正
     for name in NON_ATHLETE_PROMINENT_PEOPLE:
@@ -1018,24 +1036,30 @@ def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports):
         healed_sp = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1', healed_sp)
         return disp, healed_sp
 
-    # 3. 非スポーツ記事（またはエンタメ記事）での「選手」誤爆を100%「さん」へ是正
-    if not is_pure_sports:
+    # 3. 非スポーツ記事（かつスポーツキーワードを含まない純粋なエンタメ記事）でのみ人名＋選手を是正
+    # ※ 超重要: 「選手たち」「選手への」などの一般名詞・複数形、および直前に助詞がある「〇〇が選手」「〇〇の選手」は絶対に誤爆置換しない
+    if not is_pure_sports and not has_authentic_sports:
+        # 助詞・一般名詞接頭辞を除外し、文頭または助詞直後の明確な人名（漢字2〜4文字またはカタカナ2〜8文字）のみを置換
+        SAFE_ATHLETE_PERSON_PATTERN = r'(?:^|(?<=[、。！？\s　はがのにへと]))(?!(?:日本|日本人|女子|男子|代表|若手|出場|プロ|主力|控え|交代|所属|世界|国内|相手|全|各|当該|対象|選手))([一-鿿]{2,4}|[ァ-ヶー]{2,8})選手(?!(?:たち|ら|団|層|生命|権|宣誓|選考|枠))'
         if "選手" in disp:
-            disp_fixed = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1さん', disp)
-            disp_fixed = re.sub(r'(?<![ぁ-んァ-ヶー\u4e00-\u9fa5])選手([はがにもでの])', r'ご本人\1', disp_fixed)
+            disp_fixed = re.sub(SAFE_ATHLETE_PERSON_PATTERN, r'\1さん', disp)
             if disp_fixed != disp:
                 print(f"[敬称自己修復] 🩹 非スポーツ/エンタメ記事での「選手」誤爆を検知・是正: '{disp}' ➔ '{disp_fixed}'", flush=True)
                 disp = disp_fixed
         if "選手" in healed_sp:
-            disp_sp_fixed = re.sub(r'([\u4e00-\u9fa5A-Za-zぁ-んァ-ヶー]{2,6})選手', r'\1さん', healed_sp)
-            disp_sp_fixed = re.sub(r'(?<![ぁ-んァ-ヶー\u4e00-\u9fa5])選手([はがにもでの])', r'ご本人\1', disp_sp_fixed)
+            disp_sp_fixed = re.sub(SAFE_ATHLETE_PERSON_PATTERN, r'\1さん', healed_sp)
             if disp_sp_fixed != healed_sp:
                 healed_sp = disp_sp_fixed
+
+    # 4. 助詞直後に孤立した「さんたち」「さんへの」「さんのプレー」等の破綻表現を自動救済修復（ホワイトリスト方式・カテゴリ連動）
+    # ※ is_sports=False の場合、非スポーツ記事では絶対に「選手」という単語を使わず「皆さん」「方たち」へ救済
+    disp = apply_athlete_honorific_repairs(disp, is_sports=is_sports)
+    healed_sp = apply_athlete_honorific_repairs(healed_sp, is_sports=is_sports)
 
     return disp, healed_sp
 
 
-def audit_and_heal_news_script(items, title="", article_context=""):
+def audit_and_heal_news_script(items, title="", article_context="", category_name=""):
     """
     生成された原稿各文（items: [{'display': ..., 'speech': ...}]）を再チェックし、
     誤読・異常置換・不適切な敬称（選手/さん）の自動修正（自己修復・Healing）を行う。
@@ -1047,6 +1071,8 @@ def audit_and_heal_news_script(items, title="", article_context=""):
     has_ent = any(kw in full_context for kw in ENTERTAINMENT_KEYWORDS)
     has_authentic_sports = any(kw in full_context for kw in AUTHENTIC_SPORTS_KEYWORDS)
     is_pure_sports = has_authentic_sports and not has_ent
+    is_sports_category = (category_name == "スポーツ" or "スポーツ" in category_name)
+    is_sports = (is_sports_category or is_pure_sports or has_authentic_sports) and not has_ent
 
     # 相撲文脈キーワード（力士に対して「選手」と呼ぶ誤爆を検知・除去）
     SUMO_KEYWORDS = [
@@ -1083,8 +1109,8 @@ def audit_and_heal_news_script(items, title="", article_context=""):
         # 1. 読み上げテキスト(speech)の異常置換自己修復
         healed_sp = heal_sentence_reading(disp, sp)
 
-        # 2. 「選手」の文脈適正チェック
-        disp, healed_sp = _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports)
+        # 2. 「選手」の文脈適正チェック（カテゴリ連動）
+        disp, healed_sp = _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, has_authentic_sports, is_sports=is_sports)
 
         # 3. 普通名詞・国名・組織名への「さん」誤爆の最終除去
         for noun in INVALID_SAN_NOUNS:
@@ -1436,11 +1462,20 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
                         print(f"[VOICEVOX全文照合修復] 🩹 '{term}' を正読 '{expected_hira}' に直接ルビ補正しました: {it['speech']}", flush=True)
 
                 # 🎓 実際の誤読（wrong_reading）を特定して台帳に安全に自動登録
-                # （接尾辞・一般語の誤爆を防ぐため、2〜4文字の漢字固有名詞/人名、かつ正読ソースの裏付けがあるものに限定）
+                # （接尾辞・一般語の誤爆を防ぐため、2〜4文字の純粋な人名/固有名詞、かつ正読ソースの裏付けがあるものに限定）
                 if sample_sent and 2 <= len(term) <= 4 and re.match(r'^[\u4e00-\u9fa5]+$', term):
-                    # 信頼できる正読ソース（Wikipedia人名解決・AI発音チェック・台帳）の裏付けがあるもののみ自動登録
-                    # （Janomeの未確認地名読み「反町=たんまち」等による誤登録を100%遮断）
-                    if term in trusted_terms and not term.endswith(('的', '対', '化', '製', '感', '性', '度')):
+                    # Janomeで人名トークンを含まない一般熟語（サ変接続・一般名詞等）は自動登録を100%遮断
+                    is_general = False
+                    try:
+                        from janome.tokenizer import Tokenizer
+                        jt = Tokenizer()
+                        tks = list(jt.tokenize(term))
+                        if not any("人名" in tk.part_of_speech for tk in tks):
+                            is_general = True
+                    except Exception:
+                        pass
+
+                    if not is_general and is_plausible_reading(term, expected_hira) and term in trusted_terms and not term.endswith(('的', '対', '化', '製', '感', '性', '度')):
                         try:
                             # 出現位置から前後の文脈スニペットを切り出して実際の誤読を特定
                             pos = sample_sent.find(term)
@@ -1474,9 +1509,13 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
 
                                 # 厳格な自動登録条件:
                                 # 1. 誤読が取得できている
-                                # 2. 発音上明らかに異なる（長音のオ/ウ、促音便のチ/ッ揺らぎではない本物の誤読）
-                                # 3. 極端な長さの乖離がない
-                                if wrong_hira and _norm_h(wrong_hira) != _norm_h(expected_hira) and abs(len(wrong_hira) - len(expected_hira)) <= 4:
+                                # 2. 職業名・ジャンル名（たれんと、はいゆう等）の誤読登録は100%遮断
+                                # 3. 空白を除いた文字が同一（スペース違いのみ）は正読なので誤読登録を100%遮断
+                                # 4. 発音上明らかに異なる（長音のオ/ウ、促音便のチ/ッ揺らぎではない本物の誤読）
+                                # 5. 極端な長さの乖離がない
+                                FORBIDDEN_AUTOSAVE_READINGS = {'たれんと', 'はいゆう', 'かしゅ', 'げいいん', 'さっかー', 'やきゅう', 'すもう', 'どらま', 'あいどる', 'もでる', 'せんしゅ', 'かんとく'}
+                                is_clean_match = re.sub(r'\s+', '', wrong_hira) == re.sub(r'\s+', '', expected_hira)
+                                if wrong_hira and not is_clean_match and expected_hira not in FORBIDDEN_AUTOSAVE_READINGS and _norm_h(wrong_hira) != _norm_h(expected_hira) and abs(len(wrong_hira) - len(expected_hira)) <= 4:
                                     from server.web_pronunciation_resolver import save_to_pronunciation_memory
                                     saved = save_to_pronunciation_memory(
                                         surface=term,
@@ -2408,7 +2447,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
                 custom_dict=custom_dict,
                 context_map=news_context_map
             )
-            candidate_items = audit_and_heal_news_script(candidate_items, title=title, article_context=full_article_content)
+            candidate_items = audit_and_heal_news_script(candidate_items, title=title, article_context=full_article_content, category_name=category_name)
             # 🎙️ VOICEVOX全文プレ読み照合（文脈助詞融合による「に小栗旬➔ササグリシュン」等の誤読を機械的100%自動是正）
             candidate_items = audit_and_heal_via_voicevox_full_reading(candidate_items, title=title, known_terms_map=news_context_map)
     
@@ -2492,13 +2531,30 @@ def generate_news_item_script_data(payload, custom_dict=None):
             # 🛡️ 見出しにはキャラクター語尾（にゃ、のだ等）を絶対に付けない（カギ括弧内外・引用符内外問わず完全切除）
             headline_display = clean_headline_character_tone(headline_display)
             headline_speech = clean_headline_character_tone(headline_speech)
+
+            # 🛡️ トランプ大統領の現職呼称正規化
+            headline_display = re.sub(r'トランプ(?:前米大統領|前大統領|米大統領)', 'トランプ大統領', headline_display)
+            headline_speech = re.sub(r'トランプ(?:前米大統領|前大統領|米大統領)', 'トランプ大統領', headline_speech)
+            headline_speech = re.sub(r'まいだいとうりょう', 'べいだいとうりょう', headline_speech)
+
+            # 🛡️ URLドメイン名サフィックス（- news.yahoo.co.jp 等）の徹底切除（長大なスペル読み・待機時間の完全防止）
+            DOMAIN_STRIP_REGEX = r'[\s|｜\-–—]+(?:[a-zA-Z0-9\-_.]+\.(?:co\.jp|ne\.jp|or\.jp|ac\.jp|go\.jp|jp|com|net|org|info|biz)|news\.yahoo\.co\.jp|yahoo\.co\.jp).*$'
+            headline_display = re.sub(DOMAIN_STRIP_REGEX, '', headline_display).strip()
+            headline_speech = re.sub(DOMAIN_STRIP_REGEX, '', headline_speech).strip()
     
             print(f"{tag} 🗣️ 文脈校正見出し生成成功: 表示='{headline_display}' / 発音='{headline_speech}'", flush=True)
         else:
             # 元タイトル全文を一文字も省略せずに文脈読みを付与してTTS音声化
             headline_display = title.replace("「", "").replace("」", "").strip()
+            # 🛡️ 元タイトル末尾のドメイン名サフィックス（- news.yahoo.co.jp 等）も切除
+            DOMAIN_STRIP_REGEX = r'[\s|｜\-–—]+(?:[a-zA-Z0-9\-_.]+\.(?:co\.jp|ne\.jp|or\.jp|ac\.jp|go\.jp|jp|com|net|org|info|biz)|news\.yahoo\.co\.jp|yahoo\.co\.jp).*$'
+            headline_display = re.sub(DOMAIN_STRIP_REGEX, '', headline_display).strip()
+            headline_display = re.sub(r'トランプ(?:前米大統領|前大統領|米大統領)', 'トランプ大統領', headline_display)
             headline_speech = normalize_for_tts(headline_display, custom_dict=custom_dict, context_map=news_context_map)
             headline_speech = clean_headline_character_tone(headline_speech)
+            headline_speech = re.sub(r'トランプ(?:前米大統領|前大統領|米大統領)', 'トランプ大統領', headline_speech)
+            headline_speech = re.sub(r'まいだいとうりょう', 'べいだいとうりょう', headline_speech)
+            headline_speech = re.sub(DOMAIN_STRIP_REGEX, '', headline_speech).strip()
             headline_speech = re.sub(r'^[、,\s　]+', '', headline_speech)
             headline_speech = re.sub(r'[、,\s　]+$', '', headline_speech)
             print(f"{tag} 🗣️ 元タイトル全文から文脈読み生成 (省略ゼロ): 発音='{headline_speech}'", flush=True)

@@ -59,8 +59,15 @@ def save_to_pronunciation_memory(
     # 🚨 誤読防止台帳の絶対規約:
     # 誤読（wrong_reading）が存在しない（空・None、または正読と完全に同一）単語は、
     # 誤読防止台帳（pronunciation_memory.json）への保存を永久に拒絶・遮断する。
-    if not wrong_reading or not wrong_reading.strip() or wrong_reading.strip() == reading.strip():
-        print(f"ℹ️ [台帳保存スキップ] '{surface}' は誤読（wrong_reading）が存在しないため台帳へは保存しません。", flush=True)
+    clean_wrong = re.sub(r'\s+', '', wrong_reading or '')
+    clean_reading = re.sub(r'\s+', '', reading or '')
+    if not clean_wrong or clean_wrong == clean_reading:
+        print(f"ℹ️ [台帳保存スキップ] '{surface}' は誤読（wrong_reading）が存在しない（または正読と一致）ため台帳へは保存しません。", flush=True)
+        return False
+
+    FORBIDDEN_AUTOSAVE_READINGS = {'たれんと', 'はいゆう', 'かしゅ', 'げいいん', 'さっかー', 'やきゅう', 'すもう', 'どらま', 'あいどる', 'もでる', 'せんしゅ', 'かんとく'}
+    if clean_reading in FORBIDDEN_AUTOSAVE_READINGS:
+        print(f"🚫 [台帳保存拒絶] '{surface}' の正読 '{reading}' は職業名・ジャンル名のため台帳保存を拒絶しました。", flush=True)
         return False
 
     try:
@@ -245,8 +252,12 @@ def _extract_ruby_from_snippet(term: str, snippet: str) -> Optional[str]:
     if not snippet:
         return None
 
-    GARBAGE_PATTERNS = {"のページです", "について", "があります", "がもうちょっとで", "一覧", "案内", "検索", "公式", "サイト", "こちら", "クリック", "詳細", "スティレット"}
-    if any(gp in snippet for gp in GARBAGE_PATTERNS):
+    GARBAGE_PATTERNS = {
+        "のページです", "について", "があります", "がある", "があるよう", "がある模様",
+        "がもうちょっとで", "一覧", "案内", "検索", "公式", "サイト", "こちら",
+        "クリック", "詳細", "スティレット", "とされる", "という", "もある", "もあるよう"
+    }
+    if any(gp in snippet for gp in GARBAGE_PATTERNS if gp in ("のページです", "公式", "サイト", "こちら", "クリック")):
         return None
 
     candidates = []
@@ -257,21 +268,30 @@ def _extract_ruby_from_snippet(term: str, snippet: str) -> Optional[str]:
         c = re.sub(r'[^ぁ-んァ-ヶー]', '', m1.group(1).replace('・', '').replace(' ', ''))
         candidates.append(c)
 
-    # パターン2: 読み方は「よみ」 / 読み方は『よみ』 / 読み：よみ
-    m2 = re.search(r'(?:読み方|読み|よみ|発音)(?:は|：|:)?\s*[「『（\(]?([ぁ-んァ-ヶー]+)[」』）\)]?', snippet)
+    # パターン2: 括弧で厳密に囲まれた読み（最も信頼性が高い）
+    # 例: 読み方は「よみ」、読みは『よみ』
+    m2 = re.search(r'(?:読み方|読み|よみ|発音)(?:は|：|:)?\s*[「『（\(]([ぁ-んァ-ヶー]+)[」』）\)]', snippet)
     if m2:
         candidates.append(m2.group(1).strip())
 
     # パターン3: 「term」の読み方は「よみ」
-    m3 = re.search(re.escape(term) + r'[^。]*?(?:読み方|読み)(?:は|：|:)?\s*[「『（\(]?([ぁ-んァ-ヶー]+)[」』）\)]?', snippet)
+    m3 = re.search(re.escape(term) + r'[^。]*?(?:読み方|読み)(?:は|：|:)?\s*[「『（\(]([ぁ-んァ-ヶー]+)[」』）\)]', snippet)
     if m3:
         candidates.append(m3.group(1).strip())
 
+    # パターン4: 括弧なしの「読み方は: よみ」形式（文末・助詞による誤爆「〜の読みがある」等を厳重ブロック）
+    m4 = re.search(r'(?:読み方|よみ|発音)(?:は|：|:)\s*([ぁ-んァ-ヶー]+)', snippet)
+    if m4:
+        c4 = m4.group(1).strip()
+        # 動詞や助詞（ある、いる、する、なる等）を含まない場合のみ候補にする
+        if not re.search(r'(?:がある|もある|があるよう|とする|とされる|という|である|ます|です)$', c4):
+            candidates.append(c4)
+
     for c in candidates:
         if 2 <= len(c) <= max(len(term) * 5, 20):
-            # 助詞切れ・文末語尾ゴミの遮断
-            if not re.search(r'(?:の|が|は|で|を|に|へ|と|です|ます)$', c):
-                if not any(gp in c for gp in GARBAGE_PATTERNS):
+            # 助詞切れ・動詞・文末語尾ゴミの遮断
+            if not re.search(r'(?:の|が|は|で|を|に|へ|と|です|ます|ある|いる|する|なる)$', c):
+                if not any(gp == c or gp in c for gp in GARBAGE_PATTERNS):
                     return c
 
     return None
@@ -288,15 +308,15 @@ def is_valid_reading_for_term(term: str, ruby: str) -> bool:
     if len(ruby) > max(len(term) * 3, 8) and len(ruby) > 9:
         return False
 
-    # 助詞切れ・文末ゴミの遮断
-    if re.search(r'(?:の|が|は|で|を|に|へ|と|です|ます)$', ruby):
+    # 助詞切れ・動詞・文末ゴミの遮断
+    if re.search(r'(?:の|が|は|で|を|に|へ|と|です|ます|ある|いる|する|なる)$', ruby):
         return False
 
     # 明らかに無関係な単語の除外
     DISALLOWED_READING_KEYWORDS = {
         "かいきゅう", "しょうさい", "いちらん", "あいまいで", "たいしょう", "しんでん",
         "のぺえじ", "のページ", "について", "あります", "もうちょっと", "スティレット",
-        "もしくは", "または"
+        "もしくは", "または", "がある", "もある", "けーたい", "ひつよう", "けがん", "しゅいしゃ"
     }
     if any(kw in ruby for kw in DISALLOWED_READING_KEYWORDS):
         return False
@@ -377,10 +397,13 @@ def resolve_unknown_reading_online(
                     res = kks.convert(vv_reading)
                     hira_reading = "".join([it.get("hira", "") for it in res]).strip()
                     def _norm(s):
+                        s = re.sub(r'\s+', '', s or '')
                         s = s.replace("お", "う").replace("え", "い").replace("ー", "")
                         s = re.sub(r'[っちつくきっ]', '●', s)
                         return s
-                    if hira_reading and _norm(hira_reading) != _norm(ruby):
+                    clean_hira = re.sub(r'\s+', '', hira_reading or '')
+                    clean_ruby = re.sub(r'\s+', '', ruby or '')
+                    if clean_hira and clean_hira != clean_ruby and _norm(clean_hira) != _norm(clean_ruby):
                         wrong_reading = hira_reading
             except Exception:
                 pass

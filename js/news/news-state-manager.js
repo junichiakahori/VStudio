@@ -24,16 +24,24 @@ window.readNewsTitles = new Set();
 
 function loadReadNewsTitles() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_READ_TITLES);
+    if (localStorage.getItem("newsReadExplicitlyCleared") === "true") {
+      readNewsTitles = new Set();
+      window.readNewsTitles = readNewsTitles;
+      return readNewsTitles;
+    }
+    const raw = localStorage.getItem("newsReadTitles") || localStorage.getItem(STORAGE_KEY_READ_TITLES);
     if (raw) {
       const arr = JSON.parse(raw);
       if (Array.isArray(arr)) {
         readNewsTitles = new Set(arr);
       }
+    } else {
+      readNewsTitles = new Set();
     }
   } catch (e) {
     console.warn("[ニュース状態] 既読タイトルの復元に失敗:", e);
   }
+  window.readNewsTitles = readNewsTitles;
   return readNewsTitles;
 }
 
@@ -45,21 +53,39 @@ function saveReadNewsTitles() {
       arr.splice(0, arr.length - 500);
     }
     localStorage.setItem(STORAGE_KEY_READ_TITLES, JSON.stringify(arr));
+    localStorage.setItem("newsReadTitles", JSON.stringify(arr));
   } catch (e) {
     console.warn("[ニュース状態] 既読タイトルの保存に失敗:", e);
   }
 }
 
+function clearReadNewsTitles() {
+  if (readNewsTitles) readNewsTitles.clear();
+  if (window.readNewsTitles) window.readNewsTitles.clear();
+  try {
+    localStorage.removeItem(STORAGE_KEY_READ_TITLES);
+    localStorage.removeItem("newsReadTitles");
+    localStorage.removeItem("currentPlayingNewsTitle");
+    localStorage.removeItem(STORAGE_KEY_BROADCAST_STATE);
+    localStorage.removeItem("vstudio_current_playing_title");
+    localStorage.setItem("newsReadExplicitlyCleared", "true");
+  } catch (e) {}
+}
+
 function markNewsTitleAsRead(title) {
   if (!title) return;
+  try { localStorage.removeItem("newsReadExplicitlyCleared"); } catch (e) {}
   readNewsTitles.add(title.trim());
+  window.readNewsTitles = readNewsTitles;
   saveReadNewsTitles();
 }
 
 function isNewsTitleRead(title) {
   if (!title) return false;
+  if (localStorage.getItem("newsReadExplicitlyCleared") === "true") return false;
   const t = title.trim();
   if (readNewsTitles.has(t)) return true;
+  if (window.readNewsTitles && window.readNewsTitles.has(t)) return true;
   // 🧠 既読タイトル一覧とのトピック類似度判定（朝・昼に読んだ同一話題の続報・別メディア版を重複除外）
   if (typeof window.isSimilarNews === "function") {
     for (const readTitle of readNewsTitles) {
@@ -134,4 +160,5 @@ if (typeof window !== "undefined") {
   window.saveNewsBroadcastState = saveNewsBroadcastState;
   window.loadNewsBroadcastState = loadNewsBroadcastState;
   window.clearNewsBroadcastState = clearNewsBroadcastState;
+  window.clearReadNewsTitles = clearReadNewsTitles;
 }

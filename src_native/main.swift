@@ -416,6 +416,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
         if reqURL.contains("wizard") { targetType = "wizard" }
         else if reqURL.contains("news_list") { targetType = "news_list" }
         else if reqURL.contains("log_console") { targetType = "log_console" }
+        else if reqURL.contains("news_cache") { targetType = "news_cache" }
+        else if reqURL.contains("broadcast_picker") { targetType = "broadcast_picker" }
 
         // 既存ウィンドウが既に開いている場合は前面に浮上させて再利用
         if !targetType.isEmpty {
@@ -424,7 +426,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
                     let title = win.title
                     let match = (targetType == "wizard" && (title.contains("ウィザード") || title.contains("Wizard"))) ||
                                 (targetType == "news_list" && (title.contains("ニュース一覧") || title.contains("News"))) ||
-                                (targetType == "log_console" && (title.contains("ログコンソール") || title.contains("Log")))
+                                (targetType == "log_console" && (title.contains("ログコンソール") || title.contains("Log"))) ||
+                                (targetType == "news_cache" && (title.contains("キャッシュ") || title.contains("Cache"))) ||
+                                (targetType == "broadcast_picker" && (title.contains("配信枠") || title.contains("Broadcast")))
                     if match {
                         NSApp.activate(ignoringOtherApps: true)
                         win.makeKeyAndOrderFront(nil)
@@ -447,16 +451,35 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDe
             backing: .buffered,
             defer: false
         )
+        var autosaveName = "VStudioSubWindow"
         if reqURL.contains("log_console") {
+            targetType = "log_console"
             popupWindow.title = "📋 VStudio 統合ログコンソール"
+            autosaveName = "VStudioLogConsoleWindow"
         } else if reqURL.contains("wizard") {
+            targetType = "wizard"
             popupWindow.title = "🚀 YouTube 配信準備ウィザード"
+            autosaveName = "VStudioWizardWindow"
         } else if reqURL.contains("news_list") {
+            targetType = "news_list"
             popupWindow.title = "📰 取得済みのニュース一覧"
+            autosaveName = "VStudioNewsListWindow"
+        } else if reqURL.contains("news_cache") {
+            targetType = "news_cache"
+            popupWindow.title = "🗄️ VStudio ニュース原稿キャッシュマネージャー"
+            autosaveName = "VStudioNewsCacheWindow"
+        } else if reqURL.contains("broadcast_picker") {
+            targetType = "broadcast_picker"
+            popupWindow.title = "📋 配信枠選択"
+            autosaveName = "VStudioBroadcastPickerWindow"
         } else {
             popupWindow.title = "🪄 VStudio サブウィンドウ"
         }
-        popupWindow.center()
+
+        popupWindow.setFrameAutosaveName(autosaveName)
+        if !popupWindow.setFrameUsingName(autosaveName) {
+            popupWindow.center()
+        }
         popupWindow.backgroundColor = NSColor(red: 0.05, green: 0.05, blue: 0.07, alpha: 1.0)
         popupWindow.appearance = NSAppearance(named: .darkAqua)
         popupWindow.isReleasedWhenClosed = false

@@ -288,6 +288,32 @@
             font-family: 'Fira Code', monospace;
         }
 
+        .card-session-badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .session-morning {
+            background: rgba(254, 202, 87, 0.15);
+            color: #feca57;
+            border: 1px solid rgba(254, 202, 87, 0.3);
+        }
+        .session-evening {
+            background: rgba(165, 94, 234, 0.15);
+            color: #a55eea;
+            border: 1px solid rgba(165, 94, 234, 0.3);
+        }
+
+        .card-index-sub {
+            font-size: 10px;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
         .card-source-badge {
             background: rgba(255, 159, 67, 0.15);
             color: var(--accent-orange);
@@ -554,7 +580,7 @@
         <div class="header-left">
             <span class="header-title">🗄️ ニュース原稿キャッシュマネージャー</span>
             <div class="date-select-wrap">
-                <label for="date-select">📅 日付:</label>
+                <label for="date-select">📅 配信・日付:</label>
                 <select id="date-select" class="date-select"></select>
             </div>
         </div>
@@ -562,8 +588,8 @@
             <button id="btn-refresh" class="btn btn-refresh" title="キャッシュデータを再読み込み">
                 🔄 更新
             </button>
-            <button id="btn-clear-all" class="btn btn-danger" title="選択した日のキャッシュを全消去">
-                🗑️ この日のキャッシュを全消去
+            <button id="btn-clear-all" class="btn btn-danger" title="選択した配信のキャッシュを消去">
+                🗑️ この配信のキャッシュを消去
             </button>
         </div>
     </header>
@@ -621,6 +647,8 @@
 
         let currentItems = [];
         let currentDate = "";
+        let currentSession = "all";
+        let currentSessionLabel = "";
 
         // ── トースト通知ヘルパー ──
         function showToast(message, type = "info") {
@@ -678,7 +706,7 @@
             modal.classList.add("active");
         }
 
-        // ── 利用可能な日付一覧の取得 ──
+        // ── 利用可能な日付・配信セッション一覧の取得 ──
         async function loadAvailableDates() {
             try {
                 const res = await fetch(`${API_BASE}/api/news_cache/list`);
@@ -687,61 +715,93 @@
                 select.innerHTML = "";
 
                 if (data.success && data.dates && data.dates.length > 0) {
-                    data.dates.forEach((d, idx) => {
-                        const opt = document.createElement("option");
-                        opt.value = d.date;
-                        opt.textContent = `${d.date} (${d.item_count}件)`;
-                        select.appendChild(opt);
+                    data.dates.forEach((d) => {
+                        const sessions = d.sessions && d.sessions.length > 0 ? d.sessions : [
+                            { id: `${d.date}_all`, session: "all", date: d.date, label: `📅 ${d.date} (${d.item_count}件)` }
+                        ];
+
+                        sessions.forEach((s) => {
+                            const opt = document.createElement("option");
+                            opt.value = s.id;
+                            opt.dataset.date = s.date || d.date;
+                            opt.dataset.session = s.session || "all";
+                            opt.textContent = s.label;
+                            select.appendChild(opt);
+                        });
                     });
-                    currentDate = data.dates[0].date;
+
+                    // 最新の配信セッションをデフォルト選択
+                    const firstOpt = select.options[0];
+                    currentDate = firstOpt.dataset.date;
+                    currentSession = firstOpt.dataset.session;
+                    currentSessionLabel = firstOpt.textContent;
                 } else {
                     const today = new Date().toISOString().split("T")[0];
                     const opt = document.createElement("option");
-                    opt.value = today;
-                    opt.textContent = `${today} (0件)`;
+                    opt.value = `${today}_all`;
+                    opt.dataset.date = today;
+                    opt.dataset.session = "all";
+                    opt.textContent = `📅 ${today} (0件)`;
                     select.appendChild(opt);
+
                     currentDate = today;
+                    currentSession = "all";
+                    currentSessionLabel = opt.textContent;
                 }
 
-                select.value = currentDate;
                 select.onchange = (e) => {
-                    currentDate = e.target.value;
-                    loadCacheData(currentDate);
+                    const selectedOpt = select.options[select.selectedIndex];
+                    currentDate = selectedOpt.dataset.date;
+                    currentSession = selectedOpt.dataset.session;
+                    currentSessionLabel = selectedOpt.textContent;
+                    loadCacheData(currentDate, currentSession);
                 };
 
-                await loadCacheData(currentDate);
+                await loadCacheData(currentDate, currentSession);
             } catch (e) {
-                console.error("日付一覧取得失敗:", e);
-                showToast("キャッシュ日付一覧の取得に失敗しました", "error");
+                console.error("配信一覧取得失敗:", e);
+                showToast("キャッシュ配信一覧の取得に失敗しました", "error");
             }
         }
 
-        // ── 指定日付のキャッシュデータ読み込み ──
-        async function loadCacheData(dateStr) {
+        // ── 指定日付・配信セッションのキャッシュデータ読み込み ──
+        async function loadCacheData(dateStr, sessionStr = "all") {
             try {
-                const res = await fetch(`${API_BASE}/api/news_cache?date=${dateStr}`);
+                const url = `${API_BASE}/api/news_cache?date=${dateStr}&session=${sessionStr}`;
+                const res = await fetch(url);
                 const data = await res.json();
 
                 if (data.success) {
                     currentItems = data.items || [];
-                    document.getElementById("stat-count").textContent = `${currentItems.length} 件`;
+                    const displayLabel = data.session_label || currentSessionLabel || (sessionStr === "all" ? "一日全体" : "取得分");
+                    document.getElementById("stat-count").textContent = `${currentItems.length} 件 (${sessionStr === "all" ? "一日全体" : "選択取得分"})`;
                     document.getElementById("stat-updated").textContent = data.updated_at || "-";
                     document.getElementById("stat-size").textContent = data.file_size ? `${(data.file_size / 1024).toFixed(1)} KB` : "0 KB";
 
-                    renderCards(currentItems);
+                    // 全消去ボタンのラベルを更新
+                    const clearBtn = document.getElementById("btn-clear-all");
+                    if (sessionStr === "all") {
+                        clearBtn.textContent = `🗑️ この日の全キャッシュを消去`;
+                        clearBtn.title = `日付「${dateStr}」の全ニュースキャッシュを消去`;
+                    } else {
+                        clearBtn.textContent = `🗑️ この取得分のキャッシュを消去`;
+                        clearBtn.title = `「${displayLabel}」のキャッシュのみを消去`;
+                    }
+
+                    renderCards(currentItems, sessionStr);
                 } else {
                     showToast(data.error || "データ取得に失敗しました", "error");
-                    renderCards([]);
+                    renderCards([], sessionStr);
                 }
             } catch (e) {
                 console.error("キャッシュデータ取得失敗:", e);
                 showToast("キャッシュデータの取得に失敗しました", "error");
-                renderCards([]);
+                renderCards([], sessionStr);
             }
         }
 
-        // ── 記事カードの描画 ──
-        function renderCards(items) {
+        // ── 記事カードの描画（配信セッションごとの番号を大きく表示） ──
+        function renderCards(items, sessionStr = "all") {
             const container = document.getElementById("news-container");
             const emptyState = document.getElementById("empty-state");
             container.innerHTML = "";
@@ -764,6 +824,28 @@
                 const titleReading = item.title_reading || item.headline?.reading || "";
                 const voicevoxReading = item.title_voicevox_reading || item.headline?.voicevox_reading || "";
                 const sentences = item.sentences || [];
+
+                // 配信セッション番号と全体番号
+                const sessionIdx = item.session_index || (idx + 1);
+                const globalIdx = item.global_index || item.index || (idx + 1);
+                const sessionType = item.session_type || "morning";
+                const sessionIcon = sessionType === "evening" ? "🌙 夜" : "☀️ 朝";
+
+                // バッジ表示の構築
+                let badgeHtml = "";
+                if (sessionStr === "all") {
+                    // 全体表示時: 全体番号 + セッションバッジ（セッション内連番）
+                    badgeHtml = `
+                        <span class="card-index-badge">#${globalIdx}</span>
+                        <span class="card-session-badge ${sessionType === 'evening' ? 'session-evening' : 'session-morning'}">${sessionIcon} #${sessionIdx}</span>
+                    `;
+                } else {
+                    // 配信別表示時（夜配信 or 朝配信）: 配信内番号を大きく #1, #2... と表示！
+                    badgeHtml = `
+                        <span class="card-index-badge" style="font-size: 13px; padding: 3px 10px;">#${sessionIdx}</span>
+                        ${globalIdx !== sessionIdx ? `<span class="card-index-sub" title="一日全体での通し番号: #${globalIdx}">全体#${globalIdx}</span>` : ""}
+                    `;
+                }
 
                 // センテンス一覧のHTML生成
                 let sentencesHtml = "";
@@ -790,7 +872,7 @@
                     <div class="card-header">
                         <div class="card-title-wrap">
                             <div class="card-badge-row">
-                                <span class="card-index-badge">#${item.index || idx + 1}</span>
+                                ${badgeHtml}
                                 <span class="card-source-badge">${escapeHtml(source)}</span>
                                 <span class="card-time">${escapeHtml(pubDate)}</span>
                             </div>
@@ -798,7 +880,7 @@
                                 ${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)} 🔗</a>` : escapeHtml(title)}
                             </div>
                         </div>
-                        <button class="btn btn-danger btn-sm" onclick="handleDeleteItem(${item.index || idx + 1}, '${escapeHtml(title)}')">
+                        <button class="btn btn-danger btn-sm" onclick="handleDeleteItem(${globalIdx}, '${escapeHtml(title)}')">
                             🗑️ 削除
                         </button>
                     </div>
@@ -822,7 +904,7 @@
         }
 
         // ── 単一記事の削除 ──
-        window.handleDeleteItem = (itemIndex, itemTitle) => {
+        window.handleDeleteItem = (globalIndex, itemTitle) => {
             showConfirmModal(
                 "この記事のキャッシュを削除",
                 `「${itemTitle.substring(0, 30)}...」のキャッシュを削除しますか？\n（次回ニュース時に新エンジンで再生成されます）`,
@@ -831,12 +913,16 @@
                         const res = await fetch(`${API_BASE}/api/news_cache/delete_item`, {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ date: currentDate, index: itemIndex, title: itemTitle })
+                            body: JSON.stringify({
+                                date: currentDate,
+                                global_index: globalIndex,
+                                title: itemTitle
+                            })
                         });
                         const data = await res.json();
                         if (data.success) {
                             showToast("記事のキャッシュを削除しました", "success");
-                            loadCacheData(currentDate);
+                            loadCacheData(currentDate, currentSession);
                         } else {
                             showToast(data.error || "削除に失敗しました", "error");
                         }
@@ -847,27 +933,34 @@
             );
         };
 
-        // ── 全件キャッシュ削除 ──
+        // ── キャッシュ消去（選択セッションまたは日全体） ──
         document.getElementById("btn-clear-all").onclick = () => {
             if (!currentItems || currentItems.length === 0) {
                 showToast("削除するキャッシュデータがありません", "info");
                 return;
             }
 
+            const isAll = currentSession === "all";
+            const targetDesc = isAll ? `日付「${currentDate}」のすべてのニュース原稿キャッシュ（全 ${currentItems.length} 件）` : `「${currentSessionLabel}」のニュース原稿キャッシュ（全 ${currentItems.length} 件）`;
+
             showConfirmModal(
-                "本日のキャッシュ全消去",
-                `日付「${currentDate}」のすべてのニュース原稿キャッシュ（全 ${currentItems.length} 件）を消去しますか？\n次回ニュース時に全記事が新エンジンでゼロから再生成されます。`,
+                "キャッシュ消去の確認",
+                `${targetDesc} を消去しますか？\n次回ニュース時に新エンジンでゼロから再生成されます。`,
                 async () => {
                     try {
                         const res = await fetch(`${API_BASE}/api/news_cache/clear`, {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ date: currentDate })
+                            body: JSON.stringify({
+                                date: currentDate,
+                                session: currentSession
+                            })
                         });
                         const data = await res.json();
                         if (data.success) {
-                            showToast("本日のキャッシュを全消去しました", "success");
-                            loadCacheData(currentDate);
+                            showToast(data.message || "キャッシュを消去しました", "success");
+                            // 一覧を再取得してドロップダウンも更新
+                            await loadAvailableDates();
                         } else {
                             showToast(data.error || "消去に失敗しました", "error");
                         }
@@ -880,7 +973,7 @@
 
         // ── 更新ボタン ──
         document.getElementById("btn-refresh").onclick = () => {
-            loadCacheData(currentDate);
+            loadCacheData(currentDate, currentSession);
             showToast("キャッシュを再読み込みしました", "info");
         };
 
@@ -888,7 +981,7 @@
         document.getElementById("search-input").addEventListener("input", (e) => {
             const query = e.target.value.toLowerCase().trim();
             if (!query) {
-                renderCards(currentItems);
+                renderCards(currentItems, currentSession);
                 return;
             }
 
@@ -896,15 +989,31 @@
                 const title = (item.title || "").toLowerCase();
                 const reading = (item.title_reading || "").toLowerCase();
                 const kana = (item.title_voicevox_reading || "").toLowerCase();
-                const body = (item.sentences || []).map(s => s.display + " " + (s.voicevox_reading || "")).join(" ").toLowerCase();
+                const body = (item.sentences || []).map(s => (s.display || "") + " " + (s.voicevox_reading || "")).join(" ").toLowerCase();
                 return title.includes(query) || reading.includes(query) || kana.includes(query) || body.includes(query);
             });
 
-            renderCards(filtered);
+            renderCards(filtered, currentSession);
+        });
+
+        // ── ウィンドウサイズの自動記憶（次回オープン時に復元） ──
+        let resizeTimer = null;
+        window.addEventListener("resize", () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                try {
+                    const size = {
+                        width: window.outerWidth || window.innerWidth,
+                        height: window.outerHeight || window.innerHeight
+                    };
+                    localStorage.setItem("vstudio_news_cache_window_size", JSON.stringify(size));
+                } catch (e) {}
+            }, 300);
         });
 
         // ── 初期化 ──
         window.addEventListener("DOMContentLoaded", () => {
+            document.title = "🗄️ VStudio ニュース原稿キャッシュマネージャー";
             loadAvailableDates();
         });
     </script>

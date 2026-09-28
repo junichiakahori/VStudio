@@ -460,24 +460,13 @@ function initChatClient() {
             localStorage.setItem("savedYoutubeVideoId", info.videoId);
           }
 
-          // 📅 配信開始予定日時があればメイン画面の自動開始タイマーにも反映
+          // 📅 配信開始予定日時があれば表示用メッセージに含める（※自動タイマーを勝手にONにする副作用は完全排除）
           let schedMsg = "";
           if (info.scheduledStartTime) {
             try {
               const d = new Date(info.scheduledStartTime);
               if (!isNaN(d.getTime())) {
                 const pad = (n) => String(n).padStart(2, "0");
-                const localStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-                const localTimeInput = document.getElementById("local-schedule-time");
-                if (localTimeInput) {
-                  localTimeInput.value = localStr;
-                  localTimeInput.dispatchEvent(new Event("change"));
-                }
-                const localToggle = document.getElementById("local-schedule-toggle");
-                if (localToggle) {
-                  localToggle.checked = true;
-                  localToggle.dispatchEvent(new Event("change"));
-                }
                 schedMsg = ` (開始予定: ${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())})`;
               }
             } catch (e) {}
@@ -517,10 +506,24 @@ function initChatClient() {
     youtubeDetectBtn.addEventListener("click", () => detectYoutubeVideo(false));
   }
 
-  // メイン画面用 配信枠一覧（配信画面を遮らない独立サブウィンドウで起動）
+  // メイン画面用 配信枠一覧（配信画面を遮らない独立サブウィンドウで起動・サイズ自動復元）
   const mainBtnOpenPicker = document.getElementById("youtube-select-modal-btn");
   mainBtnOpenPicker?.addEventListener("click", () => {
-    window.open("/broadcast_picker.html", "BroadcastPicker", "width=580,height=750,menubar=no,toolbar=no,location=no,status=no");
+    let width = 580;
+    let height = 750;
+    try {
+      const saved = localStorage.getItem("vstudio_broadcast_picker_window_size");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.width && parsed.height) {
+          width = Math.min(window.screen.availWidth || 1920, Math.max(450, parsed.width));
+          height = Math.min(window.screen.availHeight || 1080, Math.max(500, parsed.height));
+        }
+      }
+    } catch (e) {}
+    const left = Math.max(0, (window.screen.width - width) / 2);
+    const top = Math.max(0, (window.screen.height - height) / 2);
+    window.open(`/broadcast_picker.html?t=${Date.now()}`, "BroadcastPicker", `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`);
   });
 
   if (youtubeUserInput) {

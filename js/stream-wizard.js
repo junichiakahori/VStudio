@@ -36,9 +36,20 @@ window.openWizardPopup = function () {
       }
     }
 
-    // ウィンドウサイズと配置（画面中央付近に表示）
-    const width = 760;
-    const height = 660;
+    // ウィンドウサイズと配置（保存されたサイズがあれば自動復元）
+    let width = 760;
+    let height = 660;
+    try {
+      const saved = localStorage.getItem("vstudio_wizard_window_size");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.width && parsed.height) {
+          width = Math.min(window.screen.availWidth || 1920, Math.max(600, parsed.width));
+          height = Math.min(window.screen.availHeight || 1080, Math.max(500, parsed.height));
+        }
+      }
+    } catch (e) {}
+
     const left = Math.max(0, (window.screen.width - width) / 2);
     const top = Math.max(0, (window.screen.height - height) / 2);
     const url = `/wizard.html?t=${Date.now()}`;

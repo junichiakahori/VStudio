@@ -27,16 +27,121 @@ def get_kks() -> typing.Any:
             _kks_instance = False
     return _kks_instance if _kks_instance is not False else None
 
+_kanwa_instance = None
+
+def get_kanwa():
+    global _kanwa_instance
+    if _kanwa_instance is None:
+        try:
+            from pykakasi.kanji import Kanwa
+            _kanwa_instance = Kanwa()
+        except Exception:
+            _kanwa_instance = False
+    return _kanwa_instance if _kanwa_instance is not False else None
+
+COMMON_NANORI = {
+    '偉': ['ひで', 'たけし'],
+    '玄': ['けん', 'しずか'],
+    '淳': ['じゅん', 'あつし'],
+    '輔': ['すけ', 'たすく'],
+    '郎': ['ろう', 'あきら'],
+    '朗': ['ろう', 'あきら'],
+    '毅': ['つよし', 'たけし', 'き'],
+    '剛': ['つよし', 'ごう', 'たけし'],
+    '徹': ['てつ', 'とおる'],
+    '薫': ['かおる', 'くん'],
+    '修': ['おさむ', 'しゅう'],
+    '博': ['ひろし', 'はく'],
+    '仁': ['ひとし', 'じん', 'まさ'],
+    '聡': ['さとし', 'そう'],
+    '誠': ['まこと', 'せい'],
+    '光': ['ひかる', 'みつ', 'こう'],
+    '明': ['あきら', 'めい', 'みょう'],
+    '勝': ['かつ', 'まさる', 'しょう'],
+    '昭': ['あきら', 'しょう'],
+    '進': ['すすむ', 'しん'],
+    '武': ['たけし', 'ぶ', 'む'],
+    '勇': ['いさむ', 'ゆう'],
+    '結': ['ゆ', 'ゆい', 'むすぶ'],
+    '弦': ['つる', 'づる', 'げん'],
+}
+
+def _get_char_readings(c, kks, kanwa):
+    if not ('\u4e00' <= c <= '\u9fa5'):
+        return [c]
+    readings = set()
+    if kks:
+        for it in kks.convert(c):
+            h = it.get('hira')
+            if h:
+                readings.add(h)
+    if kanwa:
+        try:
+            entries = kanwa.load(c).get(c, [])
+            for r, _ in entries:
+                if r:
+                    readings.add(r)
+        except Exception:
+            pass
+    if c in COMMON_NANORI:
+        readings.update(COMMON_NANORI[c])
+    expanded = set(readings)
+    for r in list(readings):
+        if r.endswith(('つ', 'く', 'ち', 'き')):
+            expanded.add(r[:-1] + 'っ')
+        first = r[0]
+        daku_map = {'か':'が','き':'ぎ','く':'ぐ','け':'げ','こ':'ご',
+                    'さ':'ざ','し':'じ','す':'ず','せ':'ぜ','そ':'ぞ',
+                    'た':'だ','ち':'ぢ','つ':'づ','て':'で','と':'ど',
+                    'は':'ば','ひ':'び','ふ':'ぶ','へ':'べ','ほ':'ぼ'}
+        sei_map = {v: k for k, v in daku_map.items()}
+        handaku_map = {'は':'ぱ','ひ':'ぴ','ふ':'ぷ','へ':'ぺ','ほ':'ぽ'}
+        if first in daku_map:
+            expanded.add(daku_map[first] + r[1:])
+        if first in handaku_map:
+            expanded.add(handaku_map[first] + r[1:])
+        if first in sei_map:
+            expanded.add(sei_map[first] + r[1:])
+    return list(expanded)
+
+def _match_kanji_reading(term, yomi, kks, kanwa):
+    def dfs(t_idx, y_idx):
+        if t_idx == len(term) and y_idx == len(yomi):
+            return True
+        if t_idx == len(term) or y_idx == len(yomi):
+            return False
+        first_c = term[t_idx]
+        if kanwa and '\u4e00' <= first_c <= '\u9fa5':
+            try:
+                dict_for_c = kanwa.load(first_c)
+                for length in range(min(4, len(term) - t_idx), 1, -1):
+                    sub = term[t_idx:t_idx+length]
+                    for r, _ in dict_for_c.get(sub, []):
+                        if r and yomi.startswith(r, y_idx):
+                            if dfs(t_idx + length, y_idx + len(r)):
+                                return True
+            except Exception:
+                pass
+        c = term[t_idx]
+        for r in _get_char_readings(c, kks, kanwa):
+            if yomi.startswith(r, y_idx):
+                if dfs(t_idx + 1, y_idx + len(r)):
+                    return True
+        return False
+    return dfs(0, 0)
+
 def is_plausible_reading(term, yomi):
     """
     漢字語句 term と読み yomi の妥当性を検証。
     完全に無関係な単語や長大作品名への破壊的誤読（例: 一生懸命 -> はしだすがこどらまおんなはいっしょうけんめい、一時閉鎖 -> すもうべや）を100%弾く。
+    また、LLMのハルシネーションや不適切な抽出（例: 宮川大輔 -> たれんと、三又 -> みつい）を排除し、
+    本物の固有名詞・人名（三又又三 -> みまたまたぞう、宮川大輔 -> みやがわだいすけ等）を正しく許容する。
     """
     if not term or not yomi:
         return False
     import unicodedata
-    norm_term = unicodedata.normalize('NFKC', term)
-    norm_yomi = unicodedata.normalize('NFKC', yomi)
+    norm_term = unicodedata.normalize('NFKC', term).strip()
+    norm_yomi = unicodedata.normalize('NFKC', yomi).strip()
 
     # 全角半角・大文字小文字の差のみの場合は同一語句として許容（例: ＧＩＲＬＳ -> Girls, KIDS -> Kids）
     if norm_term.lower() == norm_yomi.lower():
@@ -46,100 +151,95 @@ def is_plausible_reading(term, yomi):
     if re.search(r'[A-Za-z]', norm_term) and re.match(r'^[A-Za-z0-9\s\-_.]+$', norm_term):
         return True
 
-    # 漢字熟語に対して読みが異常に長い場合（例: 4文字に22文字のドラマ名）は即座に除外
-    if re.search(r'[\u4e00-\u9fa5]', norm_term) and len(norm_yomi) > max(len(norm_term) * 3, 8):
+    # 職業肩書・カテゴリ名の誤読登録を永久拒絶（宮川大輔 -> たれんと 等の完全防止）
+    FORBIDDEN_READINGS = {
+        'たれんと', 'はいゆう', 'かしゅ', 'げいいん', 'さっかー', 'やきゅう', 
+        'すもう', 'どらま', 'あいどる', 'もでる', 'せんしゅ', 'かんとく',
+        'おわらい', 'げいのうじん', 'あなうんさー', 'こメンテーター'
+    }
+    if norm_yomi in FORBIDDEN_READINGS:
         return False
+
+    # 助詞・動詞・文末語尾ゴミの遮断（「〜の読みがある」等を100%排除）
+    if re.search(r'(?:がある|もある|とする|とされる|という|である|ます|です|ある|いる|する|なる)$', norm_yomi):
+        return False
+
+    SUSPICIOUS_WORDS = {
+        "すもう", "ふな", "ぐらんぷり", "おりこん", "へいさ", "うんよう", "しけん",
+        "どらま", "しょと", "ふも", "がある", "けーたい", "ひつよう", "けがん",
+        "しゅいしゃ", "にほんだ", "ほんしん", "たかまち", "はるき", "ばとり", "げってぃ"
+    }
+    if any(sw in norm_yomi for sw in SUSPICIOUS_WORDS):
+        return False
+
+    kanji_chars = [c for c in norm_term if "\u4e00" <= c <= "\u9fa5"]
+
+    # 漢字熟語に対して読みが異常に長大または短小な場合は即座に除外
+    if kanji_chars:
+        if len(norm_yomi) > max(len(norm_term) * 3, 8):
+            return False
+        if len(kanji_chars) >= 2 and len(norm_yomi) < len(kanji_chars):
+            return False
+        if len(kanji_chars) == 2 and len(norm_yomi) >= 6:
+            return False
 
     kks = get_kks()
     if not kks:
         return True
 
     # 漢字・仮名混じりの場合
-    res = kks.convert(term)
+    res = kks.convert(norm_term)
     std_hira = "".join([it.get("hira", "") for it in res])
-    if yomi == std_hira:
+    if norm_yomi == std_hira:
         return True
 
-    kanji_chars = [c for c in term if "\u4e00" <= c <= "\u9fa5"]
+    # 漢字を一切含まない場合（カタカナ語・ひらがな語等）
+    if not kanji_chars:
+        sim = difflib.SequenceMatcher(None, std_hira, norm_yomi).ratio()
+        return sim >= 0.85
+
+    kanwa = get_kanwa()
+
+    # 1. 音韻・熟語分解マッチング（Kanwa辞書による各文字の音訓・名乗りとの完全整合）
+    # これにより「三又又三 ➔ みまたまたぞう」「宮川大輔 ➔ みやがわだいすけ」「羽生結弦 ➔ はにゅうゆづる」等が100%音韻成立として即座にTrue
+    if len(kanji_chars) == len(norm_term) and _match_kanji_reading(norm_term, norm_yomi, kks, kanwa):
+        return True
+
+    # 2. 一般熟語判定（接尾辞やサ変接続）
     NON_NAME_ENDINGS = ("供給", "施設", "基地", "会社", "組織", "政府", "停滞", "混乱", "攻撃", "需要", "発表", "決定", "計画", "問題", "対応", "対策", "支援", "規制", "会議", "連盟", "協会", "学会", "送検", "送致", "容疑")
     NON_NAME_SUFFIX_CHARS = "給金部的人化法案賞権率線点戦界隊団機館所署室駅器品物料費額数量値度業車網道党院省庁会検致疑罪流種圏"
+    is_general_compound = norm_term.endswith(NON_NAME_ENDINGS) or (bool(kanji_chars) and norm_term[-1] in NON_NAME_SUFFIX_CHARS)
 
-    is_general_compound = term.endswith(NON_NAME_ENDINGS) or (bool(kanji_chars) and term[-1] in NON_NAME_SUFFIX_CHARS)
-
-    # 一般熟語における音節・モーラ脱落の遮断（例: 石油供給 -> せきゆきゅう 等の欠落を100%排除）
-    if is_general_compound:
-        if std_hira and len(kanji_chars) >= 2 and len(yomi) <= len(std_hira) - 2:
-            return False
-        # 標準ひらがな読みと長さが大きく乖離している場合は除外
-        if std_hira and (len(yomi) > len(std_hira) * 1.5 or len(yomi) < len(std_hira) * 0.7):
-            return False
-
-    # 文字列類似度（レーベンシュタイン比率）
-    sim = difflib.SequenceMatcher(None, std_hira, yomi).ratio()
+    sim = difflib.SequenceMatcher(None, std_hira, norm_yomi).ratio()
+    # 一般熟語の場合、標準読みと高度に一致している必要がある（終了➔けーたい、警告➔けがん、表面➔ひつよう等を遮断）
     if is_general_compound:
         return sim >= 0.85
 
-    # 濁点・半濁点の清音化による類似度チェック
-    def _to_seion(s):
-        d = {"が":"か","ぎ":"き","ぐ":"く","げ":"け","ご":"こ",
-             "ざ":"さ","じ":"し","ず":"す","ぜ":"せ","ぞ":"そ",
-             "だ":"た","ぢ":"ち","づ":"つ","で":"て","ど":"と",
-             "ば":"は","び":"ひ","ぶ":"ふ","べ":"へ","ぼ":"ほ",
-             "ぱ":"は","ぴ":"ひ","ぷ":"ふ","ぺ":"へ","ぽ":"ほ"}
-        return "".join([str(d.get(c, c)) for c in s])
-
-    if difflib.SequenceMatcher(None, _to_seion(std_hira), _to_seion(yomi)).ratio() >= 0.40:
+    # 3. 人名・固有名詞フォールバック判定
+    j_hira = []
+    try:
+        from janome.tokenizer import Tokenizer
+        jt = Tokenizer()
+        for t in jt.tokenize(norm_term):
+            if t.reading and t.reading != '*':
+                j_hira.append("".join([it.get("hira", "") for it in kks.convert(t.reading)]))
+    except Exception:
+        pass
+    j_reading = "".join(j_hira)
+    if j_reading and norm_yomi == j_reading:
         return True
 
-    # 2〜5文字の人名・苗字ブロック（角田裕毅, 麻生太郎, 志尊淳, 永島龍等）
-    # ※一般熟語サフィックスを持たない純粋な漢字ブロックを許容
-    if len(term) in (2, 3, 4, 5) and len(kanji_chars) == len(term) and not is_general_compound:
-        if len(term) <= len(yomi) <= len(term) * 2.5:
-            SUSPICIOUS_WORDS = {"すもう", "ふな", "ぐらんぷり", "おりこん", "へいさ", "うんよう", "しけん", "どらま", "しょと", "ふも"}
-            if not any(sw in yomi for sw in SUSPICIOUS_WORDS):
-                return True
+    sim_j = difflib.SequenceMatcher(None, j_reading, norm_yomi).ratio() if j_reading else 0
 
-    # 漢字構成文字の音訓・音節チェック（人名等の特殊読みを許容）
-    if not kanji_chars:
-        return sim >= 0.2
+    # 漢字2文字の短い語句については、末尾文字の音訓末尾音と一致している必要がある（三又 ➔ みつい等の偽読みを100%遮断）
+    if len(kanji_chars) == 2:
+        last_c = kanji_chars[-1]
+        last_readings = _get_char_readings(last_c, kks, kanwa)
+        last_ends = {r[-1] for r in last_readings if r}
+        if norm_yomi[-1] not in last_ends:
+            return False
 
-    COMMON_POLYPHONIC_KANJI = {
-        "方": {"かた", "ほう", "がた"},
-        "大": {"おお", "だい", "たい"},
-        "上": {"うえ", "じょう", "かみ", "のぼ"},
-        "下": {"した", "げ", "しも", "くだ", "お"},
-        "日": {"ひ", "にち", "じつ", "か", "び"},
-        "月": {"つき", "がつ", "げつ"},
-        "生": {"い", "なま", "しょう", "せい", "う", "は"},
-        "行": {"い", "ゆ", "こう", "ぎょう"},
-        "出": {"で", "だ", "しゅつ"},
-        "入": {"い", "はい", "にゅう"},
-        "人": {"ひと", "にん", "じん", "びと"},
-        "間": {"あいだ", "ま", "かん", "けん"},
-        "所": {"ところ", "しょ", "じょ"},
-        "名": {"な", "めい", "みょう"}
-    }
-
-    matched_kanji = 0
-    for c in kanji_chars:
-        if c in COMMON_POLYPHONIC_KANJI:
-            if any(r in yomi for r in COMMON_POLYPHONIC_KANJI[c]):
-                matched_kanji += 1
-                continue
-        c_res = kks.convert(c)
-        if c_res:
-            c_hira = c_res[0].get("hira", "")
-            if len(c_hira) >= 2 and c_hira in yomi:
-                matched_kanji += 1
-            elif len(c_hira) == 1 and c_hira in yomi and c_hira not in "あいうえおっー":
-                matched_kanji += 1
-
-    if len(kanji_chars) >= 2 and matched_kanji >= 1:
-        return True
-    if len(kanji_chars) == 1 and matched_kanji >= 1:
-        return True
-
-    return sim >= 0.40
+    return max(sim, sim_j) >= 0.60
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TTS_RULES_PATH = os.path.join(BASE_DIR, "data", "tts_rules.json")
@@ -511,6 +611,7 @@ def _extract_person_reading_from_snippet(term, clean_snippet):
 def extract_article_rubies(text):
     """
     ニュース記事本文やタイトルから、括弧書きのふりがな（ルビ）を自動抽出して辞書化する。
+    写真クレジット（例: 首相（ゲッティ＝共同）、大統領（ロイター））の誤爆を100%遮断。
     例:
       - 甫木元空（ほきもと・そら＝34） ➔ {'甫木元空': 'ほきもとそら'}
       - 高橋藍（らん） ➔ {'高橋藍': 'らん'}
@@ -519,15 +620,44 @@ def extract_article_rubies(text):
     if not text:
         return {}
     rubies = {}
+
+    # 写真クレジット・通信社・提供元などの非ルビキーワード
+    PHOTO_CREDIT_KEYWORDS = {
+        "ゲッティ", "げってぃ", "アフロ", "あふろ", "ロイター", "ろいたー",
+        "時事", "じじ", "共同", "きょうどう", "フォト", "ふぉと", "写真",
+        "提供", "撮影", "資料", "読売", "朝日", "毎日", "産経", "日経",
+        "ブルームバーグ", "EPA", "AFP", "AP", "NEWS", "テレビ"
+    }
+
+    # 一般役職名（これらに括弧が付いている場合は100%写真クレジットや注釈であり、人名ルビではない）
+    NON_RUBY_TITLES = {
+        "首相", "大統領", "代表", "共同代表", "副総裁", "総裁", "幹事長", "長官",
+        "知事", "市長", "町長", "村長", "閣僚", "大臣", "長官", "議長", "議員",
+        "会長", "社長", "専務", "常務", "幹部", "役員", "関係者", "当局", "警察"
+    }
+
     matches = re.findall(r'([一-龥]{2,8})\s*[\(（]([ぁ-んァ-ヶー・\s]+)(?:[＝=0-9歳才代\s,、].*?)?[\)）]', text)
     for term, yomi_raw in matches:
         term_clean = term.strip()
         yomi_clean = yomi_raw.replace('・', '').replace(' ', '').strip()
+
+        # 写真クレジットや役職名に対する誤爆を即座に破棄
+        if term_clean in NON_RUBY_TITLES or term_clean.endswith(('首相', '大統領', '代表', '知事', '社長', '会長')):
+            continue
+        if any(pck in yomi_clean for pck in PHOTO_CREDIT_KEYWORDS):
+            continue
+
         yomi_hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in yomi_clean])
         yomi_hira = re.sub(r'[^ぁ-んー]', '', yomi_hira)
+
         if yomi_hira and len(yomi_hira) >= 2:
-            rubies[term_clean] = yomi_hira
-            print(f"[元記事ルビ自動抽出] 🎯 '{term_clean}' ➔ '{yomi_hira}'", flush=True)
+            # 妥当性判定器（is_plausible_reading）による厳格な検証を義務付け
+            if is_plausible_reading(term_clean, yomi_hira):
+                rubies[term_clean] = yomi_hira
+                print(f"[元記事ルビ自動抽出] 🎯 '{term_clean}' ➔ '{yomi_hira}'", flush=True)
+            else:
+                print(f"[元記事ルビ自動抽出 却下] 🛡️ 不自然なルビ判定: '{term_clean}' ➔ '{yomi_hira}' を破棄しました", flush=True)
+
     return rubies
 
 
@@ -598,21 +728,6 @@ def lookup_wikipedia_person_reading(name, context_hint=""):
                     if any(kw in extract for kw in ("日本の女性名", "日本の男性名", "曖昧さ回避", "の一覧", "に関する一覧")):
                         continue
 
-                    # 企業・法人・団体・施設・食品・一般事物は100%遮断（日本食研等の誤爆を完全防止）
-                    if any(corp in real_title or corp in extract[:120] for corp in ("株式会社", "有限会社", "合同会社", "ホールディングス", "企業", "法人", "財団", "社団", "組合", "協会", "連盟", "料理", "食品", "製品", "調味料")):
-                        continue
-
-                    # リダイレクト先タイトルが元の候補文字列で始まっていない場合は別物（例: 土砂崩 ➔ 土砂災害）なので除外
-                    if not any(real_title.startswith(c) for c in candidates):
-                        continue
-
-                    # プレフィックス一致（real_title not in candidates）の場合の厳格制限：
-                    # 記事タイトルが「名前 (曖昧さ回避)」「名前親王」「名前内親王」「四股名」等であること
-                    # 「日本食」➔「日本食研ホールディングス」のような全く異なる複合語は100%遮断！
-                    if real_title not in candidates:
-                        if not any(re.match(rf'^{re.escape(c)}(?:\s*[\(（]|親王|内親王|新大|[一-龥]{{1,2}}$)', real_title) for c in candidates):
-                            continue
-
                     # 【人物記事の厳格判定】災害・気象・一般事物・施設・企業等の誤爆を100%遮断
                     is_person = False
                     # シグナル1: 括弧内に生年・生年月日・没年等の記載がある（人物記事の典型的書式: 例「1982年12月26日 - 」）
@@ -622,22 +737,54 @@ def lookup_wikipedia_person_reading(name, context_hint=""):
                     elif re.search(r'(?:日本の|元)?(?:俳優|女優|タレント|歌手|芸人|お笑い|声優|モデル|アイドル|プロ野球|野球|サッカー|選手|政治家|議員|大臣|知事|市長|アナウンサー|キャスター|小説家|作家|漫画家|映画監督|演出家|実業家|学者|教授|研究者|医師|弁護士|皇族|力士|大相撲|騎手|棋士|プロレスラー|音楽家|作曲家|作詞家|写真家|YouTuber|武将|大名)(?:である|。|、|\s)', re.sub(r'「[^」]+」', '', extract[:300])):
                         is_person = True
 
+                    # 人物記事と確定できない場合のみ、企業・法人・団体・食品フィルターを適用
+                    # （人物記事の場合「不動産会社社員」「漫才協会所属」等の所属先表記による誤爆除外を100%防止）
                     if not is_person:
                         continue
+                    if any(corp in real_title for corp in ("株式会社", "有限会社", "合同会社", "ホールディングス", "財団法人", "社団法人")):
+                        continue
 
-                    m = re.search(r'[\(（]\s*([ぁ-んァ-ヶゔヴー・\s]+?)(?:[\[、,）\)＝=\d]|$)', extract)
-                    if m:
-                        raw = m.group(1).replace("・", " ").strip()
+                    # リダイレクト先タイトルが元の候補文字列で始まっていない場合は別物（例: 土砂崩 ➔ 土砂災害）なので除外
+                    if not any(real_title.startswith(c) for c in candidates):
+                        continue
+
+                    # プレフィックス一致（real_title not in candidates）の場合の厳格制限：
+                    # 記事タイトルが「名前 (曖昧さ回避)」「名前親王」「名前内親王」「四股名」等であること
+                    if real_title not in candidates:
+                        if not any(re.match(rf'^{re.escape(c)}(?:\s*[\(（]|親王|内親王|新大|[一-龥]{{1,2}}$)', real_title) for c in candidates):
+                            continue
+
+                    # 曖昧さ回避の分類括弧（例: 「(タレント)」「(俳優)」）をスキップし、本物のふりがなを抽出
+                    FORBIDDEN_CATEGORY_PARENS = {'タレント', 'お笑いタレント', '俳優', '女優', '歌手', '芸人', 'お笑い芸人', '声優', 'モデル', 'アイドル', 'サッカー選手', '野球選手', 'プロ野球選手', 'アナウンサー', '漫画家', '政治家'}
+                    hira = ""
+                    # 平仮名主体のふりがな括弧を最優先検索（例: （みまた またぞう）、（みやがわ だいすけ））
+                    m_hira = re.search(r'[（\(]\s*([ぁ-ん][ぁ-ん\s・]*?)(?:[、,）\)＝=\d]|$)', extract)
+                    if m_hira:
+                        raw = m_hira.group(1).replace("・", " ").strip()
                         parts = raw.split()
-                        # プレフィックス一致（例: 「安青錦」に対して記事「安青錦新大」）の場合、名字/四股名部分のみ抽出
                         if len(parts) >= 2 and real_title not in candidates and len(name) <= 4:
                             hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in parts[0]])
-                            hira = re.sub(r'[^ぁ-んー]', '', hira)
                         else:
                             hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in raw.replace(' ', '')])
+                        hira = re.sub(r'[^ぁ-んー]', '', hira)
+
+                    # 平仮名で見つからない場合、一般的な括弧から抽出（分類括弧を除外）
+                    if not hira:
+                        for m in re.finditer(r'[\(（]\s*([ぁ-んァ-ヶゔヴー・\s]+?)(?:[\[、,）\)＝=\d]|$)', extract):
+                            raw = m.group(1).replace("・", " ").strip()
+                            if raw in FORBIDDEN_CATEGORY_PARENS or raw.replace(' ', '') in FORBIDDEN_CATEGORY_PARENS:
+                                continue
+                            parts = raw.split()
+                            if len(parts) >= 2 and real_title not in candidates and len(name) <= 4:
+                                hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in parts[0]])
+                            else:
+                                hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in raw.replace(' ', '')])
                             hira = re.sub(r'[^ぁ-んー]', '', hira)
-                        if hira:
-                            found_articles.append((real_title, extract, hira))
+                            if hira:
+                                break
+
+                    if hira and hira not in ('たれんと', 'はいゆう', 'かしゅ', 'げいいん'):
+                        found_articles.append((real_title, extract, hira))
         except Exception:
             pass
 
@@ -1034,13 +1181,54 @@ def sanitize_speech_text(text):
     return t.strip()
 
 def apply_country_prefixes(text):
-    """報道文法における国名1文字プレフィックス（例: 米アンソロピック -> べいアンソロピック）の正規化"""
+    """報道文法における国名1文字プレフィックス（例: 米アンソロピック -> べいアンソロピック、米大統領 -> べい大統領）の正規化"""
     if not text:
         return ""
     t = text
+    # 🛡️ トランプ大統領の現職呼称正規化（前大統領・前米大統領・米大統領の誤用・誤読を現職に統一）
+    t = re.sub(r'トランプ前米大統領', 'トランプ大統領', t)
+    t = re.sub(r'トランプ前大統領', 'トランプ大統領', t)
+    t = re.sub(r'トランプ米大統領', 'トランプ大統領', t)
+
+    # 1. 2国間外交・首脳・関係（米印の「ベエシルシ」誤読根絶、米中、米露等）
+    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米印(?=首脳|会談|関係|安保|防衛|同盟|共同|協議|枠組み|対話|サミット|貿易|経済)', 'べいいん', t)
+    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米中(?=首脳|会談|関係|共同|協議|対話|サミット|貿易|経済|戦争|対立|激化)', 'べいちゅう', t)
+    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米露(?=首脳|会談|関係|共同|協議|対話|サミット|貿易|対立)', 'べいろ', t)
+    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米朝(?=首脳|会談|関係|共同|協議|対話|サミット|対立)', 'べいちょう', t)
+    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米欧(?=首脳|会談|関係|共同|協議|対話|サミット|通商)', 'べいおう', t)
+    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米比(?=首脳|会談|関係|安保|防衛|共同|協議|演習)', 'べいひ', t)
+    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米韓(?=首脳|会談|関係|安保|防衛|同盟|共同|協議|演習)', 'べいかん', t)
+    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米英(?=首脳|会談|関係|安保|防衛|同盟|共同|協議)', 'べいえい', t)
+    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米台(?=首脳|会談|関係|安保|防衛|共同|協議|緊密)', 'べいたい', t)
+
+    # 2. 報道組織・役職・専門用語プレフィックス
+    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米側', 'べいがわ', t)
+    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米軍', 'べいぐん', t)
+    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米大統領', 'べいだいとうりょう', t)
+    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米政権', 'べいせいけん', t)
+    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米政府', 'べいせいふ', t)
+    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米(?=当局|議会|連邦|海軍|空軍|陸軍|高官|司法省|最高裁|財務省|国防総省|国務省|市場|企業|経済|株|株式|雇用|研究|情報|紙|誌|報道|メディア|テレビ|放送|大学|機関|社会|文化|国内|国外|本土|東部|西部|南部|北部|中央|指数|金利|債|ドル|シンクタンク|世論|国民|政策|戦略|安全保障|安保)', 'べい', t)
+    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米(?=[ァ-ヴーA-Z][ァ-ヴーA-Za-z0-9・]+)', 'べい', t)
+
+    # 3. 🌾 お米・農産物文脈における「米」の「こめ」確定（文脈限定）
+    # 3-1. 複合語
+    t = re.sub(r'(?<![一-龥ァ-ヴーA-Za-z])米(?=不足|農家|相場|騒動|作|粒|俵|蔵|問屋|離れ|食|作り|作況|品薄|卸|小売|品種|銘柄|炊|研)', 'こめ', t)
+    # 3-2. 調理・食事動作
+    t = re.sub(r'(?<![一-龥ァ-ヴーA-Za-z])米を(?=炊|研|洗|食|買|売|配|保管)', 'こめを', t)
+    # 3-3. 農産物価格・収穫文脈の「米の」
+    t = re.sub(r'(?<![一-龥ァ-ヴーA-Za-z])米の(?=価格|値段|相場|収穫|作況|生産|消費|流通|品薄|高騰|下落|販売|卸|銘柄|品種)', 'こめの', t)
+
+    # 4. 国・報道主体としての独立した「米」（米は、米が、米に、米で、米と、米の、米から、米、等）
+    RICE_CONTEXT_WORDS = ("炊飯", "研ぐ", "新米", "古米", "玄米", "白米", "稲作", "水田", "農林水産", "食糧", "コシヒカリ", "あきたこまち", "主食")
+    has_rice_context = any(w in t for w in RICE_CONTEXT_WORDS)
+    if not has_rice_context:
+        t = re.sub(r'(?:^|(?<=[、。！？\s　はがのにへとでもよりから]))米(?=(?:[、，]|\s|は|が|に|で|と|の|から|より|への|へ))', 'べい', t)
+
     rules = load_tts_rules()
     prefixes = rules.get("country_prefixes", COUNTRY_PREFIX_MAP)
     for char, yomi in prefixes.items():
+        if char == '米':
+            continue  # 上記で高精度に解決済み
         t = re.sub(
             rf'(?<![一-龥ぁ-んァ-ヶA-Za-z]){re.escape(char)}(?=[ァ-ヴーA-Z][ァ-ヴーA-Za-z0-9・]+)',
             f'{yomi}',
@@ -1246,6 +1434,77 @@ def apply_model_suffix_rules(text):
     pattern = r'(?<![A-Za-z0-9])([A-Za-z]{1,4}(?:/[A-Za-z]+)?-?\d+)([VAWNvawn])(?![A-Za-z0-9])'
     return re.sub(pattern, repl, text)
 
+def apply_athlete_honorific_repairs(text, is_sports=True):
+    """
+    報道記事における孤立した『さんたち』『さんへの』等の破綻敬称を自動救済修復（ホワイトリスト方式・カテゴリ連動）
+    is_sports=True: スポーツ記事用（『選手たち』『選手』へ修復）
+    is_sports=False: 非スポーツ記事用（『選手』は絶対に使わず『皆さん』『方たち』へ修復）
+    ※ 組織・店舗・ブランド・モノへの不自然な「さん」付けは文脈を問わず自動除去
+    """
+    if not text:
+        return ""
+    t = text
+
+    # 0. 組織・企業・店舗・ブランド・モノへの「さん」除去（文脈問わず共通）
+    # (a) 修飾語付き固有名詞＋さん（例: 探鉱会社のアービング・リソースさん ➔ 探鉱会社のアービング・リソース）
+    t = re.sub(
+        r'((?:会社|株式会社|企業|店舗|和菓子店|洋菓子店|飲食店|店|ブランド|メーカー|組織|団体|協会|連盟|学校|大学|高校|自治体|病院|施設)の?\s*[A-Za-z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF・ー]+?)さん(?=[がはのにをとでへからもやより、。！？\s\b])',
+        r'\1',
+        t
+    )
+    # (b) 組織接尾辞直後の「さん」（例: 任天堂社さん ➔ 任天堂社、協会さん ➔ 協会）
+    t = re.sub(r'((?:会社|株式会社|有限会社|合同会社|社|店|店舗|ブランド|協会|連盟|機構|委員会|省|庁|署|府|県|市|町|村|党|法人|グループ))さん(?=[がはのにをとでへからもやより、。！？\s\b])', r'\1', t)
+    # (c) モノ・技術・動物＋さん（例: AIロボットさん ➔ AIロボット）
+    t = re.sub(r'((?:ロボット|AI|アンドロイド|犬|猫|車|乗り物|アプリ|ソフト|システム|サービス|製品|商品))さん(?=[がはのにをとでへからもやより、。！？\s\b])', r'\1', t)
+
+    SAFE_GENERAL = r'(?:お父|お母|お兄|お姉|おじ|おば|おじい|おばあ|みな|皆|お客|子ども|お子|奥|旦那)'
+
+    if is_sports:
+        # ── スポーツ記事用（選手たち / 選手へ修復）──
+        t = re.sub(r'さんの(?=プレー|活躍|投打|成績|パフォーマンス|力|メンタル|心|練習|試合|出場|契約|移籍|引退|復帰|負傷|怪我)', '選手の', t)
+        t = re.sub(r'のさんたち', 'の選手たち', t)
+        t = re.sub(r'のさん(?=(?:への|へ|に|が|は|を|で|と|も|より|から|\b))', 'の選手', t)
+        t = re.sub(r'(?:^|(?<=[がはのにをとでへからもやよりから\s　、。！？（(]))さんたち', '選手たち', t)
+        t = re.sub(r'(?:^|(?<=[がはのにをとでへからもやよりから\s　、。！？（(]))さん(?=(?:への|へ|に|が|は|を|で|と|も|より|から|\b))', '選手', t)
+        t = re.sub(r'((?:た|だ|る|う|く|す|つ|ぬ|む|ぐ|ぶ|ない|たい|ている|ていた|だった|である|中))さんたち', r'\1選手たち', t)
+        t = re.sub(r'((?:た|だ|る|う|く|す|つ|ぬ|む|ぐ|ぶ|ない|たい|ている|ていた|だった|である|中))さん(?=(?:への|へ|に|が|は|を|で|と|も|より|から|\b))', r'\1選手', t)
+
+        def santachi_sports_repl(m):
+            prefix = m.group(1)
+            if re.search(f'{SAFE_GENERAL}$', prefix):
+                return m.group(0)
+            NON_NAME = r'(?:チーム|軍|校|クラブ|代表|高校|大学|ユース|アカデミー|メンバー|陣|組|手|者|主力|控え|先発|ベンチ|ファーム|育成|層|側|勢|ズ|ス)$'
+            if re.search(NON_NAME, prefix):
+                return f"{prefix}選手たち"
+            PREF = r'(?:都|道|府|県|新潟|秋田|東京|大阪|愛知|福岡|宮城|広島|北海道|沖縄)$'
+            if re.search(PREF, prefix):
+                return f"{prefix}選手たち"
+            return m.group(0)
+
+        t = re.sub(r'([^\s、。！？（()）]{1,10})さんたち', santachi_sports_repl, t)
+
+    else:
+        # ── 非スポーツ記事用（絶対に「選手」と付けず、「皆さん」「方たち」へ修復）──
+        t = re.sub(r'のさんたち', 'の皆さん', t)
+        t = re.sub(r'のさん(?=(?:への|へ|に|が|は|を|で|と|も|より|から|\b))', 'の方', t)
+        t = re.sub(r'(?:^|(?<=[がはのにをとでへからもやよりから\s　、。！？（(]))さんたち', '皆さん', t)
+        t = re.sub(r'(?:^|(?<=[がはのにをとでへからもやよりから\s　、。！？（(]))さん(?=(?:への|へ|に|が|は|を|で|と|も|より|から|\b))', '方', t)
+        t = re.sub(r'((?:た|だ|る|う|く|す|つ|ぬ|む|ぐ|ぶ|ない|たい|ている|ていた|だった|である|中))さんたち', r'\1方たち', t)
+        t = re.sub(r'((?:た|だ|る|う|く|す|つ|ぬ|む|ぐ|ぶ|ない|たい|ている|ていた|だった|である|中))さん(?=(?:への|へ|に|が|は|を|で|と|も|より|から|\b))', r'\1方', t)
+
+        def santachi_non_sports_repl(m):
+            prefix = m.group(1)
+            if re.search(f'{SAFE_GENERAL}$', prefix):
+                return m.group(0)
+            NON_NAME = r'(?:チーム|軍|校|クラブ|代表|高校|大学|ユース|メンバー|陣|組|手|者|主力|層|側|勢)$'
+            if re.search(NON_NAME, prefix):
+                return f"{prefix}の方たち"
+            return m.group(0)
+
+        t = re.sub(r'([^\s、。！？（()）]{1,10})さんたち', santachi_non_sports_repl, t)
+
+    return t
+
 
 def apply_age_and_counter_rules(text):
     """年齢・助数詞に対する誤読・誤ルビの修復（data/tts_rules.json より動的適用）"""
@@ -1280,6 +1539,12 @@ def apply_special_reading_fixes(text):
         rep = rule.get("replacement")
         if pat and rep:
             t = re.sub(pat, rep, t)
+
+    # 3. 動詞活用「出た」の促音便誤読（「出たんだ」➔「しゅったんだ」）を100%防止し「でた」に固定
+    t = re.sub(r'(?<![一-龥])出た(?=ん)', 'でた', t)
+
+    # 4. 「勝った」の誤読（まさった）を「かった」に補正
+    t = re.sub(r'(?<![一-龥])勝った', 'かった', t)
 
     return t
 
@@ -1495,6 +1760,9 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
     # -1. 全角英数字を半角に統一（「ＶＩＶＡＮＴ」や「ＡＩ」等のチェックすり抜け・スペル読みを防止）
     t = normalize_fullwidth_alphanumeric(text)
 
+    # -0.9 トランプ大統領の現職呼称正規化（前大統領・前米大統領・米大統領の誤用・誤読を現職に統一）
+    t = re.sub(r'トランプ(?:前米大統領|前大統領|米大統領)', 'トランプ大統領', t)
+
     # -0.8 記号「+」「＋」の誤読（たす）を自然な「プラス」に統一（90++、NP50%+、ビジネス+IT等）
     t = apply_symbol_plus_rules(t)
 
@@ -1555,6 +1823,9 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
     # 0.7 連続した「にゃにゃ」「のだのだ」の重複除去（「考えるにゃにゃ！」➔「考えるにゃ！」）
     t = re.sub(r'(?:にゃ[\s　、]*){2,}', 'にゃ', t)
     t = re.sub(r'(?:のだ[\s　、]*){2,}', 'のだ', t)
+
+    # 0.75 助詞直後に孤立した「さんたち」「さんへの」「さんのプレー」等の破綻敬称を「選手たち」「選手への」へ自動救済修復
+    t = apply_athlete_honorific_repairs(t)
 
     # 1. 文脈考慮型のIT発音解決（映画『IT』 vs 英語代名詞 it vs 情報技術 大文字IT）
     t = apply_it_context_rules(t)

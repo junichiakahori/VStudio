@@ -355,7 +355,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             parsed = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed.query)
             date_str = params.get('date', [datetime.datetime.now().strftime("%Y-%m-%d")])[0]
-            return self._send_json(get_cache_by_date(date_str))
+            session = params.get('session', [None])[0]
+            return self._send_json(get_cache_by_date(date_str, session=session))
 
         # ── 静的ファイル配信 ──
         super().do_GET()
@@ -637,7 +638,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             if self.path == '/api/news_cache/clear':
                 p = self._read_json()
                 date_str = p.get('date', datetime.datetime.now().strftime("%Y-%m-%d"))
-                res = clear_cache_by_date(date_str)
+                session = p.get('session')
+                res = clear_cache_by_date(date_str, session=session)
                 # 🧠 サーバーのインメモリキャッシュも同時に完全消去（空のまま取り残される現象を防止）
                 NEWS_SCRIPT_CACHE.clear()
                 print("[NewsCacheManager] 🗑️ サーバーインメモリキャッシュ (NEWS_SCRIPT_CACHE) も全消去しました", flush=True)
@@ -648,7 +650,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 date_str = p.get('date', datetime.datetime.now().strftime("%Y-%m-%d"))
                 idx = p.get('index')
                 title = p.get('title')
-                res = delete_cache_item(date_str, item_index=idx, title=title)
+                global_idx = p.get('global_index')
+                res = delete_cache_item(date_str, item_index=idx, title=title, global_index=global_idx)
                 # 該当記事のインメモリキャッシュも消去
                 if title and title in NEWS_SCRIPT_CACHE:
                     del NEWS_SCRIPT_CACHE[title]

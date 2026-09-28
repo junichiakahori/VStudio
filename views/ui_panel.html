@@ -35,6 +35,16 @@
                 <span>⚡ ホット更新</span>
             </button>
         </div>
+        <!-- 🚀 クイック配信開始ボタン（常時表示エリア・タブのすぐ上） -->
+        <div id="quick-broadcast-start-container" style="margin-bottom:6px; width:100%; box-sizing:border-box;">
+            <button id="quick-broadcast-start-btn" type="button" class="btn"
+                onclick="window.startBroadcastNow && window.startBroadcastNow()"
+                title="ワンクリックで準備中を解除し、OBS連動・BGM・番組を即時スタート"
+                style="width:100%; box-sizing:border-box; background:linear-gradient(135deg, #00cec9, #0984e3); color:#fff; font-size:0.82rem; font-weight:800; padding:8px 6px; border-radius:6px; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 0 10px rgba(0,206,201,0.35); transition:all 0.2s; white-space:nowrap;">
+                <span id="quick-broadcast-start-icon" style="font-size:0.95rem;">🚀</span>
+                <span id="quick-broadcast-start-text">今すぐ配信を開始</span>
+            </button>
+        </div>
         <div class="tabs-pill-container">
             <button class="tab-btn active" data-target="tab-avatar">🎭 アバター</button>
             <button class="tab-btn" data-target="tab-audio">🎙️ 音声/AI</button>
@@ -604,7 +614,16 @@
                 style="font-size:0.75rem;color:var(--text-muted);line-height:1.6;">
                 <strong style="color:#ff9900;display:block;margin-bottom:0.5rem;">⚙️ バックエンドサーバー管理</strong>
                 <button type="button" id="btn-open-log-console-popup"
-                    onclick="window.open('log_console.html', 'VStudioLogConsole', 'width=1020,height=640,menubar=no,toolbar=no,resizable=yes')"
+                    onclick="(() => {
+                        let width = 1020, height = 640;
+                        try {
+                            const s = localStorage.getItem('vstudio_log_console_window_size');
+                            if (s) { const p = JSON.parse(s); if (p.width && p.height) { width = Math.min(window.screen.availWidth || 1920, Math.max(600, p.width)); height = Math.min(window.screen.availHeight || 1080, Math.max(400, p.height)); } }
+                        } catch(e) {}
+                        const left = Math.max(0, (window.screen.width - width) / 2);
+                        const top = Math.max(0, (window.screen.height - height) / 2);
+                        window.open('/views/log_console.html?t=' + Date.now(), 'VStudioLogConsole', `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,resizable=yes`);
+                    })()"
                     style="width:100%; margin-bottom:0.8rem; background:linear-gradient(135deg, rgba(37,99,235,0.25), rgba(96,165,250,0.35)); border:1px solid #3b82f6; color:#93c5fd; font-size:0.75rem; font-weight:bold; padding:7px 10px; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition:all 0.2s; white-space:nowrap;">
                     <span>📋 統合ログコンソールを別窓で開く</span>
                 </button>

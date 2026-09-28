@@ -126,14 +126,9 @@
         }
       }
 
-      // 最新ニュース全件(260+件)を再取得して親画面メモリとlocalStorageを完全復元
-      if (typeof window.fetchNewsWithOptions === "function") {
-        window.fetchNewsWithOptions("cat_all", Infinity).then(fresh => {
-          console.log(`[HotReload] 📰 最新ニュース全件 (${fresh.length}件) を再取得・同期完了しました`);
-          if (window.newsListWindow && !window.newsListWindow.closed && typeof window.newsListWindow.renderNewsList === "function") {
-            window.newsListWindow.renderNewsList();
-          }
-        }).catch(() => { });
+      // 🛡️ 記事一覧の再描画（ニュースの全件再取得は行わず、ユーザーの既存選定リストを100%保護）
+      if (window.newsListWindow && !window.newsListWindow.closed && typeof window.newsListWindow.renderNewsList === "function") {
+        window.newsListWindow.renderNewsList();
       }
 
       if (showToast) {

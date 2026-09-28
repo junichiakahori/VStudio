@@ -885,26 +885,6 @@ def resolve_youtube_video_id(input_str: str) -> tuple[str, str]:
         return v_match.group(1), f"Fallback Video ID: {v_match.group(1)}"
     return input_str, input_str
 
-async def start_youtube_client(video_id_or_channel: str, websocket):
-    global chat_task, current_video_id, chat, recent_comments, comment_history
-    
-    # チャンネル名/@ハンドル/URLから最新の動画IDを自動解決
-    video_id, resolve_info = await asyncio.to_thread(resolve_youtube_video_id, video_id_or_channel)
-    if not video_id:
-        video_id = video_id_or_channel
-
-    logging.info(f"[YouTube] Connect requested for '{video_id_or_channel}' -> Resolved as '{video_id}' ({resolve_info})")
-
-    # すでに同じ動画IDで実行中なら履歴だけ送って終了
-    if chat_task is not None and current_video_id == video_id:
-        logging.info(f"Already connected to {video_id}. Sending history to new client.")
-        await websocket.send(json.dumps({
-            "type": "status",
-            "status": "connected",
-            "message": f"Connected to YouTube Live (ID: {video_id})"
-        }))
-        await send_history(websocket)
-        return
 
 async def _parse_scraped_chat_action(action: dict) -> Optional[tuple[str, dict]]:
     """スクレイピングされた単一チャットアクションからコメントデータを抽出"""
@@ -1118,6 +1098,13 @@ async def _poll_chat_once(local_chat, loop, video_id, recent_comments, comment_h
 async def start_youtube_client(video_id, websocket=None):
     """YouTubeのコメント取得クライアントを開始"""
     global chat_task, stats_task, current_video_id
+
+    # チャンネル名/@ハンドル/URLから最新の動画IDを自動解決
+    resolved_id, resolve_info = await asyncio.to_thread(resolve_youtube_video_id, video_id)
+    if resolved_id:
+        video_id = resolved_id
+        logging.info(f"[YouTube] Connect requested -> Resolved as '{video_id}' ({resolve_info})")
+
     # 既存の接続・統計タスクを確実に停止
     await stop_youtube_client(broadcast=False)
 

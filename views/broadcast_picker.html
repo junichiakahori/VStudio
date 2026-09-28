@@ -279,6 +279,21 @@
         document.getElementById("btn-refresh").onclick = loadBroadcasts;
 
         window.onload = loadBroadcasts;
+
+        // ── ウィンドウサイズの自動記憶（次回オープン時に復元） ──
+        let pickerResizeTimer = null;
+        window.addEventListener("resize", () => {
+            clearTimeout(pickerResizeTimer);
+            pickerResizeTimer = setTimeout(() => {
+                try {
+                    const size = {
+                        width: window.outerWidth || window.innerWidth,
+                        height: window.outerHeight || window.innerHeight
+                    };
+                    localStorage.setItem("vstudio_broadcast_picker_window_size", JSON.stringify(size));
+                } catch (e) {}
+            }, 300);
+        });
     </script>
 </body>
 </html>

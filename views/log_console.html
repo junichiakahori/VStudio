@@ -579,6 +579,21 @@
         setInterval(() => {
             fetchLog(false);
         }, 1500);
+
+        // ── ウィンドウサイズの自動記憶（次回オープン時に復元） ──
+        let logResizeTimer = null;
+        window.addEventListener("resize", () => {
+            clearTimeout(logResizeTimer);
+            logResizeTimer = setTimeout(() => {
+                try {
+                    const size = {
+                        width: window.outerWidth || window.innerWidth,
+                        height: window.outerHeight || window.innerHeight
+                    };
+                    localStorage.setItem("vstudio_log_console_window_size", JSON.stringify(size));
+                } catch (e) {}
+            }, 300);
+        });
     </script>
 </body>
 </html>

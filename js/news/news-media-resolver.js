@@ -165,6 +165,11 @@ function extractMediaSource(itemOrTitle) {
     if (url && url.includes("news.yahoo.co.jp") && /NHK/i.test(src)) {
       src = "Yahoo!ニュース";
     }
+    // 🛡️ ドメイン名形式（news.yahoo.co.jp, mainichi.jp 等）や英数字のみのURLはメディア名と誤認させない
+    const isDomainLike = /[a-zA-Z0-9\-_.]+\.(?:co\.jp|ne\.jp|or\.jp|ac\.jp|go\.jp|jp|com|net|org|info|biz)$/i.test(src) || /^[a-zA-Z0-9\-_.\s]+$/.test(src);
+    if (isDomainLike) {
+      src = "";
+    }
     const NON_MEDIA_WORDS = new Set([
       '北海道', '青森', '岩手', '宮城', '秋田', '山形', '福島',
       '茨城', '栃木', '群馬', '埼玉', '千葉', '東京', '神奈川',
@@ -205,17 +210,21 @@ function cleanTitleForSpeech(itemOrTitle) {
   let title = typeof itemOrTitle === "object" && itemOrTitle !== null ? itemOrTitle.title : itemOrTitle;
   if (!title) return "";
   let t = stripHtmlTags(String(title)).trim();
+
+  // 0. ドメイン名（.co.jp, .jp, .com, .net 等）の末尾サフィックス先行除去（スペル読み・ドメイン誤爆完全防止）
+  t = t.replace(/[\s|｜\-–—]+[a-zA-Z0-9\-_.]+\.(?:co\.jp|ne\.jp|or\.jp|ac\.jp|go\.jp|jp|com|net|org|info|biz).*$/gi, "");
+  t = t.replace(/[\s|｜\-–—]+(?:news\.yahoo\.co\.jp|yahoo\.co\.jp|yahoo|google).*$/gi, "");
+
   const mediaSrc = extractMediaSource(itemOrTitle);
   
   // 1. タイトル末尾のメディア名サフィックスを徹底除去
-  if (mediaSrc) {
+  if (mediaSrc && !/[a-zA-Z0-9\-_.]+\.(?:co\.jp|jp|com|net|org)/i.test(mediaSrc)) {
     const esc = mediaSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     t = t.replace(new RegExp(`[\\s|｜\\-–—]+${esc}$`, 'i'), '');
   }
   t = t.replace(/[（\(][^）\)]*(?:新聞|通信|日報|新報|NEWS|スポニチ|デイリー|スポーツ|ORICON|文春|新潮|テレビ|WEB|DIG|編集部|Japan|PR|タイムス|NHK|Yahoo!|ヤフー|Bloomberg|Reuters|bloomberg|reuters)[^）\)]*[）\)]/gi, "");
   t = t.replace(/[\s|｜\-–—]+(?:[A-Za-z0-9\u4e00-\u9fff\u30a0-\u30ff\s]+のプレスリリース|PR\s*TIMES|PRTIMES|プレスリリース).*$/gi, "");
   t = t.replace(/[\s|｜\-–—]+(?:Google\s*ニュース|Google\s*News|Google|Yahoo!\s*ニュース|Yahoo!\s*JAPAN|Yahoo!|ヤフー|NHK\s*(?:ニュース|NEWS\s*WEB|NEWS)?|NHK|ITmedia[A-Za-z0-9\s]*|共同通信|時事通信|読売新聞|朝日新聞|毎日新聞|産経新聞|日経新聞|日本経済新聞|TBS\s*NEWS\s*DIG|FNNプライムオンライン|テレ朝news|日テレNEWS[A-Za-z0-9\s]*|ORICON\s*NEWS|モデルプレス|デイリースポーツ|日刊スポーツ|スポニチ|zakzak|zakⅡ|ねとらぼ|AUTOMATON|IGN\s*Japan|Game\s*Watch|4Gamer|bloomberg\.com|bloomberg|ブルームバーグ|reuters\.com|reuters|ロイター).*$/gi, "");
-  // ドメイン名（.co.jp, .jp, .com, .net 等）の末尾サフィックス除去（スペル読み防止）
   t = t.replace(/[\s|｜\-–—]+[a-zA-Z0-9\-_.]+\.(?:co\.jp|ne\.jp|or\.jp|ac\.jp|go\.jp|jp|com|net|org|info|biz).*$/gi, "");
   t = t.replace(/[\s|｜\-–—]+$/g, "").trim();
   
@@ -223,8 +232,8 @@ function cleanTitleForSpeech(itemOrTitle) {
     return "";
   }
   
-  // 2. 出典メディア名の付与
-  if (mediaSrc) {
+  // 2. 出典メディア名の付与（ドメイン名・英語URLの誤付与は絶対遮断）
+  if (mediaSrc && !/[a-zA-Z0-9\-_.]+\.(?:co\.jp|ne\.jp|or\.jp|ac\.jp|go\.jp|jp|com|net|org|info|biz)/i.test(mediaSrc)) {
     const cleanTail = t.replace(/[\s|｜\-–—　]+$/, "");
     if (cleanTail.endsWith(mediaSrc) || (typeof itemOrTitle === "object" && itemOrTitle.source && cleanTail.endsWith(itemOrTitle.source))) {
       return `${cleanTail}より`;

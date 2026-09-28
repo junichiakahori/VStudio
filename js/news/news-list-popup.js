@@ -40,8 +40,19 @@
         }
       }
 
-      const width = 850;
-      const height = 650;
+      let width = 850;
+      let height = 650;
+      try {
+        const saved = localStorage.getItem("vstudio_news_list_window_size");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.width && parsed.height) {
+            width = Math.min(window.screen.availWidth || 1920, Math.max(600, parsed.width));
+            height = Math.min(window.screen.availHeight || 1080, Math.max(450, parsed.height));
+          }
+        }
+      } catch (e) {}
+
       const left = Math.max(0, (window.screen.width - width) / 2);
       const top = Math.max(0, (window.screen.height - height) / 2);
       const url = `/news_list.html?t=${Date.now()}`;
@@ -74,8 +85,19 @@
         return;
       }
 
-      const width = 960;
-      const height = 750;
+      let width = 960;
+      let height = 750;
+      try {
+        const saved = localStorage.getItem("vstudio_news_cache_window_size");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.width && parsed.height) {
+            width = Math.min(window.screen.availWidth || 1920, Math.max(600, parsed.width));
+            height = Math.min(window.screen.availHeight || 1080, Math.max(500, parsed.height));
+          }
+        }
+      } catch (e) {}
+
       const left = Math.max(0, (window.screen.width - width) / 2);
       const top = Math.max(0, (window.screen.height - height) / 2);
       const url = `/news_cache_viewer.html?t=${Date.now()}`;
@@ -109,9 +131,21 @@
     if (window.readNewsTitles) {
       window.readNewsTitles.clear();
     }
+    if (window.newsBroadcastState) {
+      window.newsBroadcastState.readArticles = [];
+      window.newsBroadcastState.currentIndex = 0;
+    }
     try {
       localStorage.removeItem("newsReadTitles");
+      localStorage.removeItem("vstudio_read_news_titles");
+      localStorage.removeItem("currentPlayingNewsTitle");
+      localStorage.removeItem("vstudio_news_broadcast_state");
+      localStorage.removeItem("vstudio_current_playing_title");
+      localStorage.setItem("newsReadExplicitlyCleared", "true");
     } catch (e) { }
+    if (typeof window.clearReadNewsTitles === "function") {
+      try { window.clearReadNewsTitles(); } catch (e) { }
+    }
     window.updateNewsListPopup();
     if (!silent) {
       if (typeof window.showNotification === "function") {
