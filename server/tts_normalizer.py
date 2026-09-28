@@ -1101,12 +1101,18 @@ def resolve_text_readings(text, custom_dict=None):
         return text
 
     normalized = normalize_fullwidth_alphanumeric(text)
+    normalized = apply_symbol_plus_rules(normalized)
+    normalized = apply_model_suffix_rules(normalized)
     normalized = apply_age_and_counter_rules(normalized)
     normalized = apply_special_reading_fixes(normalized)
+    normalized = apply_athlete_honorific_repairs(normalized)
     normalized = apply_it_context_rules(normalized)
+    normalized = apply_idol_group_rules(normalized)
+    normalized = apply_game_title_rules(normalized)
     normalized = apply_tech_acronyms(normalized)
     normalized = apply_okonau_context_rules(normalized)
     normalized = apply_country_prefixes(normalized)
+    normalized = apply_pronunciation_memory(normalized)
     normalized = sanitize_speech_text(normalized)
 
     # 1. カスタム辞書（最優先）
@@ -1398,11 +1404,130 @@ def apply_person_kata_rules(text):
             t = re.sub(pat, rep, t)
     return t
 
+DEFAULT_IDOL_GROUP_RULES = [
+    # ── STARTO / 男性アイドル / ボーカルグループ ──
+    {"pattern": r"(?i)Hey!\s*Say!\s*JUMP", "replacement": "ヘイセイジャンプ", "note": "Hey! Say! JUMPの読み解決（「エイチ イイ ワイ」スペルアウト誤読及び文分割の防止）"},
+    {"pattern": r"(?i)King\s*&\s*Prince", "replacement": "キングアンドプリンス", "note": "King & Princeの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])SixTONES(?![A-Za-z0-9])", "replacement": "ストーンズ", "note": "SixTONESの読み解決（「シックス・トーンズ」防止）"},
+    {"pattern": r"(?i)Snow\s*Man", "replacement": "スノーマン", "note": "Snow Manの読み解決"},
+    {"pattern": r"(?i)Travis\s*Japan", "replacement": "トラビスジャパン", "note": "Travis Japanの読み解決"},
+    {"pattern": r"(?i)Sexy\s*Zone", "replacement": "セクシーゾーン", "note": "Sexy Zoneの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])timelesz(?![A-Za-z0-9])", "replacement": "タイムレス", "note": "timeleszの読み解決"},
+    {"pattern": r"(?i)Kis-My-Ft2", "replacement": "キスマイフットツー", "note": "Kis-My-Ft2の読み解決"},
+    {"pattern": r"(?i)KAT-TUN", "replacement": "カトゥーン", "note": "KAT-TUNの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])KinKi\s*Kids(?![A-Za-z0-9])", "replacement": "キンキキッズ", "note": "KinKi Kidsの読み解決"},
+    {"pattern": r"(?i)Aぇ!\s*group", "replacement": "ええグループ", "note": "Aぇ! groupの読み解決"},
+    {"pattern": r"(?i)WEST\.", "replacement": "ウエスト", "note": "WEST.の読み解決（文末ピリオドによる誤読・切断防止）"},
+    {"pattern": r"(?i)Number_i", "replacement": "ナンバーアイ", "note": "Number_iの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])IMP\.(?![A-Za-z0-9])", "replacement": "アイエムピー", "note": "IMP.の読み解決"},
+
+    # ── EBiDAN / スターダスト ──
+    {"pattern": r"(?i)M[!！]LK", "replacement": "みるく", "note": "ボーカルダンスユニットM!LK（ミルク）の読み解決"},
+    {"pattern": r"(?i)M[!！]みるく", "replacement": "みるく", "note": "LK誤解決によるM!みるくの修復"},
+    {"pattern": r"(?i)SUPER[★*]?\s*DRAGON", "replacement": "スーパードラゴン", "note": "SUPER★DRAGONの読み解決"},
+    {"pattern": r"(?i)ONE\s*N['’]?\s*ONLY", "replacement": "ワンエンオンリー", "note": "ONE N' ONLYの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])BUDDiiS(?![A-Za-z0-9])", "replacement": "バディーズ", "note": "BUDDiiSの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])ICEx(?![A-Za-z0-9])", "replacement": "アイス", "note": "ICExの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])Lienel(?![A-Za-z0-9])", "replacement": "リエネル", "note": "Lienelの読み解決"},
+
+    # ── BMSG / LAPONE / 日本のボーイズ＆ガールズ ──
+    {"pattern": r"(?i)BE:FIRST", "replacement": "ビーファースト", "note": "BE:FIRSTの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])MAZZEL(?![A-Za-z0-9])", "replacement": "マーゼル", "note": "MAZZELの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])JO1(?![A-Za-z0-9])", "replacement": "ジェイオーワン", "note": "JO1の読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])INI(?![A-Za-z0-9])", "replacement": "アイエヌアイ", "note": "INIの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])DXTEEN(?![A-Za-z0-9])", "replacement": "ディーエックスティーン", "note": "DXTEENの読み解決"},
+    {"pattern": r"(?i)ME:I", "replacement": "ミーアイ", "note": "ME:Iの読み解決"},
+    {"pattern": r"(?i)IS:SUE", "replacement": "イシュー", "note": "IS:SUEの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])NiziU(?![A-Za-z0-9])", "replacement": "ニジュー", "note": "NiziUの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])NEXZ(?![A-Za-z0-9])", "replacement": "ネクスジ", "note": "NEXZの読み解決"},
+    {"pattern": r"(?i)&TEAM", "replacement": "エンティーム", "note": "&TEAMの読み解決"},
+
+    # ── LDH ──
+    {"pattern": r"(?i)(?<![A-Za-z0-9])EXILE(?![A-Za-z0-9])", "replacement": "エグザイル", "note": "EXILEの読み解決"},
+    {"pattern": r"(?i)(?:三代目\s*)?J\s*SOUL\s*BROTHERS", "replacement": "ジェイソウルブラザーズ", "note": "J SOUL BROTHERSの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])GENERATIONS(?![A-Za-z0-9])", "replacement": "ジェネレーションズ", "note": "GENERATIONSの読み解決"},
+    {"pattern": r"(?i)THE\s*RAMPAGE", "replacement": "ザ・ランペイジ", "note": "THE RAMPAGEの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])FANTASTICS(?![A-Za-z0-9])", "replacement": "ファンタスティックス", "note": "FANTASTICSの読み解決"},
+    {"pattern": r"(?i)BALLISTIK\s*BOYZ", "replacement": "バリスティックボーイズ", "note": "BALLISTIK BOYZの読み解決"},
+    {"pattern": r"(?i)PSYCHIC\s*FEVER", "replacement": "サイキックフィーバー", "note": "PSYCHIC FEVERの読み解決"},
+    {"pattern": r"(?i)LIL\s*LEAGUE", "replacement": "リルリーグ", "note": "LIL LEAGUEの読み解決"},
+
+    # ── K-POP / グローバル ──
+    {"pattern": r"(?i)(?<![A-Za-z0-9])BTS(?![A-Za-z0-9])", "replacement": "ビーティーエス", "note": "BTSの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])SEVENTEEN(?![A-Za-z0-9])", "replacement": "セブンティーン", "note": "SEVENTEENの読み解決"},
+    {"pattern": r"(?i)Stray\s*Kids", "replacement": "ストレイキッズ", "note": "Stray Kidsの読み解決"},
+    {"pattern": r"(?i)TOMORROW\s*X\s*TOGETHER", "replacement": "トゥモロー・バイ・トゥギャザー", "note": "TOMORROW X TOGETHERの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])TXT(?![A-Za-z0-9])", "replacement": "ティーエックスティー", "note": "TXTの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])ENHYPEN(?![A-Za-z0-9])", "replacement": "エンハイプン", "note": "ENHYPENの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])NewJeans(?![A-Za-z0-9])", "replacement": "ニュージーンズ", "note": "NewJeansの読み解決"},
+    {"pattern": r"(?i)LE\s*SSERAFIM", "replacement": "ルセラフィム", "note": "LE SSERAFIMの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])aespa(?![A-Za-z0-9])", "replacement": "エスパ", "note": "aespaの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])IVE(?![A-Za-z0-9])", "replacement": "アイヴ", "note": "IVEの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])TWICE(?![A-Za-z0-9])", "replacement": "トゥワイス", "note": "TWICEの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])BLACKPINK(?![A-Za-z0-9])", "replacement": "ブラックピンク", "note": "BLACKPINKの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])ILLIT(?![A-Za-z0-9])", "replacement": "アイリット", "note": "ILLITの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])BABYMONSTER(?![A-Za-z0-9])", "replacement": "ベイビーモンスター", "note": "BABYMONSTERの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])RIIZE(?![A-Za-z0-9])", "replacement": "ライズ", "note": "RIIZEの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])BOYNEXTDOOR(?![A-Za-z0-9])", "replacement": "ボーイネクストドア", "note": "BOYNEXTDOORの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])ZEROBASEONE(?![A-Za-z0-9])", "replacement": "ゼロベースワン", "note": "ZEROBASEONEの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])ZB1(?![A-Za-z0-9])", "replacement": "ゼロベースワン", "note": "ZB1の読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])TWS(?![A-Za-z0-9])", "replacement": "トゥアス", "note": "TWSの読み解決"},
+    {"pattern": r"(?i)NCT\s*127", "replacement": "エヌシーティーイチニナナ", "note": "NCT 127の読み解決"},
+    {"pattern": r"(?i)NCT\s*DREAM", "replacement": "エヌシーティードリーム", "note": "NCT DREAMの読み解決"},
+    {"pattern": r"(?i)NCT\s*WISH", "replacement": "エヌシーティーウィッシュ", "note": "NCT WISHの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])NCT(?![A-Za-z0-9])", "replacement": "エヌシーティー", "note": "NCTの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])TREASURE(?![A-Za-z0-9])", "replacement": "トレジャー", "note": "TREASUREの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])ATEEZ(?![A-Za-z0-9])", "replacement": "エイティーズ", "note": "ATEEZの読み解決"},
+    {"pattern": r"(?i)THE\s*BOYZ", "replacement": "ザボーイズ", "note": "THE BOYZの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])ITZY(?![A-Za-z0-9])", "replacement": "イッチ", "note": "ITZYの読み解決"},
+    {"pattern": r"(?i)\(G\)I-DLE", "replacement": "ジー・アイドゥル", "note": "(G)I-DLEの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])Kep1er(?![A-Za-z0-9])", "replacement": "ケプラー", "note": "Kep1erの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])NMIXX(?![A-Za-z0-9])", "replacement": "エンミックス", "note": "NMIXXの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])STAYC(?![A-Za-z0-9])", "replacement": "ステイシー", "note": "STAYCの読み解決"},
+    {"pattern": r"(?i)KISS\s*OF\s*LIFE", "replacement": "キスオブライフ", "note": "KISS OF LIFEの読み解決"},
+
+    # ── ロックバンド / 音楽ユニット ──
+    {"pattern": r"(?i)Mrs\.\s*GREEN\s*APPLE", "replacement": "ミセスグリーンアップル", "note": "Mrs. GREEN APPLEの読み解決"},
+    {"pattern": r"(?i)Official髭男dism", "replacement": "オフィシャルひげダンディズム", "note": "Official髭男dismの読み解決"},
+    {"pattern": r"(?i)SEKAI\s*NO\s*OWARI", "replacement": "セカイノオワリ", "note": "SEKAI NO OWARIの読み解決"},
+    {"pattern": r"(?i)ONE\s*OK\s*ROCK", "replacement": "ワンオクロック", "note": "ONE OK ROCKの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])RADWIMPS(?![A-Za-z0-9])", "replacement": "ラッドウィンプス", "note": "RADWIMPSの読み解決"},
+    {"pattern": r"(?i)B['’]z", "replacement": "ビーズ", "note": "B'zの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])GLAY(?![A-Za-z0-9])", "replacement": "グレイ", "note": "GLAYの読み解決"},
+    {"pattern": r"(?i)L['’]?Arc[〜~\-]en[〜~\-]Ciel", "replacement": "ラルクアンシエル", "note": "L'Arc〜en〜Cielの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])UVERworld(?![A-Za-z0-9])", "replacement": "ウーバーワールド", "note": "UVERworldの読み解決"},
+    {"pattern": r"(?i)MAN\s*WITH\s*A\s*MISSION", "replacement": "マンウィズアミッション", "note": "MAN WITH A MISSIONの読み解決"},
+    {"pattern": r"(?i)King\s*Gnu", "replacement": "キングヌー", "note": "King Gnuの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])YOASOBI(?![A-Za-z0-9])", "replacement": "ヨアソビ", "note": "YOASOBIの読み解決"},
+    {"pattern": r"(?i)back\s*number", "replacement": "バックナンバー", "note": "back numberの読み解決"},
+    {"pattern": r"(?i)BUMP\s*OF\s*CHICKEN", "replacement": "バンプオブチキン", "note": "BUMP OF CHICKENの読み解決"},
+    {"pattern": r"(?i)\[Alexandros\]", "replacement": "アレキサンドロス", "note": "[Alexandros]の読み解決"},
+    {"pattern": r"(?i)MY\s*FIRST\s*STORY", "replacement": "マイファーストストーリー", "note": "MY FIRST STORYの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])Vaundy(?![A-Za-z0-9])", "replacement": "バウンディ", "note": "Vaundyの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])Ado(?![A-Za-z0-9])", "replacement": "アド", "note": "Adoの読み解決"},
+    {"pattern": r"(?i)(?<![A-Za-z0-9])ano(?![A-Za-z0-9])", "replacement": "あの", "note": "anoの読み解決"},
+
+    # ── 坂道・48グループ ──
+    {"pattern": r"(乃木坂|櫻坂|日向坂|吉本坂|欅坂)46", "replacement": r"\1フォーティーシックス", "note": "坂道シリーズ46の読み"},
+    {"pattern": r"(?<![A-Za-z])(AKB|SKE|NMB|HKT|NGT|STU|JKT|BNK|MNL|CGM)48(?![A-Za-z0-9])", "replacement": r"\1フォーティーエイト", "note": "48グループの読み"}
+]
+
 def apply_idol_group_rules(text):
-    """アイドルグループ（乃木坂46、櫻坂46、日向坂46、AKB48等）の読み方を解決（data/tts_rules.json より動的適用）"""
+    """
+    英語・アルファベット表記の音楽グループ・アイドル・アーティスト名の読み方を解決。
+    VOICEVOXによる「エイチ・イー・ワイ…」「ストーンズをシックス・トーンズ」等の
+    不自然なスペルアウト誤読や感嘆符・ピリオドによる文分割事故を100%防止。
+    """
     if not text:
         return ""
     t = text
+    # 1. デフォルト定義の適用
+    for item in DEFAULT_IDOL_GROUP_RULES:
+        pat = item.get("pattern")
+        rep = item.get("replacement")
+        if pat and rep:
+            t = re.sub(pat, rep, t)
+    # 2. tts_rules.json による動的オーバーライド適用
     rules = load_tts_rules()
     for item in rules.get("idol_group_rules", []):
         pat = item.get("pattern")
