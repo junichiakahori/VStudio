@@ -658,6 +658,21 @@ def extract_article_rubies(text):
             else:
                 print(f"[元記事ルビ自動抽出 却下] 🛡️ 不自然なルビ判定: '{term_clean}' ➔ '{yomi_hira}' を破棄しました", flush=True)
 
+    # 2. 英字語句・アーティスト名・グループ名の括弧ルビ（例: FRUITS ZIPPER（フルーツジッパー）、ME:I（ミーアイ）等）
+    en_matches = re.findall(r'([A-Za-z0-9\s!！\-_.:&]{2,30})\s*[\(（]([ァ-ヴーぁ-ん・\s]{2,30})[\)）]', text)
+    for term, yomi_raw in en_matches:
+        term_clean = term.strip()
+        yomi_clean = yomi_raw.replace('・', '').replace(' ', '').strip()
+        if any(pck in yomi_clean for pck in PHOTO_CREDIT_KEYWORDS):
+            continue
+        # 英単語・記号が含まれている固有名詞のみ
+        if re.search(r'[A-Za-z]', term_clean) and len(term_clean) >= 2 and len(yomi_clean) >= 2:
+            yomi_hira = "".join([chr(ord(c) - 0x60) if 0x30A1 <= ord(c) <= 0x30F6 else c for c in yomi_clean])
+            yomi_hira = re.sub(r'[^ぁ-んー]', '', yomi_hira)
+            if yomi_hira and len(yomi_hira) >= 2:
+                rubies[term_clean] = yomi_hira
+                print(f"[元記事英字グループルビ抽出] 🎯 '{term_clean}' ➔ '{yomi_hira}'", flush=True)
+
     return rubies
 
 
@@ -1032,6 +1047,16 @@ def extract_special_terms(text):
         if t.lower() not in all_ignored:
             terms.append(t)
 
+    # 2.5 複数単語からなる英字グループ名・アーティスト名・固有名詞（FRUITS ZIPPER, WHITE SCORPION等）
+    # 2〜4単語の英字フレーズを抽出し、Wikipedia検索で一発カタカナ解決
+    for m in re.finditer(r'(?<![A-Za-z0-9])(?:[A-Za-z0-9\-_’\'.]+[!！]?\s+(?:&|and)?\s*){1,3}[A-Za-z0-9\-_’\'.]+[!！]?(?![A-Za-z0-9])', text):
+        phrase = m.group(0).strip()
+        words = phrase.split()
+        if len(words) >= 2 and len(phrase) <= 35:
+            # すべて一般的な短単語のみで構成された英文フレーズは除外
+            if not all(w.lower() in all_ignored for w in words):
+                terms.append(phrase)
+
     # 3. 英字＋数字の固有名詞（F15, AKB48, SKE48, RX7, PS5等）および坂道グループ（乃木坂46, 櫻坂46, 日向坂46等）
     # ※ 一般的な漢字＋数字（例: 到着14便、日午後7時、月10日、総額400億、2回戦3）はVOICEVOXが自然に読める通常の日時・数量表現のため完全除外
     # A. 英字＋数字
@@ -1135,7 +1160,8 @@ def resolve_text_readings(text, custom_dict=None):
 
     # 3. 特殊語句・固有名詞の動的解決 (Wikipedia / Web検索)
     terms = extract_special_terms(normalized)
-    for term in terms:
+    terms_sorted = sorted(terms, key=lambda x: len(x), reverse=True)
+    for term in terms_sorted:
         if term in normalized and not re.match(r'^[ぁ-んァ-ヶー]+$', term):
             yomi, _ = lookup_wikipedia_reading(term)
             if yomi:
