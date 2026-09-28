@@ -231,15 +231,39 @@ def is_plausible_reading(term, yomi):
 
     sim_j = difflib.SequenceMatcher(None, j_reading, norm_yomi).ratio() if j_reading else 0
 
-    # 漢字2文字の短い語句については、末尾文字の音訓末尾音と一致している必要がある（三又 ➔ みつい等の偽読みを100%遮断）
+    # 漢字2文字の短い語句については、先頭文字の頭音および末尾文字の末尾音と一致している必要がある（三又 ➔ みつい、暴力 ➔ なべりょく等の偽読みを100%遮断）
     if len(kanji_chars) == 2:
+        VOICED_MAP = {
+            "か": ["が"], "き": ["ぎ"], "く": ["ぐ"], "け": ["げ"], "こ": ["ご"],
+            "さ": ["ざ"], "し": ["じ"], "す": ["ず"], "せ": ["ぜ"], "そ": ["ぞ"],
+            "た": ["だ"], "ち": ["ぢ"], "つ": ["づ"], "て": ["で"], "と": ["ど"],
+            "は": ["ば", "ぱ"], "ひ": ["び", "ぴ"], "ふ": ["ぶ", "ぷ"], "へ": ["べ", "ぺ"], "ほ": ["ぼ", "ぽ"]
+        }
+        DEVOICED_MAP = {v: [k] for k, vals in VOICED_MAP.items() for v in vals}
+
+        # A. 先頭文字の頭音チェック
+        first_c = kanji_chars[0]
+        first_readings = _get_char_readings(first_c, kks, kanwa)
+        first_starts = set()
+        for r in first_readings:
+            if r:
+                ch = r[0]
+                first_starts.add(ch)
+                for v in VOICED_MAP.get(ch, []):
+                    first_starts.add(v)
+                for d in DEVOICED_MAP.get(ch, []):
+                    first_starts.add(d)
+        if norm_yomi[0] not in first_starts:
+            return False
+
+        # B. 末尾文字の末尾音チェック
         last_c = kanji_chars[-1]
         last_readings = _get_char_readings(last_c, kks, kanwa)
         last_ends = {r[-1] for r in last_readings if r}
         if norm_yomi[-1] not in last_ends:
             return False
 
-    return max(sim, sim_j) >= 0.60
+    return max(sim, sim_j) >= 0.70
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TTS_RULES_PATH = os.path.join(BASE_DIR, "data", "tts_rules.json")

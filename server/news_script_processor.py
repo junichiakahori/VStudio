@@ -348,7 +348,8 @@ def extract_pronunciations_via_ai(text, title="", article_context="", provider="
             "打線", "安打", "連勝", "最多", "過去", "以来", "引退", "移籍", "監督", "顧問",
             "社長", "会長", "議員", "知事", "市長", "選手", "投手", "捕手",
             "供給", "石油供給", "電力供給", "需要", "施設", "基地", "空軍基地", "停滞", "混乱", "攻撃",
-            "火星", "表面", "警告", "終了", "日本", "阪神", "主席", "連覇", "下半身不随", "手に入れてしまう"
+            "火星", "表面", "警告", "終了", "日本", "阪神", "主席", "連覇", "下半身不随", "手に入れてしまう",
+            "暴力", "暴行", "傷害", "事件", "犯罪", "被害", "加害", "報道", "週刊誌", "声明"
         }
 
         pron_map = {}
@@ -369,7 +370,7 @@ def extract_pronunciations_via_ai(text, title="", article_context="", provider="
                 continue
 
             # 一般熟語・常用語の破壊を100%防止（VOICEVOXが読める単語の不要なひらがな化を拒絶）
-            if term_clean in FORBIDDEN_GENERAL_TERMS or term_clean.endswith(('不明金', '執行部', '委員会', '本塁打', '供給', '施設', '基地', '停滞', '需要', '終了', '表面', '警告')):
+            if term_clean in FORBIDDEN_GENERAL_TERMS or term_clean.endswith(('不明金', '執行部', '委員会', '本塁打', '供給', '施設', '基地', '停滞', '需要', '終了', '表面', '警告', '暴力')):
                 print(f"[AI発音チェック 却下] 🛡️ 一般熟語 '{term_clean}' への不要なひらがな化('{yomi_clean}')を拒絶しました", flush=True)
                 continue
 

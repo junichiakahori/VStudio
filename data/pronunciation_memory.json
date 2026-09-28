@@ -1097,6 +1097,58 @@
       "category": "finance_acronym",
       "registered_date": "2026-09-29",
       "note": "iDeco表記の「イデコ」固定"
+    },
+    {
+      "id": "auto_1790638978_863",
+      "surface": "大地葉",
+      "reading": "たいちよう",
+      "wrong_reading": "だいちよお",
+      "scope": "contextual",
+      "article_topic": "TVアニメ『LIAR GAME』第2期制作決定記念！仁見紗綾さん、大塚剛央さん、大地葉さん、花江夏樹さん コメントインタビュー - liargame-anime.com",
+      "sample_sentence": "ひとみさやさん、大塚剛央さん、大地葉さん、花江夏樹さん、それぞれの役者の方たちが、新シリーズへの期待と意気込みを語ってく",
+      "category": "person_name",
+      "registered_date": "2026-09-29",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'だいちよお' ➔ 正読: 'たいちよう'）",
+      "context_keywords": [
+        "TV",
+        "アニメ",
+        "LIAR",
+        "GAME",
+        "期制作決定記念",
+        "仁見紗綾"
+      ]
+    },
+    {
+      "id": "auto_1790639007_649",
+      "surface": "倉本聰",
+      "reading": "くらもとそう",
+      "wrong_reading": "くらもとさとし",
+      "scope": "contextual",
+      "article_topic": "倉本聰さん 大河「勝海舟」での大きな挫折で北海道へ 「北の国から」誕生（スポニチアネックス） - news.yahoo.co.jp",
+      "sample_sentence": "倉本聰さんというかたの人生が大きく変わった話なんにゃ。",
+      "category": "person_name",
+      "registered_date": "2026-09-29",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'くらもとさとし' ➔ 正読: 'くらもとそう'）",
+      "context_keywords": [
+        "倉本聰",
+        "大河",
+        "勝海舟",
+        "挫折",
+        "北海道",
+        "誕生"
+      ]
+    },
+    {
+      "id": "auto_1790639148_9600",
+      "surface": "鈴木海音",
+      "reading": "すずきかいと",
+      "wrong_reading": "すずきかいおん",
+      "scope": "global",
+      "article_topic": "監督・選手コメント】ルヴァンカップ1stラウンド-2 サガン鳥栖戦に向けて ～城福監督、鈴木、佐古～（26.9.28）",
+      "sample_sentence": "Dエフじゅうご鈴木海音選手も、J1第8節の浦和レッズ戦で見せた3-1の敗戦から、チーム全員で反省し、今後の試合に活かした",
+      "category": "person_name",
+      "registered_date": "2026-09-29",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'すずきかいおん' ➔ 正読: 'すずきかいと'）"
     }
   ]
 }
