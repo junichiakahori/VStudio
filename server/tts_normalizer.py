@@ -1592,7 +1592,7 @@ def apply_model_suffix_rules(text):
     pattern = r'(?<![A-Za-z0-9])([A-Za-z]{1,4}(?:/[A-Za-z]+)?-?\d+)([VAWNvawn])(?![A-Za-z0-9])'
     return re.sub(pattern, repl, text)
 
-def apply_athlete_honorific_repairs(text, is_sports=True):
+def apply_athlete_honorific_repairs(text, is_sports=False):
     """
     報道記事における孤立した『さんたち』『さんへの』等の破綻敬称を自動救済修復（ホワイトリスト方式・カテゴリ連動）
     is_sports=True: スポーツ記事用（『選手たち』『選手』へ修復）
