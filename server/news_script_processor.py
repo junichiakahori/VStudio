@@ -1367,7 +1367,7 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
         import pykakasi
         kks = pykakasi.kakasi()
         NUM_CHARS = set("一二三四五六七八九十百千万億兆0123456789０１２３４５６７８９")
-        DATE_COUNTER_WORDS = {"月末", "月上旬", "月中旬", "月下旬", "月初", "月半ば", "月", "日", "年", "週", "時", "分", "秒", "度", "回", "戦", "便", "人", "名", "個", "台", "件", "歳", "才"}
+        DATE_COUNTER_WORDS = {"月末", "月上旬", "月中旬", "月下旬", "月初", "月半ば", "月", "日", "年", "週", "時", "分", "秒", "度", "回", "戦", "便", "人", "名", "個", "台", "件", "歳", "才", "日間", "月間", "年間", "週間", "時間"}
         for it in items:
             sp = it.get("speech", "")
             tokens = list(tokenizer.tokenize(sp))
