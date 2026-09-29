@@ -281,12 +281,17 @@ async function fetchNewsWithOptions(categoryKey = "cat_all", maxPerCategory = In
         };
       }).filter(item => {
         if (!item.title) return false;
-        // 🛡️ 本文がSPA等で取得できないNHK等のドメインは記事一覧から完全除外
-        if (item.link && (item.link.includes('nhk.or.jp') || item.link.includes('news.web.nhk'))) return false;
-        // 🛡️ Google News RSS経由等で紛れ込むNHK記事を100%除外（source, publisher, titleすべて検査）
-        if (item.source && /NHK/i.test(item.source)) return false;
-        if (item.publisher && /NHK/i.test(item.publisher)) return false;
-        if (item.title && /(?:[\s\-–—|｜]|^)NHK(?:ニュース|NEWS|NEWS\s*WEB)?/i.test(item.title)) return false;
+        // 🛡️ 本文がSPA等で取得できないNHK、有料限定で本文が取得できないBloomberg/WSJ等のドメインは記事一覧から完全除外
+        if (item.link) {
+          const l = item.link.toLowerCase();
+          if (l.includes('nhk.or.jp') || l.includes('news.web.nhk') || l.includes('bloomberg.co.jp') || l.includes('bloomberg.com') || l.includes('wsj.com')) {
+            return false;
+          }
+        }
+        // 🛡️ 取得不可・有料限定メディアを100%除外（source, publisher, titleすべて検査）
+        if (item.source && /(?:NHK|Bloomberg|ブルームバーグ|WSJ|ウォール・ストリート)/i.test(item.source)) return false;
+        if (item.publisher && /(?:NHK|Bloomberg|ブルームバーグ|WSJ|ウォール・ストリート)/i.test(item.publisher)) return false;
+        if (item.title && /(?:[\s\-–—|｜]|^)(?:NHK|Bloomberg|ブルームバーグ|WSJ)(?:ニュース|NEWS|NEWS\s*WEB)?/i.test(item.title)) return false;
         if (typeof window.isInvalidNewsVideoArticle === "function" && window.isInvalidNewsVideoArticle(item.title, item.description)) return false;
         return true;
       });

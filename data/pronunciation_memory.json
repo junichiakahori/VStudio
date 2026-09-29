@@ -1149,6 +1149,25 @@
       "category": "person_name",
       "registered_date": "2026-09-29",
       "note": "VOICEVOX文脈誤読から自動特定（誤読: 'すずきかいおん' ➔ 正読: 'すずきかいと'）"
+    },
+    {
+      "id": "auto_1790639604_2424",
+      "surface": "早田",
+      "reading": "はやた",
+      "wrong_reading": "そおだ",
+      "scope": "contextual",
+      "article_topic": "張本と早田ぼう然 中国ペアに完敗",
+      "sample_sentence": "はりもとと早田ぼう然 中国ペアに完敗",
+      "category": "proper_noun",
+      "registered_date": "2026-09-29",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'そおだ' ➔ 正読: 'はやた'）",
+      "context_keywords": [
+        "張本",
+        "早田",
+        "中国",
+        "ペア",
+        "完敗"
+      ]
     }
   ]
 }

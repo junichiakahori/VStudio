@@ -88,6 +88,10 @@ const INVALID_NEWS_TITLE_PATTERNS_MODE = [
   /【ストップ高／ストップ安】/i, /ストップ高/i, /ストップ安/i,
   /値上がり率ランキング/i, /値下がり率ランキング/i, /出来高上位/i,
   /信用取引残高/i, /寄り付き/i, /大引け/i, /市況概況/i,
+  // 📋 一覧・名簿・日程等のデータ羅列記事（ストーリーがなく原稿が薄くなる・成立しない）
+  /【一覧】|\[一覧\]|\(一覧\)/i,
+  /(?:選手|退団|移籍|戦力外|去就|内定|合格|当選|落選|出演者|登壇者|日程|日程表|結果|順位|タイムスケジュール|放送スケジュール|対戦カード)一覧/i,
+  /(?:閣僚|役員|役職|議員|当選者|合格者)名簿/i,
   /^(ニュース|Google\s*ニュース|Yahoo!\s*ニュース|トップニュース|主要ニュース|トピックス)$/i
 ];
 
@@ -102,14 +106,24 @@ const INVALID_NEWS_DESC_PATTERNS_MODE = [
 function isInvalidNewsVideoArticle(arg1, arg2) {
   let title = "";
   let desc = "";
+  let link = "";
   if (typeof arg1 === "object" && arg1 !== null) {
     title = (arg1.title || "").trim();
     desc = (arg1.description || "").trim();
+    link = (arg1.link || "").trim();
   } else {
     title = (typeof arg1 === "string" ? arg1 : "").trim();
     desc = (typeof arg2 === "string" ? arg2 : "").trim();
   }
   if (!title) return true;
+
+  // 🛡️ 有料会員限定で本文が取得できないドメインを即座に除外
+  if (link) {
+    const l = link.toLowerCase();
+    if (l.includes("bloomberg.co.jp") || l.includes("bloomberg.com") || l.includes("wsj.com") || l.includes("nhk.or.jp")) {
+      return true;
+    }
+  }
 
   for (const pat of INVALID_NEWS_TITLE_PATTERNS_MODE) {
     if (pat.test(title)) return true;
@@ -118,8 +132,8 @@ function isInvalidNewsVideoArticle(arg1, arg2) {
     if (pat.test(desc)) return true;
   }
 
-  // 🛡️ 概要文（description）が極端に短く（15文字未満）、かつ本文情報が皆無の短報を除外
-  if (desc.length > 0 && desc.length < 15 && /^(?:速報|短報|更新|【速報】)/.test(title)) {
+  // 🛡️ 概要文（description）が極端に短く（20文字未満）、かつ本文情報が皆無の短報を除外
+  if (desc.length > 0 && desc.length < 20 && /^(?:速報|短報|更新|【速報】)/.test(title)) {
     return true;
   }
 
