@@ -1965,7 +1965,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
                 text_for_terms = f"{title} {full_article_content}"
                 candidate_terms = extract_candidate_terms_from_text(text_for_terms)
                 for c_term in candidate_terms[:3]:  # 1記事あたり未知語最大3件まで迅速にチェック
-                    resolve_unknown_reading_online(c_term, auto_save=True, article_title=title)
+                    resolve_unknown_reading_online(c_term, auto_save=True, article_title=title, article_content=full_article_content)
             except Exception as e:
                 print(f"{tag} ⚠️ [Web読み方解決エラー] {e}", flush=True)
     

@@ -133,21 +133,38 @@ def save_to_pronunciation_memory(
         print(f"⚠️ [自動記憶エラー] 保存失敗: {e}", flush=True)
         return False
 
-def fetch_wikipedia_ruby(term: str) -> Optional[str]:
+def _extract_context_keywords(text: str, exclude_term: str = "") -> set:
+    """ニュース記事タイトル・本文から文脈照合用キーワードを抽出（2文字以上の名詞・トピック語）"""
+    if not text:
+        return set()
+    words = set(re.findall(r'[\u4e00-\u9fa5]{2,}|[ァ-ヶー]{2,}|[A-Za-z0-9]{2,}', text))
+    STOPS = {
+        'こと', 'もの', 'ため', 'これ', 'それ', 'よう', '今日', '昨日', '明日', '今年', '去年',
+        'ニュース', '情報', '確認', '発表', '公式', '最新', '速報', '詳細', '状況', '問題',
+        '関係', '影響', '方針', '結果', '理由', '対応', '予定', '今回', '注目'
+    }
+    cleaned = {w for w in words if w not in STOPS and len(w) >= 2}
+    if exclude_term:
+        cleaned.discard(exclude_term)
+    return cleaned
+
+def fetch_wikipedia_ruby(term: str, article_context: str = "") -> Optional[str]:
     """
-    Wikipedia API を使って単語の冒頭括弧から読み仮名を抽出。
-    例: 「乃木坂46」 ➔ 「乃木坂46（のぎざかフォーティーシックス、Nogizaka46）は、...」 ➔ 「のぎざかフォーティーシックス」
+    Wikipedia API を使って単語の読み仮名を抽出。
+    ニュース記事の文脈（article_context）と照合し、曖昧さ回避ページ（多義語）でも
+    ニュース内容と最も一致率の高いセクションの読みをインテリジェントに特定・選択する。
     """
     if not term:
         return None
     ctx = _get_ssl_context()
     headers = {"User-Agent": _USER_AGENT}
+    news_kws = _extract_context_keywords(article_context, exclude_term=term)
 
     try:
-        # 1. 記事直接取得（リダイレクト解決付き）
+        # 1. 記事直接取得（リダイレクト解決付き・セクション構造を含む全文取得）
         url = (
-            f"{_WIKI_API_URL}?action=query&prop=extracts&exintro=true&exsentences=2"
-            f"&explaintext=true&titles={urllib.parse.quote(term)}&redirects=1&format=json"
+            f"{_WIKI_API_URL}?action=query&prop=extracts&explaintext=true"
+            f"&titles={urllib.parse.quote(term)}&redirects=1&format=json"
         )
         req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=_TIMEOUT, context=ctx) as r:
@@ -162,7 +179,7 @@ def fetch_wikipedia_ruby(term: str) -> Optional[str]:
                 if real_title != term and not real_title.startswith(f"{term} (") and not real_title.startswith(f"{term}（"):
                     continue
                 extract = pdata.get("extract", "")
-                ruby = _extract_ruby_from_text(term, extract)
+                ruby = _extract_ruby_from_text(term, extract, news_kws=news_kws)
                 if ruby:
                     return ruby
     except Exception:
@@ -178,14 +195,14 @@ def fetch_wikipedia_ruby(term: str) -> Optional[str]:
                 title = res.get("title", "")
                 if title == term or title.startswith(f"{term} (") or title.startswith(f"{term}（"):
                     ext_url = (
-                        f"{_WIKI_API_URL}?action=query&prop=extracts&exintro=true&exsentences=2"
-                        f"&explaintext=true&titles={urllib.parse.quote(title)}&redirects=1&format=json"
+                        f"{_WIKI_API_URL}?action=query&prop=extracts&explaintext=true"
+                        f"&titles={urllib.parse.quote(title)}&redirects=1&format=json"
                     )
                     req2 = urllib.request.Request(ext_url, headers=headers)
                     with urllib.request.urlopen(req2, timeout=_TIMEOUT, context=ctx) as r2:
                         p2 = json.loads(r2.read().decode("utf-8")).get("query", {}).get("pages", {})
                         for _, pd2 in p2.items():
-                            ruby = _extract_ruby_from_text(term, pd2.get("extract", ""))
+                            ruby = _extract_ruby_from_text(term, pd2.get("extract", ""), news_kws=news_kws)
                             if ruby:
                                 return ruby
     except Exception:
@@ -193,28 +210,89 @@ def fetch_wikipedia_ruby(term: str) -> Optional[str]:
 
     return None
 
-def _extract_ruby_from_text(term: str, extract_text: str) -> Optional[str]:
-    """Wikipedia本文冒頭から読み仮名（ひらがな・カタカナ）を抽出"""
+def _extract_ruby_from_text(term: str, extract_text: str, news_kws: Optional[set] = None) -> Optional[str]:
+    """
+    Wikipedia本文から読み仮名を抽出。
+    複数の読みが存在する場合（曖昧さ回避など）は各セクションとニュースキーワードの一致率（スコア）で最適な読みを選定。
+    """
     if not extract_text:
         return None
-    # 冒頭 200 文字以内に現れる括弧 （...） または (...) を探索
-    head = extract_text[:200]
+    # 冒頭 300 文字以内に現れる括弧 （...） または (...) を探索
+    head = extract_text[:300]
     m = re.search(r'[\(（]([^\)）]+)[\)）]', head)
     if not m:
         return None
     content = m.group(1).strip()
-    # 英語表記や別名、「もしくは」「または」等の注釈表現で分割し、最初の読みブロックを取得
-    first_part = re.split(r'[,、，/／;；|｜]|\s*(?:もしくは|または|あるいは|および)\s*', content)[0].strip()
-    # アルファベット併記を除去（例: "のぎざかフォーティーシックス Nogizaka46"）
-    first_part = re.sub(r'[A-Za-z0-9\-_.]+', '', first_part).strip()
     
-    # ひらがな・カタカナ・長音符のみを抽出
-    cleaned = re.sub(r'[^ぁ-んァ-ヶー・]', '', first_part).replace('・', '')
-    if len(cleaned) >= 2 and len(cleaned) <= max(len(term) * 5, 20):
-        # 助詞切れ・文末語尾ゴミの遮断
-        if not re.search(r'(?:の|が|は|で|を|に|へ|と|です|ます)$', cleaned):
-            return cleaned
-    return None
+    # 括弧内のパーツを分割して読み候補群を抽出
+    raw_parts = re.split(r'[,、，/／;；|｜]|\s*(?:もしくは|または|あるいは|および)\s*', content)
+    candidates = []
+    for part in raw_parts:
+        part_clean = re.sub(r'[A-Za-z0-9\-_.]+', '', part).strip()
+        cleaned = re.sub(r'[^ぁ-んァ-ヶー・]', '', part_clean).replace('・', '').strip()
+        if len(cleaned) >= 2 and len(cleaned) <= max(len(term) * 5, 20):
+            if not re.search(r'(?:の|が|は|で|を|に|へ|と|です|ます)$', cleaned):
+                if cleaned not in candidates:
+                    candidates.append(cleaned)
+
+    if not candidates:
+        return None
+
+    # 候補が1つだけの場合（通常記事）
+    if len(candidates) == 1:
+        # ニュースキーワードが存在し、記事本文と全く一致しない場合は同字異義語の誤爆と判定
+        if news_kws and len(news_kws) >= 4:
+            hits = [w for w in news_kws if w in extract_text]
+            if not hits:
+                print(f"⚠️ [文脈不一致] '{term}' のWikipedia記事本文がニュースキーワードと全く一致しないため採用を見送りました", flush=True)
+                return None
+        return candidates[0]
+
+    # 候補が複数ある場合（曖昧さ回避ページ等）: セクションごとにニュース文脈との一致率を計算
+    sections = re.split(r'\n==\s*([^=\n]+?)\s*==\n', extract_text)
+    section_map = {}
+    if len(sections) > 1:
+        for i in range(1, len(sections), 2):
+            header = sections[i].strip()
+            body = sections[i+1].strip() if i+1 < len(sections) else ''
+            section_map[header] = body
+
+    best_reading = None
+    best_score = -1
+    best_hits = []
+
+    for cand in candidates:
+        cand_text = ""
+        for h, b in section_map.items():
+            if cand in h or cand in b[:100]:
+                cand_text += " " + h + " " + b
+        if not cand_text:
+            idx = extract_text.find(cand)
+            if idx != -1:
+                cand_text = extract_text[max(0, idx - 50):min(len(extract_text), idx + 300)]
+
+        if news_kws:
+            hits = [w for w in news_kws if w in cand_text]
+            score = len(hits)
+        else:
+            hits = []
+            score = 0
+
+        if score > best_score:
+            best_score = score
+            best_reading = cand
+            best_hits = hits
+
+    # ニュースキーワードと一致したセクションの読みを採用
+    if best_reading and best_score > 0:
+        print(f"🎯 [文脈一致採用] '{term}' の読みとして '{best_reading}' を選定 (一致単語: {best_hits}, スコア: {best_score})", flush=True)
+        return best_reading
+    elif not news_kws:
+        # ニュース文脈が与えられていない場合は先頭を採用
+        return candidates[0]
+    else:
+        print(f"⚠️ [文脈不一致拒絶] '{term}' に複数の読み候補 {candidates} がありますが、ニュース内容と一致するセクションが特定できませんでした", flush=True)
+        return None
 
 def search_duckduckgo_reading(term: str) -> Optional[str]:
     """
@@ -359,10 +437,12 @@ def resolve_unknown_reading_online(
     auto_save: bool = True,
     article_title: str = "",
     context_keywords: Optional[List[str]] = None,
-    scope: str = ""
+    scope: str = "",
+    article_content: str = ""
 ) -> Optional[str]:
     """
     未知語の読み方を Web（Wikipedia ➔ DuckDuckGo）で自動解決。
+    ニュース記事の文脈（article_title, article_content）との一致率で妥当性を判定し、
     成功した場合は自動で pronunciation_memory.json に文脈情報付きで保存して永続学習。
     """
     if not term or len(term) < 2:
@@ -372,10 +452,12 @@ def resolve_unknown_reading_online(
     if is_already_registered(term):
         return None
 
-    print(f"🔍 [Web読み方検索開始] 対象: '{term}'", flush=True)
+    print(f"🔍 [Web読み方検索開始] 対象: '{term}' (文脈記事: '{article_title[:30]}')", flush=True)
 
-    # 1. まずWikipediaを調査（高精度・公式・高速）
-    ruby = fetch_wikipedia_ruby(term)
+    full_context = f"{article_title} {article_content} " + " ".join(context_keywords or [])
+
+    # 1. まずWikipediaを調査（ニュース文脈一致判定付き・高精度・高速）
+    ruby = fetch_wikipedia_ruby(term, article_context=full_context)
     source = "wikipedia"
 
     # 2. Wikipediaで取れなければDuckDuckGoで「〇〇 読み方」を検索
@@ -413,19 +495,6 @@ def resolve_unknown_reading_online(
                 print(f"ℹ️ [台帳保存スキップ] '{term}' はVOICEVOXのデフォルト読みと一致（誤読なし）のため台帳へは保存しません。", flush=True)
                 return ruby
 
-            # 🛡️ 2文字の漢字語句で、VOICEVOXの読みが標準辞書読み（pykakasi / janome）と一致している場合、
-            # Wikipediaのマイナー異読（例: 中日 -> なかび、白夜 -> はくや等）による台帳破壊・誤読汚染を100%遮断
-            if len(term) == 2 and re.match(r'^[\u4e00-\u9fa5]+$', term):
-                try:
-                    import pykakasi
-                    kks = pykakasi.kakasi()
-                    std_kks = "".join([c.get("hira", "") for c in kks.convert(term)]).strip()
-                    if clean_hira == std_kks:
-                        print(f"🛡️ [台帳汚染防止] 2文字漢字 '{term}' のVOICEVOX読み '{clean_hira}' は標準辞書読みと一致しているため、Wikipedia異読 '{ruby}' による誤読台帳登録を破棄しました", flush=True)
-                        return clean_hira
-                except Exception:
-                    pass
-
             save_to_pronunciation_memory(
                 surface=term,
                 reading=ruby,
@@ -433,7 +502,7 @@ def resolve_unknown_reading_online(
                 note=f"Web自動解決 ({source})" + (f" (VOICEVOX誤読: {wrong_reading})" if wrong_reading else ""),
                 category="web_auto_resolved",
                 article_topic=article_title,
-                context_keywords=context_keywords,
+                context_keywords=context_keywords or list(_extract_context_keywords(full_context, exclude_term=term))[:6],
                 scope=scope
             )
         return ruby
