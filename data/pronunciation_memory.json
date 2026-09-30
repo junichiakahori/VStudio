@@ -430,7 +430,7 @@
       "sample_sentence": "谷村に関する最新情報です。",
       "category": "web_auto_resolved",
       "registered_date": "2026-09-19",
-      "note": "Web自動解決 (wikipedia)",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'たんむら' ➔ 正読: 'やむら'）",
       "context_keywords": [
         "SAMURAI",
         "BLUE",
@@ -439,7 +439,8 @@
         "谷村選手",
         "松木選手"
       ],
-      "wrong_reading": "たにむら"
+      "wrong_reading": "たんむら",
+      "updated_date": "2026-09-29"
     },
     {
       "id": "auto_1789769931_7069",
@@ -1136,7 +1137,8 @@
         "挫折",
         "北海道",
         "誕生"
-      ]
+      ],
+      "updated_date": "2026-09-29"
     },
     {
       "id": "auto_1790639148_9600",
@@ -1167,6 +1169,379 @@
         "中国",
         "ペア",
         "完敗"
+      ]
+    },
+    {
+      "id": "auto_1790641916_5215",
+      "surface": "和久",
+      "reading": "わく",
+      "wrong_reading": "わぐ",
+      "scope": "contextual",
+      "article_topic": "映画『踊る大捜査線』青島が和久さんに似ていて本人びっくり「全く意識してなかった",
+      "sample_sentence": "おだゆうじさんが主演を務める映画『踊る大捜査線 N.E.W. メトロポリスを駆け抜けろ！』の舞台あいさつで、青島俊作役の",
+      "category": "proper_noun",
+      "registered_date": "2026-09-29",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'わぐ' ➔ 正読: 'わく'）",
+      "context_keywords": [
+        "映画",
+        "大捜査線",
+        "青島",
+        "和久",
+        "本人",
+        "意識"
+      ]
+    },
+    {
+      "id": "auto_1790675138_4247",
+      "surface": "三村",
+      "reading": "みむら",
+      "wrong_reading": "みつむら",
+      "scope": "contextual",
+      "article_topic": "湘南美容クリニック関連会社 架空業務発注か",
+      "sample_sentence": "三村に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-29",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'みつむら' ➔ 正読: 'みむら'）",
+      "context_keywords": [
+        "湘南美容",
+        "クリニック",
+        "関連会社",
+        "架空業務発注"
+      ],
+      "updated_date": "2026-09-30"
+    },
+    {
+      "id": "auto_1790675838_5788",
+      "surface": "王毅",
+      "reading": "おうき",
+      "wrong_reading": "おおあつし",
+      "scope": "contextual",
+      "article_topic": "岩屋毅氏訪中 国民・玉木雄一郎代表「意義ある」日中関係改善に向け「回路を開く第一歩」（産経新聞）",
+      "sample_sentence": "いわやたけし氏が中国を訪問し、王毅外相と会談したことを知ったにゃ。",
+      "category": "proper_noun",
+      "registered_date": "2026-09-29",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'おおあつし' ➔ 正読: 'おうき'）",
+      "context_keywords": [
+        "岩屋毅氏訪中",
+        "国民",
+        "玉木雄一郎代表",
+        "意義",
+        "日中関係改善",
+        "回路"
+      ],
+      "updated_date": "2026-09-30"
+    },
+    {
+      "id": "auto_1790676011_9260",
+      "surface": "中田璃士",
+      "reading": "なかたりお",
+      "wrong_reading": "なかた",
+      "scope": "global",
+      "article_topic": "高橋成美：無良崇人に「私も好きだった」「告白した」とぶっちゃけ そろって「さんま御殿」に",
+      "sample_sentence": "中田璃士に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-29",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: なかた)"
+    },
+    {
+      "id": "auto_1790676181_2252",
+      "surface": "橋本涼",
+      "reading": "はしもとりょう",
+      "wrong_reading": "はしもとすずか",
+      "scope": "contextual",
+      "article_topic": "ネタ特番「陣内・バカリズムの最強ピンネタSP」今夜 今井らいぱち、渡辺銀次、R藤本ら登場",
+      "sample_sentence": "ゲストとしていまいらいぱちさんやR藤本さん、渡辺銀次さんらが登場し、橋本涼さんと村重杏奈さんがネタを見届けるんだにゃ。",
+      "category": "person_name",
+      "registered_date": "2026-09-29",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'はしもとすずか' ➔ 正読: 'はしもとりょう'）",
+      "context_keywords": [
+        "ネタ",
+        "特番",
+        "陣内",
+        "バカリズム",
+        "最強",
+        "ピンネタ"
+      ]
+    },
+    {
+      "id": "auto_1790677425_8661",
+      "surface": "武豊",
+      "reading": "たけゆたか",
+      "wrong_reading": "たけとよ",
+      "scope": "contextual",
+      "article_topic": "凱旋門賞ストーリーズ１】メイショウタバルで12度目に挑む武豊騎手「そろそろ勝ちたい",
+      "sample_sentence": "凱旋門賞ストーリーズ1】メイショウタバルで12度目に挑む武豊騎手「そろそろ勝ちたい」",
+      "category": "proper_noun",
+      "registered_date": "2026-09-29",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'たけとよ' ➔ 正読: 'たけゆたか'）",
+      "context_keywords": [
+        "凱旋門賞",
+        "ストーリーズ",
+        "メイショウタバル",
+        "12",
+        "度目",
+        "武豊騎手"
+      ]
+    },
+    {
+      "id": "auto_1790678084_1719",
+      "surface": "柳田",
+      "reading": "やなぎた",
+      "wrong_reading": "やなぎだ",
+      "scope": "contextual",
+      "article_topic": "5番から「柳田、中村晃、今宮」 粋な打順を決めた“演出家”…黄金期を築いた3人への「ご褒美",
+      "sample_sentence": "5番から「柳田、なかむらあきら、今宮」 粋な打順を決めた“演出家”…黄金期を築いた3人への「ご褒美」",
+      "category": "proper_noun",
+      "registered_date": "2026-09-29",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'やなぎだ' ➔ 正読: 'やなぎた'）",
+      "context_keywords": [
+        "柳田",
+        "中村晃",
+        "今宮",
+        "打順",
+        "演出家",
+        "黄金期"
+      ]
+    },
+    {
+      "id": "auto_1790680084_6399",
+      "surface": "黒木佳史",
+      "reading": "よしふみ",
+      "wrong_reading": "くろき よしふみ",
+      "scope": "global",
+      "article_topic": "遺体なき傷害致死 懲役12年を求刑",
+      "sample_sentence": "黒木佳史に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-29",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: くろき よしふみ)"
+    },
+    {
+      "id": "auto_1790715356_8824",
+      "surface": "藤垣",
+      "reading": "ふじがき",
+      "wrong_reading": "ふじかき",
+      "scope": "contextual",
+      "article_topic": "日本と世界の学術をけん引」 藤垣次期学長が記者会見―東大",
+      "sample_sentence": "日本と世界の学術をけん引」 藤垣次期学長が記者会見―東大",
+      "category": "proper_noun",
+      "registered_date": "2026-09-30",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'ふじかき' ➔ 正読: 'ふじがき'）",
+      "context_keywords": [
+        "日本",
+        "世界",
+        "学術",
+        "藤垣次期学長",
+        "記者会見",
+        "東大"
+      ]
+    },
+    {
+      "id": "auto_1790715478_496",
+      "surface": "手塚",
+      "reading": "てづか",
+      "wrong_reading": "てずか",
+      "scope": "contextual",
+      "article_topic": "群馬・太田女性殺害》「高校卒業後に派手に…」前髪クネっとさせた“元ギャル男”…逮捕されたDV元夫（30）は「離婚後も妻家族と同居」現場近くからもう1本の包丁も（集英社オンライン",
+      "sample_sentence": "この事件は群馬県太田市で起こった女性殺害事件で、手塚由佳さん（52）が刃物で刺されて死亡し、長男（26）も負傷したという",
+      "category": "proper_noun",
+      "registered_date": "2026-09-30",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'てずか' ➔ 正読: 'てづか'）",
+      "context_keywords": [
+        "群馬",
+        "太田女性殺害",
+        "高校卒業後",
+        "派手",
+        "前髪",
+        "クネ"
+      ]
+    },
+    {
+      "id": "auto_1790716114_4261",
+      "surface": "大森",
+      "reading": "おおもり",
+      "wrong_reading": "だいもりもとたか",
+      "scope": "contextual",
+      "article_topic": "ミセス大森元貴、国民的バンドに「意図してなってます」…新アルバム『ＰＯＰＳ』収録曲は「ここまで歌っちゃっていいのか僕の中でも挑戦",
+      "sample_sentence": "ミセス大森元貴、国民的バンドに「意図してなってます」…新アルバム『POPS』収録曲は「ここまで歌っちゃっていいのか僕の中",
+      "category": "proper_noun",
+      "registered_date": "2026-09-30",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'だいもりもとたか' ➔ 正読: 'おおもり'）",
+      "context_keywords": [
+        "ミセス",
+        "大森元貴",
+        "国民的",
+        "バンド",
+        "意図",
+        "アルバム"
+      ]
+    },
+    {
+      "id": "auto_1790716214_612",
+      "surface": "石田重廣",
+      "reading": "いしだしげひろ",
+      "wrong_reading": "いしだ しげる ひろし",
+      "scope": "global",
+      "article_topic": "すご～い！安全」 夢グループの石田社長と保科さんが一日警察署長 生活道路の法定速度引き下げ紹介",
+      "sample_sentence": "石田重廣に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-30",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: いしだ しげる ひろし)"
+    },
+    {
+      "id": "auto_1790716722_5141",
+      "surface": "立花",
+      "reading": "たちばな",
+      "wrong_reading": "りっか",
+      "scope": "contextual",
+      "article_topic": "公選法違反疑いで追送検のN党立花被告ら3人を不起訴",
+      "sample_sentence": "公選法違反疑いで追そうけんのN党立花被告ら3人を不起訴",
+      "category": "proper_noun",
+      "registered_date": "2026-09-30",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'りっか' ➔ 正読: 'たちばな'）",
+      "context_keywords": [
+        "公選法違反疑",
+        "追送検",
+        "党立花被告",
+        "不起訴"
+      ]
+    },
+    {
+      "id": "auto_1790718223_1108",
+      "surface": "吉松",
+      "reading": "よしまつ",
+      "wrong_reading": "きちまつ",
+      "scope": "contextual",
+      "article_topic": "福岡県議会の吉松議員、第三者委に証言 「1千万円」通帳コピー提出（朝日新聞）",
+      "sample_sentence": "吉松に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-30",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: きちまつ)",
+      "context_keywords": [
+        "福岡県議会",
+        "吉松議員",
+        "第三者委",
+        "証言",
+        "千万円",
+        "通帳"
+      ]
+    },
+    {
+      "id": "auto_1790718224_2085",
+      "surface": "吉松源昭",
+      "reading": "よしまつもとあき",
+      "wrong_reading": "きちまつみなもと あきら",
+      "scope": "global",
+      "article_topic": "福岡県議会の吉松議員、第三者委に証言 「1千万円」通帳コピー提出（朝日新聞）",
+      "sample_sentence": "吉松源昭に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-30",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: きちまつみなもと あきら)"
+    },
+    {
+      "id": "auto_1790718647_5218",
+      "surface": "JO1",
+      "reading": "ジェイオーワン",
+      "wrong_reading": "じぇえおおいち",
+      "scope": "global",
+      "article_topic": "JO1「全米デビュー出発式」開催 男性グループ史上初・外国特派員協会主催の記者発表、與那城奨が英語でスピーチ",
+      "sample_sentence": "JO1に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-30",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: じぇえおおいち)"
+    },
+    {
+      "id": "auto_1790718911_77",
+      "surface": "正門良規",
+      "reading": "まさかどよしのり",
+      "wrong_reading": "せえもんよしのり",
+      "scope": "global",
+      "article_topic": "向井理、“フィナンシェ”知らずに現場へ差し入れ 正門良規が証言「これがフィナンシェか",
+      "sample_sentence": "正門良規さんから、むかいさんが撮影現場で積極的に差し入れをしていたという証言がありましたにゃ。",
+      "category": "person_name",
+      "registered_date": "2026-09-30",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'せえもんよしのり' ➔ 正読: 'まさかどよしのり'）"
+    },
+    {
+      "id": "auto_1790759042_6691",
+      "surface": "小野泰輔",
+      "reading": "おのたいすけ",
+      "wrong_reading": "おの やすすけ",
+      "scope": "global",
+      "article_topic": "速報】天皇皇后両陛下 八代市で熊本地震の被災者をお見舞い 市内では今も多くの人々が避難生活送る",
+      "sample_sentence": "小野泰輔に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-30",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: おの やすすけ)"
+    },
+    {
+      "id": "auto_1790762383_9230",
+      "surface": "勝野哲",
+      "reading": "かつのさとる",
+      "wrong_reading": "かつの あきら",
+      "scope": "contextual",
+      "article_topic": "勝野会長らの告発状提出 「業務妨害」と市民団体（共同通信）",
+      "sample_sentence": "勝野哲に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-30",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: かつの あきら)",
+      "context_keywords": [
+        "勝野会長",
+        "告発状提出",
+        "業務妨害",
+        "市民団体",
+        "共同通信"
+      ]
+    },
+    {
+      "id": "auto_1790763281_6548",
+      "surface": "二宮和也",
+      "reading": "にのみやかずなり",
+      "wrong_reading": "にのみやかずや",
+      "scope": "global",
+      "article_topic": "アマプラ10月配信作品】ゲーム実写映画『8番出口』『マインクラフト／ザ・ムービー』。ジャンプ漫画実写『サカモトデイズ』などが見放題に",
+      "sample_sentence": "特に『8番出口』はインディーゲームを実写化したもので、二宮和也さんが主演を務めていますにゃ。",
+      "category": "person_name",
+      "registered_date": "2026-09-30",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'にのみやかずや' ➔ 正読: 'にのみやかずなり'）"
+    },
+    {
+      "id": "auto_1790764393_7119",
+      "surface": "壹岐",
+      "reading": "いちき",
+      "wrong_reading": "いき",
+      "scope": "contextual",
+      "article_topic": "陸上】壹岐あいこ、三浦愛華…〝リレービーナス〟人気沸騰「かっこよすぎ」「レース後の涙に…",
+      "sample_sentence": "壹岐あいこ選手は実業団での失速を乗り越え、銅メダルを手に入れたにゃ。",
+      "category": "proper_noun",
+      "registered_date": "2026-09-30",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'いき' ➔ 正読: 'いちき'）",
+      "context_keywords": [
+        "陸上",
+        "壹岐",
+        "三浦愛華",
+        "リレービーナス",
+        "人気沸騰",
+        "レース"
+      ]
+    },
+    {
+      "id": "auto_1790764416_7344",
+      "surface": "落合晃",
+      "reading": "おちあいこう",
+      "wrong_reading": "おちあい あきら",
+      "scope": "contextual",
+      "article_topic": "64年ぶり快挙の落合晃 大八木総監督にまさかの「怒られました」 レース後のやりとりで記者笑わす 男子800ｍで1分44秒48の大会新V（日テレNEWS NNN）",
+      "sample_sentence": "落合晃に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-09-30",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: おちあい あきら)",
+      "context_keywords": [
+        "64",
+        "快挙",
+        "落合晃",
+        "大八木総監督",
+        "レース",
+        "記者笑"
       ]
     }
   ]

@@ -413,6 +413,19 @@ def resolve_unknown_reading_online(
                 print(f"ℹ️ [台帳保存スキップ] '{term}' はVOICEVOXのデフォルト読みと一致（誤読なし）のため台帳へは保存しません。", flush=True)
                 return ruby
 
+            # 🛡️ 2文字の漢字語句で、VOICEVOXの読みが標準辞書読み（pykakasi / janome）と一致している場合、
+            # Wikipediaのマイナー異読（例: 中日 -> なかび、白夜 -> はくや等）による台帳破壊・誤読汚染を100%遮断
+            if len(term) == 2 and re.match(r'^[\u4e00-\u9fa5]+$', term):
+                try:
+                    import pykakasi
+                    kks = pykakasi.kakasi()
+                    std_kks = "".join([c.get("hira", "") for c in kks.convert(term)]).strip()
+                    if clean_hira == std_kks:
+                        print(f"🛡️ [台帳汚染防止] 2文字漢字 '{term}' のVOICEVOX読み '{clean_hira}' は標準辞書読みと一致しているため、Wikipedia異読 '{ruby}' による誤読台帳登録を破棄しました", flush=True)
+                        return clean_hira
+                except Exception:
+                    pass
+
             save_to_pronunciation_memory(
                 surface=term,
                 reading=ruby,
@@ -465,6 +478,7 @@ def extract_candidate_terms_from_text(text: str) -> List[str]:
     HONORIFIC = r'(?:選手|監督|知事|市長|首相|大臣|総理|総裁|議員|社長|会長|棋士|容疑者|被告)'
     COMMON_SURNAMES_AND_WORDS = {
         "政府", "警察", "当局", "関係", "会社", "組織", "日本", "全国", "自民", "公明", "立憲", "共産",
+        "中日", "巨人", "阪神", "広島", "西武", "楽天", "代表", "球団", "チーム", "クラブ", "連盟", "協会", "機構",
         "神田", "鈴木", "田中", "佐藤", "高橋", "渡辺", "伊藤", "山本", "中村", "小林", "加藤", "吉田",
         "山田", "佐々木", "山口", "松本", "井上", "木村", "林", "斎藤", "清水", "山崎", "阿部", "森",
         "池田", "橋本", "山下", "石川", "中島", "前田", "藤田", "小川", "岡田", "後藤", "長谷川", "石井",
