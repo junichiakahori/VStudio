@@ -56,6 +56,9 @@
   - ルールベースの正規化、辞書データ（`dict/`, `data/`）、動的API解決（Wikipedia等）、またはLLMプロンプト設計を活用して汎用的に解決すること。
 - **ルーターとロジックの分離**:
   - APIサーバー（`server/local_api_server.py`）に長大な処理やビジネスロジックを直接記述せず、必ず `server/` 配下の専任モジュールに関数として切り出して呼び出すこと。
+- **`dict/custom_dict.json` の編集禁止（ユーザー手動入力専用ファイル・最重要）**:
+  - `dict/custom_dict.json` はユーザーが手動で語彙や読みを管理するための専用領域であり、AIエージェントが自動で追記・編集・更新することを厳禁とする。
+  - 誤読防止や発音解決は、`data/pronunciation_memory.json`（誤読記憶台帳）や `data/tts_rules.json`、あるいは正規化モジュール（`server/tts_normalizer.py` 等）で汎用的に解決すること。
 - **UTF-8 エンコーディングの徹底**:
   - すべての JavaScript / HTML / CSS / Python ファイルは UTF-8 で記述・保存すること。
 
