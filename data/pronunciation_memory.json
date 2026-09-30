@@ -1543,6 +1543,18 @@
         "レース",
         "記者笑"
       ]
+    },
+    {
+      "id": "weather_ooame",
+      "surface": "大雨",
+      "reading": "おおあめ",
+      "wrong_reading": "おおう",
+      "scope": "global",
+      "article_topic": "気象・自然災害",
+      "sample_sentence": "名古屋市で大雨が降った日に、火災報知機が作動したにゃ。",
+      "category": "weather_disaster",
+      "registered_date": "2026-10-01",
+      "note": "「大雨」が「おお雨」に部分置換された際に助詞と結合して「おおう」と誤読される現象を防止し「おおあめ」に固定"
     }
   ]
 }
