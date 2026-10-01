@@ -1555,6 +1555,154 @@
       "category": "weather_disaster",
       "registered_date": "2026-10-01",
       "note": "「大雨」が「おお雨」に部分置換された際に助詞と結合して「おおう」と誤読される現象を防止し「おおあめ」に固定"
+    },
+    {
+      "id": "auto_1790806374_2584",
+      "surface": "F2",
+      "reading": "エフツー",
+      "wrong_reading": "えふ に",
+      "scope": "global",
+      "article_topic": "本日発売】9月30日（水）｜Sigmaから「軽くて明るい」レンズ2本",
+      "sample_sentence": "F2に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-01",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: えふ に)"
+    },
+    {
+      "id": "auto_1790806376_5489",
+      "surface": "F3",
+      "reading": "エフスリー",
+      "wrong_reading": "えふ さん",
+      "scope": "global",
+      "article_topic": "本日発売】9月30日（水）｜Sigmaから「軽くて明るい」レンズ2本",
+      "sample_sentence": "F3に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-01",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: えふ さん)"
+    },
+    {
+      "id": "auto_1790807030_6189",
+      "surface": "野上士耀",
+      "reading": "のがみしきら",
+      "wrong_reading": "のかみし",
+      "scope": "global",
+      "article_topic": "8.2億円相当の暗号資産",
+      "sample_sentence": "野上士耀に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-01",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: のかみし)"
+    },
+    {
+      "id": "auto_1790846269_3419",
+      "surface": "村田晃大",
+      "reading": "こうだい",
+      "wrong_reading": "むらた こおだい",
+      "scope": "global",
+      "article_topic": "日本は中国になめられているという旨を言われる夢を見た」元陸上自衛官 初公判で起訴内容をおおむね認める 刃物持って中国大使館に侵入したなどの罪 東京地裁（TBS NEWS DIG Powered by JNN）",
+      "sample_sentence": "村田晃大に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-01",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: むらた こおだい)"
+    },
+    {
+      "id": "auto_1790847099_3132",
+      "surface": "八幡",
+      "reading": "はちまん",
+      "wrong_reading": "やはた",
+      "scope": "contextual",
+      "article_topic": "“次世代の100人”に京都・八幡市の川田翔子市長（36） 自治体トップの産休取得「自ら前例つくった",
+      "sample_sentence": "八幡に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-01",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: やはた)",
+      "context_keywords": [
+        "次世代",
+        "100",
+        "京都",
+        "八幡市",
+        "川田翔子市長",
+        "36"
+      ]
+    },
+    {
+      "id": "auto_1790847918_6405",
+      "surface": "健太郎副",
+      "reading": "けんたろう",
+      "wrong_reading": "けんたろお ふく",
+      "scope": "global",
+      "article_topic": "生稲晃子政務官と朝日健太郎副大臣に公選法違反の疑い《公示日前に「観劇会」で…》",
+      "sample_sentence": "健太郎副に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-01",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: けんたろお ふく)"
+    },
+    {
+      "id": "auto_1790848686_4473",
+      "surface": "河本",
+      "reading": "こうもと",
+      "wrong_reading": "かわもと",
+      "scope": "contextual",
+      "article_topic": "膵臓の不調で入院中の河本準一を脳梗塞で休養中のサンド伊達がお見舞いに 病室2ショットに「お二人ともいい笑顔」「ジーンときました",
+      "sample_sentence": "河本さんと伊達さん、お二人ともいい笑顔に見えましたにゃ。",
+      "category": "proper_noun",
+      "registered_date": "2026-10-01",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'かわもと' ➔ 正読: 'こうもと'）",
+      "context_keywords": [
+        "膵臓",
+        "不調",
+        "入院中",
+        "河本準一",
+        "脳梗塞",
+        "休養中"
+      ]
+    },
+    {
+      "id": "auto_1790848752_7080",
+      "surface": "小関裕太",
+      "reading": "こせきゆうた",
+      "wrong_reading": "おぜきゆうた",
+      "scope": "global",
+      "article_topic": "芳根京子＆本田響矢に“うぶキュン”、小関裕太・戸塚純貴も捉えた「めおと日和」予告",
+      "sample_sentence": "料理をしながら友人の深見芙美子さん（生田絵梨花さん演じる）の花嫁姿を妄想するなつ美さんや、深見龍之介さん小関裕太さん演じ",
+      "category": "person_name",
+      "registered_date": "2026-10-01",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'おぜきゆうた' ➔ 正読: 'こせきゆうた'）"
+    },
+    {
+      "id": "auto_1790848752_6144",
+      "surface": "本田響矢",
+      "reading": "ほんだきょうや",
+      "wrong_reading": "ほんだひびきや",
+      "scope": "global",
+      "article_topic": "芳根京子＆本田響矢に“うぶキュン”、小関裕太・戸塚純貴も捉えた「めおと日和」予告",
+      "sample_sentence": "この度、よしねきょうこさんと本田響矢さんだきょうや方が共演するドラマ波うららかに、めおと日和（続編）の予告編が公開されま",
+      "category": "person_name",
+      "registered_date": "2026-10-01",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'ほんだひびきや' ➔ 正読: 'ほんだきょうや'）"
+    },
+    {
+      "id": "auto_1790849522_7354",
+      "surface": "曽野舜太",
+      "reading": "そのしゅんた",
+      "wrong_reading": "そのしゅんふとし",
+      "scope": "global",
+      "article_topic": "M!LK曽野舜太と吉田仁人の横顔は美しい、2人で「E-line MASK」イメージキャラ担当",
+      "sample_sentence": "M!LKの曽野舜太さんと吉田仁人さんがE-line Maskの新イメージキャラクターに就任したにゃ。",
+      "category": "person_name",
+      "registered_date": "2026-10-01",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'そのしゅんふとし' ➔ 正読: 'そのしゅんた'）"
+    },
+    {
+      "id": "auto_1790849522_2837",
+      "surface": "吉田仁人",
+      "reading": "よしだじんと",
+      "wrong_reading": "よしだひとしじん",
+      "scope": "global",
+      "article_topic": "M!LK曽野舜太と吉田仁人の横顔は美しい、2人で「E-line MASK」イメージキャラ担当",
+      "sample_sentence": "M!LKのそのしゅんたさんと吉田仁人さんがE-line Maskの新イメージキャラクターに就任したにゃ。",
+      "category": "person_name",
+      "registered_date": "2026-10-01",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'よしだひとしじん' ➔ 正読: 'よしだじんと'）"
     }
   ]
 }

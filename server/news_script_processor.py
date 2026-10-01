@@ -17,7 +17,8 @@ from server.tts_normalizer import (
     heal_sentence_reading, apply_person_kata_rules, is_plausible_reading,
     extract_article_rubies, lookup_wikipedia_person_reading,
     extract_imperial_pronunciations, get_wikipedia_surname_reading,
-    is_imperial_article_context, apply_athlete_honorific_repairs
+    is_imperial_article_context, apply_athlete_honorific_repairs,
+    heal_tororo_tone_breakage
 )
 from server.news_crawler import find_cached_url, search_news_url_by_title, register_cached_url, fetch_article_body, decode_google_news_url
 
@@ -1190,26 +1191,9 @@ def audit_and_heal_news_script(items, title="", article_context="", category_nam
                 healed_sp = re.sub(r'東奥義塾', 'とうおうぎじゅく', healed_sp)
                 healed_sp = re.sub(r'東奥', 'とうおう', healed_sp)
 
-        # 9. 破損語尾（「みんないゃにゃ」「いゃにゃ」「ないゃ」等）の自己修復
-        if re.search(r'(?:みんないゃ|いゃにゃ|ないゃ|てみんないゃ)', disp):
-            print(f"[語尾自己修復] 🩹 破損語尾を検知・自動修復 (display): '{disp}'", flush=True)
-            disp = re.sub(r'てみんないゃにゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', disp)
-            disp = re.sub(r'みんないゃにゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', disp)
-            disp = re.sub(r'てみんないゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', disp)
-            disp = re.sub(r'みんないゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', disp)
-            disp = re.sub(r'い+ゃにゃ([！!？?。、\s　]|$)', r'いにゃ\1', disp)
-            disp = re.sub(r'ない+ゃにゃ([！!？?。、\s　]|$)', r'ないにゃ\1', disp)
-            disp = re.sub(r'ない+ゃ([！!？?。、\s　]|$)', r'ないにゃ\1', disp)
-
-        if re.search(r'(?:みんないゃ|いゃにゃ|ないゃ|てみんないゃ)', healed_sp):
-            print(f"[語尾自己修復] 🩹 破損語尾を検知・自動修復 (speech): '{healed_sp}'", flush=True)
-            healed_sp = re.sub(r'てみんないゃにゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', healed_sp)
-            healed_sp = re.sub(r'みんないゃにゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', healed_sp)
-            healed_sp = re.sub(r'てみんないゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', healed_sp)
-            healed_sp = re.sub(r'みんないゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', healed_sp)
-            healed_sp = re.sub(r'い+ゃにゃ([！!？?。、\s　]|$)', r'いにゃ\1', healed_sp)
-            healed_sp = re.sub(r'ない+ゃにゃ([！!？?。、\s　]|$)', r'ないにゃ\1', healed_sp)
-            healed_sp = re.sub(r'ない+ゃ([！!？?。、\s　]|$)', r'ないにゃ\1', healed_sp)
+        # 9. とろろ口調の語尾破損・「た」抜け（〜されにゃ、〜しにゃ、見えにゃ等）・不要な「さ」（〜さにゃ）・重複（〜にゃにゃ）の自己修復
+        disp = heal_tororo_tone_breakage(disp)
+        healed_sp = heal_tororo_tone_breakage(healed_sp)
 
         # 10. 「上（うえ／じょう）」の誤読自己修復（表示は漢字を維持し、音声読み上げを確実に補正）
         if re.search(r'(?<![A-Za-z0-9])(?:X|Ｘ)上(?=[、\s　「『でにはものからと]|$)', healed_sp):

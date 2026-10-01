@@ -180,7 +180,7 @@ def is_plausible_reading(term, yomi):
             return False
         if len(kanji_chars) >= 2 and len(norm_yomi) < len(kanji_chars):
             return False
-        if len(kanji_chars) == 2 and len(norm_yomi) >= 6:
+        if len(kanji_chars) == len(norm_term) and len(kanji_chars) == 2 and len(norm_yomi) >= 6:
             return False
 
     kks = get_kks()
@@ -232,7 +232,7 @@ def is_plausible_reading(term, yomi):
     sim_j = difflib.SequenceMatcher(None, j_reading, norm_yomi).ratio() if j_reading else 0
 
     # 漢字2文字の短い語句については、先頭文字の頭音および末尾文字の末尾音と一致している必要がある（三又 ➔ みつい、暴力 ➔ なべりょく等の偽読みを100%遮断）
-    if len(kanji_chars) == 2:
+    if len(kanji_chars) == len(norm_term) and len(kanji_chars) == 2:
         VOICED_MAP = {
             "か": ["が"], "き": ["ぎ"], "く": ["ぐ"], "け": ["げ"], "こ": ["ご"],
             "さ": ["ざ"], "し": ["じ"], "す": ["ず"], "せ": ["ぜ"], "そ": ["ぞ"],
@@ -574,6 +574,18 @@ def apply_contextual_proper_nouns_rules(text):
     t = text
     for pattern, yomi in get_imperial_proper_nouns():
         t = re.sub(pattern, yomi, t)
+
+    # 著名人・VTuber・作品名等の適切な読み解決（data/tts_rules.json prominent_people より動的適用）
+    rules = load_tts_rules()
+    prominent = rules.get("prominent_people", {})
+    if prominent and isinstance(prominent, dict):
+        for name, yomi in sorted(prominent.items(), key=lambda x: len(x[0]), reverse=True):
+            if name and yomi and name in t:
+                if re.match(r'^[\u4e00-\u9fa5]+$', name):
+                    pat = rf'(?<![\u4e00-\u9fa5]){re.escape(name)}(?![\u4e00-\u9fa5])'
+                else:
+                    pat = rf'(?<![A-Za-z0-9\u4e00-\u9fa5]){re.escape(name)}(?![A-Za-z0-9])'
+                t = re.sub(pat, yomi, t)
     return t
 
 # ── Wikipedia 読み取得キャッシュ（ヒット・ネガティブ共用）──
@@ -591,12 +603,19 @@ def _validate_wiki_reading(term, yomi):
     # 漢字熟語に対して異常に長すぎる読み（作品名・ドラマ名等の混入、漢字2文字に5文字以上等）を確実に除外
     kanji_len = len([c for c in term if '\u4e00' <= c <= '\u9fa5'])
     if kanji_len > 0:
-        if kanji_len <= 2 and len(yomi) >= 5:
-            print(f"[Wikipedia誤読防止] 🚫 '{term}' (漢字{kanji_len}文字) の読み '{yomi}' は長すぎるため破棄")
-            return None
-        if len(yomi) > max(kanji_len * 3, 8):
-            print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi}' は漢字文字数に対して長すぎるため破棄")
-            return None
+        # 純粋な漢字のみの語句の場合のみ厳格な比率チェックを適用（宝鐘マリン、星街すいせい等の仮名混じりを保護）
+        if len(term) == kanji_len:
+            if kanji_len <= 2 and len(yomi) >= 5:
+                print(f"[Wikipedia誤読防止] 🚫 '{term}' (漢字{kanji_len}文字) の読み '{yomi}' は長すぎるため破棄")
+                return None
+            if len(yomi) > max(kanji_len * 3, 8):
+                print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi}' は漢字文字数に対して長すぎるため破棄")
+                return None
+        else:
+            # 漢字＋仮名・英字の混在語句
+            if len(yomi) > max(len(term) * 3, 12):
+                print(f"[Wikipedia誤読防止] 🚫 '{term}' の読み '{yomi}' は全体文字数に対して長すぎるため破棄")
+                return None
 
     # 曖昧さ回避ページ等での複数読み連結（例: あきばあきは、あきばあきば、おおさかおおざか）の除外
     if len(yomi) >= 6:
@@ -1258,12 +1277,14 @@ def apply_country_prefixes(text):
     t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米台(?=首脳|会談|関係|安保|防衛|共同|協議|緊密)', 'べいたい', t)
 
     # 2. 報道組織・役職・専門用語プレフィックス
+    # カタカナ外国人名＋米＋役職・組織（例: ベッセント米財務長官、トランプ米政権、バイデン米大統領、ルビオ米次期国務長官等）
+    t = re.sub(r'([ァ-ヴー]{2,15})米(?=財務長官|国務長官|国防長官|司法長官|大統領|副大統領|長官|補佐官|高官|政府|政権|議会|司法省|最高裁|特使|報道官|代表|当局|市場|企業|経済)', r'\1べい', t)
     t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米側', 'べいがわ', t)
     t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米軍', 'べいぐん', t)
     t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米大統領', 'べいだいとうりょう', t)
     t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米政権', 'べいせいけん', t)
     t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米政府', 'べいせいふ', t)
-    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米(?=当局|議会|連邦|海軍|空軍|陸軍|高官|司法省|最高裁|財務省|国防総省|国務省|市場|企業|経済|株|株式|雇用|研究|情報|紙|誌|報道|メディア|テレビ|放送|大学|機関|社会|文化|国内|国外|本土|東部|西部|南部|北部|中央|指数|金利|債|ドル|シンクタンク|世論|国民|政策|戦略|安全保障|安保)', 'べい', t)
+    t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米(?=財務長官|国務長官|国防長官|司法長官|大統領|副大統領|長官|補佐官|報道官|特使|知事|市長|議員|高官|閣僚|当局|議会|連邦|海軍|空軍|陸軍|司法省|最高裁|財務省|国防総省|国務省|市場|企業|経済|株|株式|雇用|研究|情報|紙|誌|報道|メディア|テレビ|放送|大学|機関|社会|文化|国内|国外|本土|東部|西部|南部|北部|中央|指数|金利|債|ドル|シンクタンク|世論|国民|政策|戦略|安全保障|安保)', 'べい', t)
     t = re.sub(r'(?<![一-龥ぁ-んァ-ヶA-Za-z])米(?=[ァ-ヴーA-Z][ァ-ヴーA-Za-z0-9・]+)', 'べい', t)
 
     # 3. 🌾 お米・農産物文脈における「米」の「こめ」確定（文脈限定）
@@ -1339,6 +1360,8 @@ DEFAULT_TECH_ACRONYMS = {
     "G7": "ジーセブン",
     "G20": "ジートゥエンティ",
     "NHK": "エヌエイチケイ",
+    "NTT": "エヌティーティー",
+    "VIVANT": "ヴィヴァン",
     "MLB": "エムエルビー",
     "MVP": "エムブイピー",
     "WBC": "ダブリュービーシー",
@@ -2159,6 +2182,11 @@ def heal_sentence_reading(display_text, speech_text):
             # 台帳で修復された公認語句はロールバックせず採用
             if any(s in orig or orig in s for s in healed_surfaces):
                 healed_parts.append(rep)
+            # data/tts_rules.json に登録されている公認著名人・略語はロールバックせず採用
+            elif any(orig == k or orig in k or k in orig for k in load_tts_rules().get("prominent_people", {}).keys()):
+                healed_parts.append(rep)
+            elif any(orig == k or orig in k or k in orig for k in load_tts_rules().get("tech_acronyms", {}).keys()):
+                healed_parts.append(rep)
             # 英字・記号・略語からの仮名化（M!LK->みるく、SixTONES->ストーンズ、King & Prince等）は正常な読み解決
             elif re.search(r'[A-Za-z!！?？&・\-_.]', orig) and re.match(r'^[ぁ-んァ-ヶー\s　]+$', rep):
                 healed_parts.append(rep)
@@ -2175,3 +2203,50 @@ def heal_sentence_reading(display_text, speech_text):
 
     healed_result = "".join(healed_parts)
     return healed_result
+
+def heal_tororo_tone_breakage(text):
+    """
+    とろろ口調の語尾破損・脱落（「た」抜け等）・不要な「さ」・重複（にゃにゃ）を網羅的に自動修復
+    - 〜され(た)にゃ（「た」抜け） ➔ 〜されたにゃ
+    - 〜し(た)にゃ（「た」抜け） ➔ 〜したにゃ
+    - 〜さにゃ（不要な「さ」） ➔ 〜にゃ
+    - 見えにゃ（「た」抜け） ➔ 見えたにゃ
+    - 〜にゃにゃ（「にゃ」重複） ➔ 〜にゃ
+    """
+    if not text:
+        return ""
+    t = text
+
+    # 1. 「にゃにゃ」など語尾の二重・重複の解消
+    t = re.sub(r'にゃ(?:[\s　]*にゃ)+', 'にゃ', t)
+    t = re.sub(r'(?:にゃ[！!。？?\s　]*){2,}', 'にゃ！', t)
+
+    # 2. 「〜さにゃ」の不要な「さ」除去（ださにゃ、でしたさにゃ、ましたさにゃ、たさにゃ等）
+    t = re.sub(r'([だたしたるないのですますでしたました])さにゃ([！!？?。、\s　]|$)', r'\1にゃ\2', t)
+
+    # 3. 「〜され(た)にゃ」「〜させられ(た)にゃ」の「た」抜け救済
+    t = re.sub(r'([ぁ-んァ-ヶー一-鿿]+(?:され|させられ|られた|言われ|思われ|見られ|追われ|奪われ|行われ|報じられ|伝えられ))にゃ([！!？?。、\s　]|$)', r'\1たにゃ\2', t)
+
+    # 4. 「見え(た)にゃ」「思え(た)にゃ」等の連用形「た」抜け救済
+    t = re.sub(r'(見え|思え|感じ取れ|聞こえ)にゃ([！!？?。、\s　]|$)', r'\1たにゃ\2', t)
+
+    # 5. 「〜し(た)にゃ」の「た」抜け救済（形容詞語幹は「〜いにゃ」）
+    t = re.sub(r'(おいし|うれし|たのし|かなし|さみし|すばらし|めずらし|懐かし)にゃ([！!？?。、\s　]|$)', r'\1いにゃ\2', t)
+    t = re.sub(r'([ぁ-んァ-ヶー一-鿿]{2,}し)にゃ([！!？?。、\s　]|$)', r'\1たにゃ\2', t)
+    t = re.sub(r'(?<=そう)しにゃ([！!？?。、\s　]|$)', r'したにゃ\1', t)
+    t = re.sub(r'(?<=どう)しにゃ([！!？?。、\s　]|$)', r'したにゃ\1', t)
+
+    # 6. 「出さにゃ」➔ 「出たにゃ」
+    t = re.sub(r'出さにゃ([！!？?。、\s　]|$)', r'出たにゃ\1', t)
+
+    # 7. 「みんないゃにゃ」「いゃにゃ」「ないゃ」の破損修復
+    t = re.sub(r'てみんないゃにゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', t)
+    t = re.sub(r'みんないゃにゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', t)
+    t = re.sub(r'てみんないゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', t)
+    t = re.sub(r'みんないゃ([！!？?。、\s　]|$)', r'てみてほしいにゃ\1', t)
+    t = re.sub(r'い+ゃにゃ([！!？?。、\s　]|$)', r'いにゃ\1', t)
+    t = re.sub(r'ない+ゃにゃ([！!？?。、\s　]|$)', r'ないにゃ\1', t)
+    t = re.sub(r'ない+ゃ([！!？?。、\s　]|$)', r'ないにゃ\1', t)
+
+    return t
+

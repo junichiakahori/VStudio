@@ -295,6 +295,106 @@ TEST_CATEGORIES = [
                 "forbidden_pattern": r"てずか",
             },
         ]
+    },
+    {
+        "category": "7. 著名人・外国要人・作品・テクノロジー固有名詞（宝鐘マリン、趣里、ベッセント、VIVANT、NTT）",
+        "cases": [
+            {
+                "id": "proper_houshou_marine",
+                "desc": "「宝鐘マリン」が「ホオショウマリン」と正しく発音されること（たからかねまりん防止）",
+                "text": "宝鐘マリンさんの最新生配信が話題になっているにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ホオショウマリン|ホウショウマリン",
+                "forbidden_kana_pattern": r"タカラカネ|タカラガネ",
+            },
+            {
+                "id": "proper_shuri",
+                "desc": "「趣里」が「シュリ」と正しく発音されること（おもむきさと防止）",
+                "text": "女優の趣里さんが主演を務める新作映画が公開されたにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"シュリ",
+                "forbidden_kana_pattern": r"オモムキサト",
+            },
+            {
+                "id": "proper_bessent_treasury",
+                "desc": "「ベッセント米財務長官」が「ベッセントベイザイムチョウカン」と発音されること（まい財務長官防止）",
+                "text": "ベッセント米財務長官が新たな経済政策について言及しましたにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ベッセントベ[エ|イ]ザイムチョ",
+                "forbidden_kana_pattern": r"マイザイムチョ",
+            },
+            {
+                "id": "proper_vivant",
+                "desc": "「VIVANT」が「ヴィヴァン」と発音されること（ぶいあいぶいえーえぬてぃ防止）",
+                "text": "大ヒットドラマVIVANTの続編が期待されていますにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ビバン|ヴィヴァン",
+                "forbidden_kana_pattern": r"ブイアイブイ",
+            },
+            {
+                "id": "tech_ntt",
+                "desc": "「NTT」が「エヌティーティー」と明瞭に発音されること（早口・短音エヌティティ防止）",
+                "text": "NTTが次世代通信基盤の実験に成功したにゃ。",
+                "check_type": "both",
+                "expected_speech_pattern": r"エヌティーティー",
+                "forbidden_speech_pattern": r"(?<![A-Za-z0-9])NTT(?![A-Za-z0-9])",
+                "expected_kana_pattern": r"エヌティイティイ",
+                "forbidden_kana_pattern": r"エヌティティ",
+            },
+        ]
+    },
+    {
+        "category": "8. 口調・語尾破損修復（〜されにゃ、〜しにゃ、〜さにゃ、見えにゃ、にゃにゃ重複、出さにゃ）",
+        "cases": [
+            {
+                "id": "tone_sare_nya_repair",
+                "desc": "「〜されにゃ」の「た」抜けが「〜されたにゃ」へ修復されること",
+                "text": "新曲の発売が正式に発表されにゃ！",
+                "check_type": "speech_text",
+                "expected_pattern": r"発表されたにゃ",
+                "forbidden_pattern": r"発表されにゃ",
+            },
+            {
+                "id": "tone_shi_nya_repair",
+                "desc": "「〜しにゃ」の「た」抜けが「〜したにゃ」へ修復されること",
+                "text": "運営チームが新しい方針を決定しにゃ。",
+                "check_type": "speech_text",
+                "expected_pattern": r"決定したにゃ",
+                "forbidden_pattern": r"決定しにゃ",
+            },
+            {
+                "id": "tone_sa_nya_repair",
+                "desc": "「〜さにゃ」の不要な「さ」が除去されて「〜にゃ」へ修復されること",
+                "text": "それは本当ださにゃ。",
+                "check_type": "speech_text",
+                "expected_pattern": r"本当だにゃ",
+                "forbidden_pattern": r"ださにゃ",
+            },
+            {
+                "id": "tone_mie_nya_repair",
+                "desc": "「見えにゃ」の「た」抜けが「見えたにゃ」へ修復されること",
+                "text": "ステージの上に素敵な未来が見えにゃ。",
+                "check_type": "speech_text",
+                "expected_pattern": r"見えたにゃ",
+                "forbidden_pattern": r"見えにゃ",
+            },
+            {
+                "id": "tone_nya_nya_duplicate_repair",
+                "desc": "「〜にゃにゃ」の重複が「〜にゃ」へ修復されること",
+                "text": "今日もいいお天気だにゃにゃ！",
+                "check_type": "speech_text",
+                "expected_pattern": r"お天気だにゃ！",
+                "forbidden_pattern": r"にゃにゃ",
+            },
+            {
+                "id": "tone_desa_nya_repair",
+                "desc": "「出さにゃ」が「出たにゃ」へ修復されること",
+                "text": "ついに素晴らしい結果が出さにゃ！",
+                "check_type": "speech_text",
+                "expected_pattern": r"結果が出たにゃ",
+                "forbidden_pattern": r"出さにゃ",
+            },
+        ]
     }
 ]
 
