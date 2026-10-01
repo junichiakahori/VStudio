@@ -1421,6 +1421,9 @@ def apply_tech_acronyms(text):
     # 🛡️ 1.3 iDeCo（個人型確定拠出年金: イデコ）の確実な正規化（「アイデコ」誤読防止）
     t = re.sub(r'(?i)(?<![A-Za-z0-9])ideco(?![A-Za-z0-9])', 'イデコ', t)
 
+    # 🛡️ 1.4 単独の大文字「THE」（THE TIME, THE FIRST, THE Open Call等）のスペル読み防止
+    t = re.sub(r'(?<![A-Za-z0-9])THE(?![A-Za-z0-9])', 'ザ', t)
+
     acronyms = dict(DEFAULT_TECH_ACRONYMS)
     acronyms.update(load_tts_rules().get("tech_acronyms", {}))
     for acronym, yomi in sorted(acronyms.items(), key=lambda x: len(x[0]), reverse=True):
