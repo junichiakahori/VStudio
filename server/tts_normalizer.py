@@ -1616,18 +1616,11 @@ def apply_model_suffix_rules(text):
     pattern = r'(?<![A-Za-z0-9])([A-Za-z]{1,4}(?:/[A-Za-z]+)?-?\d+)([VAWNvawn])(?![A-Za-z0-9])'
     return re.sub(pattern, repl, text)
 
-def apply_athlete_honorific_repairs(text, is_sports=False):
-    """
-    報道記事における孤立した『さんたち』『さんへの』等の破綻敬称を自動救済修復（ホワイトリスト方式・カテゴリ連動）
-    is_sports=True: スポーツ記事用（『選手たち』『選手』へ修復）
-    is_sports=False: 非スポーツ記事用（『選手』は絶対に使わず『皆さん』『方たち』へ修復）
-    ※ 組織・店舗・ブランド・モノへの不自然な「さん」付けは文脈を問わず自動除去
-    """
+def apply_corporate_and_object_san_removal(text):
+    """組織・店舗・ブランド・モノへの不自然な「さん」付けを文脈問わず自動除去"""
     if not text:
         return ""
     t = text
-
-    # 0. 組織・企業・店舗・ブランド・モノへの「さん」除去（文脈問わず共通）
     # (a) 修飾語付き固有名詞＋さん（例: 探鉱会社のアービング・リソースさん ➔ 探鉱会社のアービング・リソース）
     t = re.sub(
         r'((?:会社|株式会社|企業|店舗|和菓子店|洋菓子店|飲食店|店|ブランド|メーカー|組織|団体|協会|連盟|学校|大学|高校|自治体|病院|施設)の?\s*[A-Za-z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF・ー]+?)さん(?=[がはのにをとでへからもやより、。！？\s\b])',
@@ -1638,6 +1631,18 @@ def apply_athlete_honorific_repairs(text, is_sports=False):
     t = re.sub(r'((?:会社|株式会社|有限会社|合同会社|社|店|店舗|ブランド|協会|連盟|機構|委員会|省|庁|署|府|県|市|町|村|党|法人|グループ))さん(?=[がはのにをとでへからもやより、。！？\s\b])', r'\1', t)
     # (c) モノ・技術・動物＋さん（例: AIロボットさん ➔ AIロボット）
     t = re.sub(r'((?:ロボット|AI|アンドロイド|犬|猫|車|乗り物|アプリ|ソフト|システム|サービス|製品|商品))さん(?=[がはのにをとでへからもやより、。！？\s\b])', r'\1', t)
+    return t
+
+def apply_athlete_honorific_repairs(text, is_sports=False):
+    """
+    報道記事における孤立した『さんたち』『さんへの』等の破綻敬称を自動救済修復（ホワイトリスト方式・カテゴリ連動）
+    is_sports=True: スポーツ記事用（『選手たち』『選手』へ修復）
+    is_sports=False: 非スポーツ記事用（『選手』は絶対に使わず『皆さん』『方たち』へ修復）
+    ※ 組織・店舗・ブランド・モノへの不自然な「さん」付けは文脈を問わず自動除去
+    """
+    if not text:
+        return ""
+    t = apply_corporate_and_object_san_removal(text)
 
     SAFE_GENERAL = r'(?:お父|お母|お兄|お姉|おじ|おば|おじい|おばあ|みな|皆|お客|子ども|お子|奥|旦那)'
 
@@ -2001,8 +2006,8 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
     t = re.sub(r'(?:にゃ[\s　、]*){2,}', 'にゃ', t)
     t = re.sub(r'(?:のだ[\s　、]*){2,}', 'のだ', t)
 
-    # 0.75 助詞直後に孤立した「さんたち」「さんへの」「さんのプレー」等の破綻敬称を「選手たち」「選手への」へ自動救済修復
-    t = apply_athlete_honorific_repairs(t)
+    # 0.75 組織・企業・店舗・ブランド・モノへの不自然な「さん」付けを自動除去（さんたち救済はカテゴリ連動のaudit_and_heal_news_scriptで実施）
+    t = apply_corporate_and_object_san_removal(t)
 
     # 1. 文脈考慮型のIT発音解決（映画『IT』 vs 英語代名詞 it vs 情報技術 大文字IT）
     t = apply_it_context_rules(t)
@@ -2150,6 +2155,9 @@ def heal_sentence_reading(display_text, speech_text):
             rep = speech_text[j1:j2]
             # 台帳で修復された公認語句はロールバックせず採用
             if any(s in orig or orig in s for s in healed_surfaces):
+                healed_parts.append(rep)
+            # 英字・記号・略語からの仮名化（M!LK->みるく、SixTONES->ストーンズ、King & Prince等）は正常な読み解決
+            elif re.search(r'[A-Za-z!！?？&・\-_.]', orig) and re.match(r'^[ぁ-んァ-ヶー\s　]+$', rep):
                 healed_parts.append(rep)
             elif is_plausible_reading(orig, rep):
                 healed_parts.append(rep)
