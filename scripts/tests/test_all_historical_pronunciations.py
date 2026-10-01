@@ -341,6 +341,38 @@ TEST_CATEGORIES = [
                 "expected_kana_pattern": r"エヌティイティイ",
                 "forbidden_kana_pattern": r"エヌティティ",
             },
+            {
+                "id": "proper_hanyu_yuzuru_figure",
+                "desc": "「羽生結弦選手」が「ハニュウユズルセンシュ」と正しく発音されること（ハブ防止）",
+                "text": "羽生結弦選手がアイスショーで素晴らしい演技を披露しましたにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ハニュウユズルセンシュ|ハニュウセンシュ",
+                "forbidden_kana_pattern": r"ハブユズル|ハブセンシュ",
+            },
+            {
+                "id": "proper_hanyu_single_figure",
+                "desc": "フィギュアスケート文脈での単独「羽生選手」が「ハニュウセンシュ」と正しく発音されること（ハブ防止）",
+                "text": "フィギュアスケートの羽生選手が新たな挑戦について語りましたにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ハニュウセンシュ",
+                "forbidden_kana_pattern": r"ハブセンシュ",
+            },
+            {
+                "id": "proper_habu_yoshiharu_shogi",
+                "desc": "「羽生善治九段」が「ハブヨシハル」と正しく発音されること（ハニュウ防止）",
+                "text": "羽生善治九段が竜王戦の対局に臨みましたにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ハブヨシハル|ハ'ブクダン",
+                "forbidden_kana_pattern": r"ハニュウヨシハル",
+            },
+            {
+                "id": "proper_habu_single_shogi",
+                "desc": "将棋文脈での単独「羽生九段」が「ハブクダン」と正しく発音されること（ハニュウ防止）",
+                "text": "将棋の公式戦で羽生九段が勝利を収めましたにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ハブクダン|ハ'ブクダン",
+                "forbidden_kana_pattern": r"ハニュウクダン",
+            },
         ]
     },
     {

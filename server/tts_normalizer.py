@@ -567,7 +567,7 @@ def _strip_unmatched_brand_prefix(term, yomi_clean):
         yomi_clean = yomi_clean[:-3] + "つー"
     return yomi_clean
 
-def apply_contextual_proper_nouns_rules(text):
+def apply_contextual_proper_nouns_rules(text, full_context: str = ""):
     """文脈から判断できる皇族・著名人などの固有名詞の適切な読み解決（data/tts_rules.json より動的適用）"""
     if not text:
         return ""
@@ -575,7 +575,37 @@ def apply_contextual_proper_nouns_rules(text):
     for pattern, yomi in get_imperial_proper_nouns():
         t = re.sub(pattern, yomi, t)
 
-    # 著名人・VTuber・作品名等の適切な読み解決（data/tts_rules.json prominent_people より動的適用）
+    # 1. 羽生結弦（フィギュアスケート: はにゅう）vs 羽生善治（将棋: はぶ）の文脈解決
+    if "羽生" in t:
+        ctx = (full_context or "") + " " + t
+        FIGURE_KEYWORDS = (
+            "羽生結弦", "フィギュア", "スケート", "アイスショー", "五輪", "オリンピック",
+            "金メダル", "プログラム", "スケーティング", "FaOI", "RE_PRAY", "GIFT",
+            "notte stellata", "プロアスリート", "アクセル", "ジャンプ", "グランプリ"
+        )
+        SHOGI_KEYWORDS = (
+            "羽生善治", "将棋", "棋士", "対局", "名人", "竜王", "王将", "王座",
+            "棋聖", "王位", "棋王", "叡王", "永世", "九段", "八段", "藤井聡太", "将棋連盟", "順位戦"
+        )
+        has_fig = any(kw in ctx for kw in FIGURE_KEYWORDS)
+        has_shogi = any(kw in ctx for kw in SHOGI_KEYWORDS)
+
+        # フルネームおよび確実な肩書の先行解決
+        t = re.sub(r'(?<![\u4e00-\u9fa5])羽生結弦(?![\u4e00-\u9fa5])', 'はにゅうゆづる', t)
+        t = re.sub(r'(?<![\u4e00-\u9fa5])羽生選手(?![\u4e00-\u9fa5])', 'はにゅうせんしゅ', t)
+        t = re.sub(r'(?<![\u4e00-\u9fa5])羽生善治(?![\u4e00-\u9fa5])', 'はぶよしはる', t)
+        t = re.sub(r'(?<![\u4e00-\u9fa5])羽生九段(?![\u4e00-\u9fa5])', 'はぶくだん', t)
+        t = re.sub(r'(?<![\u4e00-\u9fa5])羽生会長(?![\u4e00-\u9fa5])', 'はぶかいちょう', t)
+        t = re.sub(r'(?<![\u4e00-\u9fa5])羽生永世名人(?![\u4e00-\u9fa5])', 'はぶえいせいめいじん', t)
+        t = re.sub(r'(?<![\u4e00-\u9fa5])羽生名誉王座(?![\u4e00-\u9fa5])', 'はぶめいよおうざ', t)
+
+        # 単独「羽生（羽生さん、羽生氏等）」の文脈判定
+        if has_fig and not has_shogi:
+            t = re.sub(r'(?<![\u4e00-\u9fa5])羽生(?=さん|氏|選手|君|くん|が|は|の|に|を|と|で|へ|から|より|たち|ら|[、。！？\s　]|$)', 'はにゅう', t)
+        elif has_shogi and not has_fig:
+            t = re.sub(r'(?<![\u4e00-\u9fa5])羽生(?=さん|氏|九段|会長|永世|名誉|棋士|が|は|の|に|を|と|で|へ|から|より|たち|ら|[、。！？\s　]|$)', 'はぶ', t)
+
+    # 2. 著名人・VTuber・作品名等の適切な読み解決（data/tts_rules.json prominent_people より動的適用）
     rules = load_tts_rules()
     prominent = rules.get("prominent_people", {})
     if prominent and isinstance(prominent, dict):
@@ -2050,7 +2080,7 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
     # 3. 一般英単語（※VOICEVOX内蔵辞書で標準処理）
 
     # 4. 固有名詞の文脈保護ルール（皇族・著名人の文脈読み＆動詞「探す」と重複する「株探」の誤爆防止）
-    t = apply_contextual_proper_nouns_rules(t)
+    t = apply_contextual_proper_nouns_rules(t, full_context=full_context)
     # 送り仮名（し・す・せ・そ・さ・っ）が直後に続く場合は「探す（さがす）」なので置換せず、メディア名「株探」のみ「かぶたん」に置換
     t = re.sub(r'株探(?![しすせそさっ])', 'かぶたん', t)
 
