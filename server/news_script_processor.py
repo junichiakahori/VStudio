@@ -1363,54 +1363,8 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
 
     trusted_terms = set(terms_map.keys())
 
-    # 🔍 原稿全文に含まれる一般名詞・複合漢字語をJanomeで網羅抽出（※固有名詞はJanomeの地名誤爆「反町=たんまち」等を防ぐため除外）
-    try:
-        from janome.tokenizer import Tokenizer
-        tokenizer = Tokenizer()
-        import pykakasi
-        kks = pykakasi.kakasi()
-        NUM_CHARS = set("一二三四五六七八九十百千万億兆0123456789０１２３４５６７８９")
-        DATE_COUNTER_WORDS = {"月末", "月上旬", "月中旬", "月下旬", "月初", "月半ば", "月", "日", "年", "週", "時", "分", "秒", "度", "回", "戦", "便", "人", "名", "個", "台", "件", "歳", "才", "日間", "月間", "年間", "週間", "時間"}
-        for it in items:
-            sp = it.get("speech", "")
-            tokens = list(tokenizer.tokenize(sp))
-            for i, token in enumerate(tokens):
-                pos = token.part_of_speech.split(",")
-                surf = token.surface
-                # 数詞・助数詞・接尾辞を含むもの、および日付・暦・助数詞語句は除外（一軒、1件、月、末等）
-                if any(c in NUM_CHARS for c in surf) or pos[1] in ("数", "接尾", "助数詞") or surf in DATE_COUNTER_WORDS:
-                    continue
-                # 固有名詞はJanome辞書読み（反町=たんまち、麻生=あそ等）が不正確なため除外（Wikipedia/AI解決を信頼）
-                if pos[1] == "固有名詞":
-                    continue
-                # 直前が数詞の場合、この名詞も数詞と結合している（例: 10月末、3月、5日など）ため単体抽出を禁止
-                if i > 0:
-                    prev_tok = tokens[i-1]
-                    prev_pos = prev_tok.part_of_speech.split(",")
-                    if any(c in NUM_CHARS for c in prev_tok.surface) or prev_pos[1] in ("数", "助数詞"):
-                        continue
-                # 2文字以上の漢字一般名詞
-                if len(surf) >= 2 and any('\u4e00' <= c <= '\u9fa5' for c in surf):
-                    if pos[0] == "名詞" and token.reading and token.reading != "*":
-                        hira = "".join([c.get("hira", "") for c in kks.convert(token.reading)]).strip()
-                        if hira and surf not in terms_map:
-                            terms_map[surf] = hira
-                # 連続する一般名詞の結合
-                if i + 1 < len(tokens):
-                    next_tok = tokens[i+1]
-                    next_pos = next_tok.part_of_speech.split(",")
-                    if any(c in NUM_CHARS for c in next_tok.surface) or next_pos[1] in ("数", "接尾", "助数詞", "固有名詞") or next_tok.surface in DATE_COUNTER_WORDS:
-                        continue
-                    if pos[0] == "名詞" and next_pos[0] == "名詞":
-                        combo_surf = surf + next_tok.surface
-                        if 2 <= len(combo_surf) <= 6 and any('\u4e00' <= c <= '\u9fa5' for c in combo_surf):
-                            if token.reading and next_tok.reading and token.reading != "*" and next_tok.reading != "*":
-                                h1 = "".join([c.get("hira", "") for c in kks.convert(token.reading)]).strip()
-                                h2 = "".join([c.get("hira", "") for c in kks.convert(next_tok.reading)]).strip()
-                                if h1 and h2 and combo_surf not in terms_map:
-                                    terms_map[combo_surf] = h1 + h2
-    except Exception:
-        pass
+    # 🛡️ 一般名詞のJanome機械抽出はヘテロニム（多音語: 上方、中日、行方、市場等）を誤読破壊するため完全撤廃。
+    # 照合対象は、信頼できる固有名詞（known_terms_map）および台帳登録語句のみに限定する。
 
     if not terms_map:
         return items
