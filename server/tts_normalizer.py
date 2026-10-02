@@ -1733,6 +1733,42 @@ def apply_model_suffix_rules(text):
     pattern = r'(?<![A-Za-z0-9])([A-Za-z]{1,4}(?:/[A-Za-z]+)?-?\d+)([VAWNvawn])(?![A-Za-z0-9])'
     return re.sub(pattern, repl, text)
 
+def apply_time_unit_rules(text):
+    """
+    英字時間単位（min, sec, hr）の誤読（30min ➔ サンジュウミン 等）を日本語の「分」「秒」「時間」へ変換
+    例: 15min ➔ 15分, 30mins ➔ 30分, 10sec ➔ 10秒, 2hrs ➔ 2時間
+    """
+    if not text:
+        return ""
+    t = text
+    # 1. 読了時間・動画尺の英語表記ゴミ（3 min read, 5 min reading等）を事前除去
+    t = re.sub(r'(?i)\b\d+\s*min(?:ute)?s?\s*(?:read|reading)\b', '', t)
+    # 2. 数字 + min / mins ➔ 分 (例: 15min, 15 mins, 約3min)
+    t = re.sub(r'(\d+)\s*(?:mins?|MINS?)(?![A-Za-z0-9])', r'\1分', t)
+    # 3. 数字 + sec / secs ➔ 秒 (例: 10sec, 10 secs)
+    t = re.sub(r'(\d+)\s*(?:secs?|SECS?)(?![A-Za-z0-9])', r'\1秒', t)
+    # 4. 数字 + hr / hrs / hour / hours ➔ 時間 (例: 2hrs, 1hour)
+    t = re.sub(r'(\d+)\s*(?:hrs?|hours?|HRS?|HOURS?)(?![A-Za-z0-9])', r'\1時間', t)
+    return t
+
+def apply_spurious_title_suffix_cleanup(text):
+    """
+    要人肩書（大統領・首相等）や人名敬称（氏・選手・さん等）の直後に付着した不要な英字ゴミ（min等）を除去
+    例: プーチン大統領min ➔ プーチン大統領
+        バイデン大統領 min ➔ バイデン大統領
+    """
+    if not text:
+        return ""
+    t = text
+    # 肩書・敬称直後の min / min. / mins を除去
+    t = re.sub(
+        r'((?:大統領|首相|長官|大臣|知事|代表|会長|社長|理事長|総裁|委員長|氏|選手|さん|君|様|殿))\s*mins?\.?(?![A-Za-z0-9])',
+        r'\1',
+        t,
+        flags=re.IGNORECASE
+    )
+    return t
+
 def apply_corporate_and_object_san_removal(text):
     """組織・店舗・ブランド・モノへの不自然な「さん」付けを文脈問わず自動除去"""
     if not text:
@@ -2058,6 +2094,12 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
 
     # -1. 全角英数字を半角に統一（「ＶＩＶＡＮＴ」や「ＡＩ」等のチェックすり抜け・スペル読みを防止）
     t = normalize_fullwidth_alphanumeric(text)
+
+    # -0.95 肩書・敬称直後の不要な英語ゴミ（例: プーチン大統領min ➔ プーチン大統領）を事前除去
+    t = apply_spurious_title_suffix_cleanup(t)
+
+    # -0.92 時間単位（min, sec, hr）の日本語化（30min ➔ 30分, 15min ➔ 15分, 10sec ➔ 10秒等）
+    t = apply_time_unit_rules(t)
 
     # -0.9 トランプ大統領の現職呼称正規化（前大統領・前米大統領・米大統領の誤用・誤読を現職に統一）
     t = re.sub(r'トランプ(?:前米大統領|前大統領|米大統領)', 'トランプ大統領', t)

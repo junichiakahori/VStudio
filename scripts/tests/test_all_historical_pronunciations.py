@@ -293,6 +293,26 @@ TEST_CATEGORIES = [
                 "expected_kana_pattern": r"(?:ウエ_スト|ウエスト).*(?:ショオ|ショ'オ)",
                 "forbidden_kana_pattern": r"ダブリュウ|エフエエエス|エスエイチ",
             },
+            {
+                "id": "spurious_putin_min_cleanup",
+                "desc": "要人肩書直後の不要な英語ゴミ（プーチン大統領min）が綺麗に除去されること",
+                "text": "プーチン大統領minが今後の外交方針を発表しましたにゃ。",
+                "check_type": "both",
+                "expected_speech_pattern": r"プーチン大統領が",
+                "forbidden_speech_pattern": r"min",
+                "expected_kana_pattern": r"プウチン\s*ダイトオリョオガ",
+                "forbidden_kana_pattern": r"ミン|エムアイエヌ",
+            },
+            {
+                "id": "time_unit_min_sec_repair",
+                "desc": "英字時間単位（15min, 30sec）が「分」「秒」へ自然に日本語化されること",
+                "text": "所要時間は約15minで、残り時間は30secですにゃ。",
+                "check_type": "both",
+                "expected_speech_pattern": r"15分.*30秒",
+                "forbidden_speech_pattern": r"min|sec",
+                "expected_kana_pattern": r"ジュウ\s*ゴフン.*サンジュウビョオ",
+                "forbidden_kana_pattern": r"ミン|エスイーシー",
+            },
         ]
     },
     {
@@ -393,6 +413,16 @@ TEST_CATEGORIES = [
                 "check_type": "voicevox_kana",
                 "expected_kana_pattern": r"ハブクダン|ハ'ブクダン",
                 "forbidden_kana_pattern": r"ハニュウクダン",
+            },
+            {
+                "id": "proper_putin_russia_president",
+                "desc": "「プーチン露大統領」「露政権」が「ろだいとうりょう」「ろせいけん」と正しく発音されること（つゆ防止）",
+                "text": "プーチン露大統領と露政権が今後の対外政策を発表しましたにゃ。",
+                "check_type": "both",
+                "expected_speech_pattern": r"プーチン.*(?:露大統領|ろだいとうりょう|ロシア大統領).*(?:露政権|ろせいけん|ロシア政権)",
+                "forbidden_speech_pattern": r"つゆ大統領|つゆ政権",
+                "expected_kana_pattern": r"プウチン.*(?:ロ|ロシア)ダイトオリョオ.*(?:ロ|ロシア)セエケン",
+                "forbidden_kana_pattern": r"ツユ",
             },
         ]
     },

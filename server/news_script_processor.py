@@ -59,7 +59,7 @@ def extract_media_source(title):
     return ""
 
 def clean_news_title(title):
-    """ニュースタイトルから余計なアグリゲーターサフィックスを除去"""
+    """ニュースタイトルから余計なアグリゲーターサフィックスや読了時間・ゴミを除去"""
     if not title:
         return ""
     t = str(title).strip()
@@ -67,6 +67,10 @@ def clean_news_title(title):
     if src:
         t = re.sub(rf'[\s|｜\-–—]+\s*{re.escape(src)}$', '', t, flags=re.IGNORECASE).strip()
     t = re.sub(r'[\s|｜\-–—]+(?:Google\s*ニュース|Google\s*News|Yahoo!\s*ニュース|Yahoo!\s*JAPAN|Yahoo!|ヤフー).*$', '', t, flags=re.IGNORECASE).strip()
+    # 読了時間・動画尺の英語表記ゴミ（3 min read, 5 min, 10mins等）を除去
+    t = re.sub(r'[\s|｜\-–—]*\b\d+\s*min(?:ute)?s?(?:\s*read)?$', '', t, flags=re.IGNORECASE).strip()
+    # 肩書・敬称直後の不要な min / mins ゴミを除去（プーチン大統領min ➔ プーチン大統領 等）
+    t = re.sub(r'((?:大統領|首相|長官|大臣|知事|代表|会長|社長|氏|選手|さん))\s*mins?\.?(?![A-Za-z0-9])', r'\1', t, flags=re.IGNORECASE)
     t = re.sub(r'[\s|｜\-–—]+$', '', t).strip()
     t = re.sub(r'^[★【】〈〉\[\]「」『』\s　]+', '', t)
     t = re.sub(r'[★【】〈〉\[\]「」『』\s　]+$', '', t)
