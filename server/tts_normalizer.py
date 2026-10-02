@@ -1100,7 +1100,7 @@ def extract_special_terms(text):
         "do", "go", "he", "me", "my", "we", "us", "no", "so", "up", "an", "as", "be", "if",
         "the", "and", "but", "you", "all", "can", "not", "let", "get", "set", "make", "take",
         "have", "say", "see", "day", "new", "out", "how", "who", "why", "just", "easy", "back", "only",
-        "japan", "usa", "uk", "world", "east", "west", "south", "north",
+        "japan", "usa", "uk", "world", "east", "south", "north",
         # 既に静的マップや文脈ルールで解決済みの略語
         "ai", "vr", "ar", "dx", "os", "ui", "ux", "api", "cpu", "gpu", "pc", "tv",
         "url", "pdf", "ssd", "hdd", "usb", "wifi", "nft", "pr", "rpg", "fps", "mmo", "sns", "ev", "iot", "ict"
@@ -1392,6 +1392,47 @@ DEFAULT_TECH_ACRONYMS = {
     "NHK": "エヌエイチケイ",
     "NTT": "エヌティーティー",
     "VIVANT": "ヴィヴァン",
+    "WEST.": "ウエスト",
+    "WEST": "ウエスト",
+    "SHOW": "ショー",
+    "NEWS": "ニュース",
+    "LIVE": "ライブ",
+    "STAR": "スター",
+    "DREAM": "ドリーム",
+    "MAGIC": "マジック",
+    "POWER": "パワー",
+    "STAGE": "ステージ",
+    "NIGHT": "ナイト",
+    "SUPER": "スーパー",
+    "MUSIC": "ミュージック",
+    "DANCE": "ダンス",
+    "WORLD": "ワールド",
+    "PEACE": "ピース",
+    "SMILE": "スマイル",
+    "HAPPY": "ハッピー",
+    "SPECIAL": "スペシャル",
+    "MEMORIAL": "メモリアル",
+    "CHAMPION": "チャンピオン",
+    "FASHION": "ファッション",
+    "FESTIVAL": "フェスティバル",
+    "SPRING": "スプリング",
+    "SUMMER": "サマー",
+    "AUTUMN": "オータム",
+    "WINTER": "ウィンター",
+    "THEATER": "シアター",
+    "CINEMA": "シネマ",
+    "CONCERT": "コンサート",
+    "RELEASE": "リリース",
+    "PROJECT": "プロジェクト",
+    "NASA": "ナサ",
+    "NATO": "ナトー",
+    "ASEAN": "アセアン",
+    "OPEC": "オペック",
+    "OLED": "オーレッド",
+    "STEM": "ステム",
+    "JAXA": "ジャクサ",
+    "DRAM": "ディーラム",
+    "REVENGE": "リベンジ",
     "MLB": "エムエルビー",
     "MVP": "エムブイピー",
     "WBC": "ダブリュービーシー",
@@ -1482,6 +1523,26 @@ def apply_tech_acronyms(text):
     for acronym, yomi in sorted(acronyms.items(), key=lambda x: len(x[0]), reverse=True):
         if acronym in t:
             t = re.sub(rf'(?<![A-Za-z0-9]){re.escape(acronym)}(?![A-Za-z0-9])', yomi, t)
+
+    # 🛡️ 1.5 大文字英単語（4文字以上）のスペル読み（FASHION ➔ エフ・エー・エス... 等）を防止し、VOICEVOXの自然な英単語発音へ救済
+    SAFE_ACRONYMS = {
+        "NHK", "FBI", "CIA", "SNS", "AI", "PR", "URL", "DX", "EV", "OS", "UI", "UX",
+        "API", "CPU", "GPU", "PC", "TV", "SSD", "HDD", "USB", "NFT", "TGS", "RPG",
+        "FPS", "MMO", "VR", "AR", "USA", "UK", "WHO", "UN", "EU", "NATO", "IMF",
+        "OECD", "GDP", "GNP", "CEO", "COO", "CFO", "CTO", "CIO", "CM", "PV", "MV",
+        "BGM", "SE", "MC", "DJ", "CD", "DVD", "BD", "SD", "IC", "ID", "IT", "IP",
+        "LTE", "SIM", "PIN", "QR", "VIP", "PTA", "JAL", "ANA", "JR", "NPO", "NGO",
+        "JRA", "NPB", "JFA", "WBC", "FIFA", "IOC", "JOC", "MUFG", "UFJ", "SMBC", "FRB",
+        "CPI", "SMR", "TNO", "LLM", "NTT", "KDDI", "JCB", "SBI", "NASA", "ASEAN", "OPEC"
+    }
+    def _fix_uppercase_word(m):
+        w = m.group(0)
+        u = w.upper()
+        if u in SAFE_ACRONYMS or len(w) < 4 or not re.search(r'[AIUEOYaiueoy]', w):
+            return w
+        return w.capitalize()
+
+    t = re.sub(r'(?<![A-Za-z])[A-Z]{4,}(?![A-Za-z])', _fix_uppercase_word, t)
     return t
 
 def apply_okonau_context_rules(text):
@@ -1523,7 +1584,7 @@ DEFAULT_IDOL_GROUP_RULES = [
     {"pattern": r"(?i)KAT-TUN", "replacement": "カトゥーン", "note": "KAT-TUNの読み解決"},
     {"pattern": r"(?i)(?<![A-Za-z0-9])KinKi\s*Kids(?![A-Za-z0-9])", "replacement": "キンキキッズ", "note": "KinKi Kidsの読み解決"},
     {"pattern": r"(?i)Aぇ!\s*group", "replacement": "ええグループ", "note": "Aぇ! groupの読み解決"},
-    {"pattern": r"(?i)WEST\.", "replacement": "ウエスト", "note": "WEST.の読み解決（文末ピリオドによる誤読・切断防止）"},
+    {"pattern": r"(?i)WEST(?:\.|\b)", "replacement": "ウエスト", "note": "WEST. / WESTの読み解決（文末ピリオドによる誤読・切断防止）"},
     {"pattern": r"(?i)Number_i", "replacement": "ナンバーアイ", "note": "Number_iの読み解決"},
     {"pattern": r"(?i)(?<![A-Za-z0-9])IMP\.(?![A-Za-z0-9])", "replacement": "アイエムピー", "note": "IMP.の読み解決"},
 

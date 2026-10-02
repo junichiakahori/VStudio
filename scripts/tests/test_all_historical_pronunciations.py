@@ -283,6 +283,16 @@ TEST_CATEGORIES = [
                 "expected_pattern": r"アイフォン|アイフォーン",
                 "forbidden_pattern": r"iPhone",
             },
+            {
+                "id": "english_west_show",
+                "desc": "「WEST」「SHOW」がアルファベットスペル読みされず「ウエスト」「ショー」と発音されること",
+                "text": "人気グループWESTの最新情報とTOKYO FASHION SHOWの様子をお届けしますにゃ。",
+                "check_type": "both",
+                "expected_speech_pattern": r"ウエスト.*(?:Fashion|ファッション).*(?:Show|ショー)",
+                "forbidden_speech_pattern": r"WEST|SHOW|FASHION",
+                "expected_kana_pattern": r"(?:ウエ_スト|ウエスト).*(?:ショオ|ショ'オ)",
+                "forbidden_kana_pattern": r"ダブリュウ|エフエエエス|エスエイチ",
+            },
         ]
     },
     {
