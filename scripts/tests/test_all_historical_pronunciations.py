@@ -204,6 +204,17 @@ TEST_CATEGORIES = [
                 "expected_pattern": r"(?:大谷翔平|おおたにしょうへい)選手.*(?:野中生萌|のなかみほう)選手",
                 "forbidden_pattern": r"大谷翔平さん|野中生萌さん",
             },
+            {
+                "id": "horse_riding_jyosha_repair",
+                "desc": "競馬記事で馬に乗る行為が「乗車」と誤用された場合に「騎乗」へ自己修復されること",
+                "text": "武豊騎手は凱旋門賞挑戦のメイショウタバルに乗車し、最終追い切りを行いましたにゃ。",
+                "category_name": "スポーツ",
+                "check_type": "both",
+                "expected_speech_pattern": r"メイショウタバルに(?:騎乗|きじょう)し",
+                "forbidden_speech_pattern": r"乗車|じょうしゃ",
+                "expected_kana_pattern": r"キジョオシ|キジョウシ",
+                "forbidden_kana_pattern": r"ジョオシャ|ジョウシャ",
+            },
         ]
     },
     {

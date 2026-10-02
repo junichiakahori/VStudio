@@ -1167,6 +1167,29 @@ def audit_and_heal_news_script(items, title="", article_context="", category_nam
             if "リング" in healed_sp or "りんぐ" in healed_sp:
                 healed_sp = re.sub(r'(?:リング|りんぐ)(?:じょう|上)?', 'どひょう', healed_sp)
 
+        # 6.5 競馬・馬に関する「乗車」「搭乗」等の誤用自己修復（馬に乗る行為は「騎乗」「跨る」であり「乗車」は厳禁）
+        HORSE_RACING_KEYWORDS = {
+            "競馬", "競走馬", "騎手", "ジョッキー", "追い切り", "調教", "レース",
+            "凱旋門賞", "有馬記念", "日本ダービー", "皐月賞", "菊花賞", "天皇賞",
+            "ジャパンカップ", "桜花賞", "オークス", "宝塚記念", "安田記念", "マイルCS",
+            "スプリンターズS", "エリザベス女王杯", "チャンピオンズC", "ホープフルS", "フェブラリーS",
+            "武豊", "ルメール", "川田将雅", "坂井瑠星", "横山武史", "戸崎圭太", "モレイラ",
+            "メイショウタバル", "ドウデュース", "イクイノックス", "リバティアイランド",
+            "単勝", "複勝", "馬連", "馬単", "3連複", "3連単", "パドック", "ゲート",
+            "本馬場", "芝", "ダート", "重賞", "G1", "G2", "G3", "GI", "GII", "GIII"
+        }
+        has_horse_context = any(kw in full_context for kw in HORSE_RACING_KEYWORDS) or bool(re.search(r'(?:馬|騎手|ジョッキー)', disp))
+        if has_horse_context:
+            if re.search(r'(?:乗車|搭乗|乗船)', disp):
+                print(f"[競馬用語修復] 🩹 競馬・馬に関する「乗車/搭乗」誤用を検知: '{disp}' ➔ '騎乗' へ自動修復", flush=True)
+                disp = re.sub(r'乗車(し|する|した|して|も|に|で|へ)?', r'騎乗\1', disp)
+                disp = re.sub(r'搭乗(し|する|した|して|も|に|で|へ)?', r'騎乗\1', disp)
+                disp = re.sub(r'乗船(し|する|した|して|も|に|で|へ)?', r'騎乗\1', disp)
+            if re.search(r'(?:乗車|搭乗|乗船|じょうしゃ|とうじょう|じょうせん)', healed_sp):
+                healed_sp = re.sub(r'(?:乗車|じょうしゃ)(し|する|した|して|も|に|で|へ)?', r'きじょう\1', healed_sp)
+                healed_sp = re.sub(r'(?:搭乗|とうじょう)(し|する|した|して|も|に|で|へ)?', r'きじょう\1', healed_sp)
+                healed_sp = re.sub(r'(?:乗船|じょうせん)(し|する|した|して|も|に|で|へ)?', r'きじょう\1', healed_sp)
+
         # 7. 不自然な「。にゃ。」「！にゃ！」「。 にゃ！」等の二重句読点・語尾結合の自己修復
         if re.search(r'[。！？]+[\s　]*(?:にゃ|のだ|なのだ)', disp) or "。にゃ" in disp or "にゃ。 にゃ" in disp or "。。" in disp:
             disp = re.sub(r'[。！？]+[\s　]*(にゃ|のだ|なのだ)[！!。？?]*', r'\1。', disp)
