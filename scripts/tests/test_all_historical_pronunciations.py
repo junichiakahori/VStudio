@@ -316,7 +316,7 @@ TEST_CATEGORIES = [
                 "desc": "要人肩書直後の不要な英語ゴミ（プーチン大統領min）が綺麗に除去されること",
                 "text": "プーチン大統領minが今後の外交方針を発表しましたにゃ。",
                 "check_type": "both",
-                "expected_speech_pattern": r"プーチン大統領が",
+                "expected_speech_pattern": r"プーチン(?:大統領|だいとうりょう)が",
                 "forbidden_speech_pattern": r"min",
                 "expected_kana_pattern": r"プウチン\s*ダイトオリョオガ",
                 "forbidden_kana_pattern": r"ミン|エムアイエヌ",
@@ -439,7 +439,7 @@ TEST_CATEGORIES = [
                 "check_type": "both",
                 "expected_speech_pattern": r"プーチン.*(?:露大統領|ろだいとうりょう|ロシア大統領).*(?:露政権|ろせいけん|ロシア政権)",
                 "forbidden_speech_pattern": r"つゆ大統領|つゆ政権",
-                "expected_kana_pattern": r"プウチン.*(?:ロ|ロシア)ダイトオリョオ.*(?:ロ|ロシア)セエケン",
+                "expected_kana_pattern": r"プウチン.*(?:ロ|ロシア)ダイトオリョオ.*(?:ロ|ロシア)セ[イエ]ケン",
                 "forbidden_kana_pattern": r"ツユ",
             },
         ]

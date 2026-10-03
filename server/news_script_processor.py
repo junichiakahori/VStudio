@@ -1071,29 +1071,33 @@ def extract_primary_person(items, title="", article_context=""):
     例: 武豊騎手、大谷翔平選手、優香さん、プーチン大統領、岸田首相等
     """
     INVALID_NAMES = {"皆さん", "方たち", "選手たち", "さんたち", "男さん", "女さん", "容疑者さん"}
+    PERSON_PAT = r'(?:^|(?<=[はがのにもをとでへからより、\s「『（]))([一-鿿ぁ-んァ-ヶA-Za-zー]{2,8}(?:さん|選手|氏|監督|コーチ|知事|市長|首相|大統領|騎手|九段|会長))'
 
     # 1. 原稿の各文から探す（最も確実）
     if items and isinstance(items, list):
         for it in items:
             disp = it.get("display", "")
-            matches = re.findall(r'([一-鿿ぁ-んァ-ヶA-Za-z]{2,8}(?:さん|選手|氏|監督|コーチ|知事|市長|首相|大統領|騎手|九段|会長))', disp)
+            matches = re.findall(PERSON_PAT, disp)
             for m in matches:
-                if m not in INVALID_NAMES:
-                    return m
+                clean_m = re.sub(r'^[はがのにもをとでへからより]+', '', m)
+                if clean_m not in INVALID_NAMES and len(clean_m) >= 3:
+                    return clean_m
 
     # 2. タイトルから探す
     if title:
-        matches = re.findall(r'([一-鿿ぁ-んァ-ヶA-Za-z]{2,8}(?:さん|選手|氏|監督|コーチ|知事|市長|首相|大統領|騎手|九段|会長))', title)
+        matches = re.findall(PERSON_PAT, title)
         for m in matches:
-            if m not in INVALID_NAMES:
-                return m
+            clean_m = re.sub(r'^[はがのにもをとでへからより]+', '', m)
+            if clean_m not in INVALID_NAMES and len(clean_m) >= 3:
+                return clean_m
 
     # 3. 記事本文から探す
     if article_context:
-        matches = re.findall(r'([一-鿿ぁ-んァ-ヶA-Za-z]{2,8}(?:さん|選手|氏|監督|コーチ|知事|市長|首相|大統領|騎手|九段|会長))', article_context[:300])
+        matches = re.findall(PERSON_PAT, article_context[:300])
         for m in matches:
-            if m not in INVALID_NAMES:
-                return m
+            clean_m = re.sub(r'^[はがのにもをとでへからより]+', '', m)
+            if clean_m not in INVALID_NAMES and len(clean_m) >= 3:
+                return clean_m
 
     return None
 
