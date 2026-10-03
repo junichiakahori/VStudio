@@ -1065,6 +1065,68 @@ def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, h
     return disp, healed_sp
 
 
+def extract_primary_person(items, title="", article_context=""):
+    """
+    記事および原稿から、話題の中心となっている実在人物（氏名＋公式敬称）を抽出
+    例: 武豊騎手、大谷翔平選手、優香さん、プーチン大統領、岸田首相等
+    """
+    INVALID_NAMES = {"皆さん", "方たち", "選手たち", "さんたち", "男さん", "女さん", "容疑者さん"}
+
+    # 1. 原稿の各文から探す（最も確実）
+    if items and isinstance(items, list):
+        for it in items:
+            disp = it.get("display", "")
+            matches = re.findall(r'([一-鿿ぁ-んァ-ヶA-Za-z]{2,8}(?:さん|選手|氏|監督|コーチ|知事|市長|首相|大統領|騎手|九段|会長))', disp)
+            for m in matches:
+                if m not in INVALID_NAMES:
+                    return m
+
+    # 2. タイトルから探す
+    if title:
+        matches = re.findall(r'([一-鿿ぁ-んァ-ヶA-Za-z]{2,8}(?:さん|選手|氏|監督|コーチ|知事|市長|首相|大統領|騎手|九段|会長))', title)
+        for m in matches:
+            if m not in INVALID_NAMES:
+                return m
+
+    # 3. 記事本文から探す
+    if article_context:
+        matches = re.findall(r'([一-鿿ぁ-んァ-ヶA-Za-z]{2,8}(?:さん|選手|氏|監督|コーチ|知事|市長|首相|大統領|騎手|九段|会長))', article_context[:300])
+        for m in matches:
+            if m not in INVALID_NAMES:
+                return m
+
+    return None
+
+
+def heal_ambiguous_pronouns(text, primary_person=None):
+    """
+    性別誤認の重大な放送事故・ハルシネーションを防ぐため、
+    「彼」「彼女」などの曖昧な三人称代名詞を、実名＋敬称（または性別中立な安全表現）へ自己修復。
+    例: 「彼の目は」➔ 「武豊騎手の目は」（primary_personがある場合）
+        「彼女は」➔ 「優香さんは」（primary_personがある場合）
+        「彼は」➔ 「ご本人は」（primary_personがない場合）
+    """
+    if not text:
+        return ""
+    t = text
+    # 直後が助詞（は、が、の、に、も、を、と、へ、から、より）または「たち」「ら」である「彼」「彼女」のみを置換
+    # （※彼岸花、彼方、彼我などは完全に除外・保護）
+    pattern = r'(?:彼女たち|彼ら|彼女|彼)(?=[はがのにもをとへ]|から|より)'
+    if not re.search(pattern, t):
+        return t
+
+    replacement = primary_person if primary_person else "ご本人"
+
+    def _repl(m):
+        pronoun = m.group(0)
+        if "たち" in pronoun or "ら" in pronoun:
+            return f"{replacement}たち"
+        return replacement
+
+    t = re.sub(pattern, _repl, t)
+    return t
+
+
 def audit_and_heal_news_script(items, title="", article_context="", category_name=""):
     """
     生成された原稿各文（items: [{'display': ..., 'speech': ...}]）を再チェックし、
@@ -1097,6 +1159,10 @@ def audit_and_heal_news_script(items, title="", article_context="", category_nam
         "死亡者", "負傷者", "乗客", "住民", "市民", "県民", "国民", "本人", "同氏",
         "両者", "各位", "全員", "店舗", "施設", "病院", "事件", "事故"
     ]
+
+    primary_person = extract_primary_person(items, title=title, article_context=article_context)
+    if primary_person:
+        print(f"[代名詞修復基準人物] 👤 主要人物を特定: '{primary_person}'", flush=True)
 
     healed_items = []
     for it in items:
@@ -1230,6 +1296,13 @@ def audit_and_heal_news_script(items, title="", article_context="", category_nam
         # 「〜の上（うえ）」「〜した上で（うえで）」が音声用テキストで「じょう」と誤変換されていた場合の修復
         if re.search(r'([ぁ-んァ-ヶー一-鿿]+(?:した|された|られた|行った|見た|確認した|検討した|相談した|納得した|調査した|判断した))じょう(?=で|に|は|も|[、\s　]|$)', healed_sp):
             healed_sp = re.sub(r'([ぁ-んァ-ヶー一-鿿]+(?:した|された|られた|行った|見た|確認した|検討した|相談した|納得した|調査した|判断した))じょう(?=で|に|は|も|[、\s　]|$)', r'\1うえ', healed_sp)
+
+        # 10.5 性別誤認防止・三人称代名詞（彼・彼女）の自己修復（「彼の目は」➔「武豊騎手の目は」等）
+        disp_pronoun_fixed = heal_ambiguous_pronouns(disp, primary_person=primary_person)
+        if disp_pronoun_fixed != disp:
+            print(f"[代名詞自己修復] 🩹 曖昧な三人称代名詞（彼/彼女）を実名へ是正: '{disp}' ➔ '{disp_pronoun_fixed}'", flush=True)
+            disp = disp_pronoun_fixed
+        healed_sp = heal_ambiguous_pronouns(healed_sp, primary_person=primary_person)
 
         # 11. 読み上げテキスト(speech)内の全角英数字を半角英数へ正規化＆大文字英単語のスペル読み（GIRLS ➔ ジ・イ・アイ…）自動修復
         # ※字幕（disp）は一切変更せず全角を維持。

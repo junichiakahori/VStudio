@@ -246,6 +246,24 @@ TEST_CATEGORIES = [
                 "expected_pattern": r"任天堂社が.*(?:AI|エーアイ)ロボットが",
                 "forbidden_pattern": r"任天堂社さん|AIロボットさん|エーアイロボットさん",
             },
+            {
+                "id": "pronoun_kare_repair",
+                "desc": "性別誤認防止のため「彼の」などの三人称代名詞が実名＋敬称（武豊騎手の）へ自己修復されること",
+                "text": "武豊騎手は通算5000勝を達成しましたにゃ。彼の目は凱旋門賞に向いていますにゃ。",
+                "category_name": "スポーツ",
+                "check_type": "speech_text",
+                "expected_pattern": r"武豊騎手の目は",
+                "forbidden_pattern": r"彼の目は",
+            },
+            {
+                "id": "pronoun_kanojo_repair",
+                "desc": "性別誤認防止のため「彼女の」などの三人称代名詞が実名＋敬称（優香さんの）へ自己修復されること",
+                "text": "優香さんは笑顔で語りましたにゃ。彼女の新たな挑戦に期待が集まっていますにゃ。",
+                "category_name": "エンタメ",
+                "check_type": "speech_text",
+                "expected_pattern": r"優香さんの新たな挑戦",
+                "forbidden_pattern": r"彼女の新たな挑戦",
+            },
         ]
     },
     {
