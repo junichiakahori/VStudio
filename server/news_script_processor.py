@@ -1010,9 +1010,93 @@ NON_ATHLETE_PROMINENT_PEOPLE = [
     "浜辺美波", "有村架純", "吉高由里子", "北川景子", "芦田愛菜"
 ]
 
-def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, has_authentic_sports=False, is_sports=True):
-    """相撲・エンタメ・非スポーツ文脈における『選手』誤爆の完全自己修復"""
-    # 0. 著名俳優・アイドル・クリエイターへの「選手」誤爆を100%「さん」へ強制是正
+_PERSON_SOCIAL_HONORIFIC_CACHE = {}
+
+def resolve_person_social_honorific(person_name: str, article_context: str = "") -> str:
+    """
+    人物の世間的な肩書（「さん」or「選手」or「監督」等）を、元記事の構文およびWikipedia APIから動的に判定。
+    人名リストのハードコードに依存せず、引退した元選手・OB・解説者・俳優・タレントを完全自動判定する。
+    """
+    if not person_name or len(person_name) < 2:
+        return ""
+
+    cache_key = person_name.strip()
+    if cache_key in _PERSON_SOCIAL_HONORIFIC_CACHE:
+        return _PERSON_SOCIAL_HONORIFIC_CACHE[cache_key]
+
+    full_text = article_context or ""
+
+    # 1. 記事本文・タイトル内の明示的構文チェック（最優先・通信なし 0ミリ秒）
+    # (a) 非アスリート（芸能・文化・一般）構文
+    if re.search(rf'(?:俳優|女優|タレント|モデル|アイドル|声優|歌手|アーティスト|芸人|お笑い|アナウンサー|キャスター|作家|漫画家)の?{re.escape(person_name)}', full_text):
+        _PERSON_SOCIAL_HONORIFIC_CACHE[cache_key] = "さん"
+        return "さん"
+
+    # (b) 元選手・引退・OB・解説者構文
+    if re.search(rf'(?:元プロ|元日本代表|元メジャー|元大リーガー|元騎手|元力士|元選手|引退した|球団OB|OB|OG|解説者|野球解説|サッカー解説)の?{re.escape(person_name)}', full_text):
+        _PERSON_SOCIAL_HONORIFIC_CACHE[cache_key] = "さん"
+        return "さん"
+
+    # (c) 監督・コーチ構文
+    if re.search(rf'(?:新監督|次期監督|名将|ヘッドコーチ|コーチ|監督)の?{re.escape(person_name)}', full_text):
+        _PERSON_SOCIAL_HONORIFIC_CACHE[cache_key] = "監督"
+        return "監督"
+
+    # 2. Wikipedia API による動的検索（世間一般の肩書を検索・判定）
+    try:
+        import urllib.request, urllib.parse, json, ssl
+        headers = {"User-Agent": "VStudio-TTS-Bot/2.0 (macOS; contact: https://github.com/junichiakahori/VStudio)"}
+        ctx = ssl._create_unverified_context()
+        url = f"https://ja.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&titles={urllib.parse.quote(person_name)}&redirects=1&format=json"
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=2.0, context=ctx) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            pages = data.get("query", {}).get("pages", {})
+            for pid, pdata in pages.items():
+                if pid == "-1":
+                    continue
+                extract = pdata.get("extract", "")
+                if not extract:
+                    continue
+                intro = extract[:300]
+
+                # (a) 元選手・OB・解説者・引退
+                if re.search(r'元(?:プロ野球選手|プロサッカー選手|サッカー選手|野球選手|プロボクサー|プロレスラー|力士|大相撲力士|騎手|競輪選手|競艇選手|五輪代表|オリンピック選手|日本代表|選手)', intro) or \
+                   re.search(r'(?:現役を引退|引退した|野球解説|サッカー解説|スポーツ解説|元選手|球団OB)', intro):
+                    print(f"[世間的肩書検索] 🎯 Wikipedia検索により '{person_name}' を「元選手/引退/解説者」と判定 ➔ 『さん』", flush=True)
+                    _PERSON_SOCIAL_HONORIFIC_CACHE[cache_key] = "さん"
+                    return "さん"
+
+                # (b) 非アスリート（俳優・女優・タレント・声優・歌手・モデル・芸人等）
+                if re.search(r'(?:日本の|元)?(?:俳優|女優|タレント|歌手|声優|モデル|アイドル|芸人|お笑い|アナウンサー|キャスター|作家|漫画家)', intro):
+                    if not re.search(r'(?<!元)(?:プロサッカー選手|プロ野球選手|大相撲力士|プロレスラー|プロボクサー)', intro):
+                        print(f"[世間的肩書検索] 🎯 Wikipedia検索により '{person_name}' を「芸能・文化人」と判定 ➔ 『さん』", flush=True)
+                        _PERSON_SOCIAL_HONORIFIC_CACHE[cache_key] = "さん"
+                        return "さん"
+
+                # (c) 現役アスリート
+                if re.search(r'(?<!元)(?:プロサッカー選手|プロ野球選手|大相撲力士|女子プロゴルファー|プロゴルファー|プロボクサー|総合格闘家|騎手|競輪選手|競艇選手|陸上競技選手|水泳選手|体操選手|バスケットボール選手|バレーボール選手|プロ選手|卓球選手|バドミントン選手)', intro):
+                    print(f"[世間的肩書検索] 🎯 Wikipedia検索により '{person_name}' を「現役アスリート」と判定 ➔ 『選手』", flush=True)
+                    _PERSON_SOCIAL_HONORIFIC_CACHE[cache_key] = "選手"
+                    return "選手"
+    except Exception as e:
+        print(f"[世間的肩書検索エラー] '{person_name}': {e}", flush=True)
+
+    _PERSON_SOCIAL_HONORIFIC_CACHE[cache_key] = ""
+    return ""
+
+
+def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, has_authentic_sports=False, is_sports=True, article_context="", title=""):
+    """相撲・エンタメ・結婚混在記事における『選手』誤爆の完全自己修復（構文解析＋Wikipedia動的判定）"""
+    full_context = f"{title} {article_context}".strip()
+
+    # 0. 構文直接修復: 俳優・女優・タレント・元選手等の修飾直後の「選手」誤爆を100%「さん」へ強制是正
+    disp = re.sub(r'(?:俳優|女優|タレント|モデル|アイドル|声優|歌手|アーティスト|芸人|お笑い|アナウンサー|キャスター)の?([一-鿿ぁ-んァ-ヶA-Za-zー]{2,8})選手', r'\1さん', disp)
+    healed_sp = re.sub(r'(?:俳優|女優|タレント|モデル|アイドル|声優|歌手|アーティスト|芸人|お笑い|アナウンサー|キャスター)の?([一-鿿ぁ-んァ-ヶA-Za-zー]{2,8})選手', r'\1さん', healed_sp)
+    disp = re.sub(r'(?:元プロ|元日本代表|元メジャー|元大リーガー|元騎手|元力士|元選手|球団OB|OB|OG|解説者|野球解説|サッカー解説)の?([一-鿿ぁ-んァ-ヶA-Za-zー]{2,8})選手', r'\1さん', disp)
+    healed_sp = re.sub(r'(?:元プロ|元日本代表|元メジャー|元大リーガー|元騎手|元力士|元選手|球団OB|OB|OG|解説者|野球解説|サッカー解説)の?([一-鿿ぁ-んァ-ヶA-Za-zー]{2,8})選手', r'\1さん', healed_sp)
+
+    # 0.5 フォールバック著名人リスト
     for name in NON_ATHLETE_PROMINENT_PEOPLE:
         target = f"{name}選手"
         if target in disp:
@@ -1021,7 +1105,6 @@ def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, h
         if target in healed_sp:
             healed_sp = healed_sp.replace(target, f"{name}さん")
 
-        # 名字のみの「山田選手」「松山選手」「猪狩選手」も是正
         if len(name) >= 3:
             surname = name[:2]
             surname_target = f"{surname}選手"
@@ -1029,6 +1112,35 @@ def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, h
                 disp = disp.replace(surname_target, f"{surname}さん")
             if surname_target in healed_sp:
                 healed_sp = healed_sp.replace(surname_target, f"{surname}さん")
+
+    # 0.6 Wikipedia動的判定および構文解析による「選手」誤爆の動的修復（リストフリー）
+    if "選手" in disp or "選手" in healed_sp:
+        SAFE_ATHLETE_PERSON_SCAN = r'(?:^|(?<=[、。！？\s　はがのにへと「『（]))(?!(?:日本|日本人|女子|男子|代表|若手|出場|プロ|主力|控え|交代|所属|世界|国内|相手|全|各|当該|対象|選手))([一-鿿]{2,5}|[ァ-ヶー]{2,8})選手(?!(?:たち|ら|団|層|生命|権|宣誓|選考|枠))'
+        found_athletes = set(re.findall(SAFE_ATHLETE_PERSON_SCAN, disp) + re.findall(SAFE_ATHLETE_PERSON_SCAN, healed_sp))
+        for p_name in found_athletes:
+            honorific = resolve_person_social_honorific(p_name, article_context=full_context)
+            if honorific == "さん":
+                print(f"[敬称自己修復] 🎯 世間的肩書（非現役/引退/芸能）に基づき '{p_name}選手' ➔ '{p_name}さん' に自動修復", flush=True)
+                disp = disp.replace(f"{p_name}選手", f"{p_name}さん")
+                healed_sp = healed_sp.replace(f"{p_name}選手", f"{p_name}さん")
+                # ひらがな化された speech 側の自己修復
+                p_yomi = lookup_wikipedia_person_reading(p_name)
+                if p_yomi:
+                    healed_sp = healed_sp.replace(f"{p_yomi}選手", f"{p_yomi}さん")
+                if len(p_name) >= 3:
+                    surname = p_name[:2]
+                    disp = disp.replace(f"{surname}選手", f"{surname}さん")
+                    healed_sp = healed_sp.replace(f"{surname}選手", f"{surname}さん")
+                    s_yomi = get_wikipedia_surname_reading(surname)
+                    if s_yomi:
+                        healed_sp = healed_sp.replace(f"{s_yomi}選手", f"{s_yomi}さん")
+            elif honorific in ("監督", "コーチ"):
+                print(f"[敬称自己修復] 🎯 肩書（{honorific}）に基づき '{p_name}選手' ➔ '{p_name}{honorific}' に自動修復", flush=True)
+                disp = disp.replace(f"{p_name}選手", f"{p_name}{honorific}")
+                healed_sp = healed_sp.replace(f"{p_name}選手", f"{p_name}{honorific}")
+                p_yomi = lookup_wikipedia_person_reading(p_name)
+                if p_yomi:
+                    healed_sp = healed_sp.replace(f"{p_yomi}選手", f"{p_yomi}{honorific}")
 
     # 1. 監督・コーチに対する「選手」誤爆の是正
     disp = re.sub(r'([A-Za-z\u4e00-\u9fa5ぁ-んァ-ヶー]{2,10})監督選手', r'\1監督', disp)
@@ -1045,7 +1157,6 @@ def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, h
     # 3. 非スポーツ記事（かつスポーツキーワードを含まない純粋なエンタメ記事）でのみ人名＋選手を是正
     # ※ 超重要: 「選手たち」「選手への」などの一般名詞・複数形、および直前に助詞がある「〇〇が選手」「〇〇の選手」は絶対に誤爆置換しない
     if not is_pure_sports and not has_authentic_sports:
-        # 助詞・一般名詞接頭辞を除外し、文頭または助詞直後の明確な人名（漢字2〜4文字またはカタカナ2〜8文字）のみを置換
         SAFE_ATHLETE_PERSON_PATTERN = r'(?:^|(?<=[、。！？\s　はがのにへと]))(?!(?:日本|日本人|女子|男子|代表|若手|出場|プロ|主力|控え|交代|所属|世界|国内|相手|全|各|当該|対象|選手))([一-鿿]{2,4}|[ァ-ヶー]{2,8})選手(?!(?:たち|ら|団|層|生命|権|宣誓|選考|枠))'
         if "選手" in disp:
             disp_fixed = re.sub(SAFE_ATHLETE_PERSON_PATTERN, r'\1さん', disp)
@@ -1058,7 +1169,6 @@ def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, h
                 healed_sp = disp_sp_fixed
 
     # 4. 助詞直後に孤立した「さんたち」「さんへの」「さんのプレー」等の破綻表現を自動救済修復（ホワイトリスト方式・カテゴリ連動）
-    # ※ is_sports=False の場合、非スポーツ記事では絶対に「選手」という単語を使わず「皆さん」「方たち」へ救済
     disp = apply_athlete_honorific_repairs(disp, is_sports=is_sports)
     healed_sp = apply_athlete_honorific_repairs(healed_sp, is_sports=is_sports)
 
@@ -1185,8 +1295,8 @@ def audit_and_heal_news_script(items, title="", article_context="", category_nam
         # 1. 読み上げテキスト(speech)の異常置換自己修復
         healed_sp = heal_sentence_reading(disp, sp)
 
-        # 2. 「選手」の文脈適正チェック（カテゴリ連動）
-        disp, healed_sp = _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, has_authentic_sports, is_sports=is_sports)
+        # 2. 「選手」の文脈適正チェック（カテゴリ連動・動的世間的肩書解決）
+        disp, healed_sp = _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, has_authentic_sports, is_sports=is_sports, article_context=article_context, title=title)
 
         # 3. 普通名詞・国名・組織名への「さん」誤爆の最終除去
         for noun in INVALID_SAN_NOUNS:

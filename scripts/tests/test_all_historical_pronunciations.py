@@ -496,6 +496,63 @@ TEST_CATEGORIES = [
                 "forbidden_pattern": r"出さにゃ",
             },
         ]
+    },
+    {
+        "category": "9. スポーツ・結婚混在・引退選手（OB/解説者）の動的敬称修復（リストフリー解決）",
+        "cases": [
+            {
+                "id": "athlete_marriage_actor_honorific",
+                "desc": "スポーツ選手と俳優の結婚報道で、俳優（福原遥）が「さん」に修復され、選手（久保建英）は「選手」が維持されること",
+                "text": "サッカーの久保建英選手が活躍し、女優の福原遥選手との結婚が明らかになりましたにゃ。",
+                "title": "久保建英選手と女優・福原遥さんが電撃結婚",
+                "article_context": "サッカー日本代表の久保建英選手と、女優でタレントの福原遥さんが結婚したことが分かりました。",
+                "category_name": "スポーツ",
+                "check_type": "both_text",
+                "expected_display_pattern": r"久保建英選手.*福原遥さん",
+                "forbidden_display_pattern": r"福原遥選手|久保建英さん",
+                "expected_speech_pattern": r"(?:久保建英|くぼたけふさ)選手.*(?:福原遥|ふくはらはるか)さん",
+                "forbidden_speech_pattern": r"(?:福原遥|ふくはらはるか)選手|(?:久保建英|くぼたけふさ)さん",
+            },
+            {
+                "id": "retired_baseball_player_matsuzaka",
+                "desc": "元プロ野球選手（松坂大輔）への「選手」誤爆がWikipedia/構文解析により「さん」へ修復されること",
+                "text": "元プロ野球選手の松坂大輔選手が甲子園の決勝について熱く語りましたにゃ。",
+                "title": "松坂大輔氏が語る甲子園の熱闘",
+                "article_context": "元プロ野球選手で野球解説者の松坂大輔さんが、夏の高校野球について振り返りました。",
+                "category_name": "スポーツ",
+                "check_type": "both_text",
+                "expected_display_pattern": r"松坂大輔さん",
+                "forbidden_display_pattern": r"松坂大輔選手",
+                "expected_speech_pattern": r"(?:松坂大輔|まつざかだいすけ)さん",
+                "forbidden_speech_pattern": r"(?:松坂大輔|まつざかだいすけ)選手",
+            },
+            {
+                "id": "retired_soccer_player_uchida",
+                "desc": "元サッカー日本代表（内田篤人）への「選手」誤爆がWikipedia/構文解析により「さん」へ修復されること",
+                "text": "解説者の内田篤人選手が若手ディフェンダーのプレーを絶賛しましたにゃ。",
+                "title": "内田篤人氏が解説する日本代表の守備",
+                "article_context": "元日本代表の内田篤人さんが、最新の試合について解説を行いました。",
+                "category_name": "スポーツ",
+                "check_type": "both_text",
+                "expected_display_pattern": r"内田篤人さん",
+                "forbidden_display_pattern": r"内田篤人選手",
+                "expected_speech_pattern": r"(?:内田篤人|うちだあつと)さん",
+                "forbidden_speech_pattern": r"(?:内田篤人|うちだあつと)選手",
+            },
+            {
+                "id": "active_athlete_ohtani_protected",
+                "desc": "現役アスリート（大谷翔平選手）は「選手」の呼称が確実に維持されること（誤った『さん』化の防止）",
+                "text": "ドジャースの大谷翔平選手が豪快なホームランを放ちましたにゃ。",
+                "title": "大谷翔平選手が第50号本塁打",
+                "article_context": "メジャーリーグ・ドジャースの大谷翔平選手が本塁打を記録しました。",
+                "category_name": "スポーツ",
+                "check_type": "both_text",
+                "expected_display_pattern": r"大谷翔平選手",
+                "forbidden_display_pattern": r"大谷翔平さん",
+                "expected_speech_pattern": r"(?:大谷翔平|おおたにしょうへい)選手",
+                "forbidden_speech_pattern": r"(?:大谷翔平|おおたにしょうへい)さん",
+            },
+        ]
     }
 ]
 
@@ -533,10 +590,13 @@ def run_all_historical_regression_tests():
             norm_text = normalize_for_tts(raw_text)
 
             # Step 2: audit_and_heal_news_script（敬称・方言・文脈修復等）
+            case_title = case.get("title", raw_text)
+            case_article = case.get("article_context", raw_text)
             items = [{"display": raw_text, "speech": norm_text}]
             healed = audit_and_heal_news_script(
-                items, title=raw_text, article_context=raw_text, category_name=cat_name_input
+                items, title=case_title, article_context=case_article, category_name=cat_name_input
             )
+            display_text = healed[0]["display"]
             speech_text = healed[0]["speech"]
 
             # Step 2.5: VOICEVOX 全文照合（助詞融合救済テストの場合）
@@ -544,6 +604,7 @@ def run_all_historical_regression_tests():
                 healed_vv = audit_and_heal_via_voicevox_full_reading(
                     healed, title=raw_text, known_terms_map=known_terms
                 )
+                display_text = healed_vv[0]["display"]
                 speech_text = healed_vv[0]["speech"]
 
             # Step 3: VOICEVOX 発音生成（音声カナ判定の場合）
@@ -557,7 +618,25 @@ def run_all_historical_regression_tests():
             err_msg = ""
 
             # ── 検証判定 ──
-            if check_type in ("speech_text", "both"):
+            if check_type == "both_text":
+                exp_disp = case.get("expected_display_pattern", "")
+                forb_disp = case.get("forbidden_display_pattern", "")
+                exp_sp = case.get("expected_speech_pattern", "")
+                forb_sp = case.get("forbidden_speech_pattern", "")
+                if exp_disp and not re.search(exp_disp, display_text):
+                    is_ok = False
+                    err_msg = f"期待表示 '{exp_disp}' が display ('{display_text}') に見つかりません"
+                elif forb_disp and re.search(forb_disp, display_text):
+                    is_ok = False
+                    err_msg = f"禁止表示 '{forb_disp}' が display ('{display_text}') に含まれています"
+                elif exp_sp and not re.search(exp_sp, speech_text):
+                    is_ok = False
+                    err_msg = f"期待読み '{exp_sp}' が speech ('{speech_text}') に見つかりません"
+                elif forb_sp and re.search(forb_sp, speech_text):
+                    is_ok = False
+                    err_msg = f"禁止読み '{forb_sp}' が speech ('{speech_text}') に含まれています"
+
+            elif check_type in ("speech_text", "both"):
                 exp_pat = case.get("expected_speech_pattern") or case.get("expected_pattern", "")
                 forb_pat = case.get("forbidden_speech_pattern") or case.get("forbidden_pattern", "")
                 if exp_pat and not re.search(exp_pat, speech_text):
