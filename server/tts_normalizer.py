@@ -1188,6 +1188,10 @@ def extract_special_terms(text):
                 continue
             terms.append(t)
 
+    # 6. 特殊記号（♂、♀、☆、★、♪、♫等）を含む固有名詞候補（つんく♂、モーニング娘。等）
+    for m in re.finditer(r'(?<![A-Za-z0-9一-鿿ぁ-んァ-ヴー])([一-鿿ぁ-んァ-ヴーA-Za-z0-9]{2,10}[♂♀☆★♪♫♡♥！？!]+)', text):
+        terms.append(m.group(1))
+
     return list(dict.fromkeys(terms))
 
 
@@ -2329,8 +2333,12 @@ def heal_sentence_reading(display_text, speech_text):
                 print(f"[誤読自己修復] 🩹 異常置換検知: '{orig}' -> '{rep}' を元の '{orig}' へロールバック", flush=True)
                 healed_parts.append(orig)
         elif tag == "delete":
-            # display側にあるがspeech側で意図せず削られた場合
-            healed_parts.append(display_text[i1:i2])
+            deleted_part = display_text[i1:i2]
+            # ♂、♀、☆、★、♪、♫、♡、♥、！、!、？、?、句読点等の装飾記号が発音用に削られた場合は復活させない（つんく♂等の「おす」誤読防止）
+            if re.match(r'^[♂♀☆★♪♫♡♥！？!?・…〜~\s　]+$', deleted_part):
+                continue
+            # display側にあるがspeech側で意図せず削られた通常文字の場合のみ修復
+            healed_parts.append(deleted_part)
         elif tag == "insert":
             healed_parts.append(speech_text[j1:j2])
 

@@ -442,6 +442,16 @@ TEST_CATEGORIES = [
                 "expected_kana_pattern": r"プウチン.*(?:ロ|ロシア)ダイトオリョオ.*(?:ロ|ロシア)セ[イエ]ケン",
                 "forbidden_kana_pattern": r"ツユ",
             },
+            {
+                "id": "proper_tsunku_no_osu",
+                "desc": "「つんく♂」が「ツンク」と正しく発音されること（Wikipedia解決・つんくおす防止）",
+                "text": "つんく♂さんが新曲のプロデュースを手掛けましたにゃ。",
+                "check_type": "both",
+                "expected_speech_pattern": r"つんくさん",
+                "forbidden_speech_pattern": r"つんくおす|おすさん",
+                "expected_kana_pattern": r"ツンクサン",
+                "forbidden_kana_pattern": r"ツンクオス|オスサン",
+            },
         ]
     },
     {
