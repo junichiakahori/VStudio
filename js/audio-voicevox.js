@@ -462,7 +462,12 @@ async function fetchVoicevoxBuffer(text, speakerId, speedScaleVal, pitchScaleVal
     const firstKey = voicevoxAudioBufferCache.keys().next().value;
     voicevoxAudioBufferCache.delete(firstKey);
   }
-  return await promise;
+  const result = await promise;
+  if (!result) {
+    // 🛡️ 高負荷やタイムアウトで失敗(null)した結果はキャッシュを即時破棄（次回以降の永続スキップ事故を100%防止）
+    voicevoxAudioBufferCache.delete(cacheKey);
+  }
+  return result;
 }
 
 // 🧹 VOICEVOX送信前テキストの共通クリーンアップ（本編・先読みで100%同一のキーを保証）
@@ -580,11 +585,18 @@ async function playNextVoicevox() {
     // 音声バッファの取得と再生には speakString を渡す
     let arrayBuffer = await fetchVoicevoxBuffer(speakString, speakerId, speedScaleVal, pitchScaleVal);
     if (!arrayBuffer) {
-      console.warn("[VOICEVOX] 音声取得初回失敗 ➔ 600ms後に再試行します...");
-      await new Promise(r => setTimeout(r, 600));
+      console.warn("[VOICEVOX] 音声取得初回失敗 ➔ キャッシュを破棄して800ms後に再試行します...");
+      voicevoxAudioBufferCache.delete(`${speakerId}_${speedScaleVal}_${pitchScaleVal}_${speakString.trim()}`);
+      await new Promise(r => setTimeout(r, 800));
       arrayBuffer = await fetchVoicevoxBuffer(speakString, speakerId, speedScaleVal, pitchScaleVal);
     }
-    if (!arrayBuffer) throw new Error("Empty audio buffer");
+    if (!arrayBuffer) {
+      console.warn("[VOICEVOX] 2回目失敗 ➔ キャッシュ完全破棄＆1.2秒待機後に最終リトライします...");
+      voicevoxAudioBufferCache.delete(`${speakerId}_${speedScaleVal}_${pitchScaleVal}_${speakString.trim()}`);
+      await new Promise(r => setTimeout(r, 1200));
+      arrayBuffer = await fetchVoicevoxBuffer(speakString, speakerId, speedScaleVal, pitchScaleVal);
+    }
+    if (!arrayBuffer) throw new Error("Empty audio buffer after retries");
 
     const ctx = getVoicevoxAudioContext();
     if (ctx.state === "suspended" || ctx.state === "interrupted") {

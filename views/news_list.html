@@ -780,7 +780,7 @@
                         <div class="news-card-footer">
                             <span>📅 ${escapeHtml(item.pubDate || item.pub_date || '2026-09-26 12:00')}</span>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <button class="action-btn" style="padding: 2px 8px; font-size: 0.72rem; background: rgba(0, 210, 211, 0.12); border-color: rgba(0, 210, 211, 0.35); color: #00f3ff; border-radius: 4px;" onclick="handleOpenCacheViewer(); event.stopPropagation();" title="ニュース原稿キャッシュマネージャーを開く">🗄️ キャッシュ</button>
+                                <button class="action-btn" style="padding: 2px 8px; font-size: 0.72rem; background: rgba(0, 210, 211, 0.12); border-color: rgba(0, 210, 211, 0.35); color: #00f3ff; border-radius: 4px;" onclick="handleOpenCacheViewerFromCard(${idx}, event);" title="ニュース原稿キャッシュマネージャーを開く">🗄️ キャッシュ</button>
                                 ${linkUrl ? `<a href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener noreferrer" class="news-link">🔗 元記事を開く ↗</a>` : ''}
                             </div>
                         </div>
@@ -999,9 +999,31 @@
         }
 
         // ── ニュースキャッシュマネージャーを開く ──
-        function handleOpenCacheViewer() {
+        window.handleOpenCacheViewerFromCard = function(index, event) {
+            if (event) event.stopPropagation();
+            const sortedNews = getSortedNews();
+            if (!sortedNews || !sortedNews[index]) {
+                handleOpenCacheViewer();
+                return;
+            }
+            const targetItem = sortedNews[index];
+            const linkUrl = targetItem.link || targetItem.url || "";
+            handleOpenCacheViewer(targetItem.title, linkUrl);
+        };
+
+        function handleOpenCacheViewer(targetTitle = "", targetUrl = "") {
+            if (targetTitle) {
+                try {
+                    localStorage.setItem("vstudio_cache_scroll_target", JSON.stringify({
+                        title: targetTitle,
+                        url: targetUrl || "",
+                        time: Date.now()
+                    }));
+                } catch (e) {}
+            }
+
             if (window.opener && typeof window.opener.openNewsCachePopup === "function") {
-                window.opener.openNewsCachePopup();
+                window.opener.openNewsCachePopup(targetTitle, targetUrl);
             } else {
                 let width = 960;
                 let height = 750;
@@ -1017,8 +1039,12 @@
                 } catch (e) {}
                 const left = Math.max(0, (window.screen.width - width) / 2);
                 const top = Math.max(0, (window.screen.height - height) / 2);
+                const queryParams = new URLSearchParams({ t: Date.now() });
+                if (targetTitle) queryParams.set("target", targetTitle);
+                if (targetUrl) queryParams.set("url", targetUrl);
+
                 window.open(
-                    `/news_cache_viewer.html?t=${Date.now()}`,
+                    `/news_cache_viewer.html?${queryParams.toString()}`,
                     "VStudioNewsCacheWindow",
                     `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
                 );

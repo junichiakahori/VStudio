@@ -74,12 +74,24 @@
 
   // ── ニュース原稿キャッシュビューア（専用ポップアップ） ──
   window.newsCacheWindow = null;
-  window.openNewsCachePopup = function () {
-    console.log("[ニュースキャッシュ] 🗄️ キャッシュビューアポップアップを開きます");
+  window.openNewsCachePopup = function (targetTitle, targetUrl) {
+    console.log("[ニュースキャッシュ] 🗄️ キャッシュビューアポップアップを開きます", { targetTitle });
     try {
+      if (targetTitle) {
+        try {
+          localStorage.setItem("vstudio_cache_scroll_target", JSON.stringify({
+            title: targetTitle,
+            url: targetUrl || "",
+            time: Date.now()
+          }));
+        } catch (e) {}
+      }
+
       if (window.newsCacheWindow && !window.newsCacheWindow.closed) {
         window.newsCacheWindow.focus();
-        if (typeof window.newsCacheWindow.loadAvailableDates === "function") {
+        if (typeof window.newsCacheWindow.scrollToTarget === "function" && targetTitle) {
+          window.newsCacheWindow.scrollToTarget(targetTitle, targetUrl);
+        } else if (typeof window.newsCacheWindow.loadAvailableDates === "function") {
           window.newsCacheWindow.loadAvailableDates();
         }
         return;
@@ -100,7 +112,10 @@
 
       const left = Math.max(0, (window.screen.width - width) / 2);
       const top = Math.max(0, (window.screen.height - height) / 2);
-      const url = `/news_cache_viewer.html?t=${Date.now()}`;
+      const queryParams = new URLSearchParams({ t: Date.now() });
+      if (targetTitle) queryParams.set("target", targetTitle);
+      if (targetUrl) queryParams.set("url", targetUrl);
+      const url = `/news_cache_viewer.html?${queryParams.toString()}`;
 
       window.newsCacheWindow = window.open(
         url,

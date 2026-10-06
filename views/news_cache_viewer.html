@@ -57,12 +57,15 @@
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             z-index: 100;
+            gap: 12px;
+            flex-wrap: wrap;
         }
 
         .header-left {
             display: flex;
             align-items: center;
             gap: 12px;
+            flex-wrap: wrap;
         }
 
         .header-title {
@@ -72,6 +75,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            white-space: nowrap;
             background: linear-gradient(135deg, #00d2d3, #a55eea);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -81,6 +85,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            flex-wrap: nowrap;
         }
 
         .date-select-wrap {
@@ -91,12 +96,14 @@
             border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 4px 10px;
+            white-space: nowrap;
         }
 
         .date-select-wrap label {
             font-size: 12px;
             color: var(--text-muted);
             font-weight: 600;
+            white-space: nowrap;
         }
 
         select.date-select {
@@ -108,6 +115,7 @@
             outline: none;
             cursor: pointer;
             font-family: inherit;
+            white-space: nowrap;
         }
 
         select.date-select option {
@@ -119,6 +127,7 @@
         .btn {
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 6px;
             padding: 6px 14px;
             border-radius: 8px;
@@ -131,6 +140,8 @@
             transition: all 0.2s ease;
             outline: none;
             user-select: none;
+            white-space: nowrap;
+            word-break: keep-all;
         }
 
         .btn:hover {
@@ -256,6 +267,35 @@
         .news-card:hover {
             border-color: var(--border-hover);
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        /* ── ターゲット記事のハイライト・スクロール用アニメーション ── */
+        @keyframes targetPulseGlow {
+            0% {
+                box-shadow: 0 0 0 0 rgba(0, 243, 255, 0.8);
+                border-color: #00f3ff;
+                background: rgba(0, 243, 255, 0.16);
+                transform: scale(1);
+            }
+            40% {
+                box-shadow: 0 0 28px 6px rgba(0, 243, 255, 0.65);
+                border-color: #00f3ff;
+                background: rgba(0, 243, 255, 0.26);
+                transform: scale(1.018);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(0, 243, 255, 0);
+                border-color: var(--border-color);
+                background: var(--bg-card);
+                transform: scale(1);
+            }
+        }
+
+        .news-card.highlight-target {
+            animation: targetPulseGlow 1.2s ease-in-out 3;
+            border-color: #00f3ff !important;
+            z-index: 10;
+            position: relative;
         }
 
         .card-header {
@@ -816,11 +856,15 @@
             items.forEach((item, idx) => {
                 const card = document.createElement("div");
                 card.className = "news-card";
+                card.id = `cache-card-${idx}`;
 
                 const title = item.title || "(タイトルなし)";
                 const source = item.source || "ニュース";
                 const pubDate = item.pub_date || item.created_at || "";
                 const url = item.url || "";
+
+                card.dataset.title = title;
+                card.dataset.url = url;
                 const titleReading = item.title_reading || item.headline?.reading || "";
                 const voicevoxReading = item.title_voicevox_reading || item.headline?.voicevox_reading || "";
                 const sentences = item.sentences || [];
@@ -1011,10 +1055,124 @@
             }, 300);
         });
 
+        // ── 該当記事へのスクロール＆ハイライト処理 ──
+        function getTargetFromContext() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const targetFromUrl = urlParams.get("target");
+            const urlFromUrl = urlParams.get("url");
+            if (targetFromUrl) return { title: targetFromUrl, url: urlFromUrl || "" };
+
+            try {
+                const stored = localStorage.getItem("vstudio_cache_scroll_target");
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    if (parsed && parsed.title && (Date.now() - (parsed.time || 0) < 20000)) {
+                        return { title: parsed.title, url: parsed.url || "" };
+                    }
+                }
+            } catch (e) {}
+            return null;
+        }
+
+        window.scrollToTarget = function(targetTitle, targetUrl = "") {
+            if (!targetTitle && !targetUrl) return false;
+
+            const clean = (s) => (s || "").replace(/[\s\u3000\t\r\n]+/g, "").toLowerCase();
+            const targetClean = clean(targetTitle);
+            const cards = document.querySelectorAll(".news-card");
+            let matchedCard = null;
+
+            // 1. 完全一致・URL一致・部分一致でカード探索
+            for (const card of cards) {
+                const cardTitle = card.dataset.title || "";
+                const cardUrl = card.dataset.url || "";
+                const cardClean = clean(cardTitle);
+
+                if (targetUrl && cardUrl && cardUrl === targetUrl) {
+                    matchedCard = card;
+                    break;
+                }
+                if (targetClean && cardClean === targetClean) {
+                    matchedCard = card;
+                    break;
+                }
+                if (targetClean && (cardClean.includes(targetClean) || targetClean.includes(cardClean))) {
+                    if (!matchedCard) matchedCard = card;
+                }
+            }
+
+            if (matchedCard) {
+                // スムーズスクロール & ハイライト
+                matchedCard.scrollIntoView({ behavior: "smooth", block: "center" });
+                matchedCard.classList.remove("highlight-target");
+                void matchedCard.offsetWidth; // リフロー強制
+                matchedCard.classList.add("highlight-target");
+                showToast(`🎯 該当記事のキャッシュへスクロールしました`, "success");
+                setTimeout(() => {
+                    matchedCard.classList.remove("highlight-target");
+                }, 4000);
+                return true;
+            }
+
+            return false;
+        };
+
+        async function checkAndApplyPendingScrollTarget() {
+            const target = getTargetFromContext();
+            if (!target) return;
+
+            // 検索ボックスにテキストが入っていたらクリア
+            const searchInput = document.getElementById("search-input");
+            if (searchInput && searchInput.value) {
+                searchInput.value = "";
+                renderCards(currentItems, currentSession);
+            }
+
+            // まず現在の表示で探す
+            let found = window.scrollToTarget(target.title, target.url);
+            if (found) return;
+
+            // 現在のセッションになければ、「一日全体 (all)」に切り替えて探してみる
+            if (currentSession !== "all") {
+                console.log("[キャッシュビューア] 現在のセッション内に見つからないため、一日全体(all)で再検索します");
+                const select = document.getElementById("date-select");
+                for (let i = 0; i < select.options.length; i++) {
+                    if (select.options[i].dataset.session === "all" && select.options[i].dataset.date === currentDate) {
+                        select.selectedIndex = i;
+                        currentSession = "all";
+                        currentSessionLabel = select.options[i].textContent;
+                        await loadCacheData(currentDate, "all");
+                        found = window.scrollToTarget(target.title, target.url);
+                        if (found) return;
+                        break;
+                    }
+                }
+            }
+
+            // さらに今日以外の過去日付の場合でもセレクト全件から探すフォールバック
+            if (!found) {
+                const select = document.getElementById("date-select");
+                for (let i = 0; i < select.options.length; i++) {
+                    const opt = select.options[i];
+                    if (opt.dataset.session === "all" && opt.dataset.date !== currentDate) {
+                        // 日付を切り替えてテスト
+                        select.selectedIndex = i;
+                        currentDate = opt.dataset.date;
+                        currentSession = "all";
+                        currentSessionLabel = opt.textContent;
+                        await loadCacheData(currentDate, "all");
+                        found = window.scrollToTarget(target.title, target.url);
+                        if (found) return;
+                    }
+                }
+            }
+        }
+
         // ── 初期化 ──
-        window.addEventListener("DOMContentLoaded", () => {
+        window.addEventListener("DOMContentLoaded", async () => {
             document.title = "🗄️ VStudio ニュース原稿キャッシュマネージャー";
-            loadAvailableDates();
+            await loadAvailableDates();
+            await checkAndApplyPendingScrollTarget();
         });
     </script>
 </body>

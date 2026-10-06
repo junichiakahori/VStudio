@@ -1568,6 +1568,174 @@
       "category": "person_name",
       "registered_date": "2026-10-05",
       "note": "Wikipediaに基づき「つんく♂」の「♂」が「おす」と誤読されるのを防止し「つんく」に固定"
+    },
+    {
+      "id": "auto_1791155230_9296",
+      "surface": "望月",
+      "reading": "ぼうげつ",
+      "wrong_reading": "もちずき",
+      "scope": "contextual",
+      "article_topic": "異例の森保J離脱→再合流で笑い誘ったMF望月ヘンリー海輝「流されるままですね",
+      "sample_sentence": "エムエフ望月ヘンリー海輝選手が、一時的に日本代表から離脱し、その後再び合流したのですにゃ。",
+      "category": "proper_noun",
+      "registered_date": "2026-10-05",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'もちずき' ➔ 正読: 'ぼうげつ'）",
+      "context_keywords": [
+        "異例",
+        "森保",
+        "離脱",
+        "再合流",
+        "MF",
+        "望月"
+      ]
+    },
+    {
+      "id": "auto_1791193978_9532",
+      "surface": "寺田",
+      "reading": "じでん",
+      "wrong_reading": "てらだ",
+      "scope": "contextual",
+      "article_topic": "トヨタ子会社情報流出疑い 元社員の男女逮捕、愛知（共同通信）",
+      "sample_sentence": "寺田に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-05",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: てらだ)",
+      "context_keywords": [
+        "在日韓国人",
+        "23",
+        "進路予想",
+        "元上司",
+        "48",
+        "転職"
+      ]
+    },
+    {
+      "id": "auto_1791195406_334",
+      "surface": "柳葉敏郎",
+      "reading": "やなぎばとしろう",
+      "wrong_reading": "まきじやなぎばとしお",
+      "scope": "global",
+      "article_topic": "容疑者 室井慎次」放送→暗闇で０・３秒だけ顔が映った人物→今は亡き名優に騒然「うわ」「贅沢な無駄遣い！」「暗がりに」 「存命なら」新作映画で警視総監だったか",
+      "sample_sentence": "2005年8月の公開作品で、策略にはめられた室井慎次柳葉敏郎の逮捕に絡み、警察庁と警視庁のキャリアが内紛を起こしたにゃ。",
+      "category": "person_name",
+      "registered_date": "2026-10-05",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'まきじやなぎばとしお' ➔ 正読: 'やなぎばとしろう'）"
+    },
+    {
+      "id": "auto_1791195753_2464",
+      "surface": "千夏",
+      "reading": "ちか",
+      "wrong_reading": "ちなつ",
+      "scope": "contextual",
+      "article_topic": "爽やかな練習中のワンシーンを表現！『アオのハコ』鹿野千夏がスポーツウェア姿でバンプレストからプライズフィギュア化！",
+      "sample_sentence": "このニュース、『アオのハコ』の鹿野千夏さんがスポーツウェア姿で、バンプレストからプライズフィギュア化されることが発表され",
+      "category": "proper_noun",
+      "registered_date": "2026-10-05",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'ちなつ' ➔ 正読: 'ちか'）",
+      "context_keywords": [
+        "練習中",
+        "ワンシーン",
+        "表現",
+        "アオ",
+        "ハコ",
+        "鹿野千夏"
+      ]
+    },
+    {
+      "id": "auto_1791197056_9895",
+      "surface": "池山隆寛",
+      "reading": "いけやまたかひろ",
+      "wrong_reading": "いけやま りゅうかん",
+      "scope": "global",
+      "article_topic": "真中満氏　満点ど真ん中】ヤクルトは全員がレギュラーになるという気持ちでレベルアップを",
+      "sample_sentence": "池山隆寛に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-05",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: いけやま りゅうかん)"
+    },
+    {
+      "id": "auto_1791197545_1438",
+      "surface": "度会隆輝",
+      "reading": "わたらいりゅうき",
+      "wrong_reading": "わたらいたかてる",
+      "scope": "global",
+      "article_topic": "全部、物足りない。まだまだ行けるのに」DeNA度会隆輝の成長とそれ以上の悔しさ…安定感増した“あの安打製造機”の教え「毎日10種以上のドリルを」（Number Web）",
+      "sample_sentence": "全部、物足りない。まだまだ行けるのに」DeNA度会隆輝の成長とそれ以上の悔しさ…安定感増した“あの安打製造機”の教え「毎",
+      "category": "person_name",
+      "registered_date": "2026-10-05",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'わたらいたかてる' ➔ 正読: 'わたらいりゅうき'）"
+    },
+    {
+      "id": "auto_1791198434_3574",
+      "surface": "T9",
+      "reading": "ティーナイン",
+      "wrong_reading": "てぃい きゅう",
+      "scope": "global",
+      "article_topic": "妻が「ロボット掃除機」を3年経たずに買い替え。もったいない…と思いきや、最新モデルの全自動っぷりに寝返った",
+      "sample_sentence": "T9に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-05",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: てぃい きゅう)"
+    },
+    {
+      "id": "auto_1791237816_6669",
+      "surface": "野崎守",
+      "reading": "のざき",
+      "wrong_reading": "のさきまもる",
+      "scope": "contextual",
+      "article_topic": "そういうことか！ ＶＩＶＡＮＴ 劉ミンシュエンの一言に、ああっ！まさか正体と母親 血縁関係が濃厚 第１１話の野崎と乃木伯父のホテル面会が伏線か",
+      "sample_sentence": "第11話の野崎守阿部寛）とのぎおじ（井上順）のホテル面会が伏線として見られるようになってきたにゃ。",
+      "category": "person_name",
+      "registered_date": "2026-10-06",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'のさきまもる' ➔ 正読: 'のざき'）",
+      "context_keywords": [
+        "ミンシュエン",
+        "一言",
+        "正体",
+        "母親",
+        "血縁関係",
+        "濃厚"
+      ]
+    },
+    {
+      "id": "auto_1791240136_3377",
+      "surface": "茂木",
+      "reading": "もてぎ",
+      "wrong_reading": "もき",
+      "scope": "contextual",
+      "article_topic": "林前総務相が茂木外相と会食 臨時国会や党内情勢で意見交換か（毎日新聞）",
+      "sample_sentence": "林前総務相が茂木外相と会食 臨時国会や党内情勢で意見交換か（毎日新聞）",
+      "category": "proper_noun",
+      "registered_date": "2026-10-06",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'もき' ➔ 正読: 'もてぎ'）",
+      "context_keywords": [
+        "林前総務相",
+        "茂木外相",
+        "会食",
+        "臨時国会",
+        "党内情勢",
+        "意見交換"
+      ]
+    },
+    {
+      "id": "auto_1791241465_5769",
+      "surface": "星希",
+      "reading": "ほしき",
+      "wrong_reading": "ほしのぞみ",
+      "scope": "contextual",
+      "article_topic": "プロフェッショナルな走りに期待」 声優・星希成奏さんのJDクラシック注目馬は？",
+      "sample_sentence": "星希成奏さんから注目馬の情報が届いてにゃ！ジャパンダートクラシックに向けて、星希成奏さんが支持している馬たちについて詳し",
+      "category": "proper_noun",
+      "registered_date": "2026-10-06",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'ほしのぞみ' ➔ 正読: 'ほしき'）",
+      "context_keywords": [
+        "プロフェッショナル",
+        "期待",
+        "声優",
+        "星希成奏",
+        "JD",
+        "クラシック"
+      ]
     }
   ]
 }
