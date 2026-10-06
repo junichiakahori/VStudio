@@ -640,6 +640,13 @@
             <span class="search-icon">🔍</span>
             <input type="text" id="search-input" placeholder="タイトルや読み上げ内容で検索...">
         </div>
+        <div class="sort-select-wrap" style="display: flex; align-items: center; gap: 6px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 4px 10px; white-space: nowrap;">
+            <label for="sort-select" style="font-size: 12px; color: var(--text-muted); font-weight: 600;">並び順:</label>
+            <select id="sort-select" style="background: transparent; border: none; color: var(--text-main); font-size: 12px; font-weight: 600; outline: none; cursor: pointer;">
+                <option value="broadcast" selected>📺 番組放送順 (#1〜)</option>
+                <option value="created">🕒 生成時刻順</option>
+            </select>
+        </div>
         <div class="stats-bar">
             <div class="stat-badge">
                 <span>登録記事数:</span>
@@ -840,7 +847,37 @@
             }
         }
 
-        // ── 記事カードの描画（配信セッションごとの番号を大きく表示） ──
+        // ── 番組放送順インデックスマップの取得 ──
+        function getBroadcastIndexMap() {
+            let list = [];
+            try {
+                if (window.opener && !window.opener.closed && window.opener.latestFetchedNews) {
+                    list = window.opener.latestFetchedNews;
+                } else if (window.opener && !window.opener.closed && window.opener.newsBroadcastState && window.opener.newsBroadcastState.newsList) {
+                    list = window.opener.newsBroadcastState.newsList;
+                } else {
+                    const saved = localStorage.getItem("latestFetchedNews");
+                    if (saved) list = JSON.parse(saved);
+                }
+            } catch (e) {}
+
+            const map = new Map();
+            if (Array.isArray(list)) {
+                list.forEach((it, i) => {
+                    if (it && it.title) {
+                        const cleanT = (it.title || "").replace(/[\s\u3000\t\r\n]+/g, "").toLowerCase();
+                        map.set(it.title, i + 1);
+                        map.set(cleanT, i + 1);
+                        if (it.link || it.url) {
+                            map.set(it.link || it.url, i + 1);
+                        }
+                    }
+                });
+            }
+            return map;
+        }
+
+        // ── 記事カードの描画（番組放送順に完全一致＆ソート切替） ──
         function renderCards(items, sessionStr = "all") {
             const container = document.getElementById("news-container");
             const emptyState = document.getElementById("empty-state");
@@ -853,7 +890,34 @@
 
             emptyState.style.display = "none";
 
-            items.forEach((item, idx) => {
+            const broadcastMap = getBroadcastIndexMap();
+            const sortMode = document.getElementById("sort-select") ? document.getElementById("sort-select").value : "broadcast";
+
+            // 各アイテムに放送順インデックスを付与
+            const processedItems = items.map((item, originalIdx) => {
+                const cleanT = (item.title || "").replace(/[\s\u3000\t\r\n]+/g, "").toLowerCase();
+                const bIdx = broadcastMap.get(item.title) || broadcastMap.get(cleanT) || (item.url ? broadcastMap.get(item.url) : null) || item.broadcast_index || null;
+                return {
+                    ...item,
+                    _broadcastIdx: bIdx,
+                    _originalIdx: originalIdx
+                };
+            });
+
+            // ソート処理
+            if (sortMode === "broadcast") {
+                processedItems.sort((a, b) => {
+                    const aIdx = a._broadcastIdx != null ? a._broadcastIdx : 99999;
+                    const bIdx = b._broadcastIdx != null ? b._broadcastIdx : 99999;
+                    if (aIdx !== bIdx) return aIdx - bIdx;
+                    return (a.created_at || "").localeCompare(b.created_at || "");
+                });
+            } else {
+                // 生成時刻順
+                processedItems.sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""));
+            }
+
+            processedItems.forEach((item, idx) => {
                 const card = document.createElement("div");
                 card.className = "news-card";
                 card.id = `cache-card-${idx}`;
@@ -869,22 +933,26 @@
                 const voicevoxReading = item.title_voicevox_reading || item.headline?.voicevox_reading || "";
                 const sentences = item.sentences || [];
 
-                // 配信セッション番号と全体番号
-                const sessionIdx = item.session_index || (idx + 1);
-                const globalIdx = item.global_index || item.index || (idx + 1);
+                // 放送順番号を最優先で表示！
+                const broadcastIdx = item._broadcastIdx;
+                const sessionIdx = item.session_index || (item._originalIdx + 1);
+                const globalIdx = item.global_index || item.index || (item._originalIdx + 1);
                 const sessionType = item.session_type || "morning";
                 const sessionIcon = sessionType === "evening" ? "🌙 夜" : "☀️ 朝";
 
-                // バッジ表示の構築
+                // バッジ表示の構築: 放送順番号を大きく #1, #2... と表示
                 let badgeHtml = "";
-                if (sessionStr === "all") {
-                    // 全体表示時: 全体番号 + セッションバッジ（セッション内連番）
+                if (broadcastIdx != null) {
+                    badgeHtml = `
+                        <span class="card-index-badge" style="background: rgba(0, 210, 211, 0.2); color: #00f3ff; border: 1px solid rgba(0, 210, 211, 0.5); font-weight: 700; padding: 2px 10px;" title="番組放送順の番号です（記事一覧と100%一致）">📺 #${broadcastIdx}</span>
+                        ${sessionIdx !== broadcastIdx ? `<span class="card-index-sub" title="キャッシュ生成順: #${sessionIdx}">生成#${sessionIdx}</span>` : ""}
+                    `;
+                } else if (sessionStr === "all") {
                     badgeHtml = `
                         <span class="card-index-badge">#${globalIdx}</span>
                         <span class="card-session-badge ${sessionType === 'evening' ? 'session-evening' : 'session-morning'}">${sessionIcon} #${sessionIdx}</span>
                     `;
                 } else {
-                    // 配信別表示時（夜配信 or 朝配信）: 配信内番号を大きく #1, #2... と表示！
                     badgeHtml = `
                         <span class="card-index-badge" style="font-size: 13px; padding: 3px 10px;">#${sessionIdx}</span>
                         ${globalIdx !== sessionIdx ? `<span class="card-index-sub" title="一日全体での通し番号: #${globalIdx}">全体#${globalIdx}</span>` : ""}
@@ -1039,6 +1107,14 @@
 
             renderCards(filtered, currentSession);
         });
+
+        // ── 並び順切り替え ──
+        const sortSelect = document.getElementById("sort-select");
+        if (sortSelect) {
+            sortSelect.addEventListener("change", () => {
+                renderCards(currentItems, currentSession);
+            });
+        }
 
         // ── ウィンドウサイズの自動記憶（次回オープン時に復元） ──
         let resizeTimer = null;

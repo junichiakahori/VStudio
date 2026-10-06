@@ -86,9 +86,12 @@ def cluster_items_into_sessions(raw_items, date_str):
         session_code = f"batch_{clean_time}"
         label = f"{icon} {date_str} {time_str} 取得分 ({len(cluster)}件)"
 
+        # 各クラスタ内のソート: broadcast_index（放送順番号）があれば最優先で昇順ソート
+        cluster.sort(key=lambda x: (x.get("broadcast_index") is None, x.get("broadcast_index", 99999), x.get("created_at", "")))
+
         for s_idx, it in enumerate(cluster):
             it["session_id"] = session_code
-            it["session_index"] = s_idx + 1
+            it["session_index"] = it.get("broadcast_index") or (s_idx + 1)
 
         sessions.append({
             "id": f"{date_str}_{session_code}",

@@ -1986,6 +1986,9 @@ def _save_to_news_history(title, payload, item_obj, article_url, items, headline
                 "voicevox_kana": vv_kana
             })
 
+        broadcast_index = payload.get('articleIndex') or item_obj.get('articleIndex')
+        category_name = payload.get('categoryName') or item_obj.get('categoryName', '')
+
         log_news_script_item(
             title=title,
             pub_date=pub_date,
@@ -1997,7 +2000,9 @@ def _save_to_news_history(title, payload, item_obj, article_url, items, headline
             title_reading=headline_speech,
             title_voicevox_reading=title_vv_reading,
             title_voicevox_kana=title_vv_kana,
-            headline_display=headline_disp
+            headline_display=headline_disp,
+            broadcast_index=broadcast_index,
+            category_name=category_name
         )
     except Exception as log_err:
         print(f"[台本ログ保存エラー]: {log_err}", flush=True)

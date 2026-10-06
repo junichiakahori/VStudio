@@ -27,7 +27,8 @@ def ensure_history_dir():
     os.makedirs(HISTORY_DIR, exist_ok=True)
 
 def log_news_script_item(title, pub_date, source, url, sentences, full_display_text="", full_reading_text="",
-                         title_reading="", title_voicevox_reading="", title_voicevox_kana="", headline_display=""):
+                         title_reading="", title_voicevox_reading="", title_voicevox_kana="", headline_display="",
+                         broadcast_index=None, category_name=""):
     """
     生成されたニュース原稿1件を日次ログファイル（Markdown & JSON）に自動追記
     :param title: 記事見出し（元タイトル）
@@ -41,6 +42,8 @@ def log_news_script_item(title, pub_date, source, url, sentences, full_display_t
     :param title_voicevox_reading: タイトルのVOICEVOX実読み
     :param title_voicevox_kana: タイトルのVOICEVOXアクセントカナ
     :param headline_display: 見出し表示テキスト（AI短縮見出し等）
+    :param broadcast_index: 番組放送順の連番（#1, #2, ...）
+    :param category_name: カテゴリ名（主要、エンタメ、スポーツ等）
     """
     if not title:
         return
@@ -73,6 +76,8 @@ def log_news_script_item(title, pub_date, source, url, sentences, full_display_t
 
             record = {
                 "index": item_index,
+                "broadcast_index": broadcast_index,
+                "category_name": category_name or "",
                 "title": title,
                 "title_reading": title_reading or "",
                 "title_voicevox_reading": title_voicevox_reading or "",
