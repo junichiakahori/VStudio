@@ -563,6 +563,55 @@ TEST_CATEGORIES = [
                 "forbidden_speech_pattern": r"(?:大谷翔平|おおたにしょうへい)さん",
             },
         ]
+    },
+    {
+        "category": "10. 二重敬称防止（「氏さん」の防止・自動修復）",
+        "cases": [
+            {
+                "id": "double_honorific_inada_shi_san",
+                "desc": "「稲田氏さん」が「稲田さん」へ是正され、「氏さん」「いなだけさん」が完全に排除されること",
+                "text": "その中で稲田氏さんは、消費減税そのものには反対ではないとしながらも、議論が十分に行われていないと批判したにゃ。",
+                "check_type": "both",
+                "expected_display_pattern": r"稲田さんは",
+                "forbidden_display_pattern": r"稲田氏さん",
+                "expected_speech_pattern": r"(?:稲田|いなだ)さんは",
+                "forbidden_speech_pattern": r"氏さん|いなだけさん",
+                "expected_kana_pattern": r"イナダサンワ",
+                "forbidden_kana_pattern": r"イナダケサン|イナダシサン",
+            },
+            {
+                "id": "double_honorific_yamada_shi_san",
+                "desc": "「山田氏さん」が「山田さん」へ是正されること",
+                "text": "山田氏さんが記者会見で方針を表明したにゃ。",
+                "check_type": "speech_text",
+                "expected_speech_pattern": r"山田さんが",
+                "forbidden_speech_pattern": r"山田氏さん",
+            },
+            {
+                "id": "double_honorific_doushi_san",
+                "desc": "「同氏さん」が「同氏」へ是正され、「同さん」「同氏さん」にならないこと",
+                "text": "同氏さんは今後の見通しについて語ったにゃ。",
+                "check_type": "speech_text",
+                "expected_speech_pattern": r"同氏は",
+                "forbidden_speech_pattern": r"同氏さん|同さんは",
+            },
+            {
+                "id": "double_honorific_toji_san_protected",
+                "desc": "酒造りの「杜氏さん」が誤爆されず確実に保護されること",
+                "text": "伝統を受け継ぐ杜氏さんが酒造りを開始したにゃ。",
+                "check_type": "speech_text",
+                "expected_speech_pattern": r"杜氏さんが",
+                "forbidden_speech_pattern": r"杜さんが",
+            },
+            {
+                "id": "double_honorific_kareshi_san_protected",
+                "desc": "恋人の「彼氏さん」が誤爆されず確実に保護されること",
+                "text": "女性が彼氏さんと一緒にイベントを訪れたにゃ。",
+                "check_type": "speech_text",
+                "expected_speech_pattern": r"彼氏さんと",
+                "forbidden_speech_pattern": r"彼さんと",
+            },
+        ]
     }
 ]
 

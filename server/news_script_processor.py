@@ -18,7 +18,7 @@ from server.tts_normalizer import (
     extract_article_rubies, lookup_wikipedia_person_reading,
     extract_imperial_pronunciations, get_wikipedia_surname_reading,
     is_imperial_article_context, apply_athlete_honorific_repairs,
-    heal_tororo_tone_breakage
+    heal_tororo_tone_breakage, heal_double_honorific_shi_san
 )
 from server.news_crawler import find_cached_url, search_news_url_by_title, register_cached_url, fetch_article_body, decode_google_news_url
 
@@ -969,6 +969,8 @@ def clean_headline_character_tone(text: str) -> str:
     t = re.sub(r'[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*(?=[」』）\)\"\'、,\s]|$)', '', t)
     # 2. 残存する末尾のキャラクター語尾・感嘆符を切除
     t = re.sub(r'[\s　]*(?:にゃ|のだ|なのだ)[！!。？?\s　]*$', '', t)
+    # 3. 見出し内の二重敬称（〇〇氏さん等）を自然な敬称へ修復
+    t = heal_double_honorific_shi_san(t)
     return t.strip()
 
 AUTHENTIC_SPORTS_KEYWORDS = {
@@ -1283,6 +1285,10 @@ def audit_and_heal_news_script(items, title="", article_context="", category_nam
         disp = it.get("display", "")
         sp = it.get("speech", "")
 
+        # -0.5 二重敬称（〇〇氏さん、同氏さん等）の不自然な日本語を自動修復（字幕・音声の双方）
+        disp = heal_double_honorific_shi_san(disp)
+        sp = heal_double_honorific_shi_san(sp)
+
         # 0. 「東奥」（東奥日報等）の誤読（ひがしおく ➔ とうおう）を先行修復（差分解析の誤判定防止）
         if "東奥" in disp or "ひがしおく" in sp:
             sp = re.sub(r'ひがしおくにっぽう', 'とうおうにっぽう', sp)
@@ -1509,6 +1515,10 @@ def audit_and_heal_news_script(items, title="", article_context="", category_nam
         # 19. 人を指す「方（かた）」の文脈自己修復（字幕は漢字を完全維持、音声のみ自然な発音へ補正）
         if "方" in healed_sp:
             healed_sp = apply_person_kata_rules(healed_sp)
+
+        # 20. 二重敬称（〇〇氏さん、同氏さん等）の最終除去・完全保証
+        disp = heal_double_honorific_shi_san(disp)
+        healed_sp = heal_double_honorific_shi_san(healed_sp)
 
         healed_items.append({
             "display": disp,
@@ -2399,6 +2409,9 @@ def generate_news_item_script_data(payload, custom_dict=None):
     
             # 9. 実在の著名人・芸能人・人物に対する呼び捨ての敬称（〜さん）自動補正
             clean_text = normalize_celebrity_honorifics(clean_text, title, full_article_content)
+    
+            # 9.5 二重敬称（〇〇氏さん、同氏さん等）の不自然な日本語を自動修復
+            clean_text = heal_double_honorific_shi_san(clean_text)
     
             # 10. キャラクター口調（にゃ／なのだ）の救済（LLMが客観調で出力した場合でも後半感想を自動補正）
             clean_text = salvage_character_tone(clean_text, char_desc)

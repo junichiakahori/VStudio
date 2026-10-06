@@ -1287,6 +1287,7 @@ def sanitize_speech_text(text):
     rules = load_tts_rules()
     for pat in rules.get("sanitize_domain_patterns", []):
         t = re.sub(pat, '', t)
+    t = heal_double_honorific_shi_san(t)
     return t.strip()
 
 def apply_country_prefixes(text):
@@ -2099,6 +2100,9 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
     # -1. 全角英数字を半角に統一（「ＶＩＶＡＮＴ」や「ＡＩ」等のチェックすり抜け・スペル読みを防止）
     t = normalize_fullwidth_alphanumeric(text)
 
+    # -0.98 二重敬称（〇〇氏さん、同氏さん等）の不自然な日本語を自動修復
+    t = heal_double_honorific_shi_san(t)
+
     # -0.95 肩書・敬称直後の不要な英語ゴミ（例: プーチン大統領min ➔ プーチン大統領）を事前除去
     t = apply_spurious_title_suffix_cleanup(t)
 
@@ -2343,7 +2347,36 @@ def heal_sentence_reading(display_text, speech_text):
             healed_parts.append(speech_text[j1:j2])
 
     healed_result = "".join(healed_parts)
-    return healed_result
+    return heal_double_honorific_shi_san(healed_result)
+
+
+def heal_double_honorific_shi_san(text: str) -> str:
+    """
+    「〇〇氏さん」のような二重敬称（敬称の不自然な重複）を検知し、自然な「〇〇さん」または単独敬称へ自動修復する。
+    - 「稲田氏さん」➔ 「稲田さん」
+    - 「山田氏さん」➔ 「山田さん」
+    - 「トランプ氏さん」➔ 「トランプさん」
+    - 「同氏さん」➔ 「同氏」
+    - 「両氏さん」➔ 「両氏」
+    - 「各氏さん」➔ 「各氏」
+    - 「諸氏さん」➔ 「諸氏」
+    - 「杜氏さん（酒造り）」「彼氏さん（恋人）」等の正当な語句は100%保護して誤爆させない。
+    """
+    if not text or "氏さん" not in text:
+        return text
+
+    t = text
+    # 1. 代名詞・指示語＋氏さん の先行是正（「同さん」「両さん」等の不自然な略称化を防止）
+    t = re.sub(r'同氏さん([たち|ら])?', r'同氏\1', t)
+    t = re.sub(r'両氏さん([たち|ら])?', r'両氏\1', t)
+    t = re.sub(r'各氏さん([たち|ら])?', r'各氏\1', t)
+    t = re.sub(r'諸氏さん([たち|ら])?', r'諸氏\1', t)
+
+    # 2. 一般の「人名＋氏さん」の自動修復
+    # ※ 「杜氏（とうじ）さん」「彼氏（かれし）さん」などの正当な名詞は否定戻り読み (?<![杜彼]) で除外
+    t = re.sub(r'(?<![杜彼])氏さん', 'さん', t)
+    return t
+
 
 def heal_tororo_tone_breakage(text):
     """
