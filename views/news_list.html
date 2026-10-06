@@ -98,10 +98,19 @@
             transition: all 0.2s ease;
         }
 
-        .action-btn:hover {
+        .action-btn:hover,
+        .action-btn:focus,
+        .action-btn:focus-visible {
             background: rgba(255, 255, 255, 0.16);
-            border-color: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.35);
             color: #ffffff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transform: translateY(-1px);
+            outline: none;
+        }
+
+        .action-btn:active {
+            transform: translateY(0);
         }
 
         .action-btn.jump-btn {
@@ -111,9 +120,22 @@
             box-shadow: 0 2px 10px rgba(0, 230, 118, 0.35);
         }
 
-        .action-btn.jump-btn:hover {
+        .action-btn.jump-btn:hover,
+        .action-btn.jump-btn:focus,
+        .action-btn.jump-btn:focus-visible {
             transform: translateY(-1px);
             box-shadow: 0 4px 14px rgba(0, 230, 118, 0.6);
+            outline: none;
+        }
+
+        #open-cache-btn:hover,
+        #open-cache-btn:focus,
+        #open-cache-btn:focus-visible {
+            border-color: #00f3ff;
+            color: #ffffff;
+            box-shadow: 0 2px 14px rgba(0, 210, 211, 0.5);
+            transform: translateY(-1px);
+            outline: none;
         }
 
         #news-list-container {
@@ -251,16 +273,54 @@
             font-family: inherit;
         }
 
-        .start-here-btn:hover {
+        .start-here-btn:hover,
+        .start-here-btn:focus,
+        .start-here-btn:focus-visible {
             background: linear-gradient(135deg, #00d2d3, #00b894);
             color: #051a10;
             border-color: #00d2d3;
-            box-shadow: 0 2px 10px rgba(0, 210, 211, 0.45);
+            box-shadow: 0 2px 12px rgba(0, 210, 211, 0.55);
             transform: translateY(-1px);
+            outline: none;
         }
 
         .start-here-btn:active {
             transform: translateY(0);
+        }
+
+        /* ── カード内キャッシュボタン（共通エフェクト完備） ── */
+        .card-cache-btn {
+            background: rgba(0, 210, 211, 0.12);
+            border: 1px solid rgba(0, 210, 211, 0.35);
+            color: #00f3ff;
+            border-radius: 5px;
+            padding: 3px 9px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: inherit;
+            outline: none;
+            user-select: none;
+        }
+
+        .card-cache-btn:hover,
+        .card-cache-btn:focus,
+        .card-cache-btn:focus-visible {
+            background: linear-gradient(135deg, rgba(0, 210, 211, 0.3), rgba(165, 94, 234, 0.35));
+            border-color: #00f3ff;
+            color: #ffffff;
+            box-shadow: 0 2px 12px rgba(0, 210, 211, 0.5);
+            transform: translateY(-1px);
+            outline: none;
+        }
+
+        .card-cache-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 4px rgba(0, 210, 211, 0.3);
         }
 
         .news-title {
@@ -780,7 +840,7 @@
                         <div class="news-card-footer">
                             <span>📅 ${escapeHtml(item.pubDate || item.pub_date || '2026-09-26 12:00')}</span>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <button class="action-btn" style="padding: 2px 8px; font-size: 0.72rem; background: rgba(0, 210, 211, 0.12); border-color: rgba(0, 210, 211, 0.35); color: #00f3ff; border-radius: 4px;" onclick="handleOpenCacheViewerFromCard(${idx}, event);" title="ニュース原稿キャッシュマネージャーを開く">🗄️ キャッシュ</button>
+                                <button class="card-cache-btn" onclick="handleOpenCacheViewerFromCard(${idx}, event);" title="ニュース原稿キャッシュマネージャーを開く">🗄️ キャッシュ</button>
                                 ${linkUrl ? `<a href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener noreferrer" class="news-link">🔗 元記事を開く ↗</a>` : ''}
                             </div>
                         </div>
