@@ -1288,6 +1288,7 @@ def sanitize_speech_text(text):
     for pat in rules.get("sanitize_domain_patterns", []):
         t = re.sub(pat, '', t)
     t = heal_double_honorific_shi_san(t)
+    t = heal_sanshu_breakage(t)
     return t.strip()
 
 def apply_country_prefixes(text):
@@ -2102,6 +2103,7 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
 
     # -0.98 二重敬称（〇〇氏さん、同氏さん等）の不自然な日本語を自動修復
     t = heal_double_honorific_shi_san(t)
+    t = heal_sanshu_breakage(t)
 
     # -0.95 肩書・敬称直後の不要な英語ゴミ（例: プーチン大統領min ➔ プーチン大統領）を事前除去
     t = apply_spurious_title_suffix_cleanup(t)
@@ -2347,7 +2349,8 @@ def heal_sentence_reading(display_text, speech_text):
             healed_parts.append(speech_text[j1:j2])
 
     healed_result = "".join(healed_parts)
-    return heal_double_honorific_shi_san(healed_result)
+    healed_result = heal_double_honorific_shi_san(healed_result)
+    return heal_sanshu_breakage(healed_result)
 
 
 def heal_double_honorific_shi_san(text: str) -> str:
@@ -2375,6 +2378,39 @@ def heal_double_honorific_shi_san(text: str) -> str:
     # 2. 一般の「人名＋氏さん」の自動修復
     # ※ 「杜氏（とうじ）さん」「彼氏（かれし）さん」などの正当な名詞は否定戻り読み (?<![杜彼]) で除外
     t = re.sub(r'(?<![杜彼])氏さん', 'さん', t)
+    return t
+
+
+def heal_sanshu_breakage(text: str) -> str:
+    """
+    「マスクさんしゅ」などの「さん」+「せんしゅ/選手」差分マージ破損や異常結合を検知し、自然な敬称・名詞へ自動修復する。
+    - 「マスクさんしゅ」➔ 「マスクさん」
+    - 「イーロン・マスクさんしゅ」➔ 「イーロン・マスクさん」
+    - 「角田裕毅さんしゅ」➔ 「角田裕毅さん」
+    - 「バスケットボールさんしゅ」➔ 「バスケットボール選手」
+    - 「これはさんしゅがプレーする際」➔ 「これは選手がプレーする際」
+    - ※ 「三種」「第3種」「3種混合」等の正当な語句は保護して誤爆させない
+    """
+    if not text or "さんしゅ" not in text:
+        return text
+    t = text
+
+    # 0. 競技名＋さんしゅ ➔ 競技名＋選手（例: バスケットボールさんしゅ ➔ バスケットボール選手）
+    SPORTS_NAMES = r'(?:バスケットボール|バスケ|サッカー|野球|バレーボール|バレー|テニス|ゴルフ|陸上|水泳|卓球|バドミントン|スキー|スノボ|スケート|ラグビー|アメフト|ボクシング|レスリング|柔道|剣道|空手|自転車|競輪|競艇|競馬)'
+    t = re.sub(rf'({SPORTS_NAMES})さんしゅ', r'\1選手', t)
+
+    # 1. 漢字・カタカナ・ひらがな人名に付着した「さんしゅ」は「さん」へ修復
+    # 例: マスクさんしゅ ➔ マスクさん、イーロン・マスクさんしゅ ➔ イーロン・マスクさん、角田さんしゅ ➔ 角田さん
+    t = re.sub(r'([一-鿿]{2,5}|[ァ-ヶー・]{2,12}|[ぁ-ん]{2,6})さんしゅ', r'\1さん', t)
+
+    # 2. 助詞・指示語・普通名詞の直後にある単独の「さんしゅ」は「選手」へ修復
+    # 例: これはさんしゅが、このタックルはさんしゅの、大きなさんしゅに、両チームのさんしゅが
+    # ※ 「第1種」「三種」等の数値・序列プレフィックス直後は除外
+    t = re.sub(r'(?<![第第一二三四1234567890１２３４５６７８９０])(?<=[はがのにをとでへからよりまた大きなそのこのあのどのチームの])さんしゅ', '選手', t)
+    t = re.sub(r'^(?:さんしゅ)', '選手', t)
+
+    # 3. 敬称・文脈としての残存「さんしゅ」を「選手」へ安全に修復（ただし数値・学術用語は保護）
+    t = re.sub(r'(?<![第第一二三四1234567890１２３４５６７８９０])さんしゅ(?!(?:神器|混合|競技))', '選手', t)
     return t
 
 

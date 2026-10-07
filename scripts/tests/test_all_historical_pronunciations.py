@@ -612,6 +612,66 @@ TEST_CATEGORIES = [
                 "forbidden_speech_pattern": r"彼さんと",
             },
         ]
+    },
+    {
+        "category": "11. 差分マージ破損防止（「マスクさんしゅ」等の防止・自動修復）",
+        "cases": [
+            {
+                "id": "sanshu_mask_diff_merge_repair",
+                "desc": "「マスクさん」vs「マスクせんしゅ」の差分マージで「マスクさんしゅ」が機械合成されず「マスクさん」になること",
+                "text": "マスクさんが新型AIについて言及しましたにゃ。",
+                "display_input": "マスクさん",
+                "speech_input": "マスクせんしゅが新型AIについて言及しましたにゃ。",
+                "check_type": "both",
+                "expected_display_pattern": r"マスクさん",
+                "forbidden_display_pattern": r"マスクさんしゅ|マスク選手",
+                "expected_speech_pattern": r"マスクさん",
+                "forbidden_speech_pattern": r"マスクさんしゅ|さんしゅ",
+                "expected_kana_pattern": r"マスクサン",
+                "forbidden_kana_pattern": r"マスクサンシュ|サンシュ",
+            },
+            {
+                "id": "sanshu_mask_non_sports_raw_repair",
+                "desc": "非スポーツ記事でルビ付き「マスク選手（せんしゅ）」から生成されても「マスクさん」へ正しく統一されること",
+                "text": "マスク選手が宇宙開発計画を発表しましたにゃ。",
+                "display_input": "マスク選手",
+                "speech_input": "マスクせんしゅが宇宙開発計画を発表しましたにゃ。",
+                "title": "イーロン・マスク氏が新ロケット計画を発表",
+                "article_context": "テスラのイーロン・マスクCEOは新たな宇宙計画について語りました。",
+                "category_name": "テクノロジー",
+                "check_type": "both",
+                "expected_display_pattern": r"マスクさん",
+                "forbidden_display_pattern": r"マスク選手|マスクさんしゅ",
+                "expected_speech_pattern": r"マスクさん",
+                "forbidden_speech_pattern": r"マスクせんしゅ|マスクさんしゅ|さんしゅ",
+                "expected_kana_pattern": r"マスクサン",
+                "forbidden_kana_pattern": r"マスクサンシュ|サンシュ",
+            },
+            {
+                "id": "sanshu_tsunoda_raw_repair",
+                "desc": "人名＋さんしゅ（例: 角田裕毅さんしゅ）が自動的に「角田裕毅さん」へ修復されること",
+                "text": "角田裕毅さんしゅが好タイムを記録しましたにゃ。",
+                "check_type": "speech_text",
+                "expected_speech_pattern": r"(?:角田裕毅|つのだゆうき)さん",
+                "forbidden_speech_pattern": r"さんしゅ",
+            },
+            {
+                "id": "sanshu_basketball_protected",
+                "desc": "競技名＋選手（バスケットボール選手）は破壊されず維持されること",
+                "text": "バスケットボール選手たちが集まりましたにゃ。",
+                "check_type": "speech_text",
+                "expected_speech_pattern": r"バスケットボール選手",
+                "forbidden_speech_pattern": r"バスケットボールさん",
+            },
+            {
+                "id": "sanshu_three_kinds_protected",
+                "desc": "「第3種」「三種」などの学術・法令用語が「選手」に誤爆破壊されないこと",
+                "text": "第3種電気主任技術者の試験が実施されましたにゃ。",
+                "check_type": "speech_text",
+                "expected_speech_pattern": r"第3種|第３種|だいさんしゅ",
+                "forbidden_speech_pattern": r"第3選手|第３選手",
+            },
+        ]
     }
 ]
 
@@ -646,12 +706,12 @@ def run_all_historical_regression_tests():
 
             # ── 本番完全パイプライン実行 ──
             # Step 1: normalize_for_tts（略語・グループ名・英字等）
-            norm_text = normalize_for_tts(raw_text)
+            norm_text = case.get("speech_input") or normalize_for_tts(raw_text)
 
             # Step 2: audit_and_heal_news_script（敬称・方言・文脈修復等）
             case_title = case.get("title", raw_text)
             case_article = case.get("article_context", raw_text)
-            items = [{"display": raw_text, "speech": norm_text}]
+            items = [{"display": case.get("display_input") or raw_text, "speech": norm_text}]
             healed = audit_and_heal_news_script(
                 items, title=case_title, article_context=case_article, category_name=cat_name_input
             )
