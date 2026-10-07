@@ -692,6 +692,49 @@ TEST_CATEGORIES = [
                 "forbidden_speech_pattern": r"第3選手|第３選手",
             },
         ]
+    },
+    {
+        "category": "12. 個別記事内の不適切な挨拶（放送事故）防止・自動除去",
+        "cases": [
+            {
+                "id": "greeting_minna_konnichiwa_removal",
+                "desc": "記事冒頭の「皆さんこんにちはにゃ！」が自動切除され、放送事故が防止されること",
+                "text": "スタメン発表のニュース、皆さんこんにちはにゃ！青森県の高校野球準決勝の試合で、横浜と花巻東のスタメンが発表されましたにゃ。",
+                "title": "横浜と花巻東スタメン発表",
+                "article_context": "高校野球準決勝が行われました。",
+                "check_type": "both",
+                "expected_display_pattern": r"横浜と花巻東のスタメンが発表されましたにゃ",
+                "forbidden_display_pattern": r"こんにちは",
+                "expected_speech_pattern": r"横浜と花巻東のスタメンが発表されましたにゃ",
+                "forbidden_speech_pattern": r"こんにちは",
+                "expected_kana_pattern": r"ハナマキヒガシ",
+                "forbidden_kana_pattern": r"コンニチワ",
+            },
+            {
+                "id": "greeting_fans_konnichiwa_removal",
+                "desc": "記事冒頭の「ファンの皆さん、こんにちはにゃ！」が自動切除されること",
+                "text": "オーバーウォッチのファンの皆さん、こんにちはにゃ！今週から待望のシーズン5がスタートしましたにゃ。",
+                "title": "オーバーウォッチ新シーズン開幕",
+                "article_context": "新シーズンがスタートしました。",
+                "check_type": "both",
+                "expected_display_pattern": r"今週から待望のシーズン5がスタートしましたにゃ",
+                "forbidden_display_pattern": r"こんにちは",
+                "expected_speech_pattern": r"今週から待望のシーズン5がスタートしましたにゃ",
+                "forbidden_speech_pattern": r"こんにちは",
+                "expected_kana_pattern": r"シイズン",
+                "forbidden_kana_pattern": r"コンニチワ",
+            },
+            {
+                "id": "greeting_movie_title_protected",
+                "desc": "元記事の正当な作品名『こんにちは、母さん』は誤爆切除されず保護されること",
+                "text": "映画『こんにちは、母さん』の舞台挨拶が行われましたにゃ。",
+                "title": "映画『こんにちは、母さん』舞台挨拶",
+                "article_context": "映画『こんにちは、母さん』の舞台挨拶が行われました。",
+                "check_type": "speech_text",
+                "expected_speech_pattern": r"こんにちは、母さん|こんにちは、かあさん",
+                "forbidden_speech_pattern": r"^映画の舞台挨拶が行われましたにゃ",
+            },
+        ]
     }
 ]
 
@@ -752,6 +795,11 @@ def run_all_historical_regression_tests():
             if check_type in ("voicevox_kana", "both", "voicevox_full_heal"):
                 _, vv_raw_kana = get_voicevox_reading_and_kana(speech_text)
                 vv_clean_kana = clean_voicevox_kana(vv_raw_kana)
+                if not vv_clean_kana:
+                    import time
+                    time.sleep(0.5)
+                    _, vv_raw_kana = get_voicevox_reading_and_kana(speech_text)
+                    vv_clean_kana = clean_voicevox_kana(vv_raw_kana)
 
             is_ok = True
             err_msg = ""

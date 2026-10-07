@@ -1756,6 +1756,111 @@
         "西武台打線",
         "11"
       ]
+    },
+    {
+      "id": "auto_1791323123_4832",
+      "surface": "SKE48",
+      "reading": "エスケーイーフォーティーエイト",
+      "wrong_reading": "えすけえいい よんじゅう はち",
+      "scope": "global",
+      "article_topic": "ＪＲ東海 浜名湖サイクリングキャンペーン×荒野姫楓「Bicycle Club」公開！",
+      "sample_sentence": "SKE48に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-07",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: えすけえいい よんじゅう はち)"
+    },
+    {
+      "id": "auto_1791361719_9879",
+      "surface": "三木泰和",
+      "reading": "やすかず",
+      "wrong_reading": "みき やすかず",
+      "scope": "global",
+      "article_topic": "吉原のソープランドを摘発 売春場所に店内個室を提供か 責任者ら9人を逮捕 スカウトグループとの関連捜査",
+      "sample_sentence": "三木泰和に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-07",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: みき やすかず)"
+    },
+    {
+      "id": "auto_1791361723_8153",
+      "surface": "小栗光博",
+      "reading": "みつひろ",
+      "wrong_reading": "おぐり みつひろ",
+      "scope": "global",
+      "article_topic": "吉原のソープランドを摘発 売春場所に店内個室を提供か 責任者ら9人を逮捕 スカウトグループとの関連捜査",
+      "sample_sentence": "小栗光博に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-07",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: おぐり みつひろ)"
+    },
+    {
+      "id": "auto_1791365040_2116",
+      "surface": "大村",
+      "reading": "だいそん",
+      "wrong_reading": "おおむら",
+      "scope": "contextual",
+      "article_topic": "米スタバを提訴 「無糖」表示巡り",
+      "sample_sentence": "大村に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-07",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: おおむら)",
+      "context_keywords": [
+        "波紋",
+        "ホワイトハウス",
+        "大村知事",
+        "アメリカメディア",
+        "プロテイン",
+        "牛乳"
+      ]
+    },
+    {
+      "id": "auto_1791369406_7855",
+      "surface": "永本",
+      "reading": "ながもと",
+      "wrong_reading": "ええもと",
+      "scope": "contextual",
+      "article_topic": "藤波朱理が世界選手権欠場 パリ金",
+      "sample_sentence": "この結果、ふじなみは五十七キロ級の代表から永本聖奈に交代されることになりましたにゃ。",
+      "category": "proper_noun",
+      "registered_date": "2026-10-07",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'ええもと' ➔ 正読: 'ながもと'）",
+      "context_keywords": [
+        "藤波朱理",
+        "世界選手権欠場",
+        "パリ"
+      ]
+    },
+    {
+      "id": "auto_1791370596_8058",
+      "surface": "F2",
+      "reading": "エフツー",
+      "wrong_reading": "えふ に",
+      "scope": "global",
+      "article_topic": "厚さ約1cmの真ちゅう製パンケーキレンズ ブラックペイントとシルバーの2色",
+      "sample_sentence": "F2に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-07",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: えふ に)"
+    },
+    {
+      "id": "auto_1791370705_451",
+      "surface": "石津",
+      "reading": "いしづ",
+      "wrong_reading": "いしず",
+      "scope": "contextual",
+      "article_topic": "成績が上がるだけでなく体調もよくなる…脳科学の研究で判明｢頭にも体にも効く1日15分間の\"手書き\"の内容｣ (4ページ目) - PRESIDENT Online（プレジデントオンライン）",
+      "sample_sentence": "手書きで日記を書いたりメモをしたりする効果は何かについて、石津ヒロシさんが解説してくれていますにゃ。",
+      "category": "proper_noun",
+      "registered_date": "2026-10-07",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'いしず' ➔ 正読: 'いしづ'）",
+      "context_keywords": [
+        "成績",
+        "体調",
+        "脳科学",
+        "研究",
+        "判明",
+        "15"
+      ]
     }
   ]
 }

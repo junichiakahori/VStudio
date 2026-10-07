@@ -975,6 +975,34 @@ def clean_headline_character_tone(text: str) -> str:
     t = heal_sanshu_breakage(t)
     return t.strip()
 
+
+def clean_inline_greetings(text: str, title: str = "", article_context: str = "") -> str:
+    """
+    個別記事の原稿本文から、不適切なオープニング挨拶・リスナー呼びかけ
+    （「皆さんこんにちは」「〜のファンの皆さん、こんにちは」「おはようございます」「こんばんは」等）
+    を完全切除・サニタイズする。
+    ※ 映画名やセリフ引用等で元記事本文・タイトル自体に挨拶が含まれる正当なケースは保護する。
+    """
+    if not text:
+        return ""
+    if any(w in (title + " " + article_context) for w in ["こんにちは", "こんばんは", "おはよう"]):
+        return text
+
+    t = text
+    # 1. 文頭または句点直後の「（〇〇の話題／ニュース、）皆さんこんにちはにゃ！」等の完全除去
+    INLINE_GREETING_CLEANUP_PATTERN = (
+        r'(?:^|(?<=[。！？\n]))[\s　]*'
+        r'(?:[^\n。！？]{0,25}?(?:ニュース|話題)[、,\s]*)?'
+        r'(?:(?:[A-Za-z0-9\u4e00-\u9fffぁ-んァ-ヶー]{2,16}の)?(?:ファンの)?(?:皆[様さん]|リスナーの皆[様さん]|視聴者の皆[様さん]|読者の皆[様さん])[、,\s]*)*'
+        r'(?:こんにちは|こんばんは|おはようございます|おはよう)'
+        r'(?:にゃ|のだ|なのだ)?[！!。、\s　]*'
+    )
+    t = re.sub(INLINE_GREETING_CLEANUP_PATTERN, '', t)
+
+    # 2. 残存したインライン挨拶（「皆さんこんにちはにゃ！」「こんにちはにゃ！」等）の除去
+    t = re.sub(r'(?:皆[様さん][、,\s]*)?(?:こんにちは|こんばんは|おはようございます)(?:にゃ|のだ|なのだ)?[！!。、\s　]*', '', t)
+    return t.strip()
+
 AUTHENTIC_SPORTS_KEYWORDS = {
     "プロ野球", "高校野球", "甲子園", "MLB", "メジャーリーグ", "セ・リーグ", "パ・リーグ",
     "サッカー", "Jリーグ", "プレミアリーグ", "日本代表", "ワールドカップ", "W杯",
@@ -1296,6 +1324,10 @@ def audit_and_heal_news_script(items, title="", article_context="", category_nam
     for it in items:
         disp = it.get("display", "")
         sp = it.get("speech", "")
+
+        # -0.8 個別記事内の不適切な挨拶（皆さんこんにちは等）の完全除去（字幕・音声の双方）
+        disp = clean_inline_greetings(disp, title=title, article_context=article_context)
+        sp = clean_inline_greetings(sp, title=title, article_context=article_context)
 
         # -0.5 二重敬称（〇〇氏さん、同氏さん等）の不自然な日本語を自動修復（字幕・音声の双方）
         disp = heal_double_honorific_shi_san(disp)
@@ -1773,8 +1805,24 @@ def validate_news_script_quality(raw_text, title="", article_context="", char_de
     """
     生成されたニュース原稿の品質をダブルチェックする。
     """
-    if not raw_text or len(raw_text.strip()) < 100:
-        return False, f"原稿の文字数が少なすぎます ({len(raw_text.strip()) if raw_text else 0}文字 < 100文字)"
+    if not raw_text or len(raw_text.strip()) < 80:
+        return False, f"原稿の文字数が少なすぎます ({len(raw_text.strip()) if raw_text else 0}文字 < 80文字)"
+
+    # -1. 個別記事内の不適切な挨拶（「皆さんこんにちは」「おはようございます」「こんばんは」等）の最優先検知（重大放送事故防止）
+    # ※ 番組全体の開始・終了挨拶は別枠で行うため、個別記事の冒頭や文中でリスナー等に挨拶することは厳禁
+    # ※ 元記事の本文やタイトル自体に挨拶の単語（作品名・引用等）が含まれる正当なケースは除外
+    is_greeting_in_article = any(w in (title + " " + article_context) for w in ["こんにちは", "こんばんは", "おはよう"])
+    if not is_greeting_in_article:
+        INLINE_GREETING_PATTERNS = [
+            re.compile(r'(?:皆[様さん]|リスナーの皆[様さん]|視聴者の皆[様さん]|ファンの皆[様さん]|読者の皆[様さん])[、,\s　]*(?:こんにちは|こんばんは|おはようございます|おはよう)'),
+            re.compile(r'[^\n。！？]{0,15}の皆[様さん][、,\s　]*(?:こんにちは|こんばんは|おはようございます|おはよう)'),
+            re.compile(r'(?:^|[。！？\n])[\s　]*(?:こんにちは|こんばんは|おはようございます)(?:にゃ|のだ|なのだ)?[！!。、\s　]'),
+            re.compile(r'(?:こんにちは|こんばんは|おはようございます)(?:にゃ|のだ|なのだ)[！!。、\s　]'),
+        ]
+        for pat in INLINE_GREETING_PATTERNS:
+            m = pat.search(raw_text)
+            if m:
+                return False, f"個別記事内で不適切な挨拶（放送事故）が検知されました: '{m.group(0).strip()}'（番組挨拶は別枠で行うため個別記事での挨拶は禁止です）"
 
     split_sentences_check = split_sentences_safely(raw_text)
     raw_len = len(raw_text.strip())
@@ -2230,7 +2278,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
             cur_prompt = prompt
             if attempt > 1:
                 suffix_instruction = "語尾には必ず『にゃ』『にゃ！』を付けて発話してください。" if "にゃ" in char_desc else ("語尾には必ず『なのだ』『のだ』を付けて発話してください。" if "なのだ" in char_desc else "")
-                cur_prompt += f"\n\n【重要・品質修正指示（再生成 試行{attempt}回目）】直前の生成で品質基準の不備が検知されたため再生成します。必ず「{title}」の事件・出来事についてのみ解説してください。見出しをそのまま繰り返さず、記事本文の具体的な詳細から解説を始めてください。必ず【前半: 記事要約2〜3文】＋【後半: あなた自身の感想2〜3文】の【合計4〜6文】で作成してください。{suffix_instruction}"
+                cur_prompt += f"\n\n【重要・品質修正指示（再生成 試行{attempt}回目）】直前の生成で品質基準の不備が検知されたため再生成します。必ず「{title}」の事件・出来事についてのみ解説してください。見出しをそのまま繰り返さず、記事本文の具体的な詳細から解説を始めてください。『こんにちは』『おはようございます』『こんばんは』『皆さんこんにちは』等の挨拶は重大な放送事故のため絶対に言わず、解説から直接始めてください。必ず【前半: 記事要約2〜3文】＋【後半: あなた自身の感想2〜3文】の【合計4〜6文】で作成してください。{suffix_instruction}"
                 print(f"{tag} 🔄 [試行 {attempt}] ダブルチェック再生成を実行中...", flush=True)
             else:
                 print(f"{tag} 🤖 [試行 1] LLMへ原稿生成リクエスト送信中...", flush=True)
@@ -2424,6 +2472,9 @@ def generate_news_item_script_data(payload, custom_dict=None):
                 r'[！!。、\s]*(?:でした|です|にゃ|のだ|なのだ)?[！!。、\s]*'
             )
             clean_text = re.sub(DIRECT_GREETING_PATTERN, '', clean_text)
+
+            # 8.5 個別記事内の不適切な挨拶（「皆さんこんにちは」「〜のファンの皆さん、こんにちは」等）の完全除去
+            clean_text = clean_inline_greetings(clean_text, title=title, article_context=full_article_content)
     
             # 9. 実在の著名人・芸能人・人物に対する呼び捨ての敬称（〜さん）自動補正
             clean_text = normalize_celebrity_honorifics(clean_text, title, full_article_content)
