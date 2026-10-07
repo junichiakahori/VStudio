@@ -2345,6 +2345,8 @@ def generate_news_item_script_data(payload, custom_dict=None):
             clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿])んなんだにゃ([！!？?。、\s　]|$)', r'\1んだにゃ\2', clean_text)
             clean_text = re.sub(r'ん+んだにゃ([！!？?。、\s　]|$)', r'んだにゃ\1', clean_text)
             clean_text = re.sub(r'ん+んだのだ([！!？?。、\s　]|$)', r'んだのだ\1', clean_text)
+            clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿]+た)たにゃ([！!？?。、\s　]|$)', r'\1にゃ\2', clean_text)
+            clean_text = re.sub(r'([ぁ-んァ-ヶー一-鿿]+た)たのだ([！!？?。、\s　]|$)', r'\1のだ\2', clean_text)
     
             # 3. 「〜るにゃ」「〜すにゃ」の硬い文語体 ➔ 自然な会話口調へ補正
             clean_text = re.sub(r'となるにゃ([！!？?。、\s　]|$)', r'となりそうだにゃ\1', clean_text)

@@ -505,6 +505,26 @@ TEST_CATEGORIES = [
                 "expected_pattern": r"結果が出たにゃ",
                 "forbidden_pattern": r"出さにゃ",
             },
+            {
+                "id": "tone_okurare_tatanya_repair",
+                "desc": "「贈られたたにゃ」「見られたたにゃ」等の異常な『たたにゃ』が『たにゃ』へ修復されること",
+                "text": "アイスキューブプロジェクトにノーベル物理学賞が贈られたたにゃ。",
+                "check_type": "both",
+                "expected_display_pattern": r"贈られたにゃ",
+                "forbidden_display_pattern": r"贈られたたにゃ|たたにゃ",
+                "expected_speech_pattern": r"贈られたにゃ",
+                "forbidden_speech_pattern": r"贈られたたにゃ|たたにゃ",
+                "expected_kana_pattern": r"オクラレタニャ",
+                "forbidden_kana_pattern": r"オクラレタタニャ|タタニャ",
+            },
+            {
+                "id": "tone_rare_nya_to_tanya_repair",
+                "desc": "「贈られにゃ」の『た』抜けが『贈られたにゃ』へ修復され『贈られたたにゃ』にならないこと",
+                "text": "アイスキューブプロジェクトにノーベル物理学賞が贈られにゃ。",
+                "check_type": "speech_text",
+                "expected_pattern": r"贈られたにゃ",
+                "forbidden_pattern": r"贈られにゃ|たたにゃ",
+            },
         ]
     },
     {
