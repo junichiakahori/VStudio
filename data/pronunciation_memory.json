@@ -1208,7 +1208,7 @@
         "関連会社",
         "架空業務発注"
       ],
-      "updated_date": "2026-09-30"
+      "updated_date": "2026-10-11"
     },
     {
       "id": "auto_1790675838_5788",
@@ -1229,7 +1229,7 @@
         "日中関係改善",
         "回路"
       ],
-      "updated_date": "2026-09-30"
+      "updated_date": "2026-10-09"
     },
     {
       "id": "auto_1790676011_9260",
@@ -1715,7 +1715,8 @@
         "臨時国会",
         "党内情勢",
         "意見交換"
-      ]
+      ],
+      "updated_date": "2026-10-10"
     },
     {
       "id": "auto_1791241465_5769",
@@ -1860,6 +1861,366 @@
         "研究",
         "判明",
         "15"
+      ]
+    },
+    {
+      "id": "auto_1791408914_112",
+      "surface": "西山朋佳",
+      "reading": "にしやまともか",
+      "wrong_reading": "にしやまともけえ",
+      "scope": "global",
+      "article_topic": "初の女性棋士誕生」が目前に迫るけど…西山朋佳vs福間香奈の頂上決戦はやはり面白い「逆の勝敗もあり得た」3勝1敗の内容はすべて大接戦（Number Web）",
+      "sample_sentence": "初のじょせいきし誕生」が目前に迫るけど…西山朋佳vs福間香奈の頂上決戦はやはり面白い「逆の勝敗もあり得た」3勝1敗の内容",
+      "category": "person_name",
+      "registered_date": "2026-10-08",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'にしやまともけえ' ➔ 正読: 'にしやまともか'）"
+    },
+    {
+      "id": "auto_1791410897_6991",
+      "surface": "憲三",
+      "reading": "けんそう",
+      "wrong_reading": "けんぞお",
+      "scope": "contextual",
+      "article_topic": "硤合さん 受賞の知らせは買い物中",
+      "sample_sentence": "ノーベル化学賞を受賞した硤合憲三さんについて、じゅしょうのしらせを受けた場所が話題になっています。",
+      "category": "proper_noun",
+      "registered_date": "2026-10-08",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'けんぞお' ➔ 正読: 'けんそう'）",
+      "context_keywords": [
+        "硤合",
+        "受賞",
+        "物中"
+      ],
+      "updated_date": "2026-10-08"
+    },
+    {
+      "id": "auto_1791451532_4208",
+      "surface": "E3",
+      "reading": "イースリー",
+      "wrong_reading": "いい さん",
+      "scope": "global",
+      "article_topic": "米議会調査局が対イラン作戦で被った損害を報告、航空機の損害は81機に増加",
+      "sample_sentence": "E3に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-08",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: いい さん)"
+    },
+    {
+      "id": "auto_1791454146_756",
+      "surface": "浅川",
+      "reading": "あさかわ",
+      "wrong_reading": "あさがわ",
+      "scope": "contextual",
+      "article_topic": "浅川梨奈、渡邉美穂に「人生で初めて敗北しました」現場明るくする存在感に池田匡志も共感【嘘をついた私たち",
+      "sample_sentence": "浅川梨奈、わたなべに「人生で初めて敗北しました」現場明るくする存在感にいけだまさしも共感【嘘をついた私たち】",
+      "category": "proper_noun",
+      "registered_date": "2026-10-08",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'あさがわ' ➔ 正読: 'あさかわ'）",
+      "context_keywords": [
+        "浅川梨奈",
+        "渡邉美穂",
+        "人生",
+        "敗北",
+        "現場明",
+        "存在感"
+      ]
+    },
+    {
+      "id": "auto_1791457601_4103",
+      "surface": "八田",
+      "reading": "はた",
+      "wrong_reading": "はった",
+      "scope": "contextual",
+      "article_topic": "八田與一容疑者目撃情報 関東で増",
+      "sample_sentence": "八田に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-08",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: はった)",
+      "context_keywords": [
+        "73",
+        "4950",
+        "情報提供",
+        "1830",
+        "別府",
+        "50"
+      ]
+    },
+    {
+      "id": "auto_1791500358_2322",
+      "surface": "日本法人",
+      "reading": "にほんほうじん",
+      "wrong_reading": "にっぽんほおじん",
+      "scope": "global",
+      "article_topic": "篠原ともえ 大学の特別招聘教授に",
+      "sample_sentence": "日本法人に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-09",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: にっぽんほおじん)"
+    },
+    {
+      "id": "auto_1791500360_687",
+      "surface": "表執行役",
+      "reading": "しっこうやく",
+      "wrong_reading": "おもてしっこおやく",
+      "scope": "global",
+      "article_topic": "篠原ともえ 大学の特別招聘教授に",
+      "sample_sentence": "表執行役に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-09",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: おもてしっこおやく)"
+    },
+    {
+      "id": "auto_1791538772_8268",
+      "surface": "高田",
+      "reading": "たかた",
+      "wrong_reading": "たかだ",
+      "scope": "contextual",
+      "article_topic": "ジャパネットが「ものづくり」に本格参入、高田社長「今までにないものを」…調理家電や雑貨をＰＢ開発",
+      "sample_sentence": "高田に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-09",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'たかだ' ➔ 正読: 'たかた'）",
+      "context_keywords": [
+        "調理家電",
+        "意見",
+        "高田社長",
+        "本格参入",
+        "読売新聞",
+        "開発"
+      ],
+      "updated_date": "2026-10-10"
+    },
+    {
+      "id": "auto_1791539150_7802",
+      "surface": "片野坂",
+      "reading": "かたのさか",
+      "wrong_reading": "かたのざか",
+      "scope": "contextual",
+      "article_topic": "ブックオフにサイバー攻撃 会員情報最大643万件漏えいか（2026年10月8日掲載）",
+      "sample_sentence": "片野坂に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-09",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: かたのざか)",
+      "context_keywords": [
+        "73",
+        "quot",
+        "警察",
+        "返納",
+        "ソフトバンク",
+        "トイザ"
+      ]
+    },
+    {
+      "id": "auto_1791540036_7742",
+      "surface": "河合優実",
+      "reading": "かわいゆうみ",
+      "wrong_reading": "たまさかわいゆみ",
+      "scope": "global",
+      "article_topic": "石原さとみ主演【ポリティカルパン】次週予告にチラリ「出るの！？」「うそだろ」「マジ？？」「ダンディーが大渋滞」「こたけ正義感出てきて大爆笑",
+      "sample_sentence": "現役弁護士という異色の経歴を持つ芸人さんで、千羽17区から出馬した雅河合優実が出演するネット番組の司会者・サイバラ役でフ",
+      "category": "person_name",
+      "registered_date": "2026-10-09",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'たまさかわいゆみ' ➔ 正読: 'かわいゆうみ'）"
+    },
+    {
+      "id": "auto_1791542229_5720",
+      "surface": "古江彩佳",
+      "reading": "ふるえあやか",
+      "wrong_reading": "ここお あやか",
+      "scope": "global",
+      "article_topic": "山下美夢有の「69.64」はどれほど凄いか？ アニカから進化し続ける米ツアーの「平均ストローク」【米女子ツアー】 - みんなのゴルフダイジェスト",
+      "sample_sentence": "古江彩佳に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-09",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: ここお あやか)"
+    },
+    {
+      "id": "auto_1791542231_2490",
+      "surface": "畑岡奈紗",
+      "reading": "はたおかなさ",
+      "wrong_reading": "はたおかなしゃ",
+      "scope": "global",
+      "article_topic": "山下美夢有の「69.64」はどれほど凄いか？ アニカから進化し続ける米ツアーの「平均ストローク」【米女子ツアー】 - みんなのゴルフダイジェスト",
+      "sample_sentence": "畑岡奈紗に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-09",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: はたおかなしゃ)"
+    },
+    {
+      "id": "auto_1791542501_7459",
+      "surface": "大谷",
+      "reading": "おおや",
+      "wrong_reading": "おおたに",
+      "scope": "contextual",
+      "article_topic": "《産後初の表舞台は明るいボトムスで》“自然体な真美子さん”が大谷翔平の「不調でも笑顔」のメンタルの支えに 「子どもたちとの時間」も原動力",
+      "sample_sentence": "大谷に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-09",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'おおたに' ➔ 正読: 'おおや'）",
+      "context_keywords": [
+        "ノーアーチ",
+        "回目",
+        "離脱",
+        "スポーツ",
+        "ノースリーブ",
+        "突破"
+      ],
+      "updated_date": "2026-10-09"
+    },
+    {
+      "id": "auto_1791543152_258",
+      "surface": "L4",
+      "reading": "エルよん",
+      "wrong_reading": "える よん",
+      "scope": "global",
+      "article_topic": "中国で2万5000台走る「無人配送車」、日本で実証実験開始【駐在員が見た中国",
+      "sample_sentence": "L4に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-09",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: える よん)"
+    },
+    {
+      "id": "auto_1791585522_8663",
+      "surface": "和版落合",
+      "reading": "おちあい",
+      "wrong_reading": "わばん おちあい",
+      "scope": "global",
+      "article_topic": "令和版落合監督? 工藤氏への期待",
+      "sample_sentence": "和版落合に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-10",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: わばん おちあい)"
+    },
+    {
+      "id": "auto_1791622314_4067",
+      "surface": "兵頭龍樹",
+      "reading": "ひょうどうりゅうき",
+      "wrong_reading": "ひょおどおたつき",
+      "scope": "global",
+      "article_topic": "スペースデータ、CSO兵頭龍樹博士が予測した「フォボスの砂に混ざる火星のかけら」JAXA火星衛星探査計画MMXに関する研究成果を紹介",
+      "sample_sentence": "スペースデータ、CSO兵頭龍樹博士が予測した「フォボスの砂に混ざる火星のかけら」ジャクサ火星衛星探査計画MMXに関する研",
+      "category": "person_name",
+      "registered_date": "2026-10-10",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'ひょおどおたつき' ➔ 正読: 'ひょうどうりゅうき'）"
+    },
+    {
+      "id": "auto_1791623384_1888",
+      "surface": "元暴力団",
+      "reading": "ぼうりょくだん",
+      "wrong_reading": "もとぼおりょくだん",
+      "scope": "global",
+      "article_topic": "“赤ちゃん”が撃たれて死んだ！」 神戸連続発砲事件、容疑者の元暴力団会長（79）の素顔とは",
+      "sample_sentence": "元暴力団に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-10",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: もとぼおりょくだん)"
+    },
+    {
+      "id": "auto_1791625934_351",
+      "surface": "篠塚",
+      "reading": "しのづか",
+      "wrong_reading": "しのずか",
+      "scope": "contextual",
+      "article_topic": "timelesz会見で注目された篠塚大輝の成長 アンチも認めた“完璧な”振る舞い",
+      "sample_sentence": "篠塚さんの振る舞いは、すらすらと流れるような言葉遣いから、相手を尊重する態度まで、まるでかんぺきなように見えたのですにゃ",
+      "category": "proper_noun",
+      "registered_date": "2026-10-10",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'しのずか' ➔ 正読: 'しのづか'）",
+      "context_keywords": [
+        "timelesz",
+        "会見",
+        "注目",
+        "篠塚大輝",
+        "成長",
+        "アンチ"
+      ]
+    },
+    {
+      "id": "auto_1791626030_9563",
+      "surface": "金井紘",
+      "reading": "かないこう",
+      "wrong_reading": "かない ひろし",
+      "scope": "contextual",
+      "article_topic": "ラインくっきり！「久しぶりに見た」武井咲の衣装が「ビックリ」「素敵すぎる」「咲ちゃんしか着れない」ネット騒然",
+      "sample_sentence": "金井紘に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-10",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: かない ひろし)",
+      "context_keywords": [
+        "全部",
+        "ダブル",
+        "昨年",
+        "テレビ",
+        "映画",
+        "回釜山国際映画祭"
+      ]
+    },
+    {
+      "id": "auto_1791627233_5814",
+      "surface": "石川真佑",
+      "reading": "いしかわまゆ",
+      "wrong_reading": "いしかわ しん たすく",
+      "scope": "global",
+      "article_topic": "Ｃｏｃｏｍｉ バレー日本代表とのプライベート旅報告「らーぶ」密着ショットや彫像のように美しい横顔が",
+      "sample_sentence": "石川真佑に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-10",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: いしかわ しん たすく)"
+    },
+    {
+      "id": "auto_1791627483_9144",
+      "surface": "中村敬斗",
+      "reading": "なかむらけいと",
+      "wrong_reading": "なかむらたかしと",
+      "scope": "global",
+      "article_topic": "リヨンFW中村敬斗が60分に“緊急出場” FWオペンダが負傷のアクシデント、代表活動から帰還直後に途中出場",
+      "sample_sentence": "リヨンのエフダブリュー中村敬斗選手が、代表活動から帰還直後に60分に“緊急出場”を果たしましたにゃ。",
+      "category": "person_name",
+      "registered_date": "2026-10-10",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'なかむらたかしと' ➔ 正読: 'なかむらけいと'）"
+    },
+    {
+      "id": "auto_1791671147_2172",
+      "surface": "NMB48",
+      "reading": "エヌエムビーフォーティーエイト",
+      "wrong_reading": "えぬえむびい よんじゅう はち",
+      "scope": "global",
+      "article_topic": "オールスター感謝祭】「名探偵津田」幕開けの決定的瞬間 『VIVANT』公式Xが公開",
+      "sample_sentence": "NMB48に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-11",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: えぬえむびい よんじゅう はち)"
+    },
+    {
+      "id": "auto_1791671302_8775",
+      "surface": "民党税調",
+      "reading": "ぜいちょう",
+      "wrong_reading": "みんとおぜえちょお",
+      "scope": "global",
+      "article_topic": "消費減税後 8%に戻せるか識者疑問",
+      "sample_sentence": "民党税調に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-11",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: みんとおぜえちょお)"
+    },
+    {
+      "id": "auto_1791673092_4587",
+      "surface": "和葉",
+      "reading": "わは",
+      "wrong_reading": "かずよお",
+      "scope": "contextual",
+      "article_topic": "コナン」平次と和葉を祝う企画があべのハルカスで、青山剛昌書き下ろしボイスも（動画あり / コメントあり）",
+      "sample_sentence": "この企画には、平次役の堀川りょうさんと和葉役のみやむらゆうこさんからのコメントも届いており、ファンの皆さんには大変喜ばし",
+      "category": "proper_noun",
+      "registered_date": "2026-10-11",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'かずよお' ➔ 正読: 'わは'）",
+      "context_keywords": [
+        "コナン",
+        "平次",
+        "和葉",
+        "企画",
+        "ハルカス",
+        "青山剛昌書"
       ]
     }
   ]

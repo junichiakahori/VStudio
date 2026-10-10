@@ -123,10 +123,18 @@ def _match_kanji_reading(term, yomi, kks, kanwa):
             except Exception:
                 pass
         c = term[t_idx]
-        for r in _get_char_readings(c, kks, kanwa):
-            if yomi.startswith(r, y_idx):
-                if dfs(t_idx + 1, y_idx + len(r)):
-                    return True
+        readings = _get_char_readings(c, kks, kanwa)
+        if readings:
+            for r in readings:
+                if yomi.startswith(r, y_idx):
+                    if dfs(t_idx + 1, y_idx + len(r)):
+                        return True
+        else:
+            # 辞書未登録の稀少漢字（JIS第3/第4水準等）: 1〜3文字のかなを消費して後続が音韻一致するか試す
+            for skip_len in (1, 2, 3):
+                if y_idx + skip_len <= len(yomi):
+                    if dfs(t_idx + 1, y_idx + skip_len):
+                        return True
         return False
     return dfs(0, 0)
 
@@ -244,24 +252,26 @@ def is_plausible_reading(term, yomi):
         # A. 先頭文字の頭音チェック
         first_c = kanji_chars[0]
         first_readings = _get_char_readings(first_c, kks, kanwa)
-        first_starts = set()
-        for r in first_readings:
-            if r:
-                ch = r[0]
-                first_starts.add(ch)
-                for v in VOICED_MAP.get(ch, []):
-                    first_starts.add(v)
-                for d in DEVOICED_MAP.get(ch, []):
-                    first_starts.add(d)
-        if norm_yomi[0] not in first_starts:
-            return False
+        if first_readings:
+            first_starts = set()
+            for r in first_readings:
+                if r:
+                    ch = r[0]
+                    first_starts.add(ch)
+                    for v in VOICED_MAP.get(ch, []):
+                        first_starts.add(v)
+                    for d in DEVOICED_MAP.get(ch, []):
+                        first_starts.add(d)
+            if norm_yomi[0] not in first_starts:
+                return False
 
         # B. 末尾文字の末尾音チェック
         last_c = kanji_chars[-1]
         last_readings = _get_char_readings(last_c, kks, kanwa)
-        last_ends = {r[-1] for r in last_readings if r}
-        if norm_yomi[-1] not in last_ends:
-            return False
+        if last_readings:
+            last_ends = {r[-1] for r in last_readings if r}
+            if norm_yomi[-1] not in last_ends:
+                return False
 
     return max(sim, sim_j) >= 0.70
 
@@ -2285,7 +2295,7 @@ def convert_remaining_kanji_to_hiragana(text):
     return '\n'.join(output)
 
 
-def heal_sentence_reading(display_text, speech_text):
+def heal_sentence_reading(display_text, speech_text, context_map=None):
     """
     生成された原稿の1文について、字幕用(display)と音声用(speech)を突き合わせ、
     意味破壊・異常置換（例: 一時閉鎖 -> すもうべや、横開き -> ふながこい、約1 -> えむわんぐらんぷり、運用 -> じょうば等）
@@ -2328,6 +2338,9 @@ def heal_sentence_reading(display_text, speech_text):
             rep = speech_text[j1:j2]
             # 台帳で修復された公認語句はロールバックせず採用
             if any(s in orig or orig in s for s in healed_surfaces):
+                healed_parts.append(rep)
+            # 文脈発音マップ（Wikipedia/辞書等で照合済みの公認用語・人名）はロールバックせず採用
+            elif context_map and isinstance(context_map, dict) and any(orig == k or orig in k or k in orig for k in context_map.keys()):
                 healed_parts.append(rep)
             # data/tts_rules.json に登録されている公認著名人・略語はロールバックせず採用
             elif any(orig == k or orig in k or k in orig for k in load_tts_rules().get("prominent_people", {}).keys()):

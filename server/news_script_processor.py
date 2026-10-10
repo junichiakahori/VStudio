@@ -19,7 +19,7 @@ from server.tts_normalizer import (
     extract_imperial_pronunciations, get_wikipedia_surname_reading,
     is_imperial_article_context, apply_athlete_honorific_repairs,
     heal_tororo_tone_breakage, heal_double_honorific_shi_san,
-    heal_sanshu_breakage
+    heal_sanshu_breakage, get_kks
 )
 from server.news_crawler import find_cached_url, search_news_url_by_title, register_cached_url, fetch_article_body, decode_google_news_url
 
@@ -1137,6 +1137,16 @@ def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, h
         if target in healed_sp:
             healed_sp = healed_sp.replace(target, f"{name}さん")
 
+        # 音声側（すでにひらがな化されている場合）の置換
+        p_yomi = lookup_wikipedia_person_reading(name)
+        if not p_yomi and get_kks():
+            kks_conv = get_kks().convert(name)
+            p_yomi = "".join([c.get("hira", "") for c in kks_conv])
+        if p_yomi:
+            for y_tgt in (f"{p_yomi}選手", f"{p_yomi}せんしゅ"):
+                if y_tgt in healed_sp:
+                    healed_sp = healed_sp.replace(y_tgt, f"{p_yomi}さん")
+
         if len(name) >= 3:
             surname = name[:2]
             surname_target = f"{surname}選手"
@@ -1144,10 +1154,17 @@ def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, h
                 disp = disp.replace(surname_target, f"{surname}さん")
             if surname_target in healed_sp:
                 healed_sp = healed_sp.replace(surname_target, f"{surname}さん")
+            s_yomi = get_wikipedia_surname_reading(surname)
+            if not s_yomi and p_yomi and len(p_yomi) >= 4:
+                s_yomi = p_yomi[:(len(p_yomi)+1)//2]
+            if s_yomi:
+                for s_tgt in (f"{s_yomi}選手", f"{s_yomi}せんしゅ"):
+                    if s_tgt in healed_sp:
+                        healed_sp = healed_sp.replace(s_tgt, f"{s_yomi}さん")
 
     # 0.6 Wikipedia動的判定および構文解析による「選手」誤爆の動的修復（リストフリー）
     if "選手" in disp or "選手" in healed_sp:
-        SAFE_ATHLETE_PERSON_SCAN = r'(?:^|(?<=[、。！？\s　はがのにへと「『（]))(?!(?:日本|日本人|女子|男子|代表|若手|出場|プロ|主力|控え|交代|所属|世界|国内|相手|全|各|当該|対象|選手))([一-鿿]{2,5}|[ァ-ヶー]{2,8})選手(?!(?:たち|ら|団|層|生命|権|宣誓|選考|枠))'
+        SAFE_ATHLETE_PERSON_SCAN = r'(?:^|(?<=[、。！？\s　はがのにへとでもやからより「『（【［]))(?!(?:日本|日本人|女子|男子|代表|若手|出場|プロ|主力|控え|交代|所属|世界|国内|相手|全|各|当該|対象|選手))([一-鿿]{2,7}|[ァ-ヶー]{2,8})選手(?!(?:たち|ら|団|層|生命|権|宣誓|選考|枠))'
         found_athletes = set(re.findall(SAFE_ATHLETE_PERSON_SCAN, disp) + re.findall(SAFE_ATHLETE_PERSON_SCAN, healed_sp))
         for p_name in found_athletes:
             honorific = resolve_person_social_honorific(p_name, article_context=full_context)
@@ -1159,6 +1176,7 @@ def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, h
                 p_yomi = lookup_wikipedia_person_reading(p_name)
                 if p_yomi:
                     healed_sp = healed_sp.replace(f"{p_yomi}選手", f"{p_yomi}さん")
+                    healed_sp = healed_sp.replace(f"{p_yomi}せんしゅ", f"{p_yomi}さん")
                 if len(p_name) >= 3:
                     surname = p_name[:2]
                     disp = disp.replace(f"{surname}選手", f"{surname}さん")
@@ -1166,6 +1184,7 @@ def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, h
                     s_yomi = get_wikipedia_surname_reading(surname)
                     if s_yomi:
                         healed_sp = healed_sp.replace(f"{s_yomi}選手", f"{s_yomi}さん")
+                        healed_sp = healed_sp.replace(f"{s_yomi}せんしゅ", f"{s_yomi}さん")
             elif honorific in ("監督", "コーチ"):
                 print(f"[敬称自己修復] 🎯 肩書（{honorific}）に基づき '{p_name}選手' ➔ '{p_name}{honorific}' に自動修復", flush=True)
                 disp = disp.replace(f"{p_name}選手", f"{p_name}{honorific}")
@@ -1173,6 +1192,7 @@ def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, h
                 p_yomi = lookup_wikipedia_person_reading(p_name)
                 if p_yomi:
                     healed_sp = healed_sp.replace(f"{p_yomi}選手", f"{p_yomi}{honorific}")
+                    healed_sp = healed_sp.replace(f"{p_yomi}せんしゅ", f"{p_yomi}{honorific}")
 
     # 1. 監督・コーチに対する「選手」誤爆の是正
     disp = re.sub(r'([A-Za-z\u4e00-\u9fa5ぁ-んァ-ヶー]{2,10})監督選手', r'\1監督', disp)
@@ -1187,9 +1207,9 @@ def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, h
         return disp, healed_sp
 
     # 3. 非スポーツ記事（かつスポーツキーワードを含まない純粋なエンタメ記事）でのみ人名＋選手を是正
-    # ※ 超重要: 「選手たち」「選手への」などの一般名詞・複数形、および直前に助詞がある「〇〇が選手」「〇〇の選手」は絶対に誤爆置換しない
+    # ※ 超重要: 「選手への」などの一般名詞、および直前に助詞がある「〇〇が選手」「〇〇の選手」は絶対に誤爆置換しない
     if not is_pure_sports and not has_authentic_sports:
-        SAFE_ATHLETE_PERSON_PATTERN = r'(?:^|(?<=[、。！？\s　はがのにへと]))(?!(?:日本|日本人|女子|男子|代表|若手|出場|プロ|主力|控え|交代|所属|世界|国内|相手|全|各|当該|対象|選手))([一-鿿]{2,4}|[ァ-ヶー]{2,8})選手(?!(?:たち|ら|団|層|生命|権|宣誓|選考|枠))'
+        SAFE_ATHLETE_PERSON_PATTERN = r'(?:^|(?<=[、。！？\s　はがのにへとでもやからより「『（【［]))(?!(?:日本|日本人|女子|男子|代表|若手|出場|プロ|主力|控え|交代|所属|世界|国内|相手|全|各|当該|対象|選手))([一-鿿ぁ-んァ-ヶA-Za-zー]{2,8})選手(?!(?:たち|ら|団|層|生命|権|宣誓|選考|枠))'
         if "選手" in disp:
             disp_fixed = re.sub(SAFE_ATHLETE_PERSON_PATTERN, r'\1さん', disp)
             if disp_fixed != disp:
@@ -1200,11 +1220,16 @@ def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, h
             if disp_sp_fixed != healed_sp:
                 healed_sp = disp_sp_fixed
         # ひらがなルビ付き音声（せんしゅ）の取り残しによる差分マージ事故（「さ」＋「んしゅ」➔「さんしゅ」）を根本防止
-        SAFE_ATHLETE_HIRA_PATTERN = r'(?:^|(?<=[、。！？\s　はがのにへと]))(?!(?:にほん|にほんじん|じょし|だんし|だいひょう|わかて|しゅつじょう|ぷろ|しゅりょく|ひかえ|こうたい|しょぞく|せかい|こくない|あいて|ぜん|かく|とうがい|たいしょう|せんしゅ))([一-鿿]{2,4}|[ァ-ヶー・]{2,10}|[ぁ-ん]{2,8})せんしゅ(?!(?:たち|ら|だん|そう|せいめい|けん|せんせい|せんこう|わく))'
+        SAFE_ATHLETE_HIRA_PATTERN = r'(?:^|(?<=[、。！？\s　はがのにへとでもやからより「『（【［]))(?!(?:にほん|にほんじん|じょし|だんし|だいひょう|わかて|しゅつじょう|ぷろ|しゅりょく|ひかえ|こうたい|しょぞく|せかい|こくない|あいて|ぜん|かく|とうがい|たいしょう|せんしゅ))([一-鿿ぁ-んァ-ヶ・A-Za-zー]{2,10})せんしゅ(?!(?:たち|ら|だん|そう|せいめい|けん|せんせい|せんこう|わく))'
         if "せんしゅ" in healed_sp:
             disp_sp_hira_fixed = re.sub(SAFE_ATHLETE_HIRA_PATTERN, r'\1さん', healed_sp)
             if disp_sp_hira_fixed != healed_sp:
                 healed_sp = disp_sp_hira_fixed
+
+        # 3.2 映画・ドラマ・芸能・文化記事における「選手たち」誤爆の是正（柳楽優弥の映画ジャパンプレミア等）
+        disp = re.sub(r'(?<![スポーツ野球サッカー])選手たち', '出演者たち', disp)
+        healed_sp = re.sub(r'(?<![スポーツ野球サッカー])選手たち', '出演者たち', healed_sp)
+        healed_sp = re.sub(r'(?<![スポーツ野球サッカー])せんしゅたち', 'しゅつえんしゃたち', healed_sp)
 
     # 4. 助詞直後に孤立した「さんたち」「さんへの」「さんのプレー」等の破綻表現を自動救済修復（ホワイトリスト方式・カテゴリ連動）
     disp = apply_athlete_honorific_repairs(disp, is_sports=is_sports)
@@ -1283,7 +1308,7 @@ def heal_ambiguous_pronouns(text, primary_person=None):
     return t
 
 
-def audit_and_heal_news_script(items, title="", article_context="", category_name=""):
+def audit_and_heal_news_script(items, title="", article_context="", category_name="", context_map=None):
     """
     生成された原稿各文（items: [{'display': ..., 'speech': ...}]）を再チェックし、
     誤読・異常置換・不適切な敬称（選手/さん）の自動修正（自己修復・Healing）を行う。
@@ -1345,7 +1370,7 @@ def audit_and_heal_news_script(items, title="", article_context="", category_nam
             sp = re.sub(r'東奥', 'とうおう', sp)
 
         # 1. 読み上げテキスト(speech)の異常置換自己修復
-        healed_sp = heal_sentence_reading(disp, sp)
+        healed_sp = heal_sentence_reading(disp, sp, context_map=context_map)
 
         # 2. 「選手」の文脈適正チェック（カテゴリ連動・動的世間的肩書解決）
         disp, healed_sp = _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, has_authentic_sports, is_sports=is_sports, article_context=article_context, title=title)
@@ -1754,6 +1779,31 @@ def audit_and_heal_via_voicevox_full_reading(items, title="", known_terms_map=No
                                         print(f"[誤読自動学習] 🎓 '{term}' の誤読 '{wrong_hira}' ➔ 正読 '{expected_hira}' を台帳に新規自動登録しました", flush=True)
                         except Exception as auto_err:
                             print(f"[誤読自動学習エラー] {auto_err}", flush=True)
+        # 🎙️ 「名前が消失して『さん』しか読まれない」放送事故の確定検知・自動救済
+        # （VOICEVOX内蔵辞書未登録の難読漢字・人名漢字で名前がスキップされた場合の完全防壁）
+        for it in items:
+            cur_disp = it.get("display", "")
+            cur_sp = it.get("speech", "")
+            san_candidates = re.findall(r'(?<![おご御])([一-鿿]{2,6})さん', cur_disp)
+            for kanji_name in san_candidates:
+                if kanji_name in ["お父", "お母", "お兄", "お姉", "弟", "妹", "爺", "婆", "叔父", "叔母", "伯父", "伯母", "皆", "奥", "旦那", "客", "読者", "視聴者", "リスナー", "ファン", "たくさん", "富士"]:
+                    continue
+                # speech側に漢字が残っている場合
+                if kanji_name in cur_sp:
+                    test_phrase = f"{kanji_name}さんが"
+                    test_r, _ = get_voicevox_reading_and_kana(test_phrase)
+                    test_cl = re.sub(r'[^ァ-ヶー]', '', test_r or "")
+                    # もし「サンガ」で始まっている（＝名前が消去・スキップされた！）
+                    if test_cl.startswith("サンガ"):
+                        print(f"[VOICEVOX名前消失検知] 🚨 '{kanji_name}さん' の漢字 '{kanji_name}' がVOICEVOX辞書未登録のためスキップされ「さん」のみ発音されています！", flush=True)
+                        resolved_yomi = terms_map.get(kanji_name) or lookup_wikipedia_person_reading(kanji_name, context_hint=title + " " + cur_disp)
+                        if not resolved_yomi and get_kks():
+                            k_res = get_kks().convert(kanji_name)
+                            resolved_yomi = "".join([c.get("hira", "") for c in k_res])
+                        if resolved_yomi:
+                            it["speech"] = it["speech"].replace(f"{kanji_name}さん", f"{resolved_yomi}さん")
+                            it["speech"] = it["speech"].replace(kanji_name, resolved_yomi)
+                            print(f"[VOICEVOX名前消失救済] 🩹 '{kanji_name}' を正読 '{resolved_yomi}' に置換して名前消失放送事故を完全防止しました: {it['speech']}", flush=True)
 
     except Exception as e:
         print(f"[VOICEVOX全文照合エラー]: {e}", flush=True)
@@ -2701,7 +2751,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
                 custom_dict=custom_dict,
                 context_map=news_context_map
             )
-            candidate_items = audit_and_heal_news_script(candidate_items, title=title, article_context=full_article_content, category_name=category_name)
+            candidate_items = audit_and_heal_news_script(candidate_items, title=title, article_context=full_article_content, category_name=category_name, context_map=news_context_map)
             # 🎙️ VOICEVOX全文プレ読み照合（文脈助詞融合による「に小栗旬➔ササグリシュン」等の誤読を機械的100%自動是正）
             candidate_items = audit_and_heal_via_voicevox_full_reading(candidate_items, title=title, known_terms_map=news_context_map)
     

@@ -402,11 +402,11 @@ TEST_CATEGORIES = [
             },
             {
                 "id": "proper_hanyu_yuzuru_figure",
-                "desc": "「羽生結弦選手」が「ハニュウユズルセンシュ」と正しく発音されること（ハブ防止）",
+                "desc": "「羽生結弦」が「ハニュウユズル」と正しく発音されること（ハブ防止）",
                 "text": "羽生結弦選手がアイスショーで素晴らしい演技を披露しましたにゃ。",
                 "check_type": "voicevox_kana",
-                "expected_kana_pattern": r"ハニュウユズルセンシュ|ハニュウセンシュ",
-                "forbidden_kana_pattern": r"ハブユズル|ハブセンシュ",
+                "expected_kana_pattern": r"ハニュウユズル",
+                "forbidden_kana_pattern": r"ハブ",
             },
             {
                 "id": "proper_hanyu_single_figure",
@@ -735,6 +735,97 @@ TEST_CATEGORIES = [
                 "forbidden_speech_pattern": r"^映画の舞台挨拶が行われましたにゃ",
             },
         ]
+    },
+    {
+        "category": "13. 芸能人・非アスリートへの『選手』誤爆防止（6〜7文字名・平仮名混在・出演者たち）",
+        "cases": [
+            {
+                "id": "celebrity_shimekake_senshu_repair",
+                "desc": "漢字5文字以上の芸能人（Travis Japan七五三掛龍也）への「選手」誤爆が「さん」へ修復されること",
+                "text": "七五三掛龍也選手が米LAで留学中に家出をしたという話題ですにゃ。",
+                "title": "Travis Japan七五三掛龍也、米LA留学中のエピソード",
+                "article_context": "Travis Japan七五三掛龍也がドラマ出演について語りました。",
+                "category_name": "エンタメ",
+                "check_type": "both_text",
+                "expected_display_pattern": r"七五三掛龍也さん",
+                "forbidden_display_pattern": r"七五三掛龍也選手",
+                "expected_speech_pattern": r"(?:七五三掛龍也|しめかけりゅうや|しめかけ龍也)さん",
+                "forbidden_speech_pattern": r"(?:七五三掛龍也|しめかけりゅうや|しめかけ龍也)選手",
+            },
+            {
+                "id": "celebrity_nagase_ren_speech_repair",
+                "desc": "キンプリ永瀬廉の音声側（ひらがな化後）で「ながせれん選手」が残存せず「ながせれんさん」へ修復されること",
+                "text": "永瀬廉さん、キスマイのメンバーたちに愛されているエピソードにゃ。",
+                "speech_input": "ながせれん選手、キスマイフットツーのメンバーたちに愛されているエピソードにゃ。",
+                "title": "キンプリ永瀬廉、キスマイメンバーに周知されていること",
+                "article_context": "Kis-My-Ft2と永瀬廉の楽屋でのエピソードが明かされました。",
+                "category_name": "エンタメ",
+                "check_type": "both_text",
+                "expected_display_pattern": r"永瀬廉さん",
+                "forbidden_display_pattern": r"永瀬廉選手",
+                "expected_speech_pattern": r"ながせれんさん",
+                "forbidden_speech_pattern": r"ながせれん選手",
+            },
+            {
+                "id": "celebrity_tamamori_particle_mo_repair",
+                "desc": "直前に助詞「も」がある名字単体の芸能人（横尾さんも玉森選手）が「玉森さん/たまもりさん」へ修復されること",
+                "text": "横尾さんも玉森選手の位置を教えてくれるんだにゃ。",
+                "speech_input": "横尾さんもたまもり選手の位置を教えてくれるんだにゃ。",
+                "title": "キンプリ永瀬廉、キスマイメンバーに周知されていること",
+                "article_context": "キスマイの横尾渉や玉森裕太が永瀬廉と交流しています。",
+                "category_name": "エンタメ",
+                "check_type": "both_text",
+                "expected_display_pattern": r"玉森さん",
+                "forbidden_display_pattern": r"玉森選手",
+                "expected_speech_pattern": r"(?:たまもり|玉森)さん",
+                "forbidden_speech_pattern": r"(?:たまもり|玉森)選手",
+            },
+            {
+                "id": "entertainment_cast_senshutachi_repair",
+                "desc": "映画・舞台・プレミア等のエンタメ記事で共演者に対する「選手たち」が「出演者たち」へ修復されること",
+                "text": "主演映画ジャパンプレミアで、その秘話を語り合った選手たちと監督も一同に会しましたにゃ！",
+                "title": "柳楽優弥、デビュー秘話を告白",
+                "article_context": "主演映画『RYUJI 竜二』ジャパンプレミアに登壇した柳楽優弥さん。",
+                "category_name": "エンタメ",
+                "check_type": "both_text",
+                "expected_display_pattern": r"出演者たち",
+                "forbidden_display_pattern": r"選手たち",
+                "expected_speech_pattern": r"出演者たち|しゅつえんしゃたち",
+                "forbidden_speech_pattern": r"選手たち|せんしゅたち",
+            },
+        ]
+    },
+    {
+        "category": "14. 難読人名漢字の名前消失防止（『さん』のみ発音事故の防止・硤合さん救済）",
+        "cases": [
+            {
+                "id": "rare_kanji_soai_san_missing_name_prevention",
+                "desc": "JIS第3水準漢字を含む人名「硤合さん」がVOICEVOXで「サンガ」とスキップされず「ソアイサンガ」と発音されること",
+                "text": "硤合さんが発見した生命の謎に迫る化学的な現象が評価されたにゃ。",
+                "title": "硤合さん受賞 広島の仲間が祝福",
+                "article_context": "ノーベル化学賞の候補となった硤合憲三さん。",
+                "category_name": "ニュース",
+                "known_terms": {"硤合": "そあい", "硤合憲三": "そあいけんそう"},
+                "check_type": "both",
+                "expected_speech_pattern": r"(?:そあい|硤合)さん",
+                "forbidden_speech_pattern": r"^\s*さんが",
+                "expected_kana_pattern": r"ソアイサン|ソ'アイサン",
+                "forbidden_kana_pattern": r"^サンガ|^サ'ンガ",
+            },
+            {
+                "id": "rare_kanji_soai_kenzo_full_reading",
+                "desc": "「硤合憲三さん」が異常置換検知でロールバックされず正しく「そあいけんそうさん」と発音されること",
+                "text": "硤合憲三さん、ノーベル化学賞受賞のニュースが入ってきましたにゃ。",
+                "title": "硤合さん受賞 広島の仲間が祝福",
+                "article_context": "ノーベル化学賞の候補となった硤合憲三さん。",
+                "category_name": "ニュース",
+                "known_terms": {"硤合": "そあい", "硤合憲三": "そあいけんそう"},
+                "check_type": "both",
+                "expected_speech_pattern": r"(?:そあいけんそう|硤合憲三)さん",
+                "expected_kana_pattern": r"ソアイケンソオサン|ソ'アイケン'ソオサン",
+                "forbidden_kana_pattern": r"^ケンソオサン|^ケ'ンソオサン",
+            },
+        ]
     }
 ]
 
@@ -776,15 +867,15 @@ def run_all_historical_regression_tests():
             case_article = case.get("article_context", raw_text)
             items = [{"display": case.get("display_input") or raw_text, "speech": norm_text}]
             healed = audit_and_heal_news_script(
-                items, title=case_title, article_context=case_article, category_name=cat_name_input
+                items, title=case_title, article_context=case_article, category_name=cat_name_input, context_map=known_terms
             )
             display_text = healed[0]["display"]
             speech_text = healed[0]["speech"]
 
-            # Step 2.5: VOICEVOX 全文照合（助詞融合救済テストの場合）
-            if check_type == "voicevox_full_heal":
+            # Step 2.5: VOICEVOX 全文照合（助詞融合救済テストおよび名前消失防止の場合）
+            if check_type == "voicevox_full_heal" or known_terms:
                 healed_vv = audit_and_heal_via_voicevox_full_reading(
-                    healed, title=raw_text, known_terms_map=known_terms
+                    healed, title=case_title, known_terms_map=known_terms
                 )
                 display_text = healed_vv[0]["display"]
                 speech_text = healed_vv[0]["speech"]
