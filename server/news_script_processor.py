@@ -1392,21 +1392,42 @@ def audit_and_heal_news_script(items, title="", article_context="", category_nam
             healed_sp = re.sub(r'(?<![長次三四五ご御])男さん', '男', healed_sp)
             healed_sp = re.sub(r'(?<![長次三四五ご御])女さん', '女', healed_sp)
 
-        # 4. 「とろろにゃ」誤爆の自己修復（文末・文中の異常なキャラクター口調混入を除去・是正）
-        if "とろろにゃ" in disp or "とろろにゃ" in healed_sp:
-            print(f"[口調自己修復] 🩹 「とろろにゃ」誤爆を検知・自動修復: '{disp}'", flush=True)
-            # パターン1: 助詞＋「とろろにゃ」（例: 「事件に、とろろにゃ。」➔「事件がありました。」）
-            disp = re.sub(r'([にでへ])[\s　、,]*とろろにゃ[！!。？?]*', r'\1関するニュースです。', disp)
-            healed_sp = re.sub(r'([にでへ])[\s　、,]*とろろにゃ[！!。？?]*', r'\1かんするにゅーすです。', healed_sp)
-            # パターン2: 終助詞＋「とろろにゃ」（例: 「楽しみですねとろろにゃ。」➔「楽しみですね。」）
-            disp = re.sub(r'([ねよ]ね?|[。！？])[\s　]*とろろにゃ[！!。？?]*', r'\1', disp)
-            healed_sp = re.sub(r'([ねよ]ね?|[。！？])[\s　]*とろろにゃ[！!。？?]*', r'\1', healed_sp)
-            # パターン3: 述語＋「とろろにゃ」（例: 「驚いたとろろにゃ」➔「驚いたにゃ」）
-            disp = re.sub(r'([ただるいくすつぬふむゆよれろ]|です|ます|でした|ました)とろろにゃ', r'\1にゃ', disp)
-            healed_sp = re.sub(r'([ただるいくすつぬふむゆよれろ]|です|ます|でした|ました)とろろにゃ', r'\1にゃ', healed_sp)
-            # パターン4: 残存する「とろろにゃ」の除去・置換
-            disp = re.sub(r'とろろにゃ[！!。？?]*', 'ですね。', disp)
-            healed_sp = re.sub(r'とろろにゃ[！!。？?]*', 'ですね。', healed_sp)
+        # 4. 「とろろ」自称・「とろろにゃ」誤爆の自己修復（原稿本文中での自称『とろろは/とろろも/とろろとしては』を100%排除）
+        # 食材（とろろ蕎麦、とろろ昆布、とろろ汁、とろろ芋、とろろご飯等）を保護
+        if ("とろろ" in disp or "とろろ" in healed_sp) and not re.search(r'とろろ(?:そば|蕎麦|こんぶ|昆布|じる|汁|いも|芋|ごはん|ご飯|めし|飯|うどん|納豆)', disp + healed_sp):
+            if "とろろにゃ" in disp or "とろろにゃ" in healed_sp:
+                print(f"[口調自己修復] 🩹 「とろろにゃ」誤爆を検知・自動修復: '{disp}'", flush=True)
+                # パターン1: 助詞＋「とろろにゃ」（例: 「事件に、とろろにゃ。」➔「事件がありました。」）
+                disp = re.sub(r'([にでへ])[\s　、,]*とろろにゃ[！!。？?]*', r'\1関するニュースです。', disp)
+                healed_sp = re.sub(r'([にでへ])[\s　、,]*とろろにゃ[！!。？?]*', r'\1かんするにゅーすです。', healed_sp)
+                # パターン2: 終助詞＋「とろろにゃ」（例: 「楽しみですねとろろにゃ。」➔「楽しみですね。」）
+                disp = re.sub(r'([ねよ]ね?|[。！？])[\s　]*とろろにゃ[！!。？?]*', r'\1', disp)
+                healed_sp = re.sub(r'([ねよ]ね?|[。！？])[\s　]*とろろにゃ[！!。？?]*', r'\1', healed_sp)
+                # パターン3: 述語＋「とろろにゃ」（例: 「驚いたとろろにゃ」➔「驚いたにゃ」）
+                disp = re.sub(r'([ただるいくすつぬふむゆよれろ]|です|ます|でした|ました)とろろにゃ', r'\1にゃ', disp)
+                healed_sp = re.sub(r'([ただるいくすつぬふむゆよれろ]|です|ます|でした|ました)とろろにゃ', r'\1にゃ', healed_sp)
+                # パターン4: 残存する「とろろにゃ」の除去・置換
+                disp = re.sub(r'とろろにゃ[！!。？?]*', 'ですね。', disp)
+                healed_sp = re.sub(r'とろろにゃ[！!。？?]*', 'ですね。', healed_sp)
+
+            # 自称「とろろも」「とろろは」「とろろが」「とろろとしては」「とろろ的には」の修復
+            if re.search(r'(?<![一-龥])とろろ(?:も|は|が|として|的)', disp + healed_sp):
+                print(f"[口調自己修復] 🩹 自称「とろろ」混入を検知・自動修復: '{disp}'", flush=True)
+                # 「とろろも」➔「私も」
+                disp = re.sub(r'(?<![一-龥])とろろも', '私も', disp)
+                healed_sp = re.sub(r'(?<![一-龥])とろろも', 'わたしも', healed_sp)
+                # 「とろろは」➔「私は」
+                disp = re.sub(r'(?<![一-龥])とろろは', '私は', disp)
+                healed_sp = re.sub(r'(?<![一-龥])とろろは', 'わたしは', healed_sp)
+                # 「とろろが」➔「私が」
+                disp = re.sub(r'(?<![一-龥])とろろが', '私が', disp)
+                healed_sp = re.sub(r'(?<![一-龥])とろろが', 'わたしが', healed_sp)
+                # 「とろろとしては」「とろろ的には」➔「私としては」「私的には」
+                disp = re.sub(r'(?<![一-龥])とろろ(として|的)', r'私\1', disp)
+                healed_sp = re.sub(r'(?<![一-龥])とろろ(として|的)', r'わたし\1', healed_sp)
+                # 「とろろニュース」以外の孤立した「とろろ」自称の除去
+                disp = re.sub(r'(?<![一-龥])とろろ(?!(?:ニュース|そば|蕎麦|こんぶ|昆布|じる|汁|いも|芋|ごはん|ご飯|めし|飯|うどん|納豆))', '私', disp)
+                healed_sp = re.sub(r'(?<![一-龥])とろろ(?!(?:にゅーす|ニュース|そば|蕎麦|こんぶ|昆布|じる|汁|いも|芋|ごはん|ご飯|めし|飯|うどん|納豆))', 'わたし', healed_sp)
 
         # 5. 日付・時刻の読み崩れ（例: 「22分」が「にがつにじゅうににち」等）の自己修復
         if re.search(r'\d+分', disp) and re.search(r'[にち日]', healed_sp) and not re.search(r'\d+日', disp):
@@ -1882,6 +1903,10 @@ def validate_news_script_quality(raw_text, title="", article_context="", char_de
     if re.search(r'(?:だよですね|だねですね|よねですね|よですね|ねですね|だなにゃ|だなのだ|とろろにゃ|みんないゃ|いゃにゃ|ないゃ|てみんないゃ)', raw_text):
         return False, "不自然な二重語尾・破損した語尾（みんないゃにゃ等）または禁止された口調「とろろにゃ」が含まれています"
 
+    # 自称「とろろは/とろろも/とろろとしては」の禁止チェック（食材等を除く）
+    if re.search(r'(?<![一-龥])とろろ(?:も|は|が|として|的|にゃ)', raw_text) and not re.search(r'とろろ(?:そば|蕎麦|こんぶ|昆布|じる|汁|いも|芋|ごはん|ご飯|めし|飯|うどん|納豆)', raw_text):
+        return False, "原稿本文中で禁止されている自称「とろろ」が含まれています（一人称は「私」または主語を省略してください）"
+
     # 末尾の文が途中で切れた不完全文（助詞終了など）でないかのチェック
     if split_sentences_check:
         last_s = split_sentences_check[-1].strip()
@@ -2145,9 +2170,9 @@ def generate_news_item_script_data(payload, custom_dict=None):
     char_desc = payload.get('charDesc', '').strip()
     if not char_desc:
         if 'zunda' in model_id:
-            char_desc = "明るく元気なずんだ妖精のニュースキャスター「ずんだもん」です。語尾は「〜のだ」「〜なのだ」を使います。"
+            char_desc = "明るく元気な妖精キャスターです。語尾に「〜のだ」「〜なのだ」を使います（※原稿本文中で自身の名前を名乗ることは絶対に禁止です）。"
         else:
-            char_desc = "愛嬌のある白猫のニュースキャスター「とろろ」です。語尾には自然に「〜にゃ」「〜にゃ！」を使います。" 
+            char_desc = "親しみやすいバーチャルキャスターです。語尾に自然に「〜にゃ」「〜にゃ！」を使います（※原稿本文中で自身の名前「とろろ」を名乗ること・自称することは絶対に禁止です）。"
     category_name = payload.get('categoryName', '').strip()
     transition = payload.get('transition', '').strip()
     article_url = (payload.get('url') or item_obj.get('link', '')).strip()
