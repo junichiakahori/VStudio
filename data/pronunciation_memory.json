@@ -2261,6 +2261,18 @@
       "category": "entertainment_photo",
       "registered_date": "2026-10-11",
       "note": "全角３ショットの『サンショット』誤読防止"
+    },
+    {
+      "id": "hitome_de_kakunin",
+      "surface": "一目で",
+      "reading": "ひとめで",
+      "wrong_reading": "いちもくで",
+      "scope": "global",
+      "article_topic": "全般・IT・UI・ニュース",
+      "sample_sentence": "重要な情報を一目で確認できる便利な機能ですにゃ！",
+      "category": "polysemy_context",
+      "registered_date": "2026-10-12",
+      "note": "『一目で確認できる』の『イチモクデ』誤読防止（一目瞭然・一目置く等は保護）"
     }
   ]
 }

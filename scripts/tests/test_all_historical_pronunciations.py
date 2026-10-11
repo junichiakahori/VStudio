@@ -914,6 +914,43 @@ TEST_CATEGORIES = [
                 "forbidden_pattern": r"白鳥と熊谷が|白鳥と熊谷さんが",
             },
         ]
+    },
+    {
+        "category": "17. 多音語「一目」の文脈誤読防止（一目で/一目見て ➔ ひとめ、一目瞭然/一目置く保護）",
+        "cases": [
+            {
+                "id": "hitome_de_kakunin_voicevox",
+                "desc": "「一目で確認できる」がVOICEVOXで「ヒトメデカクニンデキル」と発音されること（イチモクデ誤読防止）",
+                "text": "重要な情報を一目で確認できる便利な新機能が登場しましたにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ヒトメデカクニンデキル",
+                "forbidden_kana_pattern": r"イチモクデカクニンデキル",
+            },
+            {
+                "id": "hitome_mite_voicevox",
+                "desc": "「一目見て」がVOICEVOXで「ヒトメミテ」と発音されること",
+                "text": "一目見てその凄さが伝わってきますにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ヒトメミテ",
+                "forbidden_kana_pattern": r"イチモクミテ",
+            },
+            {
+                "id": "ichimoku_ryozen_protected",
+                "desc": "熟語「一目瞭然」は「イチモクリョオゼン」として誤爆せず確実に保護されること",
+                "text": "グラフを見れば変化は一目瞭然ですにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"イチモクリョ[オウー]ゼン",
+                "forbidden_kana_pattern": r"ヒトメリョ[オウー]ゼン",
+            },
+            {
+                "id": "ichimoku_oku_protected",
+                "desc": "慣用句「一目置く」は「イチモクオカレル」として誤爆せず保護されること",
+                "text": "専門家からも一目置かれる存在となっていますにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"イチモクオカレル",
+                "forbidden_kana_pattern": r"ヒトメオカレル",
+            },
+        ]
     }
 ]
 
