@@ -869,6 +869,51 @@ TEST_CATEGORIES = [
                 "forbidden_kana_pattern": r"サンショット",
             },
         ]
+    },
+    {
+        "category": "16. 動物・競走馬・ペットへの不自然な「さん」付け防止（クマ・パンダ・競走馬等）",
+        "cases": [
+            {
+                "id": "animal_bear_san_removal",
+                "desc": "野生動物「クマさん」がニュースで「クマ」に是正されること",
+                "text": "住宅街にクマさんが出没し、警察が警戒を呼びかけていますにゃ。",
+                "title": "住宅街にクマ出没",
+                "category_name": "社会",
+                "check_type": "speech_text",
+                "expected_pattern": r"住宅街にクマが出没し",
+                "forbidden_pattern": r"クマさん|熊さん",
+            },
+            {
+                "id": "animal_panda_san_removal",
+                "desc": "動物園の「パンダさん」が「パンダ」に是正され、修飾付き個体名「パンダのシャンシャンさん」も「パンダのシャンシャン」になること",
+                "text": "上野動物園のパンダさんが大人気で、パンダのシャンシャンさんも中国で元気ですにゃ。",
+                "title": "上野動物園のパンダ人気",
+                "category_name": "社会",
+                "check_type": "speech_text",
+                "expected_pattern": r"上野動物園のパンダが大人気で.*パンダのシャンシャンも中国で",
+                "forbidden_pattern": r"パンダさん|シャンシャンさん",
+            },
+            {
+                "id": "racehorse_equinox_san_removal",
+                "desc": "競走馬に対する「競走馬のイクイノックスさん/選手」が「競走馬のイクイノックス」に是正されること",
+                "text": "競馬の祭典で、競走馬のイクイノックスさんが圧倒的な強さを見せましたにゃ。",
+                "title": "イクイノックス圧勝",
+                "category_name": "スポーツ",
+                "check_type": "speech_text",
+                "expected_pattern": r"競走馬のイクイノックスが",
+                "forbidden_pattern": r"イクイノックスさん|イクイノックス選手",
+            },
+            {
+                "id": "person_shiratori_san_protected",
+                "desc": "人名「白鳥さん」「熊谷さん」の「さん」は誤爆除去されず確実に保護されること",
+                "text": "白鳥さんと熊谷さんが研究成果を発表しましたにゃ。",
+                "title": "白鳥教授らの研究成果",
+                "category_name": "科学",
+                "check_type": "speech_text",
+                "expected_pattern": r"白鳥さんと熊谷さんが",
+                "forbidden_pattern": r"白鳥と熊谷が|白鳥と熊谷さんが",
+            },
+        ]
     }
 ]
 
