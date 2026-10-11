@@ -2047,27 +2047,6 @@
       "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: はたおかなしゃ)"
     },
     {
-      "id": "auto_1791542501_7459",
-      "surface": "大谷",
-      "reading": "おおや",
-      "wrong_reading": "おおたに",
-      "scope": "contextual",
-      "article_topic": "《産後初の表舞台は明るいボトムスで》“自然体な真美子さん”が大谷翔平の「不調でも笑顔」のメンタルの支えに 「子どもたちとの時間」も原動力",
-      "sample_sentence": "大谷に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-10-09",
-      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'おおたに' ➔ 正読: 'おおや'）",
-      "context_keywords": [
-        "ノーアーチ",
-        "回目",
-        "離脱",
-        "スポーツ",
-        "ノースリーブ",
-        "突破"
-      ],
-      "updated_date": "2026-10-09"
-    },
-    {
       "id": "auto_1791543152_258",
       "surface": "L4",
       "reading": "エルよん",
@@ -2222,6 +2201,66 @@
         "ハルカス",
         "青山剛昌書"
       ]
+    },
+    {
+      "id": "two_shot_photo_halfwidth",
+      "surface": "2ショット",
+      "reading": "つーしょっと",
+      "wrong_reading": "にしょっと",
+      "scope": "global",
+      "article_topic": "エンタメ・芸能・写真・撮影",
+      "sample_sentence": "川上千尋が白井審判員と2ショット撮影を公開したにゃ！",
+      "category": "entertainment_photo",
+      "registered_date": "2026-10-11",
+      "note": "写真・芸能記事における2ショット（Two-shot）の『ニショット』誤読防止"
+    },
+    {
+      "id": "two_shot_photo_fullwidth",
+      "surface": "２ショット",
+      "reading": "つーしょっと",
+      "wrong_reading": "にしょっと",
+      "scope": "global",
+      "article_topic": "エンタメ・芸能・写真・撮影",
+      "sample_sentence": "川上千尋が白井審判員と２ショット撮影を公開したにゃ！",
+      "category": "entertainment_photo",
+      "registered_date": "2026-10-11",
+      "note": "全角２ショットの『ニショット』誤読防止"
+    },
+    {
+      "id": "two_shot_photo_kanji",
+      "surface": "二ショット",
+      "reading": "つーしょっと",
+      "wrong_reading": "にしょっと",
+      "scope": "global",
+      "article_topic": "エンタメ・芸能・写真・撮影",
+      "sample_sentence": "二ショット写真を公開したにゃ！",
+      "category": "entertainment_photo",
+      "registered_date": "2026-10-11",
+      "note": "漢数字二ショットの『ニショット』誤読防止"
+    },
+    {
+      "id": "three_shot_photo_halfwidth",
+      "surface": "3ショット",
+      "reading": "すりーしょっと",
+      "wrong_reading": "さんしょっと",
+      "scope": "global",
+      "article_topic": "エンタメ・芸能・写真・撮影",
+      "sample_sentence": "貴重な3ショットを披露したにゃ！",
+      "category": "entertainment_photo",
+      "registered_date": "2026-10-11",
+      "note": "写真・芸能記事における3ショット（Three-shot）の『サンショット』誤読防止"
+    },
+    {
+      "id": "three_shot_photo_fullwidth",
+      "surface": "３ショット",
+      "reading": "すりーしょっと",
+      "wrong_reading": "さんしょっと",
+      "scope": "global",
+      "article_topic": "エンタメ・芸能・写真・撮影",
+      "sample_sentence": "貴重な３ショットを披露したにゃ！",
+      "category": "entertainment_photo",
+      "registered_date": "2026-10-11",
+      "note": "全角３ショットの『サンショット』誤読防止"
     }
   ]
 }

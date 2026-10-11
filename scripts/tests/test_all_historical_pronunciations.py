@@ -826,6 +826,49 @@ TEST_CATEGORIES = [
                 "forbidden_kana_pattern": r"^ケンソオサン|^ケ'ンソオサン",
             },
         ]
+    },
+    {
+        "category": "15. 写真・芸能撮影用語の読み誤読防止（2ショット➔ツーショット、ニショット防止）",
+        "cases": [
+            {
+                "id": "two_shot_photo_halfwidth",
+                "desc": "「2ショット撮影」が『ニショット』ではなく『ツーショット』と発音されること",
+                "text": "川上千尋が白井審判員と2ショット撮影を公開したにゃ！",
+                "title": "川上千尋が白井審判員と2ショット撮影",
+                "article_context": "NMB48の川上千尋さんが白井球審と2ショット写真を撮影しました。",
+                "category_name": "エンタメ",
+                "check_type": "both",
+                "expected_speech_pattern": r"ツーショット撮影",
+                "forbidden_speech_pattern": r"2ショット|ニショット",
+                "expected_kana_pattern": r"ツ[ウー]ショット",
+                "forbidden_kana_pattern": r"ニショット",
+            },
+            {
+                "id": "two_shot_photo_fullwidth",
+                "desc": "全角「２ショットなど添え」が『ニショット』ではなく『ツーショット』と発音されること",
+                "text": "ワンオクRyota、紗栄子との交際を公表 ２ショットなど添えましたにゃ。",
+                "title": "ワンオクRyota、交際を公表 ２ショットなど添え",
+                "article_context": "ONE OK ROCKのRyotaさんが紗栄子さんとの交際を公表しました。",
+                "category_name": "エンタメ",
+                "check_type": "both",
+                "expected_speech_pattern": r"ツーショットなど添え",
+                "forbidden_speech_pattern": r"２ショット|ニショット",
+                "expected_kana_pattern": r"ツ[ウー]ショット",
+                "forbidden_kana_pattern": r"ニショット",
+            },
+            {
+                "id": "three_shot_photo_halfwidth",
+                "desc": "「3ショット写真」が『サンショット』ではなく『スリーショット』と発音されること",
+                "text": "豪華な3ショット写真を披露しましたにゃ。",
+                "title": "豪華な3ショット写真を披露",
+                "category_name": "エンタメ",
+                "check_type": "both",
+                "expected_speech_pattern": r"スリーショット写真",
+                "forbidden_speech_pattern": r"3ショット|サンショット",
+                "expected_kana_pattern": r"スリ[イ一ー]ショット",
+                "forbidden_kana_pattern": r"サンショット",
+            },
+        ]
     }
 ]
 

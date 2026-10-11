@@ -159,6 +159,20 @@ def is_plausible_reading(term, yomi):
     if re.search(r'[A-Za-z]', norm_term) and re.match(r'^[A-Za-z0-9\s\-_.]+$', norm_term):
         return True
 
+    # 写真・撮影・芸能記事用語（2ショット -> つーしょっと 等、カタカナ・ひらがな双方に対応）
+    if re.search(r'^[1-4１-４一二三四]ショット$', norm_term) and norm_yomi in ('わんしょっと', 'つーしょっと', 'すりーしょっと', 'ふぉーしょっと', 'ワンショット', 'ツーショット', 'スリーショット', 'フォーショット'):
+        return True
+
+    # 数字と英語/和数読み（2 -> ツー/つー, 1 -> ワン/わん, 3 -> スリー/すりー 等）
+    DIGIT_READINGS = {
+        '1': {'わん', 'ワン', 'いち', 'イチ'},
+        '2': {'つー', 'ツー', 'に', 'ニ'},
+        '3': {'すりー', 'スリー', 'さん', 'サン'},
+        '4': {'ふぉー', 'フォー', 'よん', 'ヨン', 'し', 'シ'},
+    }
+    if norm_term in DIGIT_READINGS and norm_yomi in DIGIT_READINGS[norm_term]:
+        return True
+
     # 職業肩書・カテゴリ名の誤読登録を永久拒絶（宮川大輔 -> たれんと 等の完全防止）
     FORBIDDEN_READINGS = {
         'たれんと', 'はいゆう', 'かしゅ', 'げいいん', 'さっかー', 'やきゅう', 
@@ -1900,6 +1914,22 @@ def apply_special_reading_fixes(text):
     return t
 
 
+def apply_shot_photo_rules(text: str) -> str:
+    """写真撮影・芸能記事・メディアにおけるショット数表記（2ショット、3ショット等）の英語読み正規化"""
+    if not text:
+        return ""
+    t = text
+    # 2ショット / ２ショット / 二ショット ➔ ツーショット (ニショット誤読を100%防止)
+    t = re.sub(r'(?<![0-9０-９一二三四五六七八九十])[2２二]ショット', 'ツーショット', t)
+    # 1ショット / １ショット / 一ショット ➔ ワンショット
+    t = re.sub(r'(?<![0-9０-９一二三四五六七八九十])[1１一]ショット', 'ワンショット', t)
+    # 3ショット / ３ショット / 三ショット ➔ スリーショット
+    t = re.sub(r'(?<![0-9０-９一二三四五六七八九十])[3３三]ショット', 'スリーショット', t)
+    # 4ショット / ４ショット / 四ショット ➔ フォーショット
+    t = re.sub(r'(?<![0-9０-９一二三四五六七八九十])[4４四]ショット', 'フォーショット', t)
+    return t
+
+
 def apply_game_title_rules(text: str) -> str:
     """ゲームタイトル（FFシリーズ、ドラゴンクエスト等）のナンバリング・ローマ数字読みルール"""
     if not text:
@@ -2147,6 +2177,7 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
     # 0.5 年齢・助数詞および単漢字誤変換（気象予報士 ➔ さむらい）の修復
     t = apply_age_and_counter_rules(t)
     t = apply_special_reading_fixes(t)
+    t = apply_shot_photo_rules(t)
 
     # 0.55 方言（関西弁）・役割語の標準語化（「〜やろ」「〜んやろ」「じゃが」等の自動補正）
     t = re.sub(r'(?:^|(?<=[。、！？\s　]))じゃが(?!いも|バター|りこ)[、,\s　]*', 'だが、', t)
@@ -2349,6 +2380,9 @@ def heal_sentence_reading(display_text, speech_text, context_map=None):
                 healed_parts.append(rep)
             # 英字・記号・略語からの仮名化（M!LK->みるく、SixTONES->ストーンズ、King & Prince等）は正常な読み解決
             elif re.search(r'[A-Za-z!！?？&・\-_.]', orig) and re.match(r'^[ぁ-んァ-ヶー\s　]+$', rep):
+                healed_parts.append(rep)
+            # 写真・芸能ショット数表記（2->ツー, 3->スリー 等）
+            elif orig in ('1', '１', '一', '2', '２', '二', '3', '３', '三', '4', '４', '四') and rep in ('ワン', 'わん', 'ツー', 'つー', 'スリー', 'すりー', 'フォー', 'ふぉー'):
                 healed_parts.append(rep)
             elif is_plausible_reading(orig, rep):
                 healed_parts.append(rep)
