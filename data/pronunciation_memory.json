@@ -1879,19 +1879,19 @@
       "id": "auto_1791410897_6991",
       "surface": "憲三",
       "reading": "けんそう",
-      "wrong_reading": "けんぞお",
+      "wrong_reading": "ごおけんさん",
       "scope": "contextual",
       "article_topic": "硤合さん 受賞の知らせは買い物中",
       "sample_sentence": "ノーベル化学賞を受賞した硤合憲三さんについて、じゅしょうのしらせを受けた場所が話題になっています。",
       "category": "proper_noun",
       "registered_date": "2026-10-08",
-      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'けんぞお' ➔ 正読: 'けんそう'）",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'ごおけんさん' ➔ 正読: 'けんそう'）",
       "context_keywords": [
         "硤合",
         "受賞",
         "物中"
       ],
-      "updated_date": "2026-10-08"
+      "updated_date": "2026-10-12"
     },
     {
       "id": "auto_1791451532_4208",
@@ -2273,6 +2273,105 @@
       "category": "polysemy_context",
       "registered_date": "2026-10-12",
       "note": "『一目で確認できる』の『イチモクデ』誤読防止（一目瞭然・一目置く等は保護）"
+    },
+    {
+      "id": "oomoriagari_prefix",
+      "surface": "大盛り上がり",
+      "reading": "おおもりあがり",
+      "wrong_reading": "だいもりあがり",
+      "scope": "global",
+      "article_topic": "全般・エンタメ・イベント",
+      "sample_sentence": "会場は大盛り上がりとなりましたにゃ！",
+      "category": "polysemy_prefix",
+      "registered_date": "2026-10-12",
+      "note": "『大盛り上がり』の『ダイモリアガリ』誤読防止（大盛況等は保護）"
+    },
+    {
+      "id": "ima_wadai_adverb",
+      "surface": "今話題",
+      "reading": "いまわだい",
+      "wrong_reading": "こんわだい",
+      "scope": "global",
+      "article_topic": "全般・トレンド・ニュース",
+      "sample_sentence": "SNSで今話題のスイーツを特集しますにゃ！",
+      "category": "polysemy_context",
+      "registered_date": "2026-10-12",
+      "note": "『今話題』の『コンワダイ』誤読防止（今月・今回等は保護）"
+    },
+    {
+      "id": "auto_1791795916_276",
+      "surface": "LOST10",
+      "reading": "ロストテン",
+      "wrong_reading": "ろすとじゅう",
+      "scope": "global",
+      "article_topic": "表情おかしかった」横浜流星 咳き込み、沈黙も…『オールスター感謝祭』で見せた“不調ぶり”に心配の声（女性自身）",
+      "sample_sentence": "LOST10に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-12",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: ろすとじゅう)"
+    },
+    {
+      "id": "auto_1791796498_1316",
+      "surface": "歌山両県",
+      "reading": "りょうけん",
+      "wrong_reading": "うたやま りょおけん",
+      "scope": "global",
+      "article_topic": "南海フェリー撤退でどうなる？ 途中駅ゼロの激短鉄路「和歌山港線」じつは南海の持ち物じゃない!?（1/2 ページ） - 乗りものニュース",
+      "sample_sentence": "歌山両県に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-12",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: うたやま りょおけん)"
+    },
+    {
+      "id": "auto_1791798870_8595",
+      "surface": "豊見城",
+      "reading": "とみぐすくとみしろ",
+      "wrong_reading": "とみぐすく",
+      "scope": "contextual",
+      "article_topic": "豊見城市長選】クロス討論 徳元、大田氏が独自策＜立候補予定者 座談会＞詳報1／3",
+      "sample_sentence": "豊見城に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-12",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: とみぐすく)",
+      "context_keywords": [
+        "事件",
+        "議論",
+        "46",
+        "Ryukyu",
+        "文中敬称略",
+        "福祉"
+      ]
+    },
+    {
+      "id": "auto_1791800797_1723",
+      "surface": "長嶋凛桜",
+      "reading": "ながしまたるさく",
+      "wrong_reading": "ながしまりんさくら",
+      "scope": "global",
+      "article_topic": "10月12日(月)開催 42ndシングル「是非に及ばず」発売記念「リアルミート＆グリート」「リアルサイン会」@幕張メッセ 長嶋凛桜欠席のお知らせ",
+      "sample_sentence": "しかし、長嶋凛桜さんは欠席するとのお知らせが公式サイトで発表されましたにゃ。",
+      "category": "person_name",
+      "registered_date": "2026-10-12",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'ながしまりんさくら' ➔ 正読: 'ながしまたるさく'）"
+    },
+    {
+      "id": "auto_1791801540_4803",
+      "surface": "前川",
+      "reading": "まえがわ",
+      "wrong_reading": "まえかわ",
+      "scope": "contextual",
+      "article_topic": "阪神 前川、立石、栄枝が１軍合流",
+      "sample_sentence": "阪神 前川、立石、栄枝が1軍合流",
+      "category": "proper_noun",
+      "registered_date": "2026-10-12",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'まえかわ' ➔ 正読: 'まえがわ'）",
+      "context_keywords": [
+        "阪神",
+        "前川",
+        "立石",
+        "栄枝",
+        "軍合流"
+      ]
     }
   ]
 }

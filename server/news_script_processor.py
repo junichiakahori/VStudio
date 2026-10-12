@@ -84,10 +84,12 @@ def split_sentences_safely(text):
     """
     if not text:
         return []
-    # 1. ブランド名保護
+    # 1. ブランド名・グループ名記号保護（末尾に感嘆符・句点を含む固有名詞）
     t_safe = re.sub(r'Yahoo[!！]', 'Yahoo__EXCL__', text, flags=re.IGNORECASE)
     t_safe = re.sub(r'M[!！]LK', 'M__EXCL__LK', t_safe)
     t_safe = re.sub(r'Y[!！]ニュース', 'Y__EXCL__ニュース', t_safe)
+    t_safe = re.sub(r'ずっと真夜中でいいのに[。.]', 'ずっと真夜中でいいのに__PERIOD__', t_safe)
+    t_safe = re.sub(r'モーニング娘[。.]', 'モーニング娘__PERIOD__', t_safe)
     
     # 2. 不自然な「。にゃ。」「！にゃ！」等の二重句読点を「にゃ。」へ事前正規化
     t_safe = re.sub(r'[。！？]+[\s　]*(にゃ|のだ|なのだ)[。！？]*', r'\1。', t_safe)
@@ -96,17 +98,21 @@ def split_sentences_safely(text):
     t_safe = re.sub(r'[？?]{2,}', '？', t_safe)
 
     # 3. 文分割:
-    # - 句点「。」や改行「\n」で分割（ただし直後に語尾が続く場合は分割しない）
+    # - 句点「。」や改行「\n」で分割（ただし直後に語尾や助詞が続く場合は分割しない）
     # - 「！？!?」は直後に改行があるか、空白を挟んで次の文がある場合のみ分割（文中のインライン！は分割しない）
     parts = [
         s.strip() for s in re.split(
-            r'(?<=[。\n])(?!(?:にゃ|のだ|なのだ))|(?<=[！？!\?])\s*\n+|(?<=[！？!\?])\s+(?=[一-鿿ぁ-んァ-ヶ])',
+            r'(?<=[。\n])(?!(?:にゃ|のだ|なのだ|[はがをにのもとで、]))|(?<=[！？!\?])\s*\n+|(?<=[！？!\?])\s+(?=[一-鿿ぁ-んァ-ヶ])',
             t_safe
         ) if s.strip() and re.search(r'[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ffA-Za-z0-9]', s)
     ]
     
     restored = [
-        s.replace('Yahoo__EXCL__', 'Yahoo!').replace('M__EXCL__LK', 'M!LK').replace('Y__EXCL__ニュース', 'Y!ニュース')
+        s.replace('Yahoo__EXCL__', 'Yahoo!')
+         .replace('M__EXCL__LK', 'M!LK')
+         .replace('Y__EXCL__ニュース', 'Y!ニュース')
+         .replace('ずっと真夜中でいいのに__PERIOD__', 'ずっと真夜中でいいのに。')
+         .replace('モーニング娘__PERIOD__', 'モーニング娘。')
         for s in parts
     ]
     return restored
@@ -2617,7 +2623,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
     
                 # 1. 末尾が格助詞・接続助詞・読点で終わっている場合は明らかに文の途中（句点の有無問わず）
                 # 例: 「教師たちの生活も」「発売日が」「今後は」「〜という結果に」など
-                PARTICLE_ENDINGS = r'(?:[がはをにとのとでもからへよりまたそして、,，]|けど|ので|って|とか|など|といった|として|による|により|に対する)$'
+                PARTICLE_ENDINGS = r'(?:[がはをにとのもへで、,，]|でも|から|より|また|そして|けど|ので|って|とか|など|といった|として|による|により|に対する)$'
                 if re.search(PARTICLE_ENDINGS, stripped) or re.search(r'(\.{2,}|…+)$', stripped):
                     return True
     
@@ -2636,14 +2642,33 @@ def generate_news_item_script_data(payload, custom_dict=None):
     
             deduped_sentences = []
             seen_transition = False
+            last_dropped_fragment = ""
             for s in split_sentences:
+                # 🩹 直前の文片が不完全として弾かれ、現在の文が助詞「は、」「が、」等で始まっている場合、
+                # 固有名詞末尾の句点（。）等による誤分割と判定して直前の体言文片と結合復元
+                if last_dropped_fragment and re.match(r'^[はがをにのもとで、]', s.strip()):
+                    combined = last_dropped_fragment + s.strip()
+                    print(f"{tag} 🩹 助詞誤分割文片を直前の体言文片と結合復元: '{last_dropped_fragment}' + '{s}' ➔ '{combined}'", flush=True)
+                    s = combined
+                    last_dropped_fragment = ""
+
+                # 🩹 直前文片がない場合でも、文頭が「は、」「が、」などの助詞・読点で始まっている場合はゴミ助詞を切除
+                if not last_dropped_fragment and not deduped_sentences and re.match(r'^[はがをにのもとで][、,\s　]', s.strip()):
+                    healed_lead = re.sub(r'^[はがをにのもとで][、,\s　]+', '', s.strip())
+                    print(f"{tag} 🩹 文頭の孤立助詞を切除是正: '{s}' ➔ '{healed_lead}'", flush=True)
+                    s = healed_lead
+
                 if is_ai_meta_sentence(s):
                     print(f"{tag} ✂️ AIメタ行・指示文復唱を除去: '{s}'", flush=True)
+                    last_dropped_fragment = ""
                     continue
     
                 if is_incomplete_sentence_fragment(s):
                     print(f"{tag} ✂️ 途中で切れた不完全な文片を除去: '{s}'", flush=True)
+                    last_dropped_fragment = s.strip()
                     continue
+
+                last_dropped_fragment = ""
     
                 if is_transition_phrase(s):
                     if seen_transition:

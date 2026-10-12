@@ -951,6 +951,93 @@ TEST_CATEGORIES = [
                 "forbidden_kana_pattern": r"ヒトメオカレル",
             },
         ]
+    },
+    {
+        "category": "18. 接頭辞「大」の多音語誤読防止（大盛り上がり➔おおもりあがり、大盛況保護）",
+        "cases": [
+            {
+                "id": "oomoriagari_voicevox",
+                "desc": "「大盛り上がり」がVOICEVOXで「オオモリアガリ」と発音されること（ダイモリアガリ誤読防止）",
+                "text": "フェス会場は大盛り上がりとなりましたにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"オオモリアガリ",
+                "forbidden_kana_pattern": r"ダイモリアガリ",
+            },
+            {
+                "id": "oomoriagatta_voicevox",
+                "desc": "「大盛り上がった」がVOICEVOXで「オオモリアガッタ」と発音されること",
+                "text": "昨夜のライブも大盛り上がったようですにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"オオモリアガッタ",
+                "forbidden_kana_pattern": r"ダイモリアガッタ",
+            },
+            {
+                "id": "daiseikyo_protected",
+                "desc": "熟語「大盛況」は「ダイセイキョウ」として誤爆せず確実に保護されること",
+                "text": "イベントは大盛況のうちに幕を閉じましたにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ダイセ[エイー]キョ[オウー]",
+                "forbidden_kana_pattern": r"オオモリキョ",
+            },
+        ]
+    },
+    {
+        "category": "19. 末尾に句点（。）を含む固有名詞の誤分割防止（ずっと真夜中でいいのに。、モーニング娘。）",
+        "cases": [
+            {
+                "id": "ztmy_sentence_split_protection",
+                "desc": "「ずっと真夜中でいいのに。」の「。」で文が分割されず、主語消失・『は、』から始まる文片事故が防止されること",
+                "text": "バンドずっと真夜中でいいのに。は、2018年にデビューし、特定の形を持たない音楽バンドとして知られていますにゃ。",
+                "check_type": "speech_text",
+                "expected_pattern": r"ずっと真夜中でいいのに。は、2018年",
+                "forbidden_pattern": r"^は、2018年",
+            },
+            {
+                "id": "morning_musume_split_protection",
+                "desc": "「モーニング娘。」の「。」で文が分割されず、完全な文として維持されること",
+                "text": "アイドルグループモーニング娘。は、結成記念イベントを開催しましたにゃ。",
+                "check_type": "speech_text",
+                "expected_pattern": r"モーニング娘。は、結成記念",
+                "forbidden_pattern": r"^は、結成記念",
+            },
+        ]
+    },
+    {
+        "category": "20. 副詞「今（いま）」の多音語誤読防止（今話題/今注目/今人気 ➔ いま、今月/今回保護）",
+        "cases": [
+            {
+                "id": "ima_wadai_voicevox",
+                "desc": "「今話題」がVOICEVOXで「イマワダイ」と発音されること（コンワダイ誤読防止）",
+                "text": "SNSで今話題となっている新商品ですにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"イマワダイ",
+                "forbidden_kana_pattern": r"コンワダイ",
+            },
+            {
+                "id": "ima_chumoku_voicevox",
+                "desc": "「今注目」がVOICEVOXで「イマチュウモク」と発音されること（コンチュウモク誤読防止）",
+                "text": "世界中から今注目を集めていますにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"イマチュウモク",
+                "forbidden_kana_pattern": r"コンチュウモク",
+            },
+            {
+                "id": "ima_ninki_voicevox",
+                "desc": "「今人気」がVOICEVOXで「イマニンキ」と発音されること（コンニンキ誤読防止）",
+                "text": "若い世代の間で今人気のスポットですにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"イマニンキ",
+                "forbidden_kana_pattern": r"コンニンキ",
+            },
+            {
+                "id": "kongetsu_konkai_protected",
+                "desc": "熟語「今月」「今回」は「コンゲツ」「コンカイ」として誤爆せず確実に保護されること",
+                "text": "今月開催される今回のイベントも楽しみですにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"コンゲツ.*コンカイ",
+                "forbidden_kana_pattern": r"イマゲツ|イマカイ",
+            },
+        ]
     }
 ]
 
