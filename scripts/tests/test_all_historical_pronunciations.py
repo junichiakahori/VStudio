@@ -1038,6 +1038,80 @@ TEST_CATEGORIES = [
                 "forbidden_kana_pattern": r"イマゲツ|イマカイ",
             },
         ]
+    },
+    {
+        "category": "21. 英語・アルファベット発音救済（WEB/西スポWEB/1st/大文字英単語）",
+        "cases": [
+            {
+                "id": "nishispo_web_voicevox",
+                "desc": "「西スポWEB」が「ニシスポウェブ」と発音されること（ダブリューイービー誤読防止）",
+                "text": "西スポWEBの最新記事で発表されましたにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ニシスポウェブ",
+                "forbidden_kana_pattern": r"ダブリュ[ウー]イービ[イエ]",
+            },
+            {
+                "id": "first_live_voicevox",
+                "desc": "「1st LIVE」が「ファースト ライブ」と発音されること（イチショートトン単位誤読防止）",
+                "text": "記念すべき1st LIVEの開催が決定しましたにゃ！",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ファ[ア]?スト.*ライブ",
+                "forbidden_kana_pattern": r"ショ[オウ]トトン",
+            },
+            {
+                "id": "uppercase_english_words",
+                "desc": "大文字英単語（WINNER, POP等）がスペルアウトされず英単語として発音されること",
+                "text": "大会のWINNERが決定しPOPな演出で盛り上がりましたにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ウィナ[ア]?.*ポップ",
+                "forbidden_kana_pattern": r"ダブリュ[ウー]アイ|ピ[イ]オ[オ]ピ[イ]",
+            },
+        ]
+    },
+    {
+        "category": "22. ニュース頻出用語・固有名詞の誤読防止（海警局、首都高、月9、連休中日、国学院大）",
+        "cases": [
+            {
+                "id": "kaikeikyoku_voicevox",
+                "desc": "「海警局」が「カイケイキョク」と発音されること（ウミへの単語消失事故防止）",
+                "text": "中国海警局の船が航行しているのが確認されましたにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"カイケイキョク",
+                "forbidden_kana_pattern": r"チュウゴクウミノフネ",
+            },
+            {
+                "id": "shutoko_voicevox",
+                "desc": "「首都高」が「シュトコウ」と発音されること（シュトダカ誤読防止）",
+                "text": "首都高で事故が発生し渋滞していますにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"シュトコ[オウ]",
+                "forbidden_kana_pattern": r"シュトダカ",
+            },
+            {
+                "id": "getsu_ku_voicevox",
+                "desc": "「月9ドラマ」が「ゲツクドラマ」と発音されること（ツキキュウ誤読防止）",
+                "text": "大注目の月9ドラマがついに始まりましたにゃ！",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ゲツクドラマ",
+                "forbidden_kana_pattern": r"ツキキュウ",
+            },
+            {
+                "id": "renkyu_nakabi_voicevox",
+                "desc": "「3連休中日」が「サンレンキュウナカビ」と発音されること（チュウニチ誤読防止）",
+                "text": "3連休中日の今日は行楽日和となりましたにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"サンレンキュウナカビ",
+                "forbidden_kana_pattern": r"チュウニチ",
+            },
+            {
+                "id": "kokugakuindai_voicevox",
+                "desc": "「国学院大」が「コクガクインダイ」と発音されること（コクガイクインダイ誤読防止）",
+                "text": "出雲駅伝で国学院大が快走を見せましたにゃ！",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"コクガクインダイ",
+                "forbidden_kana_pattern": r"コクガイクインダイ",
+            },
+        ]
     }
 ]
 

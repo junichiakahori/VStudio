@@ -168,6 +168,8 @@ def is_plausible_reading(term, yomi):
         return True
     if norm_term in ('大盛', '大盛り', '大盛り上がり') and norm_yomi in ('おおも', 'おおもり', 'おおもりあがり'):
         return True
+    if norm_term in ('月9', '月９') and norm_yomi in ('げつく', 'げつくー', 'げつクー'):
+        return True
 
     # 数字と英語/和数読み（2 -> ツー/つー, 1 -> ワン/わん, 3 -> スリー/すりー 等）
     DIGIT_READINGS = {
@@ -1551,6 +1553,10 @@ def apply_tech_acronyms(text):
     # 🛡️ 1.3 iDeCo（個人型確定拠出年金: イデコ）の確実な正規化（「アイデコ」誤読防止）
     t = re.sub(r'(?i)(?<![A-Za-z0-9])ideco(?![A-Za-z0-9])', 'イデコ', t)
 
+    # 🛡️ 1.35 「西スポWEB」「東スポWEB」「WEB」の確実なウェブ化（「ダブリューイービー」誤読を永久防止）
+    t = re.sub(r'(?i)(?<=[一-龥ぁ-んァ-ヶ])(?:WEB|Web)(?![A-Za-z0-9])', 'うぇぶ', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])(?:WEB|Web)(?![A-Za-z0-9])', 'ウェブ', t)
+
     # 🛡️ 1.4 単独の大文字「THE」（THE TIME, THE FIRST, THE Open Call等）のスペル読み防止
     t = re.sub(r'(?<![A-Za-z0-9])THE(?![A-Za-z0-9])', 'ザ', t)
 
@@ -1560,7 +1566,7 @@ def apply_tech_acronyms(text):
         if acronym in t:
             t = re.sub(rf'(?<![A-Za-z0-9]){re.escape(acronym)}(?![A-Za-z0-9])', yomi, t)
 
-    # 🛡️ 1.5 大文字英単語（4文字以上）のスペル読み（FASHION ➔ エフ・エー・エス... 等）を防止し、VOICEVOXの自然な英単語発音へ救済
+    # 🛡️ 1.5 大文字英単語（3文字以上）のスペル読み（FASHION, WINNER, WISH, POP, DAY等）を防止し、VOICEVOXの自然な英単語発音へ救済
     SAFE_ACRONYMS = {
         "NHK", "FBI", "CIA", "SNS", "AI", "PR", "URL", "DX", "EV", "OS", "UI", "UX",
         "API", "CPU", "GPU", "PC", "TV", "SSD", "HDD", "USB", "NFT", "TGS", "RPG",
@@ -1569,16 +1575,20 @@ def apply_tech_acronyms(text):
         "BGM", "SE", "MC", "DJ", "CD", "DVD", "BD", "SD", "IC", "ID", "IT", "IP",
         "LTE", "SIM", "PIN", "QR", "VIP", "PTA", "JAL", "ANA", "JR", "NPO", "NGO",
         "JRA", "NPB", "JFA", "WBC", "FIFA", "IOC", "JOC", "MUFG", "UFJ", "SMBC", "FRB",
-        "CPI", "SMR", "TNO", "LLM", "NTT", "KDDI", "JCB", "SBI", "NASA", "ASEAN", "OPEC"
+        "CPI", "SMR", "TNO", "LLM", "NTT", "KDDI", "JCB", "SBI", "NASA", "ASEAN", "OPEC",
+        "LRT", "ATM", "IPS", "BEV", "HEV", "PHEV", "FCEV", "ETC", "NISA", "TOPIX", "DRAM",
+        "VIVANT", "NEWS"
     }
     def _fix_uppercase_word(m):
         w = m.group(0)
         u = w.upper()
-        if u in SAFE_ACRONYMS or len(w) < 4 or not re.search(r'[AIUEOYaiueoy]', w):
+        # 既知の頭文字略語（NHK, AI, PR等）や母音を含まない略語はそのまま維持
+        if u in SAFE_ACRONYMS or not re.search(r'[AIUEOYaiueoy]', w):
             return w
+        # 母音を含む一般的な英単語（3文字以上: WEB, ONE, WIN, TOP, POP, DAY, FOX, PRO, JOY, LIVE等）はCapitalizeして英語発音を促す
         return w.capitalize()
 
-    t = re.sub(r'(?<![A-Za-z])[A-Z]{4,}(?![A-Za-z])', _fix_uppercase_word, t)
+    t = re.sub(r'(?<![A-Za-z])[A-Z]{3,}(?![A-Za-z])', _fix_uppercase_word, t)
     return t
 
 def apply_okonau_context_rules(text):
@@ -1969,6 +1979,22 @@ def apply_special_reading_fixes(text):
 
     # 9. 「今話題」「今注目」「今人気」の副詞「今（いま）」誤読（「コンワダイ」「コンチュウモク」「コンニンキ」）を100%防止（今月・今回・今年等を保護）
     t = re.sub(r'(?<![一-龥])今(?=話題|注目|人気)', 'いま', t)
+
+    # 10. 英語序数（1st, 2nd, 3rd等）の英語読み正規化（「1st ➔ イチショートトン」単位誤読を永久防止）
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])1st(?![A-Za-z0-9])', 'ファースト', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])2nd(?![A-Za-z0-9])', 'セカンド', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])3rd(?![A-Za-z0-9])', 'サード', t)
+
+    # 11. ニュース頻出用語・固有名詞の誤読防止（海警局、首都高、月9、連休中日、国学院大、界王、何食わぬ顔等）
+    t = re.sub(r'(?<![一-龥])海警局', 'かいけいきょく', t)
+    t = re.sub(r'(?<![一-龥])海警船', 'かいけいせん', t)
+    t = re.sub(r'(?<![一-龥])海警(?=[のとにをはが])', 'かいけい', t)
+    t = re.sub(r'(?<![一-龥])月[9９](?=ドラマ|枠|で|に|の|を|は)', 'げつく', t)
+    t = re.sub(r'(?<![一-龥])(?:3|３|三)?連休中日', '連休なかび', t)
+    t = re.sub(r'(?<![一-龥])首都高(?![一-龥])', 'しゅとこう', t)
+    t = re.sub(r'[国國]学院大(?=学)?', 'こくがくいんだい', t)
+    t = re.sub(r'界王(?=様|星|拳|役|神)', 'かいおう', t)
+    t = re.sub(r'何食わぬ顔', 'なにくわぬかお', t)
 
     return t
 

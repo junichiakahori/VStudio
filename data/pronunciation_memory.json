@@ -1879,19 +1879,19 @@
       "id": "auto_1791410897_6991",
       "surface": "憲三",
       "reading": "けんそう",
-      "wrong_reading": "ごおけんさん",
+      "wrong_reading": "けんぞお",
       "scope": "contextual",
       "article_topic": "硤合さん 受賞の知らせは買い物中",
       "sample_sentence": "ノーベル化学賞を受賞した硤合憲三さんについて、じゅしょうのしらせを受けた場所が話題になっています。",
       "category": "proper_noun",
       "registered_date": "2026-10-08",
-      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'ごおけんさん' ➔ 正読: 'けんそう'）",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'けんぞお' ➔ 正読: 'けんそう'）",
       "context_keywords": [
         "硤合",
         "受賞",
         "物中"
       ],
-      "updated_date": "2026-10-12"
+      "updated_date": "2026-10-08"
     },
     {
       "id": "auto_1791451532_4208",
@@ -2299,79 +2299,88 @@
       "note": "『今話題』の『コンワダイ』誤読防止（今月・今回等は保護）"
     },
     {
-      "id": "auto_1791795916_276",
-      "surface": "LOST10",
-      "reading": "ロストテン",
-      "wrong_reading": "ろすとじゅう",
+      "id": "kaikeikyoku",
+      "surface": "海警局",
+      "reading": "かいけいきょく",
+      "wrong_reading": "うみ",
       "scope": "global",
-      "article_topic": "表情おかしかった」横浜流星 咳き込み、沈黙も…『オールスター感謝祭』で見せた“不調ぶり”に心配の声（女性自身）",
-      "sample_sentence": "LOST10に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-10-12",
-      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: ろすとじゅう)"
-    },
-    {
-      "id": "auto_1791796498_1316",
-      "surface": "歌山両県",
-      "reading": "りょうけん",
-      "wrong_reading": "うたやま りょおけん",
-      "scope": "global",
-      "article_topic": "南海フェリー撤退でどうなる？ 途中駅ゼロの激短鉄路「和歌山港線」じつは南海の持ち物じゃない!?（1/2 ページ） - 乗りものニュース",
-      "sample_sentence": "歌山両県に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-10-12",
-      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: うたやま りょおけん)"
-    },
-    {
-      "id": "auto_1791798870_8595",
-      "surface": "豊見城",
-      "reading": "とみぐすくとみしろ",
-      "wrong_reading": "とみぐすく",
-      "scope": "contextual",
-      "article_topic": "豊見城市長選】クロス討論 徳元、大田氏が独自策＜立候補予定者 座談会＞詳報1／3",
-      "sample_sentence": "豊見城に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-10-12",
-      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: とみぐすく)",
-      "context_keywords": [
-        "事件",
-        "議論",
-        "46",
-        "Ryukyu",
-        "文中敬称略",
-        "福祉"
-      ]
-    },
-    {
-      "id": "auto_1791800797_1723",
-      "surface": "長嶋凛桜",
-      "reading": "ながしまたるさく",
-      "wrong_reading": "ながしまりんさくら",
-      "scope": "global",
-      "article_topic": "10月12日(月)開催 42ndシングル「是非に及ばず」発売記念「リアルミート＆グリート」「リアルサイン会」@幕張メッセ 長嶋凛桜欠席のお知らせ",
-      "sample_sentence": "しかし、長嶋凛桜さんは欠席するとのお知らせが公式サイトで発表されましたにゃ。",
-      "category": "person_name",
-      "registered_date": "2026-10-12",
-      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'ながしまりんさくら' ➔ 正読: 'ながしまたるさく'）"
-    },
-    {
-      "id": "auto_1791801540_4803",
-      "surface": "前川",
-      "reading": "まえがわ",
-      "wrong_reading": "まえかわ",
-      "scope": "contextual",
-      "article_topic": "阪神 前川、立石、栄枝が１軍合流",
-      "sample_sentence": "阪神 前川、立石、栄枝が1軍合流",
+      "article_topic": "国際・社会・防衛・領海",
+      "sample_sentence": "中国海警局の船が領海付近を航行しましたにゃ。",
       "category": "proper_noun",
-      "registered_date": "2026-10-12",
-      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'まえかわ' ➔ 正読: 'まえがわ'）",
-      "context_keywords": [
-        "阪神",
-        "前川",
-        "立石",
-        "栄枝",
-        "軍合流"
-      ]
+      "registered_date": "2026-10-13",
+      "note": "『海警局』が『ウミ』と警局スキップ消失する事故を防止"
+    },
+    {
+      "id": "first_ordinal",
+      "surface": "1st",
+      "reading": "ファースト",
+      "wrong_reading": "いちショオトトン",
+      "scope": "global",
+      "article_topic": "エンタメ・音楽・芸能",
+      "sample_sentence": "待望の1stアルバムがリリースされましたにゃ！",
+      "category": "english_loanword",
+      "registered_date": "2026-10-13",
+      "note": "『1st』が重量単位『1ショートトン』と誤読される事故を防止"
+    },
+    {
+      "id": "getsu_ku",
+      "surface": "月9",
+      "reading": "げつく",
+      "wrong_reading": "ツキキュウ",
+      "scope": "global",
+      "article_topic": "テレビ・エンタメ・ドラマ",
+      "sample_sentence": "話題の月9ドラマがついにスタートしましたにゃ！",
+      "category": "entertainment_tv",
+      "registered_date": "2026-10-13",
+      "note": "『月9』が『ツキキュウ』と直訳読みされる誤読を防止"
+    },
+    {
+      "id": "renkyu_nakabi",
+      "surface": "連休中日",
+      "reading": "れんきゅうなかび",
+      "wrong_reading": "れんきゅうちゅうにち",
+      "scope": "global",
+      "article_topic": "社会・生活・気象・レジャー",
+      "sample_sentence": "3連休中日の行楽地は多くの人々でにぎわいましたにゃ。",
+      "category": "polysemy_context",
+      "registered_date": "2026-10-13",
+      "note": "連休の真ん中の日『中日（なかび）』が『ちゅうにち』と誤読されるのを防止"
+    },
+    {
+      "id": "shutoko",
+      "surface": "首都高",
+      "reading": "しゅとこう",
+      "wrong_reading": "しゅとだか",
+      "scope": "global",
+      "article_topic": "社会・交通・事件・事故",
+      "sample_sentence": "首都高で事故が発生し一部区間が通行止めとなっていますにゃ。",
+      "category": "proper_noun",
+      "registered_date": "2026-10-13",
+      "note": "『首都高』が売上高等の『だか』と誤読されるのを防止"
+    },
+    {
+      "id": "kokugakuindai",
+      "surface": "国学院大",
+      "reading": "こくがくいんだい",
+      "wrong_reading": "こくがいくいんだい",
+      "scope": "global",
+      "article_topic": "スポーツ・駅伝・大学",
+      "sample_sentence": "出雲駅伝で国学院大が健闘を見せましたにゃ！",
+      "category": "proper_noun",
+      "registered_date": "2026-10-13",
+      "note": "『国学院大』が『コクガイクインダイ』と誤読されるのを防止"
+    },
+    {
+      "id": "nishispo_web",
+      "surface": "西スポWEB",
+      "reading": "にしすぽうぇぶ",
+      "wrong_reading": "にしすぽダブリューイービー",
+      "scope": "global",
+      "article_topic": "メディア・スポーツ・エンタメ",
+      "sample_sentence": "詳細は西スポWEBの記事をご覧くださいにゃ！",
+      "category": "media_proper_noun",
+      "registered_date": "2026-10-13",
+      "note": "『西スポWEB』の『WEB』が『ダブリューイービー』とスペル読みされるのを防止"
     }
   ]
 }
