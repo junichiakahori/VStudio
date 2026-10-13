@@ -180,6 +180,8 @@ def is_plausible_reading(term, yomi):
         return True
     if norm_term.upper() in ('B2', 'Ｂ２') and norm_yomi in ('びーつー', 'ビーツー'):
         return True
+    if norm_term in ('一眼', '一眼レフ', 'デジタル一眼', 'ミラーレス一眼') and norm_yomi in ('いちがん', 'いちがんれふ', 'でじたるいちがん', 'みらーれすいちがん'):
+        return True
 
     # 数字と英語/和数読み（2 -> ツー/つー, 1 -> ワン/わん, 3 -> スリー/すりー 等）
     DIGIT_READINGS = {
@@ -2016,6 +2018,9 @@ def apply_special_reading_fixes(text):
     t = re.sub(r'(?i)(?<![A-Za-z0-9])M[-ー―]?[1１](?![A-Za-z0-9])', 'エムワン', t)
     t = re.sub(r'(?i)(?<![A-Za-z0-9])R[-ー―]?[1１](?![A-Za-z0-9])', 'アールワン', t)
     t = re.sub(r'(?i)(?<![A-Za-z0-9])K[-ー―]?[1１](?![A-Za-z0-9])', 'ケイワン', t)
+
+    # 13. カメラ・光学・専門用語「一眼（いちがん）」の誤読（デジタル一眼・ミラーレス一眼等での「イチメ」）を100%防止
+    t = re.sub(r'(?<![一-龥])一眼', 'いちがん', t)
 
     return t
 

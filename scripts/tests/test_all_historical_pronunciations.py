@@ -1201,6 +1201,27 @@ TEST_CATEGORIES = [
                 "forbidden_kana_pattern": r"オオモリモトタカ",
             },
         ]
+    },
+    {
+        "category": "25. カメラ・光学用語の多音語誤読防止（一眼レフ/ミラーレス一眼 ➔ いちがん、イチメ誤読防止）",
+        "cases": [
+            {
+                "id": "digital_ichigan_ref_voicevox",
+                "desc": "「デジタル一眼レフ」が「デジタルイチガンレフ」と発音されること（イチメレフ誤読防止）",
+                "text": "初めてのデジタル一眼レフカメラとして大人気ですにゃ！",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"デジタルイチガンレフ",
+                "forbidden_kana_pattern": r"イチメレフ",
+            },
+            {
+                "id": "mirrorless_ichigan_voicevox",
+                "desc": "「ミラーレス一眼」が「ミラーレスイチガン」と発音されること（イチメ誤読防止）",
+                "text": "最新のミラーレス一眼カメラの性能を解説しますにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ミラ[ア]?レスイチガン",
+                "forbidden_kana_pattern": r"レスイチメ",
+            },
+        ]
     }
 ]
 
