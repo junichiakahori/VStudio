@@ -1222,6 +1222,35 @@ TEST_CATEGORIES = [
                 "forbidden_kana_pattern": r"レスイチメ",
             },
         ]
+    },
+    {
+        "category": "26. ネットスラング・語尾の「w」誤読防止（w/ww/www ➔ わら、ダブリュー誤読防止）",
+        "cases": [
+            {
+                "id": "sentence_ending_w_voicevox",
+                "desc": "語尾の「w」が「ワラ」と発音されること（ダブリュー誤読防止）",
+                "text": "実物に詐欺じゃないですかwと驚きの声が上がっていますにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"サギジャナイデスカ.*ワラ",
+                "forbidden_kana_pattern": r"ダブリュ[ウー]",
+            },
+            {
+                "id": "sentence_ending_www_voicevox",
+                "desc": "語尾の「www」が「ワラ」と発音されること（ダブリュー連呼防止）",
+                "text": "コメント欄では面白すぎるwwwと大盛り上がりですにゃ！",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"オモシロスギル.*ワラ",
+                "forbidden_kana_pattern": r"ダブリュ[ウー]",
+            },
+            {
+                "id": "url_and_watt_protected",
+                "desc": "URL（www.）や電力単位（100W）は「わら」にならず確実に保護されること",
+                "text": "消費電力は100Wで公式サイトはwww.example.comですにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ワット.*ダブリュ",
+                "forbidden_kana_pattern": r"ヒャクワラ",
+            },
+        ]
     }
 ]
 

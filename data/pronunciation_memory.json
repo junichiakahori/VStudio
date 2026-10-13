@@ -2527,129 +2527,16 @@
       "note": "『ミラーレス一眼』『一眼』が『イチメ』と誤読されるのを防止"
     },
     {
-      "id": "auto_1791885896_6094",
-      "surface": "鳩山元",
-      "reading": "はとやま",
-      "wrong_reading": "はとやま はじめ",
-      "scope": "contextual",
-      "article_topic": "日本の歴史的責任は無限」…韓日の元首相、韓国・沃川で平和宣言（ハンギョレ新聞）",
-      "sample_sentence": "鳩山元に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-10-13",
-      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: はとやま はじめ)",
-      "context_keywords": [
-        "ジウォン",
-        "忠清北道沃川",
-        "子孫",
-        "気持",
-        "日本",
-        "未来志向"
-      ]
-    },
-    {
-      "id": "auto_1791888232_6253",
-      "surface": "工藤新",
-      "reading": "くどう",
-      "wrong_reading": "くどお しん",
-      "scope": "contextual",
-      "article_topic": "工藤公康を知る元コーチ断言「仕えた監督でNo.1だった」中日新監督に…ソフトバンクで“日本一5回”名将の意外な素顔「だから選手起用が的中する",
-      "sample_sentence": "工藤新に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-10-13",
-      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: くどお しん)",
-      "context_keywords": [
-        "工藤",
-        "種類",
-        "Web",
-        "トレーニング",
-        "水上",
-        "スポーツ"
-      ]
-    },
-    {
-      "id": "auto_1791888436_9252",
-      "surface": "岩井明愛",
-      "reading": "いわいあきえ",
-      "wrong_reading": "いわいあきらあい",
+      "id": "slang_w",
+      "surface": "（w）",
+      "reading": "わら",
+      "wrong_reading": "ダブリュー",
       "scope": "global",
-      "article_topic": "山下美夢有は4位に浮上 桑木志帆11位、岩井明愛18位【女子世界ランキング",
-      "sample_sentence": "やましやゆめゆうは4位に浮上 桑木志帆11位、岩井明愛18位【女子世界ランキング】",
-      "category": "person_name",
+      "article_topic": "ネット・SNS・コメント・全般",
+      "sample_sentence": "実物に詐欺じゃないですかwと驚きの声が上がっていますにゃ。",
+      "category": "internet_slang",
       "registered_date": "2026-10-13",
-      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'いわいあきらあい' ➔ 正読: 'いわいあきえ'）"
-    },
-    {
-      "id": "auto_1791888466_8305",
-      "surface": "役最年長",
-      "reading": "さいねんちょう",
-      "wrong_reading": "やくさいねんちょお",
-      "scope": "global",
-      "article_topic": "西武・中村剛也&炭谷 現役続行へ",
-      "sample_sentence": "役最年長に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-10-13",
-      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: やくさいねんちょお)"
-    },
-    {
-      "id": "auto_1791889045_6020",
-      "surface": "大谷",
-      "reading": "おおや",
-      "wrong_reading": "おおたに",
-      "scope": "contextual",
-      "article_topic": "MLB】大谷翔平、自ら発した冗談が現実味　下位打線配置の可能性、復調気配見えず　ベッツ「見ていてつらい」異例調整で続く〝模索〟",
-      "sample_sentence": "大谷に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-10-13",
-      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'おおたに' ➔ 正読: 'おおや'）",
-      "context_keywords": [
-        "現実味",
-        "確実",
-        "悪化傾向",
-        "軍投手陣",
-        "努力",
-        "長打"
-      ],
-      "updated_date": "2026-10-13"
-    },
-    {
-      "id": "auto_1791891030_136",
-      "surface": "島崎",
-      "reading": "しまさき",
-      "wrong_reading": "しまざき",
-      "scope": "contextual",
-      "article_topic": "愛知小1死亡事件 母親が故意否認",
-      "sample_sentence": "島崎に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-10-13",
-      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: しまざき)",
-      "context_keywords": [
-        "主張",
-        "パンチ",
-        "起訴状",
-        "倉田凱被告",
-        "名古屋地裁",
-        "死亡"
-      ]
-    },
-    {
-      "id": "auto_1791891033_3390",
-      "surface": "倉田",
-      "reading": "くらだ",
-      "wrong_reading": "くらた",
-      "scope": "contextual",
-      "article_topic": "愛知小1死亡事件 母親が故意否認",
-      "sample_sentence": "倉田に関する最新情報です。",
-      "category": "web_auto_resolved",
-      "registered_date": "2026-10-13",
-      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: くらた)",
-      "context_keywords": [
-        "主張",
-        "パンチ",
-        "起訴状",
-        "倉田凱被告",
-        "名古屋地裁",
-        "死亡"
-      ]
+      "note": "語尾の『w』『ww』が『ダブリュー』とアルファベット読みされるのを防止"
     }
   ]
 }
