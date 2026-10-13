@@ -933,6 +933,26 @@ TEST_CATEGORIES = [
                 "expected_pattern": r"以上、とろろがお伝えしましたにゃ",
                 "forbidden_pattern": r"以上、私がお伝え",
             },
+            {
+                "id": "tororo_food_protection",
+                "desc": "食材「名物のとろろ汁ととろろ蕎麦」で「とろろ」が「私」に誤爆置換されず保護されること",
+                "text": "名物のとろろ汁ととろろ蕎麦を堪能しましたにゃ。",
+                "title": "ご当地グルメ特集",
+                "category_name": "グルメ",
+                "check_type": "speech_text",
+                "expected_pattern": r"名物のとろろ汁ととろろ蕎麦を",
+                "forbidden_pattern": r"名物の私汁|私の蕎麦|私汁",
+            },
+            {
+                "id": "tororo_person_protection",
+                "desc": "人名・芸名「とろろ先生」で「とろろ」が「私」に誤爆置換されず保護されること",
+                "text": "人気漫画家のとろろ先生が新連載を開始しましたにゃ。",
+                "title": "新作漫画スタート",
+                "category_name": "エンタメ",
+                "check_type": "speech_text",
+                "expected_pattern": r"人気漫画家のとろろ先生が",
+                "forbidden_pattern": r"人気漫画家の私先生",
+            },
         ]
     },
     {

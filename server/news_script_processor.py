@@ -1416,26 +1416,7 @@ def audit_and_heal_news_script(items, title="", article_context="", category_nam
                 disp = re.sub(r'とろろにゃ[！!。？?]*', 'ですね。', disp)
                 healed_sp = re.sub(r'とろろにゃ[！!。？?]*', 'ですね。', healed_sp)
 
-            # 自称「とろろも」「とろろは」「とろろが」「とろろとしては」「とろろ的には」の修復
-            # ※【最重要・厳守】始まりの挨拶・終わりの挨拶・名乗り（「AITuberのとろろ」「とろろがお届け」「以上、とろろでした」等）は100%完全保護！
-            is_greeting_or_intro = bool(re.search(
-                r'(?:AITuber|VTuber|キャスター|ナビゲーター|お相手|担当|以上|お届け|お伝え|お送り|ニュースを|でした|とろろです|とろろでした)',
-                disp + healed_sp
-            ))
-            if not is_greeting_or_intro and re.search(r'(?<![一-龥])とろろ(?:も|は|が|として|的)', disp + healed_sp):
-                print(f"[口調自己修復] 🩹 本文中の自称「とろろ」混入を検知・自動修復: '{disp}'", flush=True)
-                # 「とろろも」➔「私も」
-                disp = re.sub(r'(?<![一-龥])とろろも', '私も', disp)
-                healed_sp = re.sub(r'(?<![一-龥])とろろも', 'わたしも', healed_sp)
-                # 「とろろは」➔「私は」
-                disp = re.sub(r'(?<![一-龥])とろろは', '私は', disp)
-                healed_sp = re.sub(r'(?<![一-龥])とろろは', 'わたしは', healed_sp)
-                # 「とろろとしては」「とろろ的には」➔「私としては」「私的には」
-                disp = re.sub(r'(?<![一-龥])とろろ(として|的)', r'私\1', disp)
-                healed_sp = re.sub(r'(?<![一-龥])とろろ(として|的)', r'わたし\1', healed_sp)
-                # 「とろろが」➔「私が」（お届け・お伝え・お送り等を除く）
-                disp = re.sub(r'(?<![一-龥])とろろが(?!(?:お届け|お伝え|お送り|担当|ニュース))', '私が', disp)
-                healed_sp = re.sub(r'(?<![一-龥])とろろが(?!(?:お届け|お伝え|お送り|担当|ニュース))', 'わたしが', healed_sp)
+
 
         # 5. 日付・時刻の読み崩れ（例: 「22分」が「にがつにじゅうににち」等）の自己修復
         if re.search(r'\d+分', disp) and re.search(r'[にち日]', healed_sp) and not re.search(r'\d+日', disp):
@@ -2178,9 +2159,9 @@ def generate_news_item_script_data(payload, custom_dict=None):
     char_desc = payload.get('charDesc', '').strip()
     if not char_desc:
         if 'zunda' in model_id:
-            char_desc = "明るく元気な妖精キャスターです。語尾に「〜のだ」「〜なのだ」を使います（※原稿本文中で自身の名前を名乗ることは絶対に禁止です）。"
+            char_desc = "語尾に自然に「〜のだ」「〜なのだ」を使って話します（※原稿本文中で自身のお名前を名乗ることや自称することは絶対に禁止です）。"
         else:
-            char_desc = "親しみやすいバーチャルキャスターです。語尾に自然に「〜にゃ」「〜にゃ！」を使います（※原稿本文中で自身の名前「とろろ」を名乗ること・自称することは絶対に禁止です）。"
+            char_desc = "語尾に自然に「〜にゃ」「〜にゃ！」を使って話します（※原稿本文中で自身のお名前を名乗ることや自称することは絶対に禁止です）。"
     category_name = payload.get('categoryName', '').strip()
     transition = payload.get('transition', '').strip()
     article_url = (payload.get('url') or item_obj.get('link', '')).strip()

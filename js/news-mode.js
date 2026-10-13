@@ -758,8 +758,8 @@ function getNewsConfig() {
 
     const isZundaMode = (typeof currentModelId !== "undefined" ? String(currentModelId) : "").includes("zunda");
     const charDescVal = isZundaMode
-      ? "明るく元気なずんだ妖精のニュースキャスター「ずんだもん」です。語尾は「〜のだ」「〜なのだ」を使います。"
-      : "愛嬌のある白猫のニュースキャスター「とろろ」です。語尾には自然に「〜にゃ」「〜にゃ！」を使います。";
+      ? "語尾に自然に「〜のだ」「〜なのだ」を使って話します（※原稿本文中で自身のお名前を名乗ることや自称することは絶対に禁止です）。"
+      : "語尾に自然に「〜にゃ」「〜にゃ！」を使って話します（※原稿本文中で自身のお名前を名乗ることや自称することは絶対に禁止です）。";
 
     const payload = {
       title: item.title,
