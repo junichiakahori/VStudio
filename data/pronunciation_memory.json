@@ -2417,6 +2417,90 @@
       "category": "sports_proper_noun",
       "registered_date": "2026-10-13",
       "note": "『J3』が『ジェイサン』と誤読されるのを防止"
+    },
+    {
+      "id": "kaioh_sama",
+      "surface": "界王様",
+      "reading": "かいおうさま",
+      "wrong_reading": "サカイオオサマ",
+      "scope": "global",
+      "article_topic": "アニメ・エンタメ・声優",
+      "sample_sentence": "界王様役を務めた声優さんのエピソードですにゃ。",
+      "category": "entertainment_proper_noun",
+      "registered_date": "2026-10-13",
+      "note": "『界王様』が『サカイオオサマ』と訓読みされるのを防止"
+    },
+    {
+      "id": "nani_kuwanu_kao",
+      "surface": "何食わぬ顔",
+      "reading": "なにくわぬかお",
+      "wrong_reading": "ナンクワヌカオ",
+      "scope": "global",
+      "article_topic": "全般・ニュース・社会",
+      "sample_sentence": "何食わぬ顔で起動した様子が話題となりましたにゃ。",
+      "category": "polysemy_idiom",
+      "registered_date": "2026-10-13",
+      "note": "慣用句『何食わぬ顔』が『ナン食わぬ顔』と誤読されるのを防止"
+    },
+    {
+      "id": "kawashima_noel",
+      "surface": "川島如恵留",
+      "reading": "かわしまのえる",
+      "wrong_reading": "かわしまトメ",
+      "scope": "global",
+      "article_topic": "エンタメ・アイドル・芸能",
+      "sample_sentence": "Travis Japanの川島如恵留さんが出演しましたにゃ！",
+      "category": "celebrity_name",
+      "registered_date": "2026-10-13",
+      "note": "『川島如恵留』の『如恵留』が『トメ』と誤読される事故を防止"
+    },
+    {
+      "id": "kubo_shiori",
+      "surface": "久保史緒里",
+      "reading": "くぼしおり",
+      "wrong_reading": "くぼふみおさと",
+      "scope": "global",
+      "article_topic": "エンタメ・アイドル・芸能",
+      "sample_sentence": "乃木坂46の久保史緒里さんが登場しましたにゃ！",
+      "category": "celebrity_name",
+      "registered_date": "2026-10-13",
+      "note": "『久保史緒里』が『クボフミオサト』と1文字ずつ読まれるのを防止"
+    },
+    {
+      "id": "shinkawa_yua",
+      "surface": "新川優愛",
+      "reading": "しんかわゆあ",
+      "wrong_reading": "しんかわゆうあい",
+      "scope": "global",
+      "article_topic": "エンタメ・芸能・モデル",
+      "sample_sentence": "女優の新川優愛さんも絶賛の声を寄せていますにゃ！",
+      "category": "celebrity_name",
+      "registered_date": "2026-10-13",
+      "note": "『新川優愛』が『シンカワユウアイ』と誤読されるのを防止"
+    },
+    {
+      "id": "kitamura_takumi",
+      "surface": "北村匠海",
+      "reading": "きたむらたくみ",
+      "wrong_reading": "きたむらた くみ",
+      "scope": "global",
+      "article_topic": "エンタメ・芸能・映画",
+      "sample_sentence": "主演を務める北村匠海さんのインタビューですにゃ！",
+      "category": "celebrity_name",
+      "registered_date": "2026-10-13",
+      "note": "『北村匠海』が『キタムラタ クミ』と誤分割されるのを防止"
+    },
+    {
+      "id": "oomori_motoki",
+      "surface": "大森元貴",
+      "reading": "おおもりもとき",
+      "wrong_reading": "おおもりもとたか",
+      "scope": "global",
+      "article_topic": "エンタメ・音楽・バンド",
+      "sample_sentence": "Mrs. GREEN APPLEの大森元貴さんが楽曲を制作しましたにゃ！",
+      "category": "celebrity_name",
+      "registered_date": "2026-10-13",
+      "note": "『大森元貴』が『オオモリモトタカ』と誤読されるのを防止"
     }
   ]
 }

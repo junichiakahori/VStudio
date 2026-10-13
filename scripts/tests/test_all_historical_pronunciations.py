@@ -1111,6 +1111,22 @@ TEST_CATEGORIES = [
                 "expected_kana_pattern": r"コクガクインダイ",
                 "forbidden_kana_pattern": r"コクガイクインダイ",
             },
+            {
+                "id": "kaioh_sama_voicevox",
+                "desc": "「界王様」が「カイオウサマ」と発音されること（サカイオオサマ訓読み誤読防止）",
+                "text": "界王様役を務めた声優さんの追悼ニュースですにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"カイオ[オウ]サマ",
+                "forbidden_kana_pattern": r"サカイオオ",
+            },
+            {
+                "id": "nani_kuwanu_kao_voicevox",
+                "desc": "「何食わぬ顔」が「ナニクワヌカオ」と発音されること（ナンクワヌカオ誤読防止）",
+                "text": "何食わぬ顔で起動したゲーム機が反響を呼んでいますにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ナニクワヌカオ",
+                "forbidden_kana_pattern": r"ナンクワヌカオ",
+            },
         ]
     },
     {
@@ -1139,6 +1155,50 @@ TEST_CATEGORIES = [
                 "check_type": "voicevox_kana",
                 "expected_kana_pattern": r"ビ[イ]?ワン.*オオモリアガリ",
                 "forbidden_kana_pattern": r"ビ[イ]イチ",
+            },
+        ]
+    },
+    {
+        "category": "24. 人気著名人の人名読み誤読防止（川島如恵留、久保史緒里、新川優愛、北村匠海、大森元貴）",
+        "cases": [
+            {
+                "id": "kawashima_noel_voicevox",
+                "desc": "「川島如恵留」が「カワシマノエル」と発音されること（カワシマトメ誤読防止）",
+                "text": "川島如恵留さんがイベントに登壇しましたにゃ！",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"カワシマノエル",
+                "forbidden_kana_pattern": r"カワシマトメ",
+            },
+            {
+                "id": "kubo_shiori_voicevox",
+                "desc": "「久保史緒里」が「クボシオリ」と発音されること（クボフミオサト誤読防止）",
+                "text": "乃木坂46の久保史緒里さんからコメントが届きましたにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"クボシオリ",
+                "forbidden_kana_pattern": r"クボフミオサト",
+            },
+            {
+                "id": "shinkawa_yua_voicevox",
+                "desc": "「新川優愛」が「シンカワユア」と発音されること（シンカワユウアイ誤読防止）",
+                "text": "新川優愛さんも絶賛の声を寄せていますにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"シンカワユア",
+                "forbidden_kana_pattern": r"シンカワユウアイ",
+            },
+            {
+                "id": "kitamura_takumi_voicevox",
+                "desc": "「北村匠海」が「キタムラタクミ」と発音されること（キタムラタ クミ誤読防止）",
+                "text": "主演の北村匠海さんが舞台挨拶を行いましたにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"キタムラタクミ",
+            },
+            {
+                "id": "oomori_motoki_voicevox",
+                "desc": "「大森元貴」が「オオモリモトキ」と発音されること（オオモリモトタカ誤読防止）",
+                "text": "大森元貴さんが手がけた新曲が話題ですにゃ！",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"オオモリモトキ",
+                "forbidden_kana_pattern": r"オオモリモトタカ",
             },
         ]
     }
