@@ -1417,23 +1417,25 @@ def audit_and_heal_news_script(items, title="", article_context="", category_nam
                 healed_sp = re.sub(r'とろろにゃ[！!。？?]*', 'ですね。', healed_sp)
 
             # 自称「とろろも」「とろろは」「とろろが」「とろろとしては」「とろろ的には」の修復
-            if re.search(r'(?<![一-龥])とろろ(?:も|は|が|として|的)', disp + healed_sp):
-                print(f"[口調自己修復] 🩹 自称「とろろ」混入を検知・自動修復: '{disp}'", flush=True)
+            # ※【最重要・厳守】始まりの挨拶・終わりの挨拶・名乗り（「AITuberのとろろ」「とろろがお届け」「以上、とろろでした」等）は100%完全保護！
+            is_greeting_or_intro = bool(re.search(
+                r'(?:AITuber|VTuber|キャスター|ナビゲーター|お相手|担当|以上|お届け|お伝え|お送り|ニュースを|でした|とろろです|とろろでした)',
+                disp + healed_sp
+            ))
+            if not is_greeting_or_intro and re.search(r'(?<![一-龥])とろろ(?:も|は|が|として|的)', disp + healed_sp):
+                print(f"[口調自己修復] 🩹 本文中の自称「とろろ」混入を検知・自動修復: '{disp}'", flush=True)
                 # 「とろろも」➔「私も」
                 disp = re.sub(r'(?<![一-龥])とろろも', '私も', disp)
                 healed_sp = re.sub(r'(?<![一-龥])とろろも', 'わたしも', healed_sp)
                 # 「とろろは」➔「私は」
                 disp = re.sub(r'(?<![一-龥])とろろは', '私は', disp)
                 healed_sp = re.sub(r'(?<![一-龥])とろろは', 'わたしは', healed_sp)
-                # 「とろろが」➔「私が」
-                disp = re.sub(r'(?<![一-龥])とろろが', '私が', disp)
-                healed_sp = re.sub(r'(?<![一-龥])とろろが', 'わたしが', healed_sp)
                 # 「とろろとしては」「とろろ的には」➔「私としては」「私的には」
                 disp = re.sub(r'(?<![一-龥])とろろ(として|的)', r'私\1', disp)
                 healed_sp = re.sub(r'(?<![一-龥])とろろ(として|的)', r'わたし\1', healed_sp)
-                # 「とろろニュース」以外の孤立した「とろろ」自称の除去
-                disp = re.sub(r'(?<![一-龥])とろろ(?!(?:ニュース|そば|蕎麦|こんぶ|昆布|じる|汁|いも|芋|ごはん|ご飯|めし|飯|うどん|納豆))', '私', disp)
-                healed_sp = re.sub(r'(?<![一-龥])とろろ(?!(?:にゅーす|ニュース|そば|蕎麦|こんぶ|昆布|じる|汁|いも|芋|ごはん|ご飯|めし|飯|うどん|納豆))', 'わたし', healed_sp)
+                # 「とろろが」➔「私が」（お届け・お伝え・お送り等を除く）
+                disp = re.sub(r'(?<![一-龥])とろろが(?!(?:お届け|お伝え|お送り|担当|ニュース))', '私が', disp)
+                healed_sp = re.sub(r'(?<![一-龥])とろろが(?!(?:お届け|お伝え|お送り|担当|ニュース))', 'わたしが', healed_sp)
 
         # 5. 日付・時刻の読み崩れ（例: 「22分」が「にがつにじゅうににち」等）の自己修復
         if re.search(r'\d+分', disp) and re.search(r'[にち日]', healed_sp) and not re.search(r'\d+日', disp):

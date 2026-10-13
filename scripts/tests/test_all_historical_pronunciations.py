@@ -913,6 +913,26 @@ TEST_CATEGORIES = [
                 "expected_pattern": r"白鳥さんと熊谷さんが",
                 "forbidden_pattern": r"白鳥と熊谷が|白鳥と熊谷さんが",
             },
+            {
+                "id": "tororo_greeting_protection",
+                "desc": "始まりの挨拶「AITuberのとろろがニュースをお届けします」で「とろろ」が「私」に置換されず保護されること",
+                "text": "AITuberのとろろがニュースをお届けします。",
+                "title": "ニュース番組開始",
+                "category_name": "一般",
+                "check_type": "speech_text",
+                "expected_pattern": r"(?:AITuber|アイチューバー)のとろろがニュースをお届けします",
+                "forbidden_pattern": r"私のニュース|私がニュース",
+            },
+            {
+                "id": "tororo_outro_protection",
+                "desc": "終わりの挨拶「以上、とろろがお伝えしましたにゃ」で「とろろ」が「私」に置換されず保護されること",
+                "text": "以上、とろろがお伝えしましたにゃ。",
+                "title": "ニュース番組終了",
+                "category_name": "一般",
+                "check_type": "speech_text",
+                "expected_pattern": r"以上、とろろがお伝えしましたにゃ",
+                "forbidden_pattern": r"以上、私がお伝え",
+            },
         ]
     },
     {
@@ -1065,6 +1085,14 @@ TEST_CATEGORIES = [
                 "check_type": "voicevox_kana",
                 "expected_kana_pattern": r"ウィナ[ア]?.*ポップ",
                 "forbidden_kana_pattern": r"ダブリュ[ウー]アイ|ピ[イ]オ[オ]ピ[イ]",
+            },
+            {
+                "id": "gizmodo_voicevox",
+                "desc": "「Gizmodo」が「ギズモード」と発音されること（ギズモド誤読防止）",
+                "text": "Gizmodo Japanの記事で最新ガジェットが紹介されましたにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ギズモ[オウ]ド",
+                "forbidden_kana_pattern": r"ギズモド",
             },
         ]
     },
@@ -1309,13 +1337,13 @@ def run_all_historical_regression_tests():
             vv_raw_kana = ""
             vv_clean_kana = ""
             if check_type in ("voicevox_kana", "both", "voicevox_full_heal"):
-                _, vv_raw_kana = get_voicevox_reading_and_kana(speech_text)
-                vv_clean_kana = clean_voicevox_kana(vv_raw_kana)
-                if not vv_clean_kana:
-                    import time
-                    time.sleep(0.5)
+                import time
+                for retry_i in range(3):
                     _, vv_raw_kana = get_voicevox_reading_and_kana(speech_text)
                     vv_clean_kana = clean_voicevox_kana(vv_raw_kana)
+                    if vv_clean_kana:
+                        break
+                    time.sleep(0.5 * (retry_i + 1))
 
             is_ok = True
             err_msg = ""

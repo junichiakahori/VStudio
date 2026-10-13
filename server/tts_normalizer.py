@@ -184,6 +184,8 @@ def is_plausible_reading(term, yomi):
         return True
     if re.search(r'^[wWｗＷ]+$', norm_term) and norm_yomi in ('わら', 'ワラ', 'わらー', '、わら'):
         return True
+    if norm_term.upper() in ('GIZMODO', 'ギズモード') and norm_yomi in ('ぎずもーど', 'ギズモード', 'ぎずもど'):
+        return True
 
     # 数字と英語/和数読み（2 -> ツー/つー, 1 -> ワン/わん, 3 -> スリー/すりー 等）
     DIGIT_READINGS = {
@@ -2027,6 +2029,9 @@ def apply_special_reading_fixes(text):
     # 14. ネットスラング・SNS表現の語尾「w」「ww」（「ダブリュー」誤読）を「わら」へ正規化（URLや英単語を完全保護）
     t = re.sub(r'[（\(][\s　]*[wWｗＷ]{1,}[\s　]*[）\)]', '、わら', t)
     t = re.sub(r'(?<=[ぁ-んァ-ヶー一-龥！!？?）\)』」])[wWｗＷ]{1,}(?![A-Za-z0-9_./])', '、わら', t)
+
+    # 15. メディア名・テクノロジーブランド「Gizmodo（ギズモード）」の長音誤読（ギズモド）防止
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])Gizmodo(?![A-Za-z0-9])', 'ギズモード', t)
 
     return t
 

@@ -2537,6 +2537,18 @@
       "category": "internet_slang",
       "registered_date": "2026-10-13",
       "note": "語尾の『w』『ww』が『ダブリュー』とアルファベット読みされるのを防止"
+    },
+    {
+      "id": "gizmodo_media",
+      "surface": "Gizmodo",
+      "reading": "ギズモード",
+      "wrong_reading": "ギズモド",
+      "scope": "global",
+      "article_topic": "テクノロジー・ガジェット・メディア",
+      "sample_sentence": "Gizmodo Japanの記事によると最新ガジェットが発表されたにゃ。",
+      "category": "media_proper_noun",
+      "registered_date": "2026-10-13",
+      "note": "テクノロジーメディア『Gizmodo』が『ギズモド』と誤読されるのを防止"
     }
   ]
 }
