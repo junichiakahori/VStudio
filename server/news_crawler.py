@@ -403,12 +403,14 @@ def fetch_article_body(url):
         extracted_paragraphs = []
         for p in p_tags:
             text = re.sub(r'<[^>]+>', '', p).strip()
-            # UI境界キーワードやレコメンド・一覧ブロックが現れたらそれ以降の段落はすべて本文外とみなして即時打ち切り
+            # UI境界キーワードやレコメンド・一覧ブロック・有料会員壁が現れたらそれ以降の段落はすべて本文外とみなして即時打ち切り
             UI_BREAK_WORDS = [
                 "不適切な結果を報告", "みんなの意見", "意識調査", "アクセスランキング", "ランキング",
                 "注目のニュース", "おすすめ記事", "おすすめニュース", "関連記事", "最新のニュース",
                 "トピックス一覧", "もっと見る", "続きを読む", "【ストリーミング】", "【ランキング】",
-                "【オリコン】", "【写真多数】", "ランキング一覧", "オリコンランキング"
+                "【オリコン】", "【写真多数】", "ランキング一覧", "オリコンランキング",
+                "残り：約", "残り約", "全文：", "有料会員限定", "会員限定記事", "有料記事",
+                "会員登録して続きを読む", "ログインして続きを読む", "この記事は会員限定です", "無料会員は月"
             ]
             if any(kw in text for kw in UI_BREAK_WORDS):
                 break
@@ -437,8 +439,18 @@ def fetch_article_body(url):
                 body = re.sub(pat, '', body, flags=re.DOTALL)
             body = body.strip()
 
+        # 有料記事（Paywall）検知：本文に有料会員限定ワードや極端な残文字数表示が残っている場合、不完全なゴミとして破棄
+        PAYWALL_INDICATORS = [
+            r'残り[：:]約?\s*\d+文字', r'全文[：:]\s*\d+文字', r'この記事は(?:有料)?会員限定です',
+            r'有料会員限定記事', r'無料会員は月\d+本まで', r'会員登録して続きを読む', r'ログインして続きを読む'
+        ]
+        is_paywall = any(re.search(pat, body) for pat in PAYWALL_INDICATORS)
+        if is_paywall or (len(body) < 80 and any(re.search(pat, html_text) for pat in PAYWALL_INDICATORS)):
+            print(f"[有料記事検知] 🔒 有料会員限定記事（Paywall）のため本文スクレイピングをスキップ: {url[:40]}...")
+            body = ""
+
         # 本文が短すぎる（120文字未満など）または空の場合、meta_descが充実していれば統合または代替
-        if meta_desc and len(meta_desc) >= 30:
+        if meta_desc and len(meta_desc) >= 30 and not any(re.search(pat, meta_desc) for pat in PAYWALL_INDICATORS):
             if not body or len(body) < len(meta_desc):
                 body = meta_desc
             elif meta_desc not in body and len(body) < 150:
@@ -472,6 +484,7 @@ INVALID_DATA_TITLE_PATTERNS = [
     re.compile(r'値上がり率ランキング|値下がり率ランキング', re.IGNORECASE),
     re.compile(r'出来高上位|信用取引残高', re.IGNORECASE),
     re.compile(r'写真まとめ|写真多数|写真特集|フォトギャラリー|写真ニュース|グラビア', re.IGNORECASE),
+    re.compile(r'有料会員限定|会員限定記事|有料記事|【会員限定】|【有料】', re.IGNORECASE),
 ]
 
 def check_and_filter_scrapeable_news(items):

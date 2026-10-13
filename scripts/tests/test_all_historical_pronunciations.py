@@ -26,7 +26,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(CURRENT_DIR))
 sys.path.insert(0, BASE_DIR)
 
 from server.tts_normalizer import normalize_for_tts
-from server.news_script_processor import audit_and_heal_news_script, audit_and_heal_via_voicevox_full_reading
+from server.news_script_processor import audit_and_heal_news_script, audit_and_heal_via_voicevox_full_reading, validate_news_script_quality
 from server.voicevox_client import get_voicevox_reading_and_kana
 
 
@@ -1315,6 +1315,29 @@ TEST_CATEGORIES = [
                 "forbidden_kana_pattern": r"ヒャクワラ",
             },
         ]
+    },
+    {
+        "category": "27. LLMトークン暴走・破損文片（-Rayu・反復ループ）および有料記事の完全撃墜",
+        "cases": [
+            {
+                "id": "rayu_token_hallucination_rejected",
+                "desc": "「-Rayuにゃ」「-Rayu-Rayuにゃ」等の破損英字トークン文片が品質バリデーションで確実に撃墜（False）されること",
+                "text": "高市首相はしっかりと考えさせていただくと述べたそうです。\n-Rayuにゃ。\n-Rayu-Rayuにゃ。\n-Rayu-Rayu-Rayuにゃ。",
+                "title": "農相続投問題",
+                "article_context": "農相の進退について語った。",
+                "check_type": "quality_validation",
+                "expected_valid": False,
+            },
+            {
+                "id": "paywall_clean_fallback_accepted",
+                "desc": "正常な要約台本が品質バリデーションで正常合格（True）すること",
+                "text": "高市首相は、農相の簗さんが続投を表明したことを受けて、しっかりと考えさせていただくと述べたそうですにゃ。\n事実であるとしたら本当に不適切だと指摘しましたにゃ。\n現時点で国会や国民に迷惑をかけない形で、まずは自らの口で説明責任を果たすよう求めたにゃ。\n今後の政権運営や国会審議への影響が注目されますにゃ。",
+                "title": "農相続投「しっかりと考えさせていただく」と高市首相",
+                "article_context": "簗和生農相の予算削減発言を巡り、高市早苗首相は13日の衆院予算委員会で述べた。",
+                "check_type": "quality_validation",
+                "expected_valid": True,
+            },
+        ]
     }
 ]
 
@@ -1348,6 +1371,23 @@ def run_all_historical_regression_tests():
             known_terms = case.get("known_terms", None)
 
             # ── 本番完全パイプライン実行 ──
+            if check_type == "quality_validation":
+                exp_valid = case.get("expected_valid", True)
+                case_title = case.get("title", raw_text)
+                case_article = case.get("article_context", raw_text)
+                val_res, val_reason = validate_news_script_quality(raw_text, title=case_title, article_context=case_article, char_desc="にゃ")
+                is_ok = (val_res == exp_valid)
+                err_msg = "" if is_ok else f"品質バリデーション期待値 ({exp_valid}) と結果 ({val_res}) が不一致: 判定理由='{val_reason}'"
+                if is_ok:
+                    passed_total += 1
+                    print(f"  ✅ PASS: [{c_id}] {desc}")
+                else:
+                    failed_total += 1
+                    print(f"  ❌ FAIL: [{c_id}] {desc}")
+                    print(f"     理由: {err_msg}")
+                    failures.append((c_id, desc, err_msg))
+                continue
+
             # Step 1: normalize_for_tts（略語・グループ名・英字等）
             norm_text = case.get("speech_input") or normalize_for_tts(raw_text)
 
@@ -1433,6 +1473,13 @@ def run_all_historical_regression_tests():
                 elif forb_f_pat and re.search(forb_f_pat, target_check):
                     is_ok = False
                     err_msg = f"禁止パターン '{forb_f_pat}' が修復結果 ('{target_check}') に含まれています"
+
+            if check_type == "quality_validation":
+                exp_valid = case.get("expected_valid", True)
+                val_res, val_reason = validate_news_script_quality(raw_text, title=case_title, article_context=case_article, char_desc="にゃ")
+                if val_res != exp_valid:
+                    is_ok = False
+                    err_msg = f"品質バリデーション期待値 ({exp_valid}) と結果 ({val_res}) が不一致: 判定理由='{val_reason}'"
 
             if is_ok:
                 passed_total += 1

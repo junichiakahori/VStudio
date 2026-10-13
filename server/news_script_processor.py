@@ -1932,6 +1932,30 @@ def validate_news_script_quality(raw_text, title="", article_context="", char_de
     if re.search(r'(?:[a-zA-Z]{2,}\s+){4,}[a-zA-Z]{2,}', check_text):
         return False, "長文の英文フレーズが混入しています"
 
+    # 1-2. 意味不明な英字トークン・記号・ハルシネーション文片（例: 『-Rayuにゃ』『-Rayu-Rayuにゃ』）の検知
+    for s in split_sentences_check:
+        s_clean = s.strip()
+        # 先頭ハイフンや記号＋英単語（例: -Rayu, -Rayu-Rayu, --token 等）
+        if re.search(r'^[\s　\-_*#・]*-[A-Za-z]', s_clean):
+            return False, f"ハイフンで始まる意味不明な英字トークン・箇条書き崩れ文片が検知されました: '{s_clean}'"
+        # 実質的な日本語（漢字・ひらがな・カタカナ）が極端に少なく、英字トークンと語尾しかない文片
+        core_jp = re.sub(r'[\s　\-_*#・0-9A-Za-z]+', '', s_clean)
+        core_jp = re.sub(r'(?:にゃ|のだ|なのだ|です|ます|でした|ました|ね|よ|！|？|。|、)+$', '', core_jp)
+        if len(core_jp) < 2 and re.search(r'[A-Za-z]', s_clean):
+            return False, f"意味不明な英字・トークン暴走の文片が検知されました: '{s_clean}'"
+
+    # 1-3. 同一の英数字トークン・パターンの反復ループ暴走（Repetition Loop）検知（例: Rayu-Rayu, abc abc abc 等）
+    if re.search(r'([A-Za-z0-9_\-]{3,})(?:[\s\-_/]+\1){1,}', raw_text):
+        return False, "同一の英数字トークンが反復ループ暴走しています"
+
+    # 1-4. 短い文末・語尾フレーズの3連続以上反復ループ検知
+    if len(split_sentences_check) >= 3:
+        short_tails = [re.sub(r'[。！？\s　]', '', s)[-10:] for s in split_sentences_check if len(s.strip()) < 20]
+        if len(short_tails) >= 3:
+            for i in range(len(short_tails) - 2):
+                if short_tails[i] == short_tails[i+1] == short_tails[i+2]:
+                    return False, f"短い文末フレーズが反復ループ暴走しています: '{short_tails[i]}'"
+
     # 2. 中国語・簡体字チェック
     for l in split_sentences_check:
         if is_chinese_sentence(l):
