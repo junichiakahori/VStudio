@@ -1112,6 +1112,35 @@ TEST_CATEGORIES = [
                 "forbidden_kana_pattern": r"コクガイクインダイ",
             },
         ]
+    },
+    {
+        "category": "23. スポーツ・リーグカテゴリの英語数詞誤読防止（J1/J2/J3, B1/B2, M-1）",
+        "cases": [
+            {
+                "id": "j1_category_voicevox",
+                "desc": "「J1」が「ジェイワン」と発音されること（ジェイイチ誤読防止）",
+                "text": "J1昇格をかけた大一番が始まりますにゃ！",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ジェイワン",
+                "forbidden_kana_pattern": r"ジェイイチ",
+            },
+            {
+                "id": "j2_j3_category_voicevox",
+                "desc": "「J2」「J3」が「ジェイツー」「ジェイスリー」と発音されること",
+                "text": "J2とJ3の最新順位をお知らせしますにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ジェイツ[ウー]トジェイスリ[イー]",
+                "forbidden_kana_pattern": r"ジェイニ|ジェイサン",
+            },
+            {
+                "id": "b1_category_voicevox",
+                "desc": "「B1」が「ビーワン」と発音されること（ビイイチ誤読防止）",
+                "text": "B1リーグの開幕戦は大盛り上がりとなりましたにゃ！",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ビ[イ]?ワン.*オオモリアガリ",
+                "forbidden_kana_pattern": r"ビ[イ]イチ",
+            },
+        ]
     }
 ]
 

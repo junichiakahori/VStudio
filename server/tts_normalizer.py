@@ -170,6 +170,16 @@ def is_plausible_reading(term, yomi):
         return True
     if norm_term in ('月9', '月９') and norm_yomi in ('げつく', 'げつくー', 'げつクー'):
         return True
+    if norm_term.upper() in ('J1', 'Ｊ１') and norm_yomi in ('じぇいわん', 'ジェイワン'):
+        return True
+    if norm_term.upper() in ('J2', 'Ｊ２') and norm_yomi in ('じぇいつー', 'ジェイツー'):
+        return True
+    if norm_term.upper() in ('J3', 'Ｊ３') and norm_yomi in ('じぇいすりー', 'ジェイスリー'):
+        return True
+    if norm_term.upper() in ('B1', 'Ｂ１') and norm_yomi in ('びーわん', 'ビーワン'):
+        return True
+    if norm_term.upper() in ('B2', 'Ｂ２') and norm_yomi in ('びーつー', 'ビーツー'):
+        return True
 
     # 数字と英語/和数読み（2 -> ツー/つー, 1 -> ワン/わん, 3 -> スリー/すりー 等）
     DIGIT_READINGS = {
@@ -1995,6 +2005,17 @@ def apply_special_reading_fixes(text):
     t = re.sub(r'[国國]学院大(?=学)?', 'こくがくいんだい', t)
     t = re.sub(r'界王(?=様|星|拳|役|神)', 'かいおう', t)
     t = re.sub(r'何食わぬ顔', 'なにくわぬかお', t)
+
+    # 12. スポーツ・格闘技・リーグカテゴリ（J1/J2/J3, B1/B2/B3, M-1, R-1, K-1等）の英語数詞正規化（「J1 ➔ ジェイイチ」防止）
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])J[1１](?![A-Za-z0-9])', 'ジェイワン', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])J[2２](?![A-Za-z0-9])', 'ジェイツー', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])J[3３](?![A-Za-z0-9])', 'ジェイスリー', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])B[1１](?![A-Za-z0-9])', 'ビーワン', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])B[2２](?![A-Za-z0-9])', 'ビーツー', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])B[3３](?![A-Za-z0-9])', 'ビースリー', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])M[-ー―]?[1１](?![A-Za-z0-9])', 'エムワン', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])R[-ー―]?[1１](?![A-Za-z0-9])', 'アールワン', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])K[-ー―]?[1１](?![A-Za-z0-9])', 'ケイワン', t)
 
     return t
 

@@ -2381,6 +2381,42 @@
       "category": "media_proper_noun",
       "registered_date": "2026-10-13",
       "note": "『西スポWEB』の『WEB』が『ダブリューイービー』とスペル読みされるのを防止"
+    },
+    {
+      "id": "j1_category",
+      "surface": "J1",
+      "reading": "ジェイワン",
+      "wrong_reading": "ジェイイチ",
+      "scope": "global",
+      "article_topic": "スポーツ・サッカー・Jリーグ",
+      "sample_sentence": "J1昇格を果たしたチームの活躍に期待ですにゃ！",
+      "category": "sports_proper_noun",
+      "registered_date": "2026-10-13",
+      "note": "『J1』が『ジェイイチ』と誤読されるのを防止"
+    },
+    {
+      "id": "j2_category",
+      "surface": "J2",
+      "reading": "ジェイツー",
+      "wrong_reading": "ジェイニ",
+      "scope": "global",
+      "article_topic": "スポーツ・サッカー・Jリーグ",
+      "sample_sentence": "J2リーグの熱い戦いが続いていますにゃ！",
+      "category": "sports_proper_noun",
+      "registered_date": "2026-10-13",
+      "note": "『J2』が『ジェイニ』と誤読されるのを防止"
+    },
+    {
+      "id": "j3_category",
+      "surface": "J3",
+      "reading": "ジェイスリー",
+      "wrong_reading": "ジェイサン",
+      "scope": "global",
+      "article_topic": "スポーツ・サッカー・Jリーグ",
+      "sample_sentence": "J3の試合結果をお伝えしますにゃ！",
+      "category": "sports_proper_noun",
+      "registered_date": "2026-10-13",
+      "note": "『J3』が『ジェイサン』と誤読されるのを防止"
     }
   ]
 }
