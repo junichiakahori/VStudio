@@ -1094,6 +1094,22 @@ TEST_CATEGORIES = [
                 "expected_kana_pattern": r"ギズモ[オウ]ド",
                 "forbidden_kana_pattern": r"ギズモド",
             },
+            {
+                "id": "j_reit_voicevox",
+                "desc": "「J-REIT」が「ジェイリート」と発音されること（ジェイライト誤読防止）",
+                "text": "J-REIT市場で買い推奨が強まっていますにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ジェイリ[イエ]?ト",
+                "forbidden_kana_pattern": r"ジェイライト",
+            },
+            {
+                "id": "reit_market_voicevox",
+                "desc": "「Reit」が「リート」と発音されること（ライト誤読防止）",
+                "text": "国内外のReit市場の動向を解説しますにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"リ[イエ]?トシジョ[オウ]",
+                "forbidden_kana_pattern": r"ライトシジョ[オウ]",
+            },
         ]
     },
     {

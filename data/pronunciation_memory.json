@@ -2549,6 +2549,30 @@
       "category": "media_proper_noun",
       "registered_date": "2026-10-13",
       "note": "テクノロジーメディア『Gizmodo』が『ギズモド』と誤読されるのを防止"
+    },
+    {
+      "id": "j_reit_fund",
+      "surface": "J-REIT",
+      "reading": "ジェイリート",
+      "wrong_reading": "ジェイライト",
+      "scope": "global",
+      "article_topic": "ビジネス・経済・金融・投資",
+      "sample_sentence": "J-REIT市場で買い推奨が強まっていますにゃ。",
+      "category": "finance_proper_noun",
+      "registered_date": "2026-10-13",
+      "note": "不動産投資信託『J-REIT』が『ジェイライト』と誤読されるのを防止"
+    },
+    {
+      "id": "reit_fund",
+      "surface": "REIT",
+      "reading": "リート",
+      "wrong_reading": "ライト",
+      "scope": "global",
+      "article_topic": "ビジネス・経済・金融・投資",
+      "sample_sentence": "国内外のREIT市場の動向を解説しますにゃ。",
+      "category": "finance_proper_noun",
+      "registered_date": "2026-10-13",
+      "note": "不動産投資信託『REIT』が『ライト』と誤読されるのを防止"
     }
   ]
 }

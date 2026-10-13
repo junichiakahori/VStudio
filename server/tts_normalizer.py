@@ -186,6 +186,10 @@ def is_plausible_reading(term, yomi):
         return True
     if norm_term.upper() in ('GIZMODO', 'ギズモード') and norm_yomi in ('ぎずもーど', 'ギズモード', 'ぎずもど'):
         return True
+    if norm_term.upper() in ('J-REIT', 'JREIT', 'Jリート') and norm_yomi in ('じぇいりーと', 'ジェイリート', 'じぇいりいと'):
+        return True
+    if norm_term.upper() in ('REIT', 'リート') and norm_yomi in ('りーと', 'リート', 'りいと'):
+        return True
 
     # 数字と英語/和数読み（2 -> ツー/つー, 1 -> ワン/わん, 3 -> スリー/すりー 等）
     DIGIT_READINGS = {
@@ -2032,6 +2036,10 @@ def apply_special_reading_fixes(text):
 
     # 15. メディア名・テクノロジーブランド「Gizmodo（ギズモード）」の長音誤読（ギズモド）防止
     t = re.sub(r'(?i)(?<![A-Za-z0-9])Gizmodo(?![A-Za-z0-9])', 'ギズモード', t)
+
+    # 16. 金融・不動産投資信託用語「J-REIT」「REIT」の誤読（ジェイライト、ライト）を100%防止
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])J[-ー―]?REIT(?![A-Za-z0-9])', 'ジェイリート', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])REIT(?![A-Za-z0-9])', 'リート', t)
 
     return t
 
