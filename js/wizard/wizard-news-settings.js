@@ -62,7 +62,7 @@
       startHidden.value = sDate.value ? `${sDate.value}T${sHour.value || "00"}:00` : "";
     }
     if (endHidden && eDate && eHour) {
-      endHidden.value = eDate.value ? `${eDate.value}T${eHour.value || "23"}:59` : "";
+      endHidden.value = eDate.value ? `${eDate.value}T${eHour.value || "23"}:00` : "";
     }
   };
 
@@ -72,6 +72,7 @@
     if (!hidden) return;
     let current = hidden.value ? new Date(hidden.value) : new Date();
     if (isNaN(current.getTime())) current = new Date();
+    current.setMinutes(0, 0, 0);
     current.setTime(current.getTime() + hoursDiff * 60 * 60 * 1000);
     hidden.value = formatDT(current);
     syncWizardInputsFromHidden();
@@ -80,13 +81,16 @@
   window.setWizardNow = function() {
     const endHidden = document.getElementById("wizard-news-date-end");
     if (endHidden) {
-      endHidden.value = formatDT(new Date());
+      const nowOnHour = new Date();
+      nowOnHour.setMinutes(0, 0, 0);
+      endHidden.value = formatDT(nowOnHour);
       syncWizardInputsFromHidden();
     }
   };
 
   const applyWizardQuickRange = (rangeKey = "12h") => {
     const now = new Date();
+    now.setMinutes(0, 0, 0);
     const btn6 = document.getElementById("btn-quick-6h");
     const btn12 = document.getElementById("btn-quick-12h");
     const btn24 = document.getElementById("btn-quick-24h");
