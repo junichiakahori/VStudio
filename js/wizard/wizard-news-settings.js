@@ -18,13 +18,13 @@
     if (sHour && sHour.options.length === 0) {
       for (let i = 0; i < 24; i++) {
         const val = String(i).padStart(2, "0");
-        sHour.innerHTML += `<option value="${val}">${val}時</option>`;
+        sHour.innerHTML += `<option value="${val}">${val}:00</option>`;
       }
     }
     if (eHour && eHour.options.length === 0) {
       for (let i = 0; i < 24; i++) {
         const val = String(i).padStart(2, "0");
-        eHour.innerHTML += `<option value="${val}">${val}時</option>`;
+        eHour.innerHTML += `<option value="${val}">${val}:00</option>`;
       }
     }
   };
