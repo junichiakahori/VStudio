@@ -178,6 +178,8 @@ def is_plausible_reading(term, yomi):
         return True
     if norm_term.upper() in ('B1', 'Ｂ１') and norm_yomi in ('びーわん', 'ビーワン'):
         return True
+    if norm_term == '肩甲骨' and norm_yomi in ('けんこうこつ', 'ケンコウコツ', 'けんこーこつ'):
+        return True
     if norm_term.upper() in ('B2', 'Ｂ２') and norm_yomi in ('びーつー', 'ビーツー'):
         return True
     if norm_term in ('一眼', '一眼レフ', 'デジタル一眼', 'ミラーレス一眼') and norm_yomi in ('いちがん', 'いちがんれふ', 'でじたるいちがん', 'みらーれすいちがん'):
@@ -1979,7 +1981,8 @@ def apply_special_reading_fixes(text):
     t = re.sub(r'(?<![一-龥])勝った', 'かった', t)
 
     # 5. 「おお雨」の中途半端な漢字仮名交じり表記を「大雨」に修復し「オオウ」誤読を完全防止
-    t = re.sub(r'おお雨', '大雨', t)
+    # 6. 解剖学・身体部位の誤読防止（「肩甲骨 ➔ カタカブトコツ」誤読を永久防止）
+    t = re.sub(r'(?<![一-龥])肩甲骨', 'けんこうこつ', t)
 
 
     # 7. 「一目」の多音語文脈修復（「一目瞭然」「一目置く」「一目散」等を保護しつつ、「一目で」「一目見て」等の「ひとめ」誤読を完全防止）

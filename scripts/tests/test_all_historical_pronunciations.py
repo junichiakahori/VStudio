@@ -1338,6 +1338,27 @@ TEST_CATEGORIES = [
                 "expected_valid": True,
             },
         ]
+    },
+    {
+        "category": "28. 解剖学・身体部位の誤読防止（肩甲骨 ➔ けんこうこつ、カタカブトコツ誤読防止）",
+        "cases": [
+            {
+                "id": "kenkoukotsu_voicevox",
+                "desc": "「肩甲骨」がVOICEVOXで「ケンコオコツ」と発音されること（カタカブトコツ誤読防止）",
+                "text": "肩甲骨をほぐすストレッチが効果的ですにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "ケンコオコツ",
+                "forbidden_kana": ["カタカブトコツ"],
+            },
+            {
+                "id": "kenkoukotsu_hagashi_voicevox",
+                "desc": "複合表現「肩甲骨はがし」でも「ケンコオコツ」と発音されること",
+                "text": "最近話題の肩甲骨はがしを体験してみたにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "ケンコオコツ",
+                "forbidden_kana": ["カタカブトコツ"],
+            },
+        ]
     }
 ]
 

@@ -2575,24 +2575,16 @@
       "note": "不動産投資信託『REIT』が『ライト』と誤読されるのを防止"
     },
     {
-      "id": "auto_1791928275_7888",
-      "surface": "大渕",
-      "reading": "おおぶち",
-      "wrong_reading": "おおふち",
-      "scope": "contextual",
-      "article_topic": "スカウト会議 動向を注視する１位候補・織田と１４日に面談 大渕スカウト部長「担当スカウトも推していました",
-      "sample_sentence": "大渕スカウト部長はおださんについて将来、メジャーに行くかもしれないけど、日本で頑張ってほしいなと思うと高い評価を示してい",
-      "category": "proper_noun",
-      "registered_date": "2026-10-14",
-      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'おおふち' ➔ 正読: 'おおぶち'）",
-      "context_keywords": [
-        "スカウト",
-        "会議",
-        "動向",
-        "注視",
-        "位候補",
-        "織田"
-      ]
+      "id": "kenkoukotsu_shoulder_blade",
+      "surface": "肩甲骨",
+      "reading": "けんこうこつ",
+      "wrong_reading": "かたかぶとこつ",
+      "scope": "global",
+      "article_topic": "健康・医療・フィットネス・解剖学",
+      "sample_sentence": "肩甲骨をほぐすストレッチが肩こり解消に効果的ですにゃ。",
+      "category": "anatomy_body_part",
+      "registered_date": "2026-10-15",
+      "note": "解剖学用語『肩甲骨』が『かたかぶとこつ』と訓読み誤読されるのを防止し『けんこうこつ』と正しく発音させる"
     }
   ]
 }
