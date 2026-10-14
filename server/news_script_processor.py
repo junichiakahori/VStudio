@@ -138,7 +138,7 @@ def build_news_prompt(char_desc, title, full_article_content):
                     )
         except Exception as e:
             print(f"[prompts.json 読み込みエラー]: {e}")
-    return f"あなたは人気配信者である{char_desc}\n【タイトル】: {title}\n【内容】: {full_article_content}"
+    return f"あなたはニュース解説キャスターです。\n【タイトル】: {title}\n【内容】: {full_article_content}"
 
 def call_gemini_backend(prompt, api_key, model="gemini-1.5-flash"):
     target_model = model or "gemini-1.5-flash"
