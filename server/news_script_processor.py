@@ -1288,29 +1288,42 @@ def extract_primary_person(items, title="", article_context=""):
 def heal_ambiguous_pronouns(text, primary_person=None):
     """
     性別誤認の重大な放送事故・ハルシネーションを防ぐため、
-    「彼」「彼女」などの曖昧な三人称代名詞を、実名＋敬称（または性別中立な安全表現）へ自己修復。
+    「彼」「彼女」「彼ら」「彼女たち」などの曖昧な三人称代名詞を、実名＋敬称（または自然な主語省略・関係者表現）へ自己修復。
+    ※「ご本人」「ご本人たち」等の不自然・不適切な表現は絶対に使用しない。
     例: 「彼の目は」➔ 「武豊騎手の目は」（primary_personがある場合）
-        「彼女は」➔ 「優香さんは」（primary_personがある場合）
-        「彼は」➔ 「ご本人は」（primary_personがない場合）
+        「彼らは、AIの技術が…」➔ 「AIの技術が…」（primary_personがない場合：主語省略で極めて自然な日本語に）
+        「彼らの主張は」➔ 「その主張は」（primary_personがない場合）
     """
     if not text:
         return ""
     t = text
-    # 直後が助詞（は、が、の、に、も、を、と、へ、から、より）または「たち」「ら」である「彼」「彼女」のみを置換
-    # （※彼岸花、彼方、彼我などは完全に除外・保護）
-    pattern = r'(?:彼女たち|彼ら|彼女|彼)(?=[はがのにもをとへ]|から|より)'
-    if not re.search(pattern, t):
+
+    # 1. もし primary_person がある場合：実名＋敬称（＋たち/ら）へ正確に置換
+    if primary_person:
+        def _repl_person(m):
+            pronoun = m.group(0)
+            if "たち" in pronoun or "ら" in pronoun:
+                return f"{primary_person}たち"
+            return primary_person
+        t = re.sub(r'(?:彼女たち|彼ら|彼女|彼)(?=[はがのにもをとへ]|から|より)', _repl_person, t)
         return t
 
-    replacement = primary_person if primary_person else "ご本人"
+    # 2. primary_person が特定できない場合：
+    # パターンA: 文頭または読点直後の「彼らは」「彼女たちは」「彼は」「彼女は」は主語ごと完全消去（自然な主語省略）
+    # 例: 「彼らは、AIの技術が…」➔ 「AIの技術が…」
+    t = re.sub(r'(?:^|(?<=[。！？\s「（]))(?:彼女たち|彼ら|彼女|彼)は[、,\s　]*', '', t)
 
-    def _repl(m):
-        pronoun = m.group(0)
-        if "たち" in pronoun or "ら" in pronoun:
-            return f"{replacement}たち"
-        return replacement
+    # パターンB: 「彼らの」「彼女たちの」「彼の」「彼女の」➔ 「その」
+    t = re.sub(r'(?:彼女たち|彼ら|彼女|彼)の', 'その', t)
 
-    t = re.sub(pattern, _repl, t)
+    # パターンC: 文中で残る「彼らは」「彼らが」「彼らも」➔ 「関係者らは」「関係者らが」「関係者らも」
+    t = re.sub(r'(?:彼女たち|彼ら)(?=[はがも])', '関係者ら', t)
+    t = re.sub(r'(?:彼女|彼)(?=[はがも])', '当事者', t)
+
+    # パターンD: それ以外の格助詞（に、と、を、へ、で、から、より）
+    t = re.sub(r'(?:彼女たち|彼ら)(?=[にとをへで]|から|より)', '関係者ら', t)
+    t = re.sub(r'(?:彼女|彼)(?=[にとをへで]|から|より)', '関係者', t)
+
     return t
 
 
@@ -1426,6 +1439,14 @@ def audit_and_heal_news_script(items, title="", article_context="", category_nam
         for pat_as in SELF_AS_PATTERNS:
             disp = re.sub(pat_as, '', disp)
             healed_sp = re.sub(pat_as, '', healed_sp)
+
+        # 4-3. 不自然な「ご本人」「ご本人たち」の完全根絶（主語省略または自然な「関係者」等へ是正）
+        disp = re.sub(r'(?:^|(?<=[。！？\s「（]))ご本人(?:たち|ら)?[はがも][、,\s　]*', '', disp)
+        healed_sp = re.sub(r'(?:^|(?<=[。！？\s「（]))ご本人(?:たち|ら)?[はがも][、,\s　]*', '', healed_sp)
+        disp = re.sub(r'ご本人(?:たち|ら)?の', 'その', disp)
+        healed_sp = re.sub(r'ご本人(?:たち|ら)?の', 'その', healed_sp)
+        disp = re.sub(r'ご本人(?:たち|ら)?', '関係者', disp)
+        healed_sp = re.sub(r'ご本人(?:たち|ら)?', '関係者', healed_sp)
 
 
 
@@ -1906,6 +1927,8 @@ def validate_news_script_quality(raw_text, title="", article_context="", char_de
     # 自称「とろろは/とろろも/とろろとしては」および「私としては」の禁止チェック（食材等を除く）
     if re.search(r'(?<![一-龥])(?:とろろ|私|わたし|自分|個人的)としては', raw_text):
         return False, "原稿本文中で禁止されている無駄な自称・前置き「〜としては」が含まれています（直接感想を述べてください）"
+    if re.search(r'(?<![一-龥])ご本人(?:たち|ら)?', raw_text):
+        return False, "原稿本文中で禁止されている不自然な表現「ご本人」が含まれています（実名・肩書または主語省略にしてください）"
     if re.search(r'(?<![一-龥])とろろ(?:も|は|が|として|的|にゃ)', raw_text) and not re.search(r'とろろ(?:そば|蕎麦|こんぶ|昆布|じる|汁|いも|芋|ごはん|ご飯|めし|飯|うどん|納豆)', raw_text):
         return False, "原稿本文中で禁止されている自称「とろろ」が含まれています（主語を省略して直接述べてください）"
 
@@ -2420,6 +2443,10 @@ def generate_news_item_script_data(payload, custom_dict=None):
             clean_text = re.sub(r'(?:^|(?<=[。！？\s「（]))(?:とろろ|トロロ|ずんだもん|ズンダモン|私|わたし|自分|個人的に|個人的には)(?:としては|的には|にゃ|はにゃ|なのだ|のだ|はなのだ|はのだ)[、,\s　]*', '', clean_text)
             clean_text = re.sub(r'(?:^|(?<=[。！？\s「（]))(?:個人的には|個人的に)[、,\s　]*', '', clean_text)
             clean_text = re.sub(r'(?<![一-龥])(?:とろろ|私|わたし|自分)としては[、,\s　]*', '', clean_text)
+            # 不自然な「ご本人」「ご本人たち」の完全根絶
+            clean_text = re.sub(r'(?:^|(?<=[。！？\s「（]))ご本人(?:たち|ら)?[はがも][、,\s　]*', '', clean_text)
+            clean_text = re.sub(r'ご本人(?:たち|ら)?の', 'その', clean_text)
+            clean_text = re.sub(r'ご本人(?:たち|ら)?', '関係者', clean_text)
             clean_text = re.sub(r'^[、,\s　]+', '', clean_text)
             clean_text = re.sub(r'この(?:ニュース|話題|記事|出来事)(?:を|は)?(?:見て|聞いて|知って|読んで)[、,\s　]*本当に便利(?:だにゃ|ですね|だなにゃ|だ)', 'この取り組み、本当に便利だにゃ', clean_text)
             clean_text = re.sub(r'この(?:ニュース|話題|記事|出来事)(?:を|は)?(?:見て|見た|見ました|聞いて|知って|知った|読んで)[、,\s　]*(?:にゃ|のだ|ですね|だなにゃ|だ|！|。|、|\s)*', '', clean_text)
