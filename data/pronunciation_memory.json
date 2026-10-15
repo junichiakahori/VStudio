@@ -2585,6 +2585,118 @@
       "category": "anatomy_body_part",
       "registered_date": "2026-10-15",
       "note": "解剖学用語『肩甲骨』が『かたかぶとこつ』と訓読み誤読されるのを防止し『けんこうこつ』と正しく発音させる"
+    },
+    {
+      "id": "auto_1792015657_1332",
+      "surface": "年全国",
+      "reading": "ぜんこく",
+      "wrong_reading": "としぜんこく",
+      "scope": "contextual",
+      "article_topic": "秋季北海道大会初の決勝進出 「酪農学園大とわの森三愛」とは",
+      "sample_sentence": "年全国に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-15",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: としぜんこく)",
+      "context_keywords": [
+        "統合",
+        "秋季北海道大会初",
+        "毎日新聞",
+        "酪農学園大",
+        "酪農学園女子",
+        "決勝進出"
+      ]
+    },
+    {
+      "id": "auto_1792016692_3314",
+      "surface": "竹下徠空",
+      "reading": "たけしたらいあ",
+      "wrong_reading": "ふとしやたけした",
+      "scope": "global",
+      "article_topic": "巨人“未来の岡本和真”たちが豪州、台湾など国内外５リーグ武者修行へ…若手総勢１０人超派遣へ",
+      "sample_sentence": "若手育成を強化する巨人が、平山功太や竹下徠空といった選手を含め、計10選手以上を国内外5か所へ派遣するにゃ。",
+      "category": "person_name",
+      "registered_date": "2026-10-15",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'ふとしやたけした' ➔ 正読: 'たけしたらいあ'）"
+    },
+    {
+      "id": "auto_1792017302_9032",
+      "surface": "赤沢",
+      "reading": "あかさわ",
+      "wrong_reading": "あかざわ",
+      "scope": "contextual",
+      "article_topic": "大樹生命の元社員を逮捕 詐取疑い",
+      "sample_sentence": "赤沢に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-15",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: あかざわ)",
+      "context_keywords": [
+        "男性",
+        "80",
+        "赤沢大臣",
+        "口座",
+        "担当",
+        "台風"
+      ]
+    },
+    {
+      "id": "auto_1792052389_3569",
+      "surface": "工藤新",
+      "reading": "くどう",
+      "wrong_reading": "くどお しん",
+      "scope": "contextual",
+      "article_topic": "中日・工藤公康新監督、チーム改革への思いは？「野球をやるのはあくまでも選手たち。選手たちの意識を変えていくことが大事",
+      "sample_sentence": "工藤新に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-15",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: くどお しん)",
+      "context_keywords": [
+        "中日",
+        "Tweet",
+        "2027",
+        "モータースポーツ",
+        "今季限",
+        "改革"
+      ]
+    },
+    {
+      "id": "auto_1792055035_2487",
+      "surface": "Ft2",
+      "reading": "キスマイフットツー",
+      "wrong_reading": "ふとに",
+      "scope": "global",
+      "article_topic": "黒柳徹子「徹子の部屋」で最も緊張したゲストは？ 意外な回答にキスマイ驚がくも理由に納得「かっこいい",
+      "sample_sentence": "Ft2に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-15",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: ふとに)"
+    },
+    {
+      "id": "auto_1792060501_1109",
+      "surface": "翔希",
+      "reading": "しょうき",
+      "wrong_reading": "しょおまれ",
+      "scope": "contextual",
+      "article_topic": "織田翔希が米球界へ すごく悩んだ",
+      "sample_sentence": "織田翔希が米球界へ すごく悩んだ",
+      "category": "proper_noun",
+      "registered_date": "2026-10-15",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'しょおまれ' ➔ 正読: 'しょうき'）",
+      "context_keywords": [
+        "織田翔希",
+        "米球界"
+      ]
+    },
+    {
+      "id": "auto_1792061780_1197",
+      "surface": "大内拓実",
+      "reading": "おおうち",
+      "wrong_reading": "おおうち たくじつ",
+      "scope": "global",
+      "article_topic": "ネイリスト殺害 拘禁刑20年が確定",
+      "sample_sentence": "大内拓実に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-15",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: おおうち たくじつ)"
     }
   ]
 }
