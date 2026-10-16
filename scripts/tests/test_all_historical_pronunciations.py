@@ -1359,6 +1359,67 @@ TEST_CATEGORIES = [
                 "forbidden_kana": ["カタカブトコツ"],
             },
         ]
+    },
+    {
+        "category": "29. 接頭辞「誤（ご）」・固有名詞の誤読防止（誤送信/誤作動/誤判定/誤ロスカット/小松本/IIJ）",
+        "cases": [
+            {
+                "id": "prefix_go_houshin_voicevox",
+                "desc": "「誤送信」がVOICEVOXで「ゴソオシン」と発音されること（アヤマソオシン誤読防止）",
+                "text": "私に誤送信した後輩へ返信したにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "ゴソオシン",
+                "forbidden_kana": ["アヤマソオシン"],
+            },
+            {
+                "id": "prefix_go_sadou_voicevox",
+                "desc": "「誤作動」がVOICEVOXで「ゴサドオ」と発音されること（アヤマサドオ誤読防止）",
+                "text": "システムの誤作動により停止したにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "ゴサドオ",
+                "forbidden_kana": ["アヤマサドオ"],
+            },
+            {
+                "id": "prefix_go_hantei_voicevox",
+                "desc": "「誤判定」がVOICEVOXで「ゴハンテエ」と発音されること（ごはんじょう誤読防止）",
+                "text": "エーアイの誤判定を防ぐ取り組みだにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "ゴハンテエ",
+                "forbidden_kana": ["ゴハンジョオ", "アヤマハンテエ"],
+            },
+            {
+                "id": "prefix_go_losscut_voicevox",
+                "desc": "「誤ロスカット」がVOICEVOXで「ゴロスカット」と発音されること（アヤマロスカット誤読防止）",
+                "text": "FX取引で誤ロスカットが発生したにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "ゴロスカット",
+                "forbidden_kana": ["アヤマロスカット"],
+            },
+            {
+                "id": "komatsumoto_person_voicevox",
+                "desc": "「小松本さん」がVOICEVOXで「コマツモトサン」と発音されること（ショウマツモト誤読防止）",
+                "text": "小松本さんを偲ぶ声が寄せられたにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "コマツモトサン",
+                "forbidden_kana": ["ショオマツモトサン"],
+            },
+            {
+                "id": "iij_acronym_voicevox",
+                "desc": "「Iij」がVOICEVOXで「アイアイジェイ」と発音されること（イイジ誤読防止）",
+                "text": "通信大手のIijが作業ミスを発表したにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "アイアイジェイ",
+                "forbidden_kana": ["イイジ"],
+            },
+            {
+                "id": "ayamari_protected",
+                "desc": "「誤り（あやまり）」が「アヤマリ」として誤爆せず確実に保護されること",
+                "text": "誤りを見つけて訂正したにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "アヤマリオ",
+                "forbidden_kana": ["ゴリオ"],
+            },
+        ]
     }
 ]
 

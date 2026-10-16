@@ -979,6 +979,13 @@ def clean_headline_character_tone(text: str) -> str:
     # 3. 見出し内の二重敬称（〇〇氏さん等）を自然な敬称へ修復
     t = heal_double_honorific_shi_san(t)
     t = heal_sanshu_breakage(t)
+    # 4. 先頭の孤立した閉じ括弧（開き括弧欠落事故: 例「岐阜ケーキ店放火殺人】なぜ…」）の自動補完
+    if '】' in t and ('【' not in t or t.index('】') < t.index('【')):
+        t = '【' + t
+    elif '」' in t and ('「' not in t or t.index('」') < t.index('「')):
+        t = '「' + t
+    elif '』' in t and ('『' not in t or t.index('』') < t.index('『')):
+        t = '『' + t
     return t.strip()
 
 
