@@ -1468,6 +1468,59 @@ TEST_CATEGORIES = [
                 "forbidden_kana": ["ゴリオ"],
             },
         ]
+    },
+    {
+        "category": "30. 配信頻出略語・エンタメ・美容用語の誤読防止（水だけ洗顔/KOC/QAB/DiVE/WEC/CVE）",
+        "cases": [
+            {
+                "id": "mizudake_cleansing_voicevox",
+                "desc": "引用符付き「水だけ洗顔」が「ミズダケセンガン」と発音されること（スイダケ誤読防止）",
+                "text": "〝水だけ洗顔〟で20年美肌を保っているにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "ミズダケセンガン",
+                "forbidden_kana": ["スイダケ"],
+            },
+            {
+                "id": "koc_comedy_voicevox",
+                "desc": "「Koc」が「ケエオオシイ」と発音されること（コック誤読防止）",
+                "text": "Koc敗者復活戦で決定したにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "ケエオオシイ",
+                "forbidden_kana": ["コック"],
+            },
+            {
+                "id": "qab_ryukyu_voicevox",
+                "desc": "「Qab」が「キュウエエビイ」と発音されること（カブ誤読防止）",
+                "text": "沖縄ニュースQabの報道をお伝えするにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "キュウエエビイ",
+                "forbidden_kana": ["カブ"],
+            },
+            {
+                "id": "dive_drama_voicevox",
+                "desc": "「ドラマDiVE」が「ドラマダイブ」と発音されること（ディブイイイ誤読防止）",
+                "text": "ドラマDiVE女帝の主題歌に決定したにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "ドラマダイブ",
+                "forbidden_kana": ["ディブイイイ"],
+            },
+            {
+                "id": "wec_motorsport_voicevox",
+                "desc": "「Wec」が「ダブリュウイイシイ」と発音されること（ウェック誤読防止）",
+                "text": "2026年Wec第7戦の予選結果だにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "ダブリュウイイシイ",
+                "forbidden_kana": ["ウェック"],
+            },
+            {
+                "id": "cve_vulnerability_voicevox",
+                "desc": "「Cve」が「シイブイイイ」と発音されること（クヴェ誤読防止）",
+                "text": "Cveという識別番号で脆弱性を管理するにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "シイブイイイ",
+                "forbidden_kana": ["クヴェ"],
+            },
+        ]
     }
 ]
 
