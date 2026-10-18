@@ -2729,6 +2729,18 @@
       "category": "tech_security",
       "registered_date": "2026-10-19",
       "note": "共通脆弱性識別子『CVE (Cve)』が『クヴェ』と誤読されるのを防止"
+    },
+    {
+      "id": "okome_rice",
+      "surface": "お米",
+      "reading": "おこめ",
+      "wrong_reading": "おべい",
+      "scope": "global",
+      "article_topic": "食・農産物・生活",
+      "sample_sentence": "今年の新米のお米が店頭に並び始めましたにゃ。",
+      "category": "agriculture_food",
+      "registered_date": "2026-10-19",
+      "note": "『お米』が『オベイ（オベエ）』と音読み誤読されるのを防止"
     }
   ]
 }

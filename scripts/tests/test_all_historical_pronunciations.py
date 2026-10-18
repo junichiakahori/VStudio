@@ -222,6 +222,14 @@ TEST_CATEGORIES = [
                 "forbidden_kana_pattern": r"ハクベイ|シンベイ",
             },
             {
+                "id": "heteronym_okome_rice",
+                "desc": "「お米」は「オコメ」と正しく発音されること（オベイ・オベエ誤読防止）",
+                "text": "美味しいお米と新米のお米を店頭で購入したにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"オコメ.*オコメ",
+                "forbidden_kana_pattern": r"オベエ|オベイ",
+            },
+            {
                 "id": "heteronym_yukue",
                 "desc": "「行方不明」「行方」は「ユクエ」と読まれること（ぎょうほう防止）",
                 "text": "行方不明者の捜索が続き、今後の行方が注目されますにゃ。",
