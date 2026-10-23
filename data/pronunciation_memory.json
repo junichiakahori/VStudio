@@ -2741,6 +2741,151 @@
       "category": "agriculture_food",
       "registered_date": "2026-10-19",
       "note": "『お米』が『オベイ（オベエ）』と音読み誤読されるのを防止"
+    },
+    {
+      "id": "php_tech",
+      "surface": "PHP",
+      "reading": "ピーエイチピー",
+      "wrong_reading": "プログラミング",
+      "scope": "global",
+      "article_topic": "IT・テクノロジー・プログラミング",
+      "sample_sentence": "高市総理がPHPパッチの適用を要請しましたにゃ。",
+      "category": "tech_programming",
+      "registered_date": "2026-10-23",
+      "note": "Wikipedia曖昧さ回避抽出バグにより『PHP』が『プログラミング』と誤読されるのを防止"
+    },
+    {
+      "id": "auto_1792704383_2077",
+      "surface": "芳野友子",
+      "reading": "よしのともこ",
+      "wrong_reading": "よしの ゆうこ",
+      "scope": "global",
+      "article_topic": "連合の芳野会長、消費減税に反対 社会保障財源へ影響（時事通信）",
+      "sample_sentence": "芳野友子に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-23",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: よしの ゆうこ)"
+    },
+    {
+      "id": "auto_1792705782_116",
+      "surface": "柴崎",
+      "reading": "しばさき",
+      "wrong_reading": "しばざきまさと",
+      "scope": "contextual",
+      "article_topic": "中日から2位指名の王子・柴崎聖人外野手、「やっぱり一番はホッと」地元CBCテレビの中継で喜び 対戦したい投手に同僚になる金丸の名前挙げる ：中日スポーツ・東京中日スポーツ",
+      "sample_sentence": "中日から2位指名の王子・柴崎聖人外野手、「やっぱり一番はホっと」地元CBCテレビの中継で喜び 対戦したい投手に同僚になる",
+      "category": "proper_noun",
+      "registered_date": "2026-10-23",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'しばざきまさと' ➔ 正読: 'しばさき'）",
+      "context_keywords": [
+        "中日",
+        "位指名",
+        "王子",
+        "柴崎聖人外野手",
+        "一番",
+        "ホッ"
+      ]
+    },
+    {
+      "id": "auto_1792744464_1802",
+      "surface": "LOST10",
+      "reading": "ロストテン",
+      "wrong_reading": "ろすとじゅう",
+      "scope": "global",
+      "article_topic": "Tシャツが乾くまで』を超えた！ 『LOST10』初回配信でTBS金曜ドラマ歴代最高を記録",
+      "sample_sentence": "LOST10に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-23",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: ろすとじゅう)"
+    },
+    {
+      "id": "auto_1792744512_4900",
+      "surface": "女子",
+      "reading": "おなご",
+      "wrong_reading": "じょし",
+      "scope": "contextual",
+      "article_topic": "＜速報＞首位の吉田優利はパー発進 岩井明愛がイーグル奪取で1打差5位に浮上中",
+      "sample_sentence": "女子に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-23",
+      "note": "Web自動解決 (duckduckgo) (VOICEVOX誤読: じょし)",
+      "context_keywords": [
+        "Championship",
+        "Net",
+        "米女子",
+        "浮上",
+        "元記事",
+        "BMW"
+      ]
+    },
+    {
+      "id": "auto_1792744602_2887",
+      "surface": "小関裕太",
+      "reading": "こせきゆうた",
+      "wrong_reading": "おぜきゆうた",
+      "scope": "global",
+      "article_topic": "めおと日和」芙美子（生田絵梨花）が初登場 深見（小関裕太）との結婚初夜シーンに反響殺到 “キャスト変更”イジる演出にも「斬新」「クスッとした",
+      "sample_sentence": "芙美子は深見小関裕太との結婚初夜シーンに大きな反響を呼んだ。",
+      "category": "person_name",
+      "registered_date": "2026-10-23",
+      "note": "VOICEVOX文脈誤読から自動特定（誤読: 'おぜきゆうた' ➔ 正読: 'こせきゆうた'）",
+      "updated_date": "2026-10-23"
+    },
+    {
+      "id": "auto_1792747199_4995",
+      "surface": "小池",
+      "reading": "おいけ",
+      "wrong_reading": "こいけ",
+      "scope": "contextual",
+      "article_topic": "小池知事から「出てこいや」野田聖子氏、都議補選応援へ「クールビズに勝る社会変容ない",
+      "sample_sentence": "小池に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-23",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: こいけ)",
+      "context_keywords": [
+        "東京都議会議員補欠選挙",
+        "住宅対策",
+        "元記事",
+        "国際感",
+        "クールビズ",
+        "環境相"
+      ]
+    },
+    {
+      "id": "auto_1792751066_5706",
+      "surface": "G3",
+      "reading": "ジースリー",
+      "wrong_reading": "じい さん",
+      "scope": "global",
+      "article_topic": "認証局eMudhra、SSL/TLS証明書事業から撤退へ　秘密鍵問題受け──既存顧客の証明書は無償で置き換え",
+      "sample_sentence": "G3に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-23",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: じい さん)"
+    },
+    {
+      "id": "auto_1792790989_4737",
+      "surface": "F22",
+      "reading": "エフ",
+      "wrong_reading": "えふ にじゅう に",
+      "scope": "global",
+      "article_topic": "米空軍F-22戦闘機が築城基地に飛来！「キーン・ソード27」 テールコードなしの機体も",
+      "sample_sentence": "F22に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-24",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: えふ にじゅう に)"
+    },
+    {
+      "id": "auto_1792791962_2483",
+      "surface": "村岡嗣政",
+      "reading": "むらおかつぐまさ",
+      "wrong_reading": "むらおか つぐせえ",
+      "scope": "global",
+      "article_topic": "村岡知事「予定期間は交付すべき」 国が再編交付金対象から山口県和木町を除外の方向で調整 （ｔｙｓテレビ山口）",
+      "sample_sentence": "村岡嗣政に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-24",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: むらおか つぐせえ)"
     }
   ]
 }

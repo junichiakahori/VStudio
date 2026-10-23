@@ -1019,6 +1019,9 @@ def lookup_wikipedia_reading(term):
                 WIKI_NAME_DISAMBIG_KEYWORDS = ("日本の女性名", "日本の男性名", "日本の人名", "人名の曖昧さ回避", "曖昧さ回避のためのページ", "曖昧さ回避", "同姓同名")
                 if any(kw in extract for kw in WIKI_NAME_DISAMBIG_KEYWORDS):
                     continue
+                # 箇条書きが複数含まれる一覧・曖昧さ回避ページ（例: 「PHP (プログラミング言語)... - Webページ作成... \n PHP研究所...」）を完全遮断
+                if len(re.findall(r'(?:^|\n)\s*[-・]\s+', extract)) >= 2 or len(re.findall(r'\s+[-–—]\s+[^\n]+', extract)) >= 2:
+                    continue
 
                 m = re.search(r'[\(（]\s*([ぁ-んァ-ヶゔヴー・、\s,，/／]+)', extract)
                 if not m:
@@ -1426,6 +1429,8 @@ DEFAULT_TECH_ACRONYMS = {
     "ChatGPT": "チャットジーピーティー",
     "OpenAI": "オープンエーアイ",
     "SiC": "エスアイシー",
+    "PHP": "ピーエイチピー",
+    "php": "ピーエイチピー",
     "Switch": "スイッチ",
     "Nintendo": "ニンテンドー",
     "AI": "エーアイ",
@@ -2009,6 +2014,7 @@ def apply_special_reading_fixes(text):
     t = re.sub(r'(?i)(?<![A-Za-z0-9])(?:ドラマ\s*)?DiVE(?![A-Za-z0-9])', 'ドラマダイブ', t)
     t = re.sub(r'(?i)(?<![A-Za-z0-9])WEC(?![A-Za-z0-9])', 'ダブリューイーシー', t)
     t = re.sub(r'(?i)(?<![A-Za-z0-9])CVE(?![A-Za-z0-9])', 'シーブイイー', t)
+    t = re.sub(r'(?i)(?<![A-Za-z0-9])PHP(?![A-Za-z0-9])', 'ピーエイチピー', t)
 
 
     # 7. 「一目」の多音語文脈修復（「一目瞭然」「一目置く」「一目散」等を保護しつつ、「一目で」「一目見て」等の「ひとめ」誤読を完全防止）

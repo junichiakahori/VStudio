@@ -1528,6 +1528,14 @@ TEST_CATEGORIES = [
                 "expected_kana": "シイブイイイ",
                 "forbidden_kana": ["クヴェ"],
             },
+            {
+                "id": "php_tech_reading_voicevox",
+                "desc": "「PHP」が「ピイエイチピイ」と発音されること（Wikipedia曖昧さ回避誤爆によるプログラミング誤読防止）",
+                "text": "高市総理がPHPパッチの適用を要請しましたにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "ピイエイチピイ",
+                "forbidden_kana": ["プログラミング", "フログラミング"],
+            },
         ]
     }
 ]
