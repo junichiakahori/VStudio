@@ -7,9 +7,11 @@ import path from 'path';
 const checkPort = (port) => {
   return new Promise((resolve) => {
     const s = new net.Socket();
-    s.once('error', () => resolve(false));
+    s.setTimeout(1000);
+    s.once('error', () => { s.destroy(); resolve(false); });
+    s.once('timeout', () => { s.destroy(); resolve(false); });
     s.once('connect', () => { s.destroy(); resolve(true); });
-    s.connect(port, 'localhost');
+    s.connect(port, '127.0.0.1');
   });
 };
 
@@ -234,7 +236,7 @@ export default defineConfig({
       'Pragma': 'no-cache',
       'Expires': '0'
     },
-    host: 'localhost',
+    host: '0.0.0.0',
     port: 8443,
     strictPort: true,
     hmr: false, // 配信中の勝手な画面強制リロード・エラーオーバーレイを完全防止
