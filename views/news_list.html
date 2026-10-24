@@ -143,6 +143,7 @@
             flex-direction: column;
             gap: 10px;
             padding-bottom: 20px;
+            contain: content;
         }
 
         .news-card {
@@ -150,9 +151,10 @@
             border: 1px solid var(--border-color);
             border-radius: 10px;
             padding: 12px 16px;
-            transition: all 0.2s ease;
+            transition: border-color 0.2s ease, background 0.2s ease;
             position: relative;
             overflow: hidden;
+            contain: layout style;
         }
 
         .news-card:hover {
@@ -688,7 +690,6 @@
         }
 
         function updatePrefetchDisplay() {
-            fetchServerNewsCache();
             const status = getPrefetchStatus();
             const statsEl = document.getElementById("prefetch-buffer-stats");
             const barEl = document.getElementById("prefetch-buffer-progress-bar");
@@ -753,14 +754,25 @@
             }
         }
 
-        function renderNewsList() {
+        let _lastRenderedHtml = "";
+        let _isUserScrolling = false;
+        let _scrollEndTimer = null;
+
+        window.addEventListener("scroll", () => {
+            _isUserScrolling = true;
+            if (_scrollEndTimer) clearTimeout(_scrollEndTimer);
+            _scrollEndTimer = setTimeout(() => {
+                _isUserScrolling = false;
+            }, 1200);
+        }, { passive: true });
+
+        function renderNewsList(force = false) {
             const container = document.getElementById("news-list-container");
             const badge = document.getElementById("news-count-badge");
             const sortedNews = getSortedNews();
             const readTitles = getReadTitles();
             const prefetchStatus = getPrefetchStatus(sortedNews, readTitles);
             const preloadedTitlesSet = new Set(prefetchStatus.titles || []);
-            const allCachedTitlesSet = new Set(prefetchStatus.allCachedTitles || []);
             const currentGenTitle = prefetchStatus.currentTitle || "";
 
             if (!sortedNews || sortedNews.length === 0) {
@@ -772,6 +784,7 @@
                         <div class="empty-desc">メイン画面の「⬇️ ニュースを取得」ボタンを押してニュースを取得してください。</div>
                     </div>
                 `;
+                _lastRenderedHtml = "";
                 return;
             }
 
@@ -789,6 +802,11 @@
             const readCount = sortedNews.length - unreadCount;
             badge.innerHTML = `全 ${sortedNews.length} 件 (未読: ${unreadCount} / 既読: ${readCount}) <span style="margin-left:8px; color:#00f3ff; font-weight:700;">📦 先読み: ${prefetchStatus.count}/${prefetchStatus.max}件</span>`;
 
+            // 🛡️ スクロール中はユーザー操作を優先し、DOM破棄・再描画を安全にスキップ
+            if (_isUserScrolling && !force) {
+                return;
+            }
+
             // 現在放送中のタイトル
             const currentPlayingTitle = localStorage.getItem("currentPlayingNewsTitle") || "";
 
@@ -798,7 +816,7 @@
             sortedNews.forEach((item, idx) => {
                 const isRead = checkRead(item.title);
                 const isPlaying = currentPlayingTitle && item.title.includes(currentPlayingTitle);
-                const isPreloaded = (preloadedTitlesSet.has(item.title) || allCachedTitlesSet.has(item.title)) && !isRead;
+                const isPreloaded = preloadedTitlesSet.has(item.title) && !isRead;
                 const isGenerating = currentGenTitle && item.title.includes(currentGenTitle);
                 const catKey = item.categoryKey || "cat_top";
                 const catName = CATEGORY_NAMES[catKey] || item.category || "ニュース";
@@ -841,6 +859,11 @@
                 `;
             });
 
+            // 🛡️ 差分チェック: HTMLに変化がない場合はDOMの全差し替え（innerHTML）を完全にスキップ
+            if (!force && html === _lastRenderedHtml) {
+                return;
+            }
+            _lastRenderedHtml = html;
             container.innerHTML = html;
         }
 
@@ -976,8 +999,9 @@
         // 初期化 & 定期更新（親画面や別ウィンドウの変更を自動同期）
         renderNewsList();
         updatePrefetchDisplay();
-        setInterval(renderNewsList, 2500);
-        setInterval(updatePrefetchDisplay, 1000);
+        setInterval(renderNewsList, 3000);
+        setInterval(updatePrefetchDisplay, 2000);
+        setInterval(fetchServerNewsCache, 60000); // サーバーキャッシュは60秒に1回だけ緩やかに取得
 
         // 原稿一括事前生成 UI 制御（ルール18準拠: alert完全排除）
         function updateBatchGenUI(status) {
