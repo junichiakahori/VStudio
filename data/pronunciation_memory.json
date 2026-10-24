@@ -2785,6 +2785,42 @@
         "中央",
         "詳細本文"
       ]
+    },
+    {
+      "id": "counter_ken_ichiman",
+      "surface": "1万件",
+      "reading": "1万けん",
+      "wrong_reading": "いちまんげん",
+      "scope": "global",
+      "article_topic": "助数詞・統計・一般ニュース",
+      "sample_sentence": "1万件を超える通報が寄せられましたにゃ。",
+      "category": "counter",
+      "registered_date": "2026-10-24",
+      "note": "OpenJTalkが『軒（げん）』の連濁を誤適用して『いちまんげん』と誤読するのを100%防止し『いちまんけん』に固定"
+    },
+    {
+      "id": "counter_ken_san",
+      "surface": "3件",
+      "reading": "3けん",
+      "wrong_reading": "さんげん",
+      "scope": "global",
+      "article_topic": "助数詞・統計・一般ニュース",
+      "sample_sentence": "3件の事故が報告されていますにゃ。",
+      "category": "counter",
+      "registered_date": "2026-10-24",
+      "note": "OpenJTalkが『軒（げん）』の連濁を誤適用して『さんげん』と誤読するのを100%防止し『さんけん』に固定"
+    },
+    {
+      "id": "counter_ken_sen",
+      "surface": "千件",
+      "reading": "千けん",
+      "wrong_reading": "せんげん",
+      "scope": "global",
+      "article_topic": "助数詞・統計・一般ニュース",
+      "sample_sentence": "千件以上のデータが集計されましたにゃ。",
+      "category": "counter",
+      "registered_date": "2026-10-24",
+      "note": "OpenJTalkが『軒（げん）』の連濁を誤適用して『せんげん』と誤読するのを100%防止し『せんけん』に固定"
     }
   ]
 }

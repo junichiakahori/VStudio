@@ -1256,6 +1256,9 @@ def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, h
     disp = re.sub(r'(?<![0-9０-９一二三四五六七八九十])[2２二]ショット', 'ツーショット', disp)
     healed_sp = re.sub(r'(?<![0-9０-９一二三四五六七八九十])[2２二]ショット', 'ツーショット', healed_sp)
 
+    # 7. 助数詞「件」の連濁誤読防止（音声読み上げのみ「けん」に統一し、字幕表示は「1万件」等の漢字を美しく維持）
+    healed_sp = re.sub(r'(?<=[0-9０-９一二三四五六七八九十百千万億兆数何約])件', 'けん', healed_sp)
+
     return disp, healed_sp
 
 

@@ -1578,6 +1578,51 @@ TEST_CATEGORIES = [
                 "forbidden_kana_pattern": r"ニショット",
             },
         ]
+    },
+    {
+        "category": "32. 助数詞「件（けん）」の連濁誤読防止（1万件➔いちまんけん、3件➔さんけん、千件➔せんけん、事件・条件保護）",
+        "cases": [
+            {
+                "id": "ken_ichiman_reading",
+                "desc": "「1万件」が「イチマンケン」と清音で発音されること（イチマンゲン連濁誤読の完全防止）",
+                "text": "この問題では1万件を超える通報が寄せられましたにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "イチマンケン",
+                "forbidden_kana": ["イチマンゲン", "マンゲン"],
+            },
+            {
+                "id": "ken_san_reading",
+                "desc": "「3件」が「サンケン」と清音で発音されること（サンゲン連濁誤読の完全防止）",
+                "text": "現場付近で3件の事故が確認されましたにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "サンケン",
+                "forbidden_kana": ["サンゲン"],
+            },
+            {
+                "id": "ken_sen_reading",
+                "desc": "「千件」「数千件」が「センケン」「スウセンケン」と清音で発音されること（センゲン連濁誤読の完全防止）",
+                "text": "調査の結果、数千件のデータが集計されましたにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "スウセンケン",
+                "forbidden_kana": ["スウセンゲン", "センゲン"],
+            },
+            {
+                "id": "ken_suuman_reading",
+                "desc": "「数万件」が「スウマンケン」と清音で発音されること（スウマンゲン連濁誤読の完全防止）",
+                "text": "全国で数万件規模の被害が出ている模様ですにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "スウマンケン",
+                "forbidden_kana": ["スウマンゲン"],
+            },
+            {
+                "id": "ken_kanji_compound_protection",
+                "desc": "「事件」「条件」「要件」「案件」などの一般熟語が「ケン」のまま誤変換・破壊されないこと",
+                "text": "今回の事件では厳しい条件を満たす要件が課され、多数の案件が精査されましたにゃ。",
+                "check_type": "voicevox_reading",
+                "expected_kana": "ジケン",
+                "forbidden_kana": ["ジけん", "ジゲン"],
+            },
+        ]
     }
 ]
 
