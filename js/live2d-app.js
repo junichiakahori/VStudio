@@ -425,10 +425,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       console.log("Loading model:", modelDef.path);
-      const model = await PIXI.live2d.Live2DModel.from(modelDef.path, {
-        autoInteract: false,
-        autoUpdate: false,
-      });
+      const loadTimeout = setTimeout(() => {
+        console.warn("[Live2D] モデルロードが8秒を超過したため、安全のためオーバーレイを解除します");
+        if (loadingOverlay) loadingOverlay.classList.remove("visible");
+      }, 8000);
+
+      const model = await Promise.race([
+        PIXI.live2d.Live2DModel.from(modelDef.path, {
+          autoInteract: false,
+          autoUpdate: false,
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("モデルロードタイムアウト (8秒)")), 8000))
+      ]);
+      clearTimeout(loadTimeout);
 
       console.log("Model loaded successfully:", model);
       live2dModel = model;
@@ -479,8 +488,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       window.saveSettings();
     } catch (err) {
       console.error("モデルロード失敗:", err);
-      loadingText.textContent = `エラー: ${err.message || "不明なエラー"} — コンソールを確認してください`;
-      setTimeout(() => loadingOverlay.classList.remove("visible"), 5000);
+      loadingText.textContent = `エラー: ${err.message || "不明なエラー"}`;
+      setTimeout(() => {
+        if (loadingOverlay) loadingOverlay.classList.remove("visible");
+      }, 1500);
     }
   };
 

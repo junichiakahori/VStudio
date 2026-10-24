@@ -309,9 +309,9 @@ function getNewsConfig() {
     } catch (err) {
       if (signal && signal.aborted) throw err;
       const fallbackPort = (window.location && window.location.port === "8444") ? "8002" : "8001";
-      console.warn(`[ニュース通信] ⚠️ 相対パス (${endpoint}) 接続エラー ➔ http://localhost:${fallbackPort}${endpoint} へ直結フォールバック試行:`, err && err.message ? err.message : err);
+      console.warn(`[ニュース通信] ⚠️ 相対パス (${endpoint}) 接続エラー ➔ http://127.0.0.1:${fallbackPort}${endpoint} へ直結フォールバック試行:`, err && err.message ? err.message : err);
       try {
-        const directRes = await fetch(`http://localhost:${fallbackPort}${endpoint}`, {
+        const directRes = await fetch(`http://127.0.0.1:${fallbackPort}${endpoint}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),

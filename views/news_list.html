@@ -600,7 +600,7 @@
             _isFetchingServerCache = true;
             try {
                 const apiPort = (window.location && window.location.port === "8444") ? "8002" : "8001";
-                const res = await fetch(`http://localhost:${apiPort}/api/news_cache`);
+                const res = await fetch(`http://127.0.0.1:${apiPort}/api/news_cache`);
                 if (res.ok) {
                     const data = await res.json();
                     if (data && Array.isArray(data.items)) {

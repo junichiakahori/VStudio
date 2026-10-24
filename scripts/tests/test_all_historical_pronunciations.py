@@ -1320,6 +1320,14 @@ TEST_CATEGORIES = [
                 "expected_kana_pattern": r"オオモリモトキ",
                 "forbidden_kana_pattern": r"オオモリモトタカ",
             },
+            {
+                "id": "murakami_ryu_author_voicevox",
+                "desc": "「村上龍さん」が「ムラカミリョウサン/ムラカミリュウサン」と発音されること（むらかみさん姓のみ脱落防止）",
+                "text": "作家の村上龍さん死去のニュースが入ってきましたにゃ。",
+                "check_type": "voicevox_kana",
+                "expected_kana_pattern": r"ムラカミリュウサン|ムラカミリョオサン",
+                "forbidden_kana_pattern": r"ムラカミサンシキョ",
+            },
         ]
     },
     {
