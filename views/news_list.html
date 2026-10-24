@@ -646,35 +646,12 @@
                 currentGenTitle = statusObj.currentTitle || "";
                 preloadedTitles = Array.isArray(statusObj.titles) ? statusObj.titles : [];
             } else {
-                // 2. 親画面の UI パネル DOM（#ui-batch-gen-stats）から直結取得（フォールバック）
-                try {
-                    if (window.opener && !window.opener.closed && window.opener.document) {
-                        const openerStats = window.opener.document.getElementById("ui-batch-gen-stats");
-                        if (openerStats && openerStats.textContent) {
-                            const txt = openerStats.textContent.trim();
-                            const m = txt.match(/(\d+)\s*[\/／]\s*(\d+)/);
-                            if (m) {
-                                count = parseInt(m[1], 10);
-                                max = parseInt(m[2], 10);
-                                isRunning = txt.includes("先読み中");
-                            }
-                        }
-                        if (window.opener._currentGeneratingNewsTitle) {
-                            currentGenTitle = window.opener._currentGeneratingNewsTitle;
-                        }
-                    }
-                } catch (e) {}
-
-                const items = sortedNews || getSortedNews() || [];
-                const readSet = readTitles || getReadTitles() || new Set();
-                const currentPlayingTitle = localStorage.getItem("currentPlayingNewsTitle") || "";
-                const unreadItems = items.filter(it => !readSet.has(it.title) && (!currentPlayingTitle || !it.title.includes(currentPlayingTitle)));
-
-                if (count > 0 && preloadedTitles.length === 0) {
-                    for (let i = 0; i < Math.min(count, unreadItems.length); i++) {
-                        preloadedTitles.push(unreadItems[i].title);
-                    }
-                }
+                // localStorage にない場合はデフォルト待機
+                count = 0;
+                max = 8;
+                isRunning = false;
+                currentGenTitle = "";
+                preloadedTitles = [];
             }
 
             const pct = Math.min(100, Math.round((count / max) * 100));
@@ -791,11 +768,7 @@
             const checkRead = (title) => {
                 if (!title) return false;
                 if (localStorage.getItem("newsReadExplicitlyCleared") === "true") return false;
-                if (readTitles.has(title)) return true;
-                if (window.opener && typeof window.opener.isNewsTitleRead === "function") {
-                    return window.opener.isNewsTitleRead(title);
-                }
-                return false;
+                return readTitles.has(title);
             };
 
             const unreadCount = sortedNews.filter(n => !checkRead(n.title)).length;
