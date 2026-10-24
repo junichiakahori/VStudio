@@ -1325,8 +1325,8 @@ TEST_CATEGORIES = [
                 "desc": "「村上龍さん」が「ムラカミリョウサン/ムラカミリュウサン」と発音されること（むらかみさん姓のみ脱落防止）",
                 "text": "作家の村上龍さん死去のニュースが入ってきましたにゃ。",
                 "check_type": "voicevox_kana",
-                "expected_kana_pattern": r"ムラカミリュウサン|ムラカミリョオサン",
-                "forbidden_kana_pattern": r"ムラカミサンシキョ",
+                "expected_kana_pattern": r"ムラカミ\s*(?:リュウサン|リョオサン)",
+                "forbidden_kana_pattern": r"ムラカミサンシキョ|リュウリュウ",
             },
         ]
     },

@@ -2758,13 +2758,33 @@
       "id": "murakami_ryu_author",
       "surface": "村上龍",
       "reading": "むらかみりゅう",
-      "wrong_reading": "むらかみ",
+      "wrong_reading": "",
       "scope": "global",
       "article_topic": "文学・作家・文化",
       "sample_sentence": "作家の村上龍さん死去のニュースが入ってきましたにゃ。",
       "category": "person_author",
       "registered_date": "2026-10-24",
       "note": "Wikipedia人物記事ネスト括弧バグにより『村上龍』が姓のみの『むらかみ』と誤読されるのを防止"
+    },
+    {
+      "id": "auto_1792801979_5701",
+      "surface": "服部",
+      "reading": "はとり",
+      "wrong_reading": "はっとり",
+      "scope": "contextual",
+      "article_topic": "独自】蔵内前議長と福岡県議4人、パリで1人20万円の夕食会参加 県が公費で負担",
+      "sample_sentence": "服部に関する最新情報です。",
+      "category": "web_auto_resolved",
+      "registered_date": "2026-10-24",
+      "note": "Web自動解決 (wikipedia) (VOICEVOX誤読: はっとり)",
+      "context_keywords": [
+        "夕食会参加",
+        "実施",
+        "高額",
+        "公費",
+        "中央",
+        "詳細本文"
+      ]
     }
   ]
 }
