@@ -622,65 +622,57 @@
             let currentGenTitle = "";
             let preloadedTitles = [];
 
-            // 1. 【最優先】親画面の UI パネル DOM（#ui-batch-gen-stats）からリアルタイム件数を直結取得
+            // 1. 【最優先】親画面のメモリステート（newsPrefetchStatus）から真実のキュー状態を取得
+            let statusObj = null;
             try {
-                if (window.opener && !window.opener.closed && window.opener.document) {
-                    const openerStats = window.opener.document.getElementById("ui-batch-gen-stats");
-                    if (openerStats && openerStats.textContent) {
-                        const txt = openerStats.textContent.trim();
-                        const m = txt.match(/(\d+)\s*[\/／]\s*(\d+)/);
-                        if (m) {
-                            count = parseInt(m[1], 10);
-                            max = parseInt(m[2], 10);
-                            isRunning = txt.includes("先読み中");
-                        }
-                    }
-                    if (window.opener._currentGeneratingNewsTitle) {
-                        currentGenTitle = window.opener._currentGeneratingNewsTitle;
-                    }
+                if (window.opener && !window.opener.closed && window.opener.newsPrefetchStatus) {
+                    statusObj = window.opener.newsPrefetchStatus;
                 }
             } catch (e) {}
 
-            const items = sortedNews || getSortedNews() || [];
-            const readSet = readTitles || getReadTitles() || new Set();
-            const currentPlayingTitle = localStorage.getItem("currentPlayingNewsTitle") || "";
+            if (!statusObj) {
+                try {
+                    const saved = localStorage.getItem("newsPrefetchStatus");
+                    if (saved) statusObj = JSON.parse(saved);
+                } catch (e) {}
+            }
 
-            // 2. 未読記事リストを作成（現在再生中記事を除く）
-            const unreadItems = items.filter(it => !readSet.has(it.title) && (!currentPlayingTitle || !it.title.includes(currentPlayingTitle)));
-
-            // 3. 親画面のDOMから count が取得できた場合、未読記事の先頭から count 件を先読み済みリストとする
-            if (count > 0) {
-                for (let i = 0; i < Math.min(count, unreadItems.length); i++) {
-                    preloadedTitles.push(unreadItems[i].title);
-                }
-                if (isRunning && !currentGenTitle && unreadItems.length > count) {
-                    currentGenTitle = unreadItems[count].title;
-                }
+            if (statusObj && typeof statusObj === "object") {
+                count = typeof statusObj.count === "number" ? statusObj.count : 0;
+                max = typeof statusObj.max === "number" ? statusObj.max : 8;
+                isRunning = !!statusObj.isRunning;
+                currentGenTitle = statusObj.currentTitle || "";
+                preloadedTitles = Array.isArray(statusObj.titles) ? statusObj.titles : [];
             } else {
-                // 4. フォールバック: サーバーキャッシュ（前方16文字あいまい一致）から照合
-                const cachedSet = _serverCachedTitles;
-                for (let i = 0; i < unreadItems.length; i++) {
-                    const it = unreadItems[i];
-                    const cleanT = it.title.substring(0, 16);
-                    let hit = cachedSet.has(it.title);
-                    if (!hit) {
-                        for (const ct of cachedSet) {
-                            if (ct.includes(cleanT) || it.title.includes(ct.substring(0, 16))) {
-                                hit = true;
-                                break;
+                // 2. 親画面の UI パネル DOM（#ui-batch-gen-stats）から直結取得（フォールバック）
+                try {
+                    if (window.opener && !window.opener.closed && window.opener.document) {
+                        const openerStats = window.opener.document.getElementById("ui-batch-gen-stats");
+                        if (openerStats && openerStats.textContent) {
+                            const txt = openerStats.textContent.trim();
+                            const m = txt.match(/(\d+)\s*[\/／]\s*(\d+)/);
+                            if (m) {
+                                count = parseInt(m[1], 10);
+                                max = parseInt(m[2], 10);
+                                isRunning = txt.includes("先読み中");
                             }
                         }
-                    }
-                    if (hit) {
-                        if (preloadedTitles.length < max) {
-                            preloadedTitles.push(it.title);
+                        if (window.opener._currentGeneratingNewsTitle) {
+                            currentGenTitle = window.opener._currentGeneratingNewsTitle;
                         }
-                    } else if (!currentGenTitle && preloadedTitles.length < max) {
-                        currentGenTitle = it.title;
+                    }
+                } catch (e) {}
+
+                const items = sortedNews || getSortedNews() || [];
+                const readSet = readTitles || getReadTitles() || new Set();
+                const currentPlayingTitle = localStorage.getItem("currentPlayingNewsTitle") || "";
+                const unreadItems = items.filter(it => !readSet.has(it.title) && (!currentPlayingTitle || !it.title.includes(currentPlayingTitle)));
+
+                if (count > 0 && preloadedTitles.length === 0) {
+                    for (let i = 0; i < Math.min(count, unreadItems.length); i++) {
+                        preloadedTitles.push(unreadItems[i].title);
                     }
                 }
-                count = Math.min(max, preloadedTitles.length);
-                isRunning = count < max && currentGenTitle !== "";
             }
 
             const pct = Math.min(100, Math.round((count / max) * 100));
@@ -689,7 +681,7 @@
                 count: count,
                 max: max,
                 pct: pct,
-                isRunning: isRunning,
+                isRunning: isRunning || !!currentGenTitle,
                 currentTitle: currentGenTitle,
                 titles: preloadedTitles
             };
@@ -713,7 +705,8 @@
             statsEl.textContent = `${count} / ${max} 件 (${pct}%)`;
             barEl.style.width = `${pct}%`;
 
-            if (status.isRunning) {
+            // 🛡️ 最優先: 生成中（または再生成中）であれば件数に関わらず「先行生成中」を明瞭表示
+            if (status.isRunning || status.currentTitle) {
                 badgeEl.textContent = "⏳ 先行生成中";
                 badgeEl.style.background = "rgba(0, 210, 211, 0.2)";
                 badgeEl.style.color = "#00f3ff";
@@ -728,7 +721,7 @@
                 stateTextEl.textContent = "即時再生バッファ準備完了";
                 stateTextEl.style.color = "#00e676";
             } else if (count > 0) {
-                badgeEl.textContent = "📦 蓄積中";
+                badgeEl.textContent = `📦 バッファ: ${count}件`;
                 badgeEl.style.background = "rgba(129, 236, 236, 0.15)";
                 badgeEl.style.color = "#81ecec";
                 badgeEl.style.borderColor = "rgba(129, 236, 236, 0.4)";
