@@ -1545,6 +1545,39 @@ TEST_CATEGORIES = [
                 "forbidden_kana": ["プログラミング", "フログラミング"],
             },
         ]
+    },
+    {
+        "category": "31. プロンプトルール品質保証 & 自動強制執行（動物さん付け防止・自称とろろ排除・ツーショット統一）",
+        "cases": [
+            {
+                "id": "animal_san_validation_rejection",
+                "desc": "動物への敬称「パンダさん」が検知されてバリデーションで即座に不合格（再生成）になること",
+                "text": "上野動物園のパンダさんが元気いっぱいに遊んでいる姿が公開されたにゃ。来園者たちもその愛らしい動きに歓声を上げていたにゃ。飼育員によると食欲も旺盛で健康状態は極めて良好だそうだにゃ。これからも温かく見守っていきたいところだにゃ。",
+                "title": "上野動物園のパンダ公開",
+                "article_context": "上野動物園でパンダが元気に公開されました。",
+                "check_type": "quality_validation",
+                "expected_valid": False,
+            },
+            {
+                "id": "tororo_self_name_validation_rejection",
+                "desc": "原稿本文中の自称・キャラ名「とろろなら」が検知されてバリデーションで即座に不合格（再生成）になること",
+                "text": "とろろならこのニュースについて詳しく知っているにゃ。最新の技術動向についてしっかりと解説していきたいにゃ。業界関係者からも大きな注目が集まっている状況だにゃ。今後の展開からも目が離せないにゃ。",
+                "title": "最新の技術動向ニュース",
+                "article_context": "最新の技術動向について発表がありました。",
+                "check_type": "quality_validation",
+                "expected_valid": False,
+            },
+            {
+                "id": "twoshot_normalization_pipeline",
+                "desc": "「2ショット写真」が「ツーショット」に自動修復され、VOICEVOXで「ニショット」と誤読されないこと",
+                "text": "公式SNSで2ショット写真を公開しましたにゃ。",
+                "check_type": "both",
+                "expected_display_pattern": r"ツーショット",
+                "forbidden_display_pattern": r"2ショット",
+                "expected_kana_pattern": r"ツウショット|ツーショット",
+                "forbidden_kana_pattern": r"ニショット",
+            },
+        ]
     }
 ]
 

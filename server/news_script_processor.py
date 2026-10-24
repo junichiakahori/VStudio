@@ -1252,6 +1252,10 @@ def _heal_athlete_honorific(disp, healed_sp, has_sumo_context, is_pure_sports, h
     disp = heal_sanshu_breakage(disp)
     healed_sp = heal_sanshu_breakage(healed_sp)
 
+    # 6. 「2ショット / ２ショット / 二ショット」のツーショット表記・音声統一（ニショット誤読を100%防止）
+    disp = re.sub(r'(?<![0-9０-９一二三四五六七八九十])[2２二]ショット', 'ツーショット', disp)
+    healed_sp = re.sub(r'(?<![0-9０-９一二三四五六七八九十])[2２二]ショット', 'ツーショット', healed_sp)
+
     return disp, healed_sp
 
 
@@ -1931,13 +1935,24 @@ def validate_news_script_quality(raw_text, title="", article_context="", char_de
     if re.search(r'(?:だよですね|だねですね|よねですね|よですね|ねですね|だなにゃ|だなのだ|とろろにゃ|みんないゃ|いゃにゃ|ないゃ|てみんないゃ)', raw_text):
         return False, "不自然な二重語尾・破損した語尾（みんないゃにゃ等）または禁止された口調「とろろにゃ」が含まれています"
 
-    # 自称「とろろは/とろろも/とろろとしては」および「私としては」の禁止チェック（食材等を除く）
-    if re.search(r'(?<![一-龥])(?:とろろ|私|わたし|自分|個人的)としては', raw_text):
+    # 自称・キャラ名「とろろ」の完全禁止チェック（食材等を除く）
+    if re.search(r'(?<![一-龥])(?:私|わたし|自分|個人的)としては', raw_text):
         return False, "原稿本文中で禁止されている無駄な自称・前置き「〜としては」が含まれています（直接感想を述べてください）"
     if re.search(r'(?<![一-龥])ご本人(?:たち|ら)?', raw_text):
         return False, "原稿本文中で禁止されている不自然な表現「ご本人」が含まれています（実名・肩書または主語省略にしてください）"
-    if re.search(r'(?<![一-龥])とろろ(?:も|は|が|として|的|にゃ)', raw_text) and not re.search(r'とろろ(?:そば|蕎麦|こんぶ|昆布|じる|汁|いも|芋|ごはん|ご飯|めし|飯|うどん|納豆)', raw_text):
-        return False, "原稿本文中で禁止されている自称「とろろ」が含まれています（主語を省略して直接述べてください）"
+    if re.search(r'(?<![一-龥])とろろ', raw_text) and not re.search(r'とろろ(?:そば|蕎麦|こんぶ|昆布|じる|汁|いも|芋|ごはん|ご飯|めし|飯|うどん|納豆|オクラ)', raw_text):
+        return False, "原稿本文中で禁止されているキャラ名・自称「とろろ」が含まれています（原稿内で名乗らず、直接内容を伝えてください）"
+
+    # 動物・生き物に対する不自然な敬称「さん」付けの検知（童話・固有作品名等を除く）
+    ANIMAL_SAN_PATTERNS = [
+        re.compile(r'(?<![一-龥])(?:パンダ|クマ|熊|犬|イヌ|いぬ|猫|ネコ|ねこ|サル|猿|さる|カラス|鳥|小鳥|魚|トラ|虎|ライオン|キリン|ゾウ|象|ウサギ|兎|うさぎ|イルカ|クジラ|ラッコ|ペンギン|コアラ|シカ|鹿|イノシシ|猪|キツネ|狐|タヌキ|狸|カピバラ|ハムスター|モルモット|リス|馬|ウマ|牛|ウシ|豚|ブタ|羊|ヒツジ|ヤギ|山羊|ワニ|ヘビ|蛇)さん(?:たち|ら)?'),
+    ]
+    for pat in ANIMAL_SAN_PATTERNS:
+        m_animal = pat.search(raw_text)
+        if m_animal:
+            matched_str = m_animal.group(0)
+            if matched_str not in title and matched_str not in article_context:
+                return False, f"動物・生き物に対して不自然な敬称「さん」が検知されました: '{matched_str}'（動物には「さん」を付けず、そのままで呼んでください）"
 
     # 末尾の文が途中で切れた不完全文（助詞終了など）でないかのチェック
     if split_sentences_check:
