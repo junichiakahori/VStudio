@@ -131,41 +131,97 @@ window.updateAiLink = function updateAiLink() {
 
 (window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("ai-settings", () => {
   // =====================================================================
-  // TikTok & VOICEVOX 連携
+  // TikTok & VOICEVOX 連携 (スマート自動検知・定期ポーリング・動的リトライ完備)
   // =====================================================================
-  // Populate VOICEVOX speakers
-  if (voicevoxSpeakerId) {
+  let _voicevoxPollTimer = null;
+  let _isVoicevoxLoaded = false;
+
+  window.refreshVoicevoxSpeakers = async function (showFeedback = false) {
+    if (!voicevoxSpeakerId) return false;
     const savedSpeaker = localStorage.getItem("savedVoicevoxSpeaker");
 
-    fetch("http://localhost:50021/speakers")
-      .then((res) => res.json())
-      .then((speakers) => {
-        voicevoxSpeakerId.innerHTML = ""; // clear default
-        let foundSaved = false;
-        speakers.forEach((speaker) => {
-          speaker.styles.forEach((style) => {
-            const option = document.createElement("option");
-            option.value = style.id;
-            option.textContent = `${speaker.name} (${style.name})`;
-            if (savedSpeaker && style.id.toString() === savedSpeaker) {
-              option.selected = true;
-              foundSaved = true;
-            } else if (!savedSpeaker && style.id === 3) {
-              // Default to Zundamon normal (id 3) if nothing is saved
-              option.selected = true;
-            }
-            voicevoxSpeakerId.appendChild(option);
-          });
-        });
+    try {
+      const res = await fetch("http://127.0.0.1:50021/speakers", { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const speakers = await res.json();
+      if (!Array.isArray(speakers) || speakers.length === 0) throw new Error("話者データが空です");
 
-        // Save whenever it changes
-        voicevoxSpeakerId.addEventListener("change", () => {
-          localStorage.setItem("savedVoicevoxSpeaker", voicevoxSpeakerId.value);
+      voicevoxSpeakerId.innerHTML = "";
+      let foundSaved = false;
+      speakers.forEach((speaker) => {
+        speaker.styles.forEach((style) => {
+          const option = document.createElement("option");
+          option.value = style.id;
+          option.textContent = `${speaker.name} (${style.name})`;
+          if (savedSpeaker && style.id.toString() === savedSpeaker) {
+            option.selected = true;
+            foundSaved = true;
+          } else if (!savedSpeaker && style.id === 3) {
+            // Default to Zundamon normal (id 3) if nothing is saved
+            option.selected = true;
+          }
+          voicevoxSpeakerId.appendChild(option);
         });
-      })
-      .catch((err) => {
-        console.warn("Failed to fetch VOICEVOX speakers:", err);
       });
+
+      _isVoicevoxLoaded = true;
+      if (_voicevoxPollTimer) {
+        clearInterval(_voicevoxPollTimer);
+        _voicevoxPollTimer = null;
+      }
+      console.log(`[AI設定] 🟢 VOICEVOX話者一覧を正常取得・更新しました (${voicevoxSpeakerId.options.length}件)`);
+      if (showFeedback && typeof window.alert === "function") {
+        window.alert(`✅ VOICEVOX話者一覧を更新しました (${voicevoxSpeakerId.options.length}件)`);
+      }
+      return true;
+    } catch (err) {
+      if (showFeedback) {
+        console.warn("[AI設定] VOICEVOX話者取得失敗:", err);
+        if (typeof window.alert === "function") {
+          window.alert("⚠️ VOICEVOXが起動していません。VOICEVOXアプリを起動してから再取得してください。");
+        }
+      }
+      return false;
+    }
+  };
+
+  if (voicevoxSpeakerId) {
+    // 1. 初回即時フェッチ
+    window.refreshVoicevoxSpeakers(false).then((ok) => {
+      // 2. 失敗した場合（VOICEVOXが後から起動されるケース）、3秒おきに自動ポーリングして起動を自動検知
+      if (!ok && !_voicevoxPollTimer) {
+        _voicevoxPollTimer = setInterval(async () => {
+          const success = await window.refreshVoicevoxSpeakers(false);
+          if (success && _voicevoxPollTimer) {
+            clearInterval(_voicevoxPollTimer);
+            _voicevoxPollTimer = null;
+          }
+        }, 3000);
+      }
+    });
+
+    // 3. セレクトボックスをクリック/フォーカスした瞬間に、未取得なら即時フェッチ
+    voicevoxSpeakerId.addEventListener("focus", () => {
+      if (!_isVoicevoxLoaded || voicevoxSpeakerId.options.length <= 1) {
+        window.refreshVoicevoxSpeakers(false);
+      }
+    });
+    voicevoxSpeakerId.addEventListener("mousedown", () => {
+      if (!_isVoicevoxLoaded || voicevoxSpeakerId.options.length <= 1) {
+        window.refreshVoicevoxSpeakers(false);
+      }
+    });
+
+    // 4. 選択値変更時の保存
+    voicevoxSpeakerId.addEventListener("change", () => {
+      localStorage.setItem("savedVoicevoxSpeaker", voicevoxSpeakerId.value);
+    });
+
+    // 5. 手動リフレッシュボタン
+    const refreshBtn = document.getElementById("btn-refresh-voicevox-speakers");
+    if (refreshBtn) {
+      refreshBtn.onclick = () => window.refreshVoicevoxSpeakers(true);
+    }
   }
   if (voicevoxToggle) {
     const savedToggle = localStorage.getItem("savedVoicevoxToggle");

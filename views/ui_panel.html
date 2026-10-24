@@ -837,7 +837,10 @@
                 <input type="range" id="se-volume-slider" min="0" max="100" value="100" step="1">
             </div>
             <div class="control-group" style="margin-top:10px;">
-                <label style="font-size:0.8rem;color:var(--text-muted);">VOICEVOX 話者</label>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <label style="font-size:0.8rem;color:var(--text-muted);">VOICEVOX 話者</label>
+                    <button type="button" id="btn-refresh-voicevox-speakers" class="btn" style="font-size:0.68rem; padding:2px 7px; background:rgba(0,210,211,0.12); border:1px solid rgba(0,210,211,0.3); border-radius:4px; color:#00f3ff; cursor:pointer;" title="VOICEVOX話者一覧を再取得">🔄 再取得</button>
+                </div>
                 <select id="voicevox-speaker-id"
                     style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border-neon);border-radius:6px;padding:0.5rem;color:var(--text-muted);font-size:0.8rem;outline:none;margin-top:0.3rem;cursor:pointer;">
                     <option value="3">ずんだもん (ノーマル)</option>
