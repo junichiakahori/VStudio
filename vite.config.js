@@ -17,56 +17,49 @@ const checkPort = (port) => {
 
 const killProcessOnPort = (port, serverFileName) => {
   return new Promise((resolve) => {
-    // 1. スクリプト名によるピンポイント停止（Python/python3/絶対パス・相対パス全てに対応）
+    // 1. スクリプト名が指定されている場合は pkill でピンポイント停止 (最も安全)
     if (serverFileName) {
       const baseName = serverFileName.split('/').pop();
       exec(`pkill -9 -f "${baseName}"`, () => {
-        // ポート側も念のためチェックしてクリーンアップ
-        cleanupPort(port, resolve);
+        resolve();
       });
       return;
     }
 
-    cleanupPort(port, resolve);
-  });
-};
-
-const cleanupPort = (port, resolve) => {
-  // 2. ポート番号で停止する場合: LISTEN状態のサーバープロセスのみを抽出し、ブラウザ/WebKitを絶対にkillしない
-  exec(`lsof -nP -iTCP:${port} -sTCP:LISTEN`, (err, stdout) => {
-    if (!stdout || !stdout.trim()) {
-      resolve();
-      return;
-    }
-    const lines = stdout.trim().split('\n').slice(1);
-    const serverPids = [];
-    lines.forEach(line => {
-      const parts = line.trim().split(/\s+/);
-      if (parts.length >= 2) {
-        const cmd = parts[0].toLowerCase();
-        const pid = parts[1];
-        // Python または Node プロセスのみを安全にkill対象とする
-        if (cmd.includes('python') || cmd.includes('node')) {
-          serverPids.push(pid);
+    // 2. ポート番号で停止する場合: LISTEN状態のサーバープロセスのみを抽出し、ブラウザ/WebKitを絶対にkillしない
+    exec(`lsof -nP -iTCP:${port} -sTCP:LISTEN`, (err, stdout) => {
+      if (!stdout || !stdout.trim()) {
+        resolve();
+        return;
+      }
+      const lines = stdout.trim().split('\n').slice(1);
+      const serverPids = [];
+      lines.forEach(line => {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length >= 2) {
+          const cmd = parts[0].toLowerCase();
+          const pid = parts[1];
+          // Python または Node プロセスのみを安全にkill対象とする
+          if (cmd.includes('python') || cmd.includes('node')) {
+            serverPids.push(pid);
+          }
         }
+      });
+
+      if (serverPids.length > 0) {
+        exec(`kill -9 ${serverPids.join(' ')}`, () => resolve());
+      } else {
+        resolve();
       }
     });
-
-    if (serverPids.length > 0) {
-      exec(`kill -9 ${serverPids.join(' ')}`, () => resolve());
-    } else {
-      resolve();
-    }
   });
 };
 
-
 const scriptMap = {
-  'local_api_server': { file: 'server/local_api_server.py', port: 8001, logFile: 'logs/api_server.log' },
-  'youtube_comment_server': { file: 'server/youtube_comment_server.py', port: 8768, logFile: 'logs/youtube_server.log' },
-  'tiktok_comment_server': { file: 'server/tiktok_comment_server.py', port: 8767, logFile: 'logs/tiktok_server.log' }
+  'local_api_server': { file: 'server/local_api_server.py', port: 8002, logFile: 'logs/api_server.log' },
+  'youtube_comment_server': { file: 'server/youtube_comment_server.py', port: 8778, logFile: 'logs/youtube_server.log' },
+  'tiktok_comment_server': { file: 'server/tiktok_comment_server.py', port: 8777, logFile: 'logs/tiktok_server.log' }
 };
-
 
 const serverLogs = {
   'local_api_server': [],
@@ -76,9 +69,17 @@ const serverLogs = {
 
 const addLog = (serverName, type, msg) => {
   const time = new Date().toLocaleTimeString();
-  serverLogs[serverName].push(`[${time}] [${type}] ${msg}`);
+  const logLine = `[${time}] [${type}] ${msg}`;
+  serverLogs[serverName].push(logLine);
   if (serverLogs[serverName].length > 100) {
     serverLogs[serverName].shift();
+  }
+  const config = scriptMap[serverName];
+  if (config && config.logFile) {
+    try {
+      const fullPath = path.resolve(process.cwd(), config.logFile);
+      fs.appendFileSync(fullPath, logLine + '\n', 'utf-8');
+    } catch (e) {}
   }
 };
 
@@ -128,30 +129,7 @@ const backendManagerPlugin = () => ({
           const parts = url.pathname.split('/');
           if (parts.length === 5 && parts[4] === 'logs') {
             const serverName = parts[3];
-            let combinedLogs = [...(serverLogs[serverName] || [])];
-            
-            // 実ログファイルが存在する場合は末尾50行を取得してマージ
-            const config = scriptMap[serverName];
-            if (config && config.logFile) {
-              const fullLogPath = path.resolve(process.cwd(), config.logFile);
-              if (fs.existsSync(fullLogPath)) {
-                try {
-                  const fileContent = fs.readFileSync(fullLogPath, 'utf-8');
-                  const lines = fileContent.split('\n').filter(Boolean);
-                  const recentLines = lines.slice(-50);
-                  if (combinedLogs.length === 0) {
-                    combinedLogs = recentLines;
-                  } else {
-                    // 重複を避けてマージ
-                    combinedLogs = Array.from(new Set([...combinedLogs, ...recentLines])).slice(-60);
-                  }
-                } catch (err) {
-                  // read error fallback
-                }
-              }
-            }
-
-            res.end(JSON.stringify({ logs: combinedLogs }));
+            res.end(JSON.stringify({ logs: serverLogs[serverName] || [] }));
             return;
           }
         }
@@ -170,41 +148,18 @@ const backendManagerPlugin = () => ({
               return;
             }
 
-            if (action === 'stop' || action === 'restart') {
+            if (action === 'stop') {
               await killProcessOnPort(config.port, config.file);
               addLog(serverName, 'SYSTEM', 'Server stopped.');
-            }
-
-            if (action === 'start') {
-              const isRunning = await checkPort(config.port);
-              if (isRunning) {
-                res.end(JSON.stringify({ status: 'already_running' }));
-                return;
-              }
+            } else if (action === 'start' || action === 'restart') {
+              // ゾンビプロセスによる Address already in use を防ぐため、安全に既存サーバープロセスをクリーンアップ
+              await killProcessOnPort(config.port, config.file);
               serverLogs[serverName] = [];
-              addLog(serverName, 'SYSTEM', 'Starting server...');
+              addLog(serverName, 'SYSTEM', action === 'restart' ? 'Restarting server...' : 'Starting server...');
 
-              const child = spawn('python3', [config.file], {
+              const child = spawn('python3', ['-u', config.file, '--port', String(config.port)], {
                 cwd: process.cwd(),
-                stdio: 'pipe'
-              });
-              child.stdout.on('data', (data) => {
-                const lines = data.toString().split('\n').filter(Boolean);
-                lines.forEach(l => addLog(serverName, 'STDOUT', l));
-              });
-              child.stderr.on('data', (data) => {
-                const lines = data.toString().split('\n').filter(Boolean);
-                lines.forEach(l => addLog(serverName, 'STDERR', l));
-              });
-              child.on('close', (code) => {
-                addLog(serverName, 'SYSTEM', `Process exited with code ${code}`);
-              });
-            } else if (action === 'restart') {
-              serverLogs[serverName] = [];
-              addLog(serverName, 'SYSTEM', 'Restarting server...');
-
-              const child = spawn('python3', [config.file], {
-                cwd: process.cwd(),
+                env: { ...process.env, PYTHONUNBUFFERED: '1' },
                 stdio: 'pipe'
               });
               child.stdout.on('data', (data) => {
@@ -239,7 +194,7 @@ export default defineConfig({
       'Expires': '0'
     },
     host: '0.0.0.0',
-    port: 8443,
+    port: 8444,
     strictPort: true,
     hmr: false, // 配信中の勝手な画面強制リロード・エラーオーバーレイを完全防止
     watch: {
@@ -247,7 +202,7 @@ export default defineConfig({
     },
     proxy: {
       '^/(api|news_script|log(?:$|[/?])|update_hiragana_data|radio_script|radio_script_yomi|radio_script_config|custom_idle_phrases|hiragana_data|se_list|add_idle_phrase|convert_remaining_kanji|fetch_rss|get_youtube_video_info)': {
-        target: 'http://127.0.0.1:8001',
+        target: 'http://127.0.0.1:8002',
         changeOrigin: true,
         secure: false,
       }

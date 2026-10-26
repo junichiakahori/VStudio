@@ -224,6 +224,27 @@ async def stop_tiktok_client():
             "message": "Disconnected"
         })
 
+def _ensure_port_available(port: int):
+    """起動時に指定ポートが古いPythonサーバーに占有されていれば自動解放（ゾンビ防止）"""
+    try:
+        import subprocess
+        res = subprocess.run(["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN"], capture_output=True, text=True)
+        lines = res.stdout.strip().split("\n")
+        if len(lines) <= 1:
+            return
+        my_pid = str(os.getpid())
+        for line in lines[1:]:
+            parts = line.strip().split()
+            if len(parts) >= 2:
+                cmd = parts[0].lower()
+                pid = parts[1]
+                if "python" in cmd and pid != my_pid:
+                    logging.warning(f"[TikTok WS] 🛡️ ポート {port} を占有している旧プロセス (PID: {pid}) を自動解放します...")
+                    subprocess.run(["kill", "-9", pid], check=False)
+                    time.sleep(0.5)
+    except Exception as e:
+        logging.warning(f"[TikTok WS] ポート自動解放エラー (スキップ): {e}")
+
 async def main():
     host = "localhost"
     port = 8767
@@ -243,9 +264,17 @@ async def main():
             port = int(os.environ["PORT"])
         except ValueError:
             pass
+    _ensure_port_available(port)
     logging.info(f"Starting WebSocket server on ws://{host}:{port}")
     
-    server = await websockets.serve(ws_handler, host, port)
+    server = await websockets.serve(
+        ws_handler,
+        host,
+        port,
+        ping_interval=20,
+        ping_timeout=20,
+        close_timeout=10
+    )
     await server.wait_closed()
 
 if __name__ == "__main__":
