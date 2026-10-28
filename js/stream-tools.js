@@ -1,3 +1,15 @@
+// 🎨 サムネイルエディタモーダルを開くグローバル関数（uiLoaded前でも即座に呼べるよう早期宣言）
+window.openThumbnailEditorModal = window.openThumbnailEditorModal || function () {
+  const modal = document.getElementById("thumbnail-editor-modal");
+  if (modal) {
+    modal.style.display = "flex";
+  }
+  const btn = document.getElementById("open-thumb-editor-btn");
+  if (btn && typeof btn.onclick === "function") {
+    try { btn.onclick(); } catch (e) {}
+  }
+};
+
 (window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("stream-tools", () => {
   // =====================================================================
   // 配信情報・サムネ作成

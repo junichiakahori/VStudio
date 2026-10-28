@@ -907,22 +907,63 @@ https://x.com/drone_akahori
     const editThumbBtn = document.getElementById("btn-wizard-open-thumb-editor") || document.getElementById("wizard-btn-edit-thumb");
     editThumbBtn?.addEventListener("click", () => {
       const titleVal = getTitleInputElement()?.value || "";
-      if (window.openerWin) {
+      if (window.openerWin && !window.openerWin.closed) {
         // 親画面の配信タイトル入力欄にタイトルを同期
-        const mainTitleInput = window.openerWin.document.getElementById("stream-title");
-        if (mainTitleInput && titleVal) {
-          mainTitleInput.value = titleVal;
-        }
+        try {
+          const mainTitleInput = window.openerWin.document.getElementById("stream-title");
+          if (mainTitleInput && titleVal) {
+            mainTitleInput.value = titleVal;
+          }
+        } catch (e) {}
+
+        let opened = false;
+
+        // 1. 親画面の openThumbnailEditorModal 関数
         if (typeof window.openerWin.openThumbnailEditorModal === "function") {
-          window.openerWin.openThumbnailEditorModal();
-          window.openerWin.focus();
-          showYtApiFeedback("🎨 メイン画面でサムネイルエディタを開きました！", true);
-        } else if (typeof window.openerWin.openNewsThumbnailModal === "function") {
-          window.openerWin.openNewsThumbnailModal();
-          window.openerWin.focus();
+          try {
+            window.openerWin.openThumbnailEditorModal();
+            opened = true;
+          } catch (e) {
+            console.warn("[Wizard] openThumbnailEditorModal call failed:", e);
+          }
+        }
+
+        // 2. 親画面の openNewsThumbnailModal 関数（フォールバック）
+        if (!opened && typeof window.openerWin.openNewsThumbnailModal === "function") {
+          try {
+            window.openerWin.openNewsThumbnailModal();
+            opened = true;
+          } catch (e) {}
+        }
+
+        // 3. 親画面の「サムネイルエディタを開く」ボタンを直接クリック
+        if (!opened) {
+          try {
+            const btn = window.openerWin.document.getElementById("open-thumb-editor-btn") ||
+                        window.openerWin.document.getElementById("generate-thumb-btn");
+            if (btn) {
+              btn.click();
+              opened = true;
+            }
+          } catch (e) {}
+        }
+
+        // 4. 親画面のモーダルDOM (#thumbnail-editor-modal) を直接 display: flex
+        if (!opened) {
+          try {
+            const modal = window.openerWin.document.getElementById("thumbnail-editor-modal");
+            if (modal) {
+              modal.style.display = "flex";
+              opened = true;
+            }
+          } catch (e) {}
+        }
+
+        if (opened) {
+          try { window.openerWin.focus(); } catch (e) {}
           showYtApiFeedback("🎨 メイン画面でサムネイルエディタを開きました！", true);
         } else {
-          showYtApiFeedback("⚠️ メイン画面でサムネイルエディタが見つかりませんでした。", false);
+          showYtApiFeedback("⚠️ メイン画面でサムネイルエディタが見つかりませんでした。メイン画面を更新してください。", false);
         }
       } else {
         showYtApiFeedback("⚠️ 親ウィンドウ（スタジオ画面）との通信が切断されています。", false);
