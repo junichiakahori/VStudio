@@ -290,8 +290,11 @@
             <span class="badge" id="canvas-size-badge">1280 × 720</span>
         </div>
         <div style="display: flex; gap: 8px;">
+            <button class="action-btn" id="btn-header-save-settings" style="font-size: 0.76rem; padding: 5px 10px; background: rgba(0, 210, 211, 0.2); border: 1px solid var(--primary); color: #00d2d3;">
+                ⚙️ 設定を保存
+            </button>
             <button class="action-btn" id="btn-sync-from-main" style="font-size: 0.76rem; padding: 5px 10px;">
-                🔄 タイトル・ポーズを再同期
+                🔄 再同期
             </button>
             <button class="action-btn danger" id="btn-close-window" style="font-size: 0.76rem; padding: 5px 10px;">
                 ✕ 閉じる
@@ -349,6 +352,15 @@
                 <!-- 3. 背景設定 -->
                 <div class="control-card">
                     <div class="control-card-title">🖼️ 背景</div>
+                    <div class="form-row" style="display: flex; gap: 6px; margin-bottom: 8px;">
+                        <button class="action-btn" id="btn-sync-studio-bg" style="flex: 1; font-size: 0.76rem; padding: 6px 8px;">
+                            🏠 スタジオの背景を同期
+                        </button>
+                        <label class="action-btn" style="flex: 1; font-size: 0.76rem; padding: 6px 8px; cursor: pointer; text-align: center;">
+                            📁 画像をアップロード
+                            <input type="file" id="thumb-bg-file-input" accept="image/*" style="display: none;">
+                        </label>
+                    </div>
                     <div class="form-row">
                         <textarea id="thumb-ai-bg-prompt" rows="2" placeholder="例: サイバーパンクなVTuber配信スタジオ、ネオンブルー"></textarea>
                     </div>
@@ -445,7 +457,15 @@
 
             <!-- フッター操作エリア -->
             <div class="controls-footer">
-                <div class="form-row" style="margin-bottom: 4px;">
+                <div style="display: flex; gap: 8px;">
+                    <button class="action-btn" id="btn-save-settings" style="flex: 1.4; font-size: 0.8rem; background: rgba(0, 210, 211, 0.2); border: 1px solid var(--primary); color: #00d2d3;">
+                        ⚙️ 設定のみ保存
+                    </button>
+                    <button class="action-btn" id="btn-reset-settings" style="flex: 0.6; font-size: 0.75rem; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: var(--text-muted);">
+                        ↺ 初期値
+                    </button>
+                </div>
+                <div class="form-row" style="margin-bottom: 2px;">
                     <input type="text" id="thumb-filename-input" placeholder="保存ファイル名 (例: 20261028_朝ニュース)">
                 </div>
                 <div style="display: flex; gap: 8px;">
@@ -462,6 +482,6 @@
     </div>
 
     <!-- 専用スクリプト -->
-    <script src="/js/thumbnail-editor.js?v=1.0"></script>
+    <script src="/js/thumbnail-editor.js?v=1.1"></script>
 </body>
 </html>

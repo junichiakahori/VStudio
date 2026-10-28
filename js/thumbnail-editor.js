@@ -18,6 +18,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const aiBgPrompt = document.getElementById("thumb-ai-bg-prompt");
   const aiBgBtn = document.getElementById("thumb-ai-bg-generate-btn");
   const aiBgStatus = document.getElementById("thumb-ai-bg-status");
+  const syncStudioBgBtn = document.getElementById("btn-sync-studio-bg");
+  const bgFileInput = document.getElementById("thumb-bg-file-input");
 
   const avatarScale = document.getElementById("thumb-avatar-scale");
   const avatarX = document.getElementById("thumb-avatar-x");
@@ -41,6 +43,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const filenameInput = document.getElementById("thumb-filename-input");
   const downloadBtn = document.getElementById("thumb-download-btn");
   const uploadYtBtn = document.getElementById("btn-upload-to-youtube");
+  const saveSettingsBtn = document.getElementById("btn-save-settings");
+  const resetSettingsBtn = document.getElementById("btn-reset-settings");
   const feedbackEl = document.getElementById("yt-api-feedback");
 
   const syncBtn = document.getElementById("btn-sync-from-main");
@@ -59,12 +63,188 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // キャッシュ画像
   let cachedAvatarCanvas = null;
-  let cachedAiBgImage = null;
+  let cachedStudioBgImage = null; // スタジオ背景画像
+  let cachedAiBgImage = null;     // AI背景画像
+  let activeBgSource = "studio";  // "studio" | "ai"
 
   // 親ウィンドウの参照
   const openerWin = window.opener && !window.opener.closed ? window.opener : null;
 
-  // 1. 親ウィンドウまたはlocalStorageからの初期値同期
+  // =========================================================================
+  // 1. 設定の保存・復元ロジック（画像を保存せずに設定のみ保存）
+  // =========================================================================
+  const SETTINGS_STORAGE_KEY = "vstudio_thumbnail_settings";
+
+  function saveCurrentSettings(showFeedbackToast = false) {
+    const settings = {
+      size: sizeSelect.value,
+      showBg: showBg.checked,
+      showAvatar: showAvatar.checked,
+      showTitle: showTitle.checked,
+      showDesc: showDesc.checked,
+      avatarScale: avatarScale.value,
+      avatarX: avatarX.value,
+      avatarY: avatarY.value,
+      titleColor: titleColor.value,
+      titleStroke: titleStroke.value,
+      titleSize: titleSize.value,
+      titleX: titleX.value,
+      titleY: titleY.value,
+      descColor: descColor.value,
+      descStroke: descStroke.value,
+      descSize: descSize.value,
+      descX: descX.value,
+      descY: descY.value,
+      activeBgSource: activeBgSource
+    };
+
+    try {
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+      if (showFeedbackToast) {
+        showFeedback("✅ サムネイル設定を保存しました！（次回起動時も自動適用されます）", true);
+      }
+    } catch (e) {
+      console.warn("[ThumbEditor] 設定保存エラー:", e);
+    }
+  }
+
+  function loadSavedSettings() {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) return false;
+    try {
+      const s = JSON.parse(raw);
+      if (s.size) sizeSelect.value = s.size;
+      if (typeof s.showBg === "boolean") showBg.checked = s.showBg;
+      if (typeof s.showAvatar === "boolean") showAvatar.checked = s.showAvatar;
+      if (typeof s.showTitle === "boolean") showTitle.checked = s.showTitle;
+      if (typeof s.showDesc === "boolean") showDesc.checked = s.showDesc;
+
+      if (s.avatarScale) avatarScale.value = s.avatarScale;
+      if (s.avatarX) avatarX.value = s.avatarX;
+      if (s.avatarY) avatarY.value = s.avatarY;
+
+      if (s.titleColor) titleColor.value = s.titleColor;
+      if (s.titleStroke) titleStroke.value = s.titleStroke;
+      if (s.titleSize) titleSize.value = s.titleSize;
+      if (s.titleX) titleX.value = s.titleX;
+      if (s.titleY) titleY.value = s.titleY;
+
+      if (s.descColor) descColor.value = s.descColor;
+      if (s.descStroke) descStroke.value = s.descStroke;
+      if (s.descSize) descSize.value = s.descSize;
+      if (s.descX) descX.value = s.descX;
+      if (s.descY) descY.value = s.descY;
+
+      if (s.activeBgSource) activeBgSource = s.activeBgSource;
+
+      updateLabels();
+      return true;
+    } catch (e) {
+      console.warn("[ThumbEditor] 設定ロードエラー:", e);
+      return false;
+    }
+  }
+
+  function resetToDefaultSettings() {
+    sizeSelect.value = "youtube";
+    showBg.checked = true;
+    showAvatar.checked = true;
+    showTitle.checked = true;
+    showDesc.checked = true;
+
+    avatarScale.value = "100";
+    avatarX.value = "100";
+    avatarY.value = "100";
+
+    titleColor.value = "#ffffff";
+    titleStroke.value = "#000000";
+    titleSize.value = "72";
+    titleX.value = "10";
+    titleY.value = "15";
+
+    descColor.value = "#f0f0f0";
+    descStroke.value = "#000000";
+    descSize.value = "40";
+    descX.value = "10";
+    descY.value = "80";
+
+    activeBgSource = "studio";
+    updateLabels();
+    updateCanvasDimensions();
+    saveCurrentSettings(false);
+    showFeedback("↺ サムネイル設定を初期値に戻しました", true);
+  }
+
+  function updateLabels() {
+    if (lblAvatarScale) lblAvatarScale.textContent = `${avatarScale.value}%`;
+    if (lblAvatarX) lblAvatarX.textContent = `${avatarX.value}%`;
+    if (lblAvatarY) lblAvatarY.textContent = `${avatarY.value}%`;
+    if (lblTitleSize) lblTitleSize.textContent = `${titleSize.value}px`;
+    if (lblTitleX) lblTitleX.textContent = `${titleX.value}%`;
+    if (lblTitleY) lblTitleY.textContent = `${titleY.value}%`;
+    if (lblDescSize) lblDescSize.textContent = `${descSize.value}px`;
+    if (lblDescX) lblDescX.textContent = `${descX.value}%`;
+    if (lblDescY) lblDescY.textContent = `${descY.value}%`;
+  }
+
+  // =========================================================================
+  // 2. スタジオ背景画像の読み込みと同期
+  // =========================================================================
+  function loadStudioBackground() {
+    let bgUrl = "";
+
+    // 1. 親ウィンドウから取得
+    if (openerWin) {
+      try {
+        const bgLayer = openerWin.document.getElementById("background-layer");
+        if (bgLayer) {
+          const bgStyle = bgLayer.style.backgroundImage || openerWin.getComputedStyle(bgLayer).backgroundImage;
+          if (bgStyle && bgStyle !== "none") {
+            const m = bgStyle.match(/url\(['"]?(.*?)['"]?\)/);
+            if (m && m[1]) bgUrl = m[1];
+          }
+        }
+      } catch (e) {
+        console.warn("[ThumbEditor] opener背景取得エラー:", e);
+      }
+    }
+
+    // 2. localStorage からの取得
+    if (!bgUrl) {
+      bgUrl = localStorage.getItem("savedBackgroundImage") || "";
+    }
+
+    if (bgUrl) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        cachedStudioBgImage = img;
+        activeBgSource = "studio";
+        drawPreview();
+      };
+      img.onerror = (err) => {
+        console.warn("[ThumbEditor] スタジオ背景画像ロード失敗:", err);
+      };
+      img.src = bgUrl;
+    } else {
+      drawPreview();
+    }
+  }
+
+  // 保存済みAI背景画像の復元
+  const savedAiBgData = localStorage.getItem("savedThumb_aiBgData");
+  if (savedAiBgData) {
+    const bgImg = new Image();
+    bgImg.onload = () => {
+      cachedAiBgImage = bgImg;
+      if (activeBgSource === "ai") drawPreview();
+    };
+    bgImg.src = savedAiBgData;
+  }
+
+  // =========================================================================
+  // 3. 親ウィンドウからの情報同期
+  // =========================================================================
   function syncFromParent(force = false) {
     if (openerWin) {
       try {
@@ -95,7 +275,8 @@ document.addEventListener("DOMContentLoaded", () => {
       filenameInput.value = `${ymd}_サムネイル`;
     }
 
-    // アバターキャプチャ
+    // 背景とアバターの同期
+    loadStudioBackground();
     captureAvatarFromOpener();
   }
 
@@ -103,7 +284,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function captureAvatarFromOpener() {
     if (openerWin) {
       try {
-        // 親ウィンドウのPixiJSビューを取得
         const pApp = openerWin.pixiApp;
         if (pApp && pApp.view) {
           const v = pApp.view;
@@ -142,18 +322,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 保存済みAI背景画像の復元
-  const savedAiBgData = localStorage.getItem("savedThumb_aiBgData");
-  if (savedAiBgData) {
-    const bgImg = new Image();
-    bgImg.onload = () => {
-      cachedAiBgImage = bgImg;
-      drawPreview();
-    };
-    bgImg.src = savedAiBgData;
-  }
-
-  // 2. キャンバスサイズ変更
+  // =========================================================================
+  // 4. キャンバスサイズ変更
+  // =========================================================================
   function updateCanvasDimensions() {
     const mode = sizeSelect.value;
     if (mode === "tiktok") {
@@ -175,7 +346,9 @@ document.addEventListener("DOMContentLoaded", () => {
     drawPreview();
   }
 
-  // 3. プレビュー描画メイン処理
+  // =========================================================================
+  // 5. プレビュー描画メイン処理
+  // =========================================================================
   function drawPreview() {
     const W = canvas.width;
     const H = canvas.height;
@@ -184,8 +357,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 1. 背景描画
     if (showBg.checked) {
-      if (cachedAiBgImage && cachedAiBgImage.complete && cachedAiBgImage.naturalWidth > 0) {
-        ctx.drawImage(cachedAiBgImage, 0, 0, W, H);
+      let targetBg = null;
+      if (activeBgSource === "ai" && cachedAiBgImage && cachedAiBgImage.complete && cachedAiBgImage.naturalWidth > 0) {
+        targetBg = cachedAiBgImage;
+      } else if (cachedStudioBgImage && cachedStudioBgImage.complete && cachedStudioBgImage.naturalWidth > 0) {
+        targetBg = cachedStudioBgImage;
+      } else if (cachedAiBgImage && cachedAiBgImage.complete && cachedAiBgImage.naturalWidth > 0) {
+        targetBg = cachedAiBgImage;
+      }
+
+      if (targetBg) {
+        // cover: アスペクト比を維持しつつキャンバス全体を満たす
+        const scale = Math.max(W / targetBg.naturalWidth, H / targetBg.naturalHeight);
+        const drawW = targetBg.naturalWidth * scale;
+        const drawH = targetBg.naturalHeight * scale;
+        const drawX = (W - drawW) / 2;
+        const drawY = (H - drawH) / 2;
+        ctx.drawImage(targetBg, drawX, drawY, drawW, drawH);
       } else {
         // グラデーション背景
         const grad = ctx.createLinearGradient(0, 0, W, H);
@@ -235,7 +423,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const posY = H * yPct - drawH * 0.9;
 
       ctx.save();
-      // アバターにわずかなシャドウ
       ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
       ctx.shadowBlur = 24;
       ctx.shadowOffsetX = 4;
@@ -299,14 +486,17 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.restore();
     }
 
-    // 🌟 自動永続化（親画面やYouTubeアップロードが即座に読めるよう保存）
+    // 🌟 自動永続化（最新画像データと設定のオートセーブ）
     try {
       const currentDataUrl = canvas.toDataURL("image/png");
       localStorage.setItem("savedThumb_latestDataUrl", currentDataUrl);
+      saveCurrentSettings(false);
     } catch (e) {}
   }
 
-  // 4. スライダーラベル・値連動
+  // =========================================================================
+  // 6. 入力イベントバインド
+  // =========================================================================
   function setupInputs() {
     const bindRange = (input, label, unit = "", callback = drawPreview) => {
       input.addEventListener("input", () => {
@@ -335,7 +525,10 @@ document.addEventListener("DOMContentLoaded", () => {
       el.addEventListener("input", drawPreview);
     });
 
-    sizeSelect.addEventListener("change", updateCanvasDimensions);
+    sizeSelect.addEventListener("change", () => {
+      updateCanvasDimensions();
+      saveCurrentSettings(false);
+    });
 
     recaptureBtn.addEventListener("click", () => {
       captureAvatarFromOpener();
@@ -343,22 +536,68 @@ document.addEventListener("DOMContentLoaded", () => {
 
     syncBtn.addEventListener("click", () => {
       syncFromParent(true);
+      showFeedback("🔄 親画面からタイトル・背景・アバターを再同期しました", true);
     });
 
     closeBtn.addEventListener("click", () => {
       window.close();
     });
 
-    // 5. 画像保存（ダウンロード）
+    // ⚙️ 設定のみ保存ボタン
+    if (saveSettingsBtn) {
+      saveSettingsBtn.addEventListener("click", () => {
+        saveCurrentSettings(true);
+      });
+    }
+    const headerSaveBtn = document.getElementById("btn-header-save-settings");
+    if (headerSaveBtn) {
+      headerSaveBtn.addEventListener("click", () => {
+        saveCurrentSettings(true);
+      });
+    }
+
+    // ↺ 設定初期値リセットボタン
+    resetSettingsBtn.addEventListener("click", () => {
+      if (confirm("サムネイルの文字サイズや位置設定を初期値に戻しますか？")) {
+        resetToDefaultSettings();
+      }
+    });
+
+    // 🏠 スタジオの背景を同期ボタン
+    syncStudioBgBtn.addEventListener("click", () => {
+      loadStudioBackground();
+      showFeedback("🏠 スタジオの配信背景を読み込みました！", true);
+    });
+
+    // 📁 ローカル画像アップロード
+    bgFileInput.addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const img = new Image();
+        img.onload = () => {
+          cachedStudioBgImage = img;
+          activeBgSource = "studio";
+          drawPreview();
+          showFeedback("📁 背景画像をアップロードしました！", true);
+        };
+        img.src = evt.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // 💾 画像保存（ダウンロード）
     downloadBtn.addEventListener("click", () => {
       const fn = (filenameInput.value.trim() || "thumbnail") + ".png";
       const a = document.createElement("a");
       a.download = fn;
       a.href = canvas.toDataURL("image/png");
       a.click();
+      showFeedback(`💾 サムネイル画像 (${fn}) をダウンロードしました！`, true);
     });
 
-    // 6. YouTube枠へ直接反映（API送信）
+    // 🚀 YouTube枠へ直接反映（API送信）
     uploadYtBtn.addEventListener("click", async () => {
       let videoId = "";
       if (openerWin) {
@@ -403,7 +642,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    // 7. AI背景生成ボタン
+    // ✨ AI背景生成ボタン
     aiBgBtn.addEventListener("click", async () => {
       const prompt = aiBgPrompt.value.trim();
       if (!prompt) {
@@ -426,6 +665,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const img = new Image();
           img.onload = () => {
             cachedAiBgImage = img;
+            activeBgSource = "ai";
             localStorage.setItem("savedThumb_aiBgData", data.image_url);
             aiBgStatus.textContent = "✅ 背景生成が完了しました！";
             drawPreview();
@@ -447,9 +687,13 @@ document.addEventListener("DOMContentLoaded", () => {
     feedbackEl.textContent = msg;
     feedbackEl.className = isSuccess ? "success" : "error";
     feedbackEl.style.display = "block";
+    setTimeout(() => {
+      if (feedbackEl) feedbackEl.style.display = "none";
+    }, 5000);
   }
 
   // 初期化実行
+  loadSavedSettings();
   setupInputs();
   syncFromParent();
   updateCanvasDimensions();
