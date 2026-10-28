@@ -74,9 +74,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // 1. 設定の保存・復元ロジック（画像を保存せずに設定のみ保存）
   // =========================================================================
   const SETTINGS_STORAGE_KEY = "vstudio_thumbnail_settings";
+  let hasUserCustomTitle = false;
 
   function saveCurrentSettings(showFeedbackToast = false) {
     const settings = {
+      titleText: editTitle.value,
+      descText: editDesc.value,
       size: sizeSelect.value,
       showBg: showBg.checked,
       showAvatar: showAvatar.checked,
@@ -101,7 +104,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
       if (showFeedbackToast) {
-        showFeedback("✅ サムネイル設定を保存しました！（次回起動時も自動適用されます）", true);
+        showFeedback("✅ サムネイル設定（タイトル含む）を保存しました！", true);
       }
     } catch (e) {
       console.warn("[ThumbEditor] 設定保存エラー:", e);
@@ -113,6 +116,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!raw) return false;
     try {
       const s = JSON.parse(raw);
+      if (typeof s.titleText === "string" && s.titleText.trim()) {
+        editTitle.value = s.titleText;
+        hasUserCustomTitle = true;
+      }
+      if (typeof s.descText === "string") {
+        editDesc.value = s.descText;
+      }
       if (s.size) sizeSelect.value = s.size;
       if (typeof s.showBg === "boolean") showBg.checked = s.showBg;
       if (typeof s.showAvatar === "boolean") showAvatar.checked = s.showAvatar;
@@ -169,6 +179,8 @@ document.addEventListener("DOMContentLoaded", () => {
     descY.value = "80";
 
     activeBgSource = "studio";
+    hasUserCustomTitle = false;
+    syncFromParent(true);
     updateLabels();
     updateCanvasDimensions();
     saveCurrentSettings(false);
@@ -249,11 +261,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (openerWin) {
       try {
         const pTitle = openerWin.document.getElementById("stream-title");
-        if (pTitle && pTitle.value && (!editTitle.value || force)) {
+        // force（明示的な再同期ボタン）以外は、保存済みカスタムタイトルを尊重して上書きしない
+        if (pTitle && pTitle.value && (force || (!editTitle.value && !hasUserCustomTitle))) {
           editTitle.value = pTitle.value;
         }
         const pDesc = openerWin.document.getElementById("stream-description");
-        if (pDesc && pDesc.value && (!editDesc.value || force)) {
+        if (pDesc && pDesc.value && (force || !editDesc.value)) {
           editDesc.value = pDesc.value.split("\n")[0] || "";
         }
       } catch (e) {
@@ -521,9 +534,11 @@ document.addEventListener("DOMContentLoaded", () => {
       el.addEventListener("change", drawPreview);
     });
 
-    [editTitle, editDesc].forEach((el) => {
-      el.addEventListener("input", drawPreview);
+    editTitle.addEventListener("input", () => {
+      hasUserCustomTitle = true;
+      drawPreview();
     });
+    editDesc.addEventListener("input", drawPreview);
 
     sizeSelect.addEventListener("change", () => {
       updateCanvasDimensions();
