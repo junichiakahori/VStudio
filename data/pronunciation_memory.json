@@ -2821,6 +2821,18 @@
       "category": "counter",
       "registered_date": "2026-10-24",
       "note": "OpenJTalkが『軒（げん）』の連濁を誤適用して『せんげん』と誤読するのを100%防止し『せんけん』に固定"
+    },
+    {
+      "id": "polyphone_hitomede",
+      "surface": "一目で",
+      "reading": "ひとめで",
+      "wrong_reading": "いちもくで",
+      "scope": "global",
+      "article_topic": "多音語・副詞・一般表現",
+      "sample_sentence": "現在の状況が一目で確認できるダッシュボードを公開しましたにゃ。",
+      "category": "polyphone_expression",
+      "registered_date": "2026-10-29",
+      "note": "『一目瞭然』『一目置く』等の熟語を保護しつつ、VOICEVOXが『いちもくで』と誤読するのを『ひとめで』へ恒久是正"
     }
   ]
 }

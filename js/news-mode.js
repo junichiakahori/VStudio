@@ -144,11 +144,25 @@ window.isInvalidNewsVideoArticle = isInvalidNewsVideoArticle;
 window.readNewsTitles = window.readNewsTitles || new Set(JSON.parse(localStorage.getItem("newsReadTitles") || "[]"));
 
 // 既存の window.latestFetchedNews が存在する場合は保護し、空の場合のみ localStorage から復元
+// 🛡️ ただし最後まで読み終わっている場合（newsCompleted === "true"）や全件読了済みの場合はゾンビ復元しない
 if (!window.latestFetchedNews || window.latestFetchedNews.length === 0) {
   try {
+    const isCompleted = localStorage.getItem("newsCompleted") === "true";
     const savedNews = localStorage.getItem("latestFetchedNews");
-    if (savedNews) {
-      window.latestFetchedNews = JSON.parse(savedNews);
+    if (savedNews && !isCompleted) {
+      const parsed = JSON.parse(savedNews);
+      const readTitles = window.readNewsTitles || new Set(JSON.parse(localStorage.getItem("newsReadTitles") || "[]"));
+      // 全記事がすでに既読の場合は古いニュースなので復元せずにクリア
+      const hasUnread = Array.isArray(parsed) && parsed.some(it => it && it.title && !readTitles.has(it.title));
+      if (hasUnread) {
+        window.latestFetchedNews = parsed;
+      } else {
+        console.log("[ニュース初期化] ℹ️ 前回のニュースは全件読了済みのためキャッシュを自動クリアしました");
+        localStorage.removeItem("latestFetchedNews");
+        window.latestFetchedNews = [];
+      }
+    } else {
+      window.latestFetchedNews = [];
     }
   } catch (e) {
     window.latestFetchedNews = [];
@@ -1262,6 +1276,23 @@ function getNewsConfig() {
       }
 
       console.log("[ニュース番組] 🎉 番組がすべて正常に完了しました！");
+      // 🧹 全記事読了クリーンアップ：最後まで読み終わったため、中断復帰データと古いキャッシュを完全破棄
+      try {
+        localStorage.removeItem("newsActiveState");
+        localStorage.removeItem("vstudio_news_broadcast_state");
+        localStorage.setItem("newsCompleted", "true");
+        localStorage.removeItem("latestFetchedNews");
+        window.latestFetchedNews = [];
+        const existingBanner = document.getElementById("news-resume-banner");
+        if (existingBanner) existingBanner.remove();
+        const resumeContainer = document.getElementById("news-resume-container");
+        if (resumeContainer) { resumeContainer.innerHTML = ""; resumeContainer.style.display = "none"; }
+        const startIdxInput = document.getElementById("news-broadcast-start-index");
+        if (startIdxInput) startIdxInput.value = 1;
+        console.log("[ニュース番組] 🧹 読了に伴い中断復帰データおよび古いニュースキャッシュをクリアしました");
+      } catch (cleanupErr) {
+        console.warn("[ニュース番組] クリーンアップ例外:", cleanupErr);
+      }
       stopNewsBroadcast();
 
       // 📰 全記事読了時の自動終了設定（isAutoEndAfterNews または DOM設定）が有効な場合、直ちに配信終了・OBS停止プロセスを起動
@@ -1354,6 +1385,19 @@ function getNewsConfig() {
       const container = document.getElementById("news-resume-container") || document.querySelector(".panel-header-wrapper") || document.body;
       const resumeContainer = document.getElementById("news-resume-container");
 
+      // 🛡️ すでに最後まで読み終わっている（読了済み）場合はレジューム不要
+      if (localStorage.getItem("newsCompleted") === "true") {
+        try {
+          localStorage.removeItem("newsActiveState");
+          localStorage.removeItem("latestFetchedNews");
+          window.latestFetchedNews = [];
+        } catch (e) {}
+        console.log("[ニュースレジューム] 🏁 前回の放送は全件読了済みのためレジュームをスキップしました");
+        const startIdxInput = document.getElementById("news-broadcast-start-index");
+        if (startIdxInput) startIdxInput.value = 1;
+        return;
+      }
+
       // 1. ピンポイント中断データ（newsActiveState）が存在する場合
       const raw = localStorage.getItem("newsActiveState");
       if (raw) {
@@ -1363,6 +1407,15 @@ function getNewsConfig() {
             const totalS = (saved.scriptData && saved.scriptData.items) ? saved.scriptData.items.length : 1;
             const currentS = (saved.sentenceIndex || 0) + 1;
             const artNum = (saved.articleIndex || 0) + 1;
+
+            // 🛡️ 最終記事の最終文まで読了している場合は中断ではなく完了なので破棄
+            if (saved.totalArticles && artNum >= saved.totalArticles && currentS >= totalS) {
+              localStorage.removeItem("newsActiveState");
+              localStorage.removeItem("latestFetchedNews");
+              window.latestFetchedNews = [];
+              return;
+            }
+
             const titleShort = saved.item.title.length > 20 ? saved.item.title.substring(0, 20) + "…" : saved.item.title;
 
             const existing = document.getElementById("news-resume-banner");
@@ -1407,6 +1460,11 @@ function getNewsConfig() {
               if (resumeContainer) resumeContainer.style.display = "none";
               banner.remove();
               localStorage.removeItem("newsActiveState");
+              localStorage.removeItem("latestFetchedNews");
+              window.latestFetchedNews = [];
+              const startIdxInput = document.getElementById("news-broadcast-start-index");
+              if (startIdxInput) startIdxInput.value = 1;
+              console.log("[ニュースレジューム] 🗑️ 中断復帰を破棄しました");
             };
             return;
           }
@@ -1433,6 +1491,18 @@ function getNewsConfig() {
           return false;
         };
         const firstUnreadIdx = sorted.findIndex(n => !checkIsRead(n.title));
+        
+        // 🛡️ 全件読了済み（未読記事が1件もない）場合：レジューム不要＆古いキャッシュクリア
+        if (firstUnreadIdx === -1) {
+          console.log("[ニュースレジューム] 🏁 全記事がすでに既読済みのためレジューム不要と判定しました");
+          localStorage.removeItem("newsActiveState");
+          localStorage.removeItem("latestFetchedNews");
+          window.latestFetchedNews = [];
+          const startIdxInput = document.getElementById("news-broadcast-start-index");
+          if (startIdxInput) startIdxInput.value = 1;
+          return;
+        }
+
         if (firstUnreadIdx !== -1 && firstUnreadIdx < sorted.length) {
           const startIdxInput = document.getElementById("news-broadcast-start-index");
           if (startIdxInput) {
@@ -1478,6 +1548,9 @@ function getNewsConfig() {
             if (resumeContainer) resumeContainer.style.display = "none";
             banner.remove();
             if (startIdxInput) startIdxInput.value = 1;
+            localStorage.removeItem("newsActiveState");
+            localStorage.removeItem("latestFetchedNews");
+            window.latestFetchedNews = [];
             console.log("[ニュースレジューム] 🗑️ 続きから再開を破棄し、第1件からの開始にリセットしました");
           };
         }

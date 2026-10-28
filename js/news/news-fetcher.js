@@ -214,6 +214,10 @@ function smartDeduplicateNewsItems(items) {
 }
 
 async function fetchNewsWithOptions(categoryKey = "cat_all", maxPerCategory = Infinity, startDate = null, endDate = null) {
+  try {
+    localStorage.removeItem("newsCompleted");
+    localStorage.removeItem("newsActiveState");
+  } catch (e) {}
   let fetchTargets = [];
   let sourceName = "全て";
 
