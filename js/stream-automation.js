@@ -246,8 +246,19 @@ window.executeStreamEndProcess = executeStreamEndProcess;
     // 2. 10秒待機（画面は配信準備中を維持）
     // 3. 配信準備中解除（※定型挨拶なし）
     // 4. BGM開始
-    // 5. ニュースの挨拶〜最初のニュースへ進行
     function triggerScheduledBroadcastSequence() {
+      // 🛑【最重要・放送事故防止】既に生配信中または番組読み上げ中なら二重起動・巻き戻しを100%遮断
+      const isBroadcastingNow = (
+        (typeof window.isNewsBroadcasting !== "undefined" && window.isNewsBroadcasting) ||
+        (window.newsStateManager && window.newsStateManager.isBroadcasting) ||
+        (typeof window.isRadioPlaying !== "undefined" && window.isRadioPlaying) ||
+        (window.obsWsClient && window.obsWsClient.isStreaming)
+      );
+      if (isBroadcastingNow) {
+        console.warn("[Local Schedule] 🛑 既に生配信・番組読み上げが進行中のため、重複する配信開始シーケンスを完全遮断・スキップします！");
+        return;
+      }
+
       console.log("[Local Schedule] ⏰ 配信開始シーケンス起動: 1. OBS配信開始合図を送信します。");
 
       // 1. OBS配信の自動開始（ON設定かつ接続時のみ）
@@ -413,9 +424,28 @@ window.executeStreamEndProcess = executeStreamEndProcess;
       const nowSetup = new Date();
       const pastDiffMs = nowSetup.getTime() - targetTime.getTime();
 
-      // 既に指定日時を過ぎている場合は、何分過ぎていても配信開始シーケンスを実行！
+      // 既に指定日時を過ぎている場合の処理
       if (pastDiffMs > 0) {
-        console.log("[Local Schedule] 指定日時を既に過ぎているため、配信開始シーケンスを実行します！");
+        // 🛑【最重要・放送事故防止】既に配信中・番組進行中なら絶対に発火させない
+        const isBroadcastingNow = (
+          (typeof window.isNewsBroadcasting !== "undefined" && window.isNewsBroadcasting) ||
+          (window.newsStateManager && window.newsStateManager.isBroadcasting) ||
+          (typeof window.isRadioPlaying !== "undefined" && window.isRadioPlaying) ||
+          (window.obsWsClient && window.obsWsClient.isStreaming)
+        );
+        if (isBroadcastingNow) {
+          console.warn("[Local Schedule] 🛑 既に配信中・番組進行中のため、過去の予約時刻による自動発火を完全遮断しました。");
+          return;
+        }
+
+        // 30秒以上過去の時刻は「過去の残骸」とみなし、暴走発火させない
+        if (pastDiffMs > 30000) {
+          console.warn("[Local Schedule] ⚠️ 指定時刻が30秒以上過去（過去の残骸）のため、自動発火をスキップしてタイマーを終了します。");
+          if (localScheduleCountdown) localScheduleCountdown.textContent = "00:00:00";
+          return;
+        }
+
+        console.log("[Local Schedule] 指定日時を直前に過ぎたため、配信開始シーケンスを実行します！");
         if (localScheduleCountdown) localScheduleCountdown.textContent = "00:00:00";
         if (statusBadge) {
           statusBadge.textContent = "🟢 開始中";
@@ -427,11 +457,20 @@ window.executeStreamEndProcess = executeStreamEndProcess;
       }
 
       // ⏳ 未来時刻待機: 配信開始前は画面を「配信準備中」にして待機
-      if (typeof window.setOverlayPreparing === "function") {
-        window.setOverlayPreparing();
-      } else {
-        const prepBtn = document.getElementById("overlay-prep-btn");
-        if (prepBtn) prepBtn.click();
+      // 🛑 ただし、既に配信中・番組進行中なら絶対に「配信準備中」で邪魔しない
+      const isBroadcastingForPrep = (
+        (typeof window.isNewsBroadcasting !== "undefined" && window.isNewsBroadcasting) ||
+        (window.newsStateManager && window.newsStateManager.isBroadcasting) ||
+        (typeof window.isRadioPlaying !== "undefined" && window.isRadioPlaying) ||
+        (window.obsWsClient && window.obsWsClient.isStreaming)
+      );
+      if (!isBroadcastingForPrep) {
+        if (typeof window.setOverlayPreparing === "function") {
+          window.setOverlayPreparing();
+        } else {
+          const prepBtn = document.getElementById("overlay-prep-btn");
+          if (prepBtn) prepBtn.click();
+        }
       }
 
       let lastHealthCheckTime = 0;
