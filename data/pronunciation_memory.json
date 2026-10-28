@@ -2833,6 +2833,30 @@
       "category": "polyphone_expression",
       "registered_date": "2026-10-29",
       "note": "『一目瞭然』『一目置く』等の熟語を保護しつつ、VOICEVOXが『いちもくで』と誤読するのを『ひとめで』へ恒久是正"
+    },
+    {
+      "id": "polyphone_houshin",
+      "surface": "方針",
+      "reading": "ほうしん",
+      "wrong_reading": "かたばり",
+      "scope": "global",
+      "article_topic": "一般・政治・経済・社会",
+      "sample_sentence": "政府は今後の基本方針を発表しましたにゃ。",
+      "category": "common_noun",
+      "registered_date": "2026-10-29",
+      "note": "「方針」の誤読（かたばり）を防止し、常に「ほうしん」と正しく発音するよう是正"
+    },
+    {
+      "id": "polyphone_houshin_katahari",
+      "surface": "方針",
+      "reading": "ほうしん",
+      "wrong_reading": "かたはり",
+      "scope": "global",
+      "article_topic": "一般・政治・経済・社会",
+      "sample_sentence": "今後の運営方針について説明しましたにゃ。",
+      "category": "common_noun",
+      "registered_date": "2026-10-29",
+      "note": "「方針」の誤読（かたはり）を防止し、常に「ほうしん」と正しく発音するよう是正"
     }
   ]
 }
