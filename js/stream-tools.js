@@ -1,13 +1,26 @@
-// 🎨 サムネイルエディタモーダルを開くグローバル関数（uiLoaded前でも即座に呼べるよう早期宣言）
+// 🎨 サムネイルエディタを別ウィンドウ（ポップアップ）で開くグローバル関数（配信画面への映り込みを完全防止）
 window.openThumbnailEditorModal = window.openThumbnailEditorModal || function () {
-  const modal = document.getElementById("thumbnail-editor-modal");
-  if (modal) {
-    modal.style.display = "flex";
+  const width = 1120;
+  const height = 820;
+  const left = Math.max(0, Math.round((screen.width - width) / 2));
+  const top = Math.max(0, Math.round((screen.height - height) / 2));
+
+  if (window.thumbEditorWindow && !window.thumbEditorWindow.closed) {
+    try {
+      window.thumbEditorWindow.focus();
+      return window.thumbEditorWindow;
+    } catch (e) {}
   }
-  const btn = document.getElementById("open-thumb-editor-btn");
-  if (btn && typeof btn.onclick === "function") {
-    try { btn.onclick(); } catch (e) {}
+
+  window.thumbEditorWindow = window.open(
+    `/thumbnail_editor.html?v=${Date.now()}`,
+    "VStudioThumbnailEditor",
+    `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
+  );
+  if (window.thumbEditorWindow) {
+    try { window.thumbEditorWindow.focus(); } catch (e) {}
   }
+  return window.thumbEditorWindow;
 };
 
 (window.onUILoaded || ((id, fn) => window.addEventListener("uiLoaded", fn)))("stream-tools", () => {
@@ -763,31 +776,30 @@ window.openThumbnailEditorModal = window.openThumbnailEditorModal || function ()
   };
 
   window.openThumbnailEditorModal = function () {
-    if (thumbEditorModal) thumbEditorModal.style.display = "flex";
+    const width = 1120;
+    const height = 820;
+    const left = Math.max(0, Math.round((screen.width - width) / 2));
+    const top = Math.max(0, Math.round((screen.height - height) / 2));
 
-    window.thumbFilenameInput = document.getElementById("thumb-filename-input");
-    if (
-      thumbFilenameInput &&
-      (!thumbFilenameInput.value || thumbFilenameInput.value === "thumbnail")
-    ) {
-      const now = new Date();
-      const yyyymmdd =
-        String(now.getFullYear()) +
-        String(now.getMonth() + 1).padStart(2, "0") +
-        String(now.getDate()).padStart(2, "0");
-      const title =
-        streamTitleInput && streamTitleInput.value.trim()
-          ? streamTitleInput.value.trim()
-          : "サムネ";
-      thumbFilenameInput.value = `${yyyymmdd}_${title}`;
-    }
-
-    if (thumbEditTitle && streamTitleInput && !thumbEditTitle.value) {
-      thumbEditTitle.value = streamTitleInput.value;
-    }
-
+    // アバターの最新フレームをlocalStorageへ確実に保存
     captureAvatarFrame();
-    drawThumbPreview();
+
+    if (window.thumbEditorWindow && !window.thumbEditorWindow.closed) {
+      try {
+        window.thumbEditorWindow.focus();
+        return window.thumbEditorWindow;
+      } catch (e) {}
+    }
+
+    window.thumbEditorWindow = window.open(
+      `/thumbnail_editor.html?v=${Date.now()}`,
+      "VStudioThumbnailEditor",
+      `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
+    );
+    if (window.thumbEditorWindow) {
+      try { window.thumbEditorWindow.focus(); } catch (e) {}
+    }
+    return window.thumbEditorWindow;
   };
 
   window.generateThumbnailDataUrl = async function () {

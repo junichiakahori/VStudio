@@ -916,57 +916,45 @@ https://x.com/drone_akahori
           }
         } catch (e) {}
 
-        let opened = false;
+        // 🎨 独立した別ウィンドウとしてサムネイルエディタを開く（配信画面への映り込みを完全防止）
+        const width = 1120;
+        const height = 820;
+        const left = Math.max(0, Math.round((screen.width - width) / 2));
+        const top = Math.max(0, Math.round((screen.height - height) / 2));
 
-        // 1. 親画面の openThumbnailEditorModal 関数
-        if (typeof window.openerWin.openThumbnailEditorModal === "function") {
-          try {
-            window.openerWin.openThumbnailEditorModal();
-            opened = true;
-          } catch (e) {
-            console.warn("[Wizard] openThumbnailEditorModal call failed:", e);
-          }
+        let thumbWin = null;
+        try {
+          thumbWin = window.open(
+            `/thumbnail_editor.html?v=${Date.now()}`,
+            "VStudioThumbnailEditor",
+            `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
+          );
+        } catch (e) {
+          console.warn("[Wizard] window.open thumbnail failed:", e);
         }
 
-        // 2. 親画面の openNewsThumbnailModal 関数（フォールバック）
-        if (!opened && typeof window.openerWin.openNewsThumbnailModal === "function") {
-          try {
-            window.openerWin.openNewsThumbnailModal();
-            opened = true;
-          } catch (e) {}
-        }
-
-        // 3. 親画面の「サムネイルエディタを開く」ボタンを直接クリック
-        if (!opened) {
-          try {
-            const btn = window.openerWin.document.getElementById("open-thumb-editor-btn") ||
-                        window.openerWin.document.getElementById("generate-thumb-btn");
-            if (btn) {
-              btn.click();
-              opened = true;
-            }
-          } catch (e) {}
-        }
-
-        // 4. 親画面のモーダルDOM (#thumbnail-editor-modal) を直接 display: flex
-        if (!opened) {
-          try {
-            const modal = window.openerWin.document.getElementById("thumbnail-editor-modal");
-            if (modal) {
-              modal.style.display = "flex";
-              opened = true;
-            }
-          } catch (e) {}
-        }
-
-        if (opened) {
-          try { window.openerWin.focus(); } catch (e) {}
-          showYtApiFeedback("🎨 メイン画面でサムネイルエディタを開きました！", true);
+        if (thumbWin) {
+          try { thumbWin.focus(); } catch (e) {}
+          showYtApiFeedback("🎨 サムネイルエディタを別ウィンドウで開きました！", true);
+        } else if (typeof window.openerWin?.openThumbnailEditorModal === "function") {
+          // フォールバック: 親画面のオープナー呼び出し
+          window.openerWin.openThumbnailEditorModal();
+          showYtApiFeedback("🎨 サムネイルエディタを開きました！", true);
         } else {
-          showYtApiFeedback("⚠️ メイン画面でサムネイルエディタが見つかりませんでした。メイン画面を更新してください。", false);
+          showYtApiFeedback("⚠️ サムネイルエディタのポップアップがブロックされました。ブラウザのポップアップ許可をご確認ください。", false);
         }
       } else {
-        showYtApiFeedback("⚠️ 親ウィンドウ（スタジオ画面）との通信が切断されています。", false);
+        // 親ウィンドウがない場合でも独立ウィンドウとしてオープン可能
+        const width = 1120;
+        const height = 820;
+        const left = Math.max(0, Math.round((screen.width - width) / 2));
+        const top = Math.max(0, Math.round((screen.height - height) / 2));
+        window.open(
+          `/thumbnail_editor.html?v=${Date.now()}`,
+          "VStudioThumbnailEditor",
+          `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
+        );
+        showYtApiFeedback("🎨 サムネイルエディタを別ウィンドウで開きました！", true);
       }
     });
 
