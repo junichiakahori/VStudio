@@ -1274,6 +1274,11 @@ def resolve_text_readings(text, custom_dict=None):
     normalized = apply_okonau_context_rules(normalized)
     normalized = apply_country_prefixes(normalized)
     normalized = apply_pronunciation_memory(normalized)
+    try:
+        from server.polyphone_resolver import resolve_polyphones
+        normalized = resolve_polyphones(normalized)
+    except Exception:
+        pass
     normalized = sanitize_speech_text(normalized)
 
     # 1. カスタム辞書（最優先）
@@ -2426,6 +2431,13 @@ def normalize_for_tts(text, custom_dict=None, log_collector=None, context_map=No
     t = apply_okonau_context_rules(t)
     t = apply_person_kata_rules(t)
     t = apply_legal_and_general_rules(t)
+
+    # 6.5 多音語（天草、〜の上、歳 等）の文脈・構文条件付き確率判定エンジン
+    try:
+        from server.polyphone_resolver import resolve_polyphones
+        t = resolve_polyphones(t, full_context=full_context)
+    except Exception as poly_err:
+        pass
 
     # 7. 特殊固有名詞の動的解決
     # ⚠️ context_map（AI発音ダブルチェック）が渡されている場合は、文脈を無視したWikipedia検索による誤読
