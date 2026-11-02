@@ -118,8 +118,26 @@ def split_sentences_safely(text):
     return restored
 
 
-def build_news_prompt(char_desc, title, full_article_content):
-    """prompts.json の news_script からプロンプトを構築"""
+def build_news_prompt(char_desc, title, full_article_content, pub_date=""):
+    """prompts.json の news_script からプロンプトを構築（現在日時・季節情報の動的注入付き）"""
+    import datetime
+    now = datetime.datetime.now()
+    m = now.month
+    d = now.day
+    # 季節の判定
+    if m in [3, 4, 5]:
+        season = f"春（{m}月）"
+    elif m in [6, 7, 8]:
+        season = f"夏（{m}月）"
+    elif m in [9, 10, 11]:
+        season = f"秋（{m}月・晩秋/初冬に向かう時期）" if m == 11 else f"秋（{m}月）"
+    else:
+        season = f"冬（{m}月・真冬/寒期）"
+
+    date_str = now.strftime('%Y年%m月%d日')
+    pub_info = f"（記事の公表・配信日: {pub_date}）" if pub_date else ""
+    current_date_info = f"・本日の配信日: {date_str} {pub_info}\n・現在の季節: {season}"
+
     prompts_file = os.path.join(BASE_DIR, "data", "prompts.json")
     if os.path.exists(prompts_file):
         try:
@@ -134,11 +152,12 @@ def build_news_prompt(char_desc, title, full_article_content):
                     return template.format(
                         char_desc=char_desc,
                         title=title,
-                        full_article_content=full_article_content
+                        full_article_content=full_article_content,
+                        current_date_info=current_date_info
                     )
         except Exception as e:
             print(f"[prompts.json 読み込みエラー]: {e}")
-    return f"あなたはニュース解説キャスターです。\n【タイトル】: {title}\n【内容】: {full_article_content}"
+    return f"あなたはニュース解説キャスターです。\n【現在の配信日・季節】: {date_str} ({season})\n【タイトル】: {title}\n【内容】: {full_article_content}"
 
 def call_gemini_backend(prompt, api_key, model="gemini-1.5-flash"):
     target_model = model or "gemini-1.5-flash"
@@ -2169,6 +2188,26 @@ def validate_news_script_quality(raw_text, title="", article_context="", char_de
             if not article_context or matched_str not in article_context:
                 return False, f"元記事に存在しない架空の企業名・プレースホルダーが捏造されています: '{matched_str}'"
 
+    # 12. 季節外れの感想・季節ハルシネーション（例: 11月に「春先が近い」「春の訪れ」等）の検知
+    import datetime
+    cur_m = datetime.datetime.now().month
+    # 晩秋・初冬・冬（10月〜2月）に「春先」「春の訪れ」「新学期」「桜の季節」等の春言及を検知
+    if cur_m in [10, 11, 12, 1]:
+        SPRING_ANACHRONISMS = [
+            '春先', '春の訪れ', '春が近づい', '春の気配', '暖かな春', '桜の季節', '新学期', '春めい', '春らしい'
+        ]
+        for sp in SPRING_ANACHRONISMS:
+            if sp in raw_text and sp not in (title + " " + article_context):
+                return False, f"現在の季節（晩秋〜冬・{cur_m}月）にそぐわない季節外れの感想表現「{sp}」が検知されました"
+    # 夏（6月〜8月）に「厳しい寒さ」「雪景色」「凍える」等の冬言及を検知
+    elif cur_m in [6, 7, 8]:
+        WINTER_ANACHRONISMS = [
+            '厳しい寒さ', '凍える', '雪景色', '冬の訪れ', '真冬', '寒さが厳し', '氷点下'
+        ]
+        for wi in WINTER_ANACHRONISMS:
+            if wi in raw_text and wi not in (title + " " + article_context):
+                return False, f"現在の季節（夏・{cur_m}月）にそぐわない季節外れの感想表現「{wi}」が検知されました"
+
     return True, ""
 
 
@@ -2248,6 +2287,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
         else:
             char_desc = "語尾に自然に「〜にゃ」「〜にゃ！」を使って話します（※原稿本文中で自身のお名前を名乗ることや自称することは絶対に禁止です）。"
     category_name = payload.get('categoryName', '').strip()
+    pub_date = payload.get('pubDate') or item_obj.get('pubDate', '')
     transition = payload.get('transition', '').strip()
     article_url = (payload.get('url') or item_obj.get('link', '')).strip()
     provider = payload.get('provider', 'gemini')
@@ -2413,7 +2453,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
                 "sentences": [it["display"] for it in items]
             }
     
-        prompt = build_news_prompt(char_desc, title, full_article_content)
+        prompt = build_news_prompt(char_desc, title, full_article_content, pub_date=pub_date)
         raw_text = None
         items = None
         ai_headline_raw = None
