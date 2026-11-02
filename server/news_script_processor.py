@@ -80,7 +80,10 @@ def clean_news_title(title):
 def split_sentences_safely(text):
     """
     Yahoo! や M!LK 等のブランド名感嘆符での誤分割を防ぎ、
-    文中の感嘆符（！）での過剰分割や「。にゃ。」などの不自然な二重句点・語尾孤立を防止する安全な文分割。
+    文中の感嘆符（！）やエクスクラメーションマークでの過剰分割・短文細断、
+    および「。にゃ。」などの不自然な二重句点・語尾孤立を防止する安全な文分割。
+    字幕テロップの視認性（1文あたり適切な長さ）を保証するため、感嘆符による強制細断を防止し、
+    短すぎる文片は後続文と自然に結合マージする。
     """
     if not text:
         return []
@@ -98,11 +101,11 @@ def split_sentences_safely(text):
     t_safe = re.sub(r'[？?]{2,}', '？', t_safe)
 
     # 3. 文分割:
-    # - 句点「。」や改行「\n」で分割（ただし直後に語尾や助詞が続く場合は分割しない）
-    # - 「！？!?」は直後に改行があるか、空白を挟んで次の文がある場合のみ分割（文中のインライン！は分割しない）
+    # - 原則として句点「。」および改行「\n」で分割（直後に語尾や助詞が続く場合は分割しない）
+    # - 感嘆符（！/!）単体による過剰分割や文中の強制細断は完全撤廃（字幕テロップの視認性保護）
     parts = [
         s.strip() for s in re.split(
-            r'(?<=[。\n])(?!(?:にゃ|のだ|なのだ|[はがをにのもとで、]))|(?<=[！？!\?])\s*\n+|(?<=[！？!\?])\s+(?=[一-鿿ぁ-んァ-ヶ])',
+            r'(?<=[。\n])(?!(?:にゃ|のだ|なのだ|[はがをにのもとで、]))',
             t_safe
         ) if s.strip() and re.search(r'[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ffA-Za-z0-9]', s)
     ]
@@ -115,7 +118,32 @@ def split_sentences_safely(text):
          .replace('モーニング娘__PERIOD__', 'モーニング娘。')
         for s in parts
     ]
-    return restored
+
+    # 4. 短すぎる感嘆符文片や不完全な文片を後続文と安全に結合（字幕テロップの細切れ・ちらつき防止）
+    # 例: 「人気No.1のぜったいうまい！」(14字) ➔ 後続文と結合
+    # 例: 「これ、大変なミスなんだにゃ！」(14字) ➔ 後続文と結合
+    merged = []
+    i = 0
+    while i < len(restored):
+        cur = restored[i]
+        while i + 1 < len(restored):
+            next_sent = restored[i + 1]
+            cur_stripped = re.sub(r'[。！？\!\?」』）\)\s　]+$', '', cur)
+            # 末尾が「！」で終わる短文（30文字未満）や、極端に短い文（20文字未満）
+            is_short_excl = bool(re.search(r'[！!]$', cur.strip()) and len(cur_stripped) < 30)
+            is_too_short = len(cur_stripped) < 20
+            # 直後が助詞で始まる（誤分割文片）
+            is_lead_particle = bool(re.match(r'^[はがをにのもとで、]', next_sent.strip()))
+            
+            if is_short_excl or is_too_short or is_lead_particle:
+                connector = "" if (cur.endswith("！") or cur.endswith("!") or cur.endswith("、")) else " "
+                cur = cur + connector + next_sent
+                i += 1
+            else:
+                break
+        merged.append(cur)
+        i += 1
+    return merged
 
 
 def build_news_prompt(char_desc, title, full_article_content, pub_date=""):
