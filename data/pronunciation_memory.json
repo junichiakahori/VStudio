@@ -3221,6 +3221,30 @@
       "category": "common_noun",
       "registered_date": "2026-10-31",
       "note": "「女子」を「おなご」と誤読する事故を恒久防止し、常に「じょし」と正しく発音するよう是正"
+    },
+    {
+      "id": "tech_gmo_group",
+      "surface": "GMO",
+      "reading": "ジーエムオー",
+      "wrong_reading": "グモ",
+      "scope": "global",
+      "article_topic": "IT・ビジネス・テクノロジー・企業",
+      "sample_sentence": "GMOインターネットグループが記者会見を開きましたにゃ。",
+      "category": "brand",
+      "registered_date": "2026-11-03",
+      "note": "「GMO」を「グモ」と誤読するのを防止し、常に「ジーエムオー」と発音するよう是正"
+    },
+    {
+      "id": "common_noun_houhou",
+      "surface": "方法",
+      "reading": "ほうほう",
+      "wrong_reading": "かたほう",
+      "scope": "global",
+      "article_topic": "一般・ニュース全般",
+      "sample_sentence": "どちらの方法でも問題ないと思うにゃ。",
+      "category": "common_noun",
+      "registered_date": "2026-11-03",
+      "note": "「方法」を「かたほう」「かた法」と誤読・誤変換するのを防止し、常に「ほうほう」と正しく発音するよう是正"
     }
   ]
 }

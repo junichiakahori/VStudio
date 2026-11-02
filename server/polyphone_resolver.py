@@ -159,4 +159,9 @@ def resolve_polyphones(text: str, full_context: str = "") -> str:
     if '歳' in t:
         t = resolve_age_sai_reading(t)
 
+    # 4. 「方法」の誤読・誤置換（かた法 ➔ 方法/ほうほう）の自己修復
+    if 'かた法' in t:
+        t = re.sub(r'かた法', '方法', t)
+
     return t
+
