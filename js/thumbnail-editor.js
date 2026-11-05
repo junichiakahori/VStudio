@@ -613,9 +613,26 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // 🚀 YouTube枠へ直接反映（API送信）
-    uploadYtBtn.addEventListener("click", async () => {
-      let videoId = "";
+    const ytVideoIdInput = document.getElementById("thumb-yt-video-id");
+    // 初期ロード時に親画面やlocalStorageから動画IDを自動補完
+    if (ytVideoIdInput) {
+      let initialVid = "";
       if (openerWin) {
+        try {
+          initialVid = openerWin.document.getElementById("youtube-video-input")?.value || "";
+        } catch (e) {}
+      }
+      if (!initialVid) {
+        initialVid = localStorage.getItem("savedYoutubeVideoId") || "";
+      }
+      if (initialVid) {
+        ytVideoIdInput.value = initialVid;
+      }
+    }
+
+    uploadYtBtn.addEventListener("click", async () => {
+      let videoId = (ytVideoIdInput?.value || "").trim();
+      if (!videoId && openerWin) {
         try {
           videoId = openerWin.document.getElementById("youtube-video-input")?.value || "";
         } catch (e) {}
@@ -625,7 +642,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (!videoId) {
-        showFeedback("⚠️ YouTube枠の動画IDが見つかりません。親画面で動画IDを入力してください。", false);
+        showFeedback("⚠️ YouTube枠の動画IDが見つかりません。動画IDを入力してください。", false);
         return;
       }
 
@@ -644,7 +661,7 @@ document.addEventListener("DOMContentLoaded", () => {
           })
         });
         const data = await res.json();
-        if (data.ok) {
+        if (data.ok || data.success) {
           showFeedback(`✅ サムネイル画像をYouTube枠 (${videoId}) に反映完了しました！🎉`, true);
         } else {
           showFeedback(`❌ 反映エラー: ${data.error || "送信に失敗しました"}`, false);

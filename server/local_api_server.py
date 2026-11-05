@@ -626,12 +626,14 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 img = p.get('imageData') or p.get('image_base64', '')
                 try:
                     res = youtube_api_helper.upload_thumbnail(vid, img)
-                    return self._send_json({"success": True, "videoId": vid, "data": res})
+                    print(f"[YouTube Thumbnail] ✅ サムネイル画像をYouTube枠 ({vid}) に送信成功！", flush=True)
+                    return self._send_json({"success": True, "ok": True, "videoId": vid, "data": res})
                 except Exception as e:
                     err_str = str(e)
                     if "quotaExceeded" in err_str:
                         err_str = "YouTube APIの1日あたりの利用枠（クォータ上限）に達しました。"
-                    return self._send_json({"success": False, "error": err_str})
+                    print(f"[YouTube Thumbnail] ❌ サムネイル送信エラー (枠: {vid}): {err_str}", flush=True)
+                    return self._send_json({"success": False, "ok": False, "error": err_str})
 
 
             # ── ニュースキャッシュ管理 API (POST) ──
