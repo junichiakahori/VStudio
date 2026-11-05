@@ -146,6 +146,14 @@ def split_sentences_safely(text):
     return merged
 
 
+def safe_format(template, **kwargs):
+    """プレースホルダーの過不足や中括弧が含まれていてもKeyErrorでクラッシュしない安全なフォーマッタ"""
+    res = template
+    for k, v in kwargs.items():
+        res = res.replace(f"{{{k}}}", str(v))
+    return res
+
+
 def build_news_prompt(char_desc, title, full_article_content, pub_date=""):
     """prompts.json の news_script からプロンプトを構築（現在日時・季節情報の動的注入付き）"""
     import datetime
@@ -177,7 +185,8 @@ def build_news_prompt(char_desc, title, full_article_content, pub_date=""):
                 else:
                     template = str(news_p)
                 if template:
-                    return template.format(
+                    return safe_format(
+                        template,
                         char_desc=char_desc,
                         title=title,
                         full_article_content=full_article_content,
@@ -1063,6 +1072,37 @@ def clean_inline_greetings(text: str, title: str = "", article_context: str = ""
     t = re.sub(r'(?:皆[様さん][、,\s]*)?(?:こんにちは|こんばんは|おはようございます)(?:にゃ|のだ|なのだ)?[！!。、\s　]*', '', t)
     return t.strip()
 
+
+def clean_unwanted_season_openers(text: str, title: str = "", article_context: str = "") -> str:
+    """
+    プロンプトの背景情報に引きずられて個別記事の文頭に出現した
+    不要な季節・日付宣言フレーズを自動切除・是正する。
+    例: '本日は秋の季節、Switch向けの大規模セールが行われているにゃ。'
+        ➔ 'Switch向けの大規模セールが行われているにゃ。'
+    例: 'はい、本日は秋の訪れの中、映画監督の是枝裕和氏が...'
+        ➔ '映画監督の是枝裕和氏が...'
+    例: '本日は秋の訪れを感じる11月、佐賀バルーンフェスタの...'
+        ➔ '佐賀バルーンフェスタの...'
+    例: '本日は秋の季節、11月5日に『夢幻桜楼閣』という...'
+        ➔ '11月5日に『夢幻桜楼閣』という...'
+    ※ 元記事タイトル自体に季節が含まれる場合（例: 『秋の味覚パフェ』等）は過剰切除を防止。
+    """
+    if not text:
+        return ""
+    if title and any(w in title for w in ["秋の", "春の", "夏の", "冬の"]):
+        return text
+
+    UNWANTED_SEASON_OPENER_PATTERN = (
+        r'^(?:(?:はい|えー|さて)[、,\s　]*)?'
+        r'(?:本日(?:は|の配信日(?:は|である)?)|今日(?:は)?)[\s　]*'
+        r'(?:(?:春|夏|秋|冬)の(?:季節|訪れ|気配|日和|真っ只中|深まる頃|深まる中)'
+        r'(?:(?:の|な)?中[、,\s　]*|(?:を)?感じ(?:る|られる)?[、,\s　]*(?:[0-9０-９]{1,2}月)?[、,\s　]*|[、,\s　]+)'
+        r'|(?:春|夏|秋|冬)[、,\s　]+'
+        r'|[0-9０-９]{1,2}月[、,\s　]+)'
+    )
+    t = re.sub(UNWANTED_SEASON_OPENER_PATTERN, '', text.strip()).strip()
+    return t
+
 AUTHENTIC_SPORTS_KEYWORDS = {
     "プロ野球", "高校野球", "甲子園", "MLB", "メジャーリーグ", "セ・リーグ", "パ・リーグ",
     "サッカー", "Jリーグ", "プレミアリーグ", "日本代表", "ワールドカップ", "W杯",
@@ -1433,6 +1473,10 @@ def audit_and_heal_news_script(items, title="", article_context="", category_nam
         # -0.8 個別記事内の不適切な挨拶（皆さんこんにちは等）の完全除去（字幕・音声の双方）
         disp = clean_inline_greetings(disp, title=title, article_context=article_context)
         sp = clean_inline_greetings(sp, title=title, article_context=article_context)
+
+        # -0.7 不要な季節・日付宣言フレーズ（本日は秋の季節等）の完全除去（字幕・音声の双方）
+        disp = clean_unwanted_season_openers(disp, title=title, article_context=article_context)
+        sp = clean_unwanted_season_openers(sp, title=title, article_context=article_context)
 
         # -0.5 二重敬称（〇〇氏さん、同氏さん等）の不自然な日本語を自動修復（字幕・音声の双方）
         disp = heal_double_honorific_shi_san(disp)
@@ -1977,6 +2021,13 @@ def validate_news_script_quality(raw_text, title="", article_context="", char_de
             if m:
                 return False, f"個別記事内で不適切な挨拶（放送事故）が検知されました: '{m.group(0).strip()}'（番組挨拶は別枠で行うため個別記事での挨拶は禁止です）"
 
+    # -0.9 不要な季節・日付宣言フレーズ（「本日は秋の季節」「秋の訪れの中」等）の検知（元記事の事実から始めること）
+    if not (title and any(w in title for w in ["秋の", "春の", "夏の", "冬の"])):
+        if re.search(r'^(?:(?:はい|えー|さて)[、,\s　]*)?本日(?:は|の配信日(?:は|である)?)[、,\s　]*(?:春|夏|秋|冬)', raw_text):
+            return False, "原稿本文冒頭で禁止されている不要な季節宣言（「本日は秋の季節」等）が検知されました（元記事の事実から直接解説を始めてください）"
+        if re.search(r'^(?:(?:はい|えー|さて)[、,\s　]*)?(?:春|夏|秋|冬)の(?:季節|訪れ|気配|日和)', raw_text):
+            return False, "原稿本文冒頭で禁止されている不要な季節宣言（「秋の訪れの中」等）が検知されました（元記事の事実から直接解説を始めてください）"
+
     split_sentences_check = split_sentences_safely(raw_text)
     raw_len = len(raw_text.strip())
     if len(split_sentences_check) < 3 or (len(split_sentences_check) < 4 and raw_len < 160):
@@ -2019,17 +2070,21 @@ def validate_news_script_quality(raw_text, title="", article_context="", char_de
     if any(kw in full_context_check for kw in SUMO_CHECK_KEYWORDS) and ("リング" in raw_text or "リング上" in raw_text):
         return False, "相撲のニュースで不適切な格闘技用語「リング」が使用されています（相撲の舞台は「土俵」です）"
 
-    # 0. AIメタ応答・前置き・プロンプト復唱の検知（「了解しました」「以下に出力します」等）
+    # 0. AIメタ応答・前置き・プロンプト復唱・番組総括の検知（「了解しました」「以上が今日のニュースの概要」等）
     AI_META_PATTERNS = [
         re.compile(r'(了解しました|承知いたしました|承知しました|かしこまりました)'),
         re.compile(r'(以下に[、\s]|以下のとおり|以下の通り|テキストを出力します|台本を出力します)'),
         re.compile(r'(指定されたルール|ルールに従|ルールに基づ|プロンプト|制約事項|品質修正指示|ダブルチェック)'),
         re.compile(r'(皇族のお名前|ルビ形式|ルビを付けないで|キャスター感想の表現|報道倫理ルール|出力形式のルール|深掘り解説台本|台本作成ルール)'),
         re.compile(r'(別の話題へのすり替え|話題のすり替え|すり替えは厳禁)'),
+        re.compile(r'以上が(?:今日|本日|今回)?の(?:ニュース|話題)?の(?:概要|まとめ|詳細|すべて)'),
+        re.compile(r'以上[、,\s]*(?:今日|本日|今回)のニュースをお伝えしました'),
+        re.compile(r'(?:ぜひご視聴ください|次回(?:の配信)?でお会いしましょう|チャンネル登録|ご視聴いただきありがとうございました|ご視聴ありがとうございました)'),
+        re.compile(r'^(?:ニュースキャスター|キャスター|アナウンサー|司会|リポーター|ナレーター)[\s　]*[：:\-ー]'),
     ]
     for pat in AI_META_PATTERNS:
         if pat.search(raw_text):
-            return False, f"AIのメタ発言・プロンプト指示の復唱が検知されました: '{pat.pattern}'"
+            return False, f"AIのメタ発言・番組総括・プロンプト指示の復唱が検知されました: '{pat.pattern}'"
 
     # 1. 連続した長文英文フレーズの混入チェック（※製品名等の固有名詞は許容し、5単語以上の英文センテンスのみを検知）
     check_text = raw_text
@@ -2698,6 +2753,8 @@ def generate_news_item_script_data(payload, custom_dict=None):
 
             # 8.5 個別記事内の不適切な挨拶（「皆さんこんにちは」「〜のファンの皆さん、こんにちは」等）の完全除去
             clean_text = clean_inline_greetings(clean_text, title=title, article_context=full_article_content)
+            # 8.6 不要な季節・日付宣言フレーズ（「本日は秋の季節、」「本日は秋の訪れの中、」等）の完全除去
+            clean_text = clean_unwanted_season_openers(clean_text, title=title, article_context=full_article_content)
     
             # 9. 実在の著名人・芸能人・人物に対する呼び捨ての敬称（〜さん）自動補正
             clean_text = normalize_celebrity_honorifics(clean_text, title, full_article_content)
@@ -2736,6 +2793,13 @@ def generate_news_item_script_data(payload, custom_dict=None):
                     return True
                 # プロンプトの禁止文句復唱の撃墜
                 if re.search(r'(別の話題へのすり替え|話題のすり替え|すり替えは厳禁)', cleaned):
+                    return True
+                # 番組総括・キャスターラベル・締め挨拶の撃墜
+                if re.search(r'^(?:ニュースキャスター|キャスター|アナウンサー|司会|リポーター|ナレーター)[\s　]*[：:\-ー]', cleaned):
+                    return True
+                if re.search(r'以上が(?:今日|本日|今回)?の(?:ニュース|話題)?の(?:概要|まとめ|詳細|すべて)', cleaned):
+                    return True
+                if re.search(r'(?:ぜひご視聴ください|次回の配信でお会いしましょう|チャンネル登録|ご視聴いただきありがとうございました|ご視聴ありがとうございました)', cleaned):
                     return True
                 # ✂️ セクション見出し・構成ラベル・プロンプト項目名の漏れ出しを完全除去（「記事本文の見出し」「記事要約」「1文目」等）
                 if re.search(r'^(?:[【\[「(（]?)?(?:記事本文|ニュース本文|本文|見出し|記事要約|要約|解説台本|解説|感想|リアクション|前半|後半|[1-6１-６一二三四五六]文目?)(?:の見出し|の要約|の解説|の感想)?(?:[】\]」)）:：\s　]|にゃ|のだ|です|した|$)', cleaned):
