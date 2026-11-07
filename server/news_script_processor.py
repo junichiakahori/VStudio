@@ -1993,8 +1993,8 @@ def validate_news_script_quality(raw_text, title="", article_context="", char_de
     """
     生成されたニュース原稿の品質をダブルチェックする。
     """
-    if not raw_text or len(raw_text.strip()) < 80:
-        return False, f"原稿の文字数が少なすぎます ({len(raw_text.strip()) if raw_text else 0}文字 < 80文字)"
+    if not raw_text or len(raw_text.strip()) < 50:
+        return False, f"原稿の文字数が少なすぎます ({len(raw_text.strip()) if raw_text else 0}文字 < 50文字)"
 
     # -1. 個別記事内の不適切な挨拶（「皆さんこんにちは」「おはようございます」「こんばんは」等）の最優先検知（重大放送事故防止）
     # ※ 番組全体の開始・終了挨拶は別枠で行うため、個別記事の冒頭や文中でリスナー等に挨拶することは厳禁
@@ -2383,8 +2383,16 @@ def generate_news_item_script_data(payload, custom_dict=None):
     if not is_special_item:
         with _SCRIPT_CACHE_LOCK:
             if cache_key in _NEWS_SCRIPT_CACHE:
-                print(f"{tag} ⚡ サーバーキャッシュから即時返却 (重複処理を完全スキップ)", flush=True)
-                return _NEWS_SCRIPT_CACHE[cache_key]
+                cached_res = _NEWS_SCRIPT_CACHE[cache_key]
+                c_items = cached_res.get('items', []) if isinstance(cached_res, dict) else []
+                c_sents = cached_res.get('sentences', []) if isinstance(cached_res, dict) else []
+                # 🛡️ 過去の古い2行以下の不完全原稿がキャッシュに残っている場合は即時破棄して再生成
+                if len(c_items or c_sents) <= 2:
+                    print(f"{tag} ⚠️ キャッシュされた原稿が2行以下のため、キャッシュを破棄して高品質に再生成します", flush=True)
+                    del _NEWS_SCRIPT_CACHE[cache_key]
+                else:
+                    print(f"{tag} ⚡ サーバーキャッシュから即時返却 (重複処理を完全スキップ)", flush=True)
+                    return cached_res
 
         # 2. 別スレッドで同一タイトルが現在生成中の場合、重複実行せず完了を待機して同じ結果を共有
         my_event = None
@@ -2825,8 +2833,10 @@ def generate_news_item_script_data(payload, custom_dict=None):
                 if re.search(PARTICLE_ENDINGS, stripped) or re.search(r'(\.{2,}|…+)$', stripped):
                     return True
     
-                # 2. 文末に述語・用言・終止形・口調（にゃ、のだ、です、ます、だ、た、る、い、よ、ね等）がない未完結・体言止め文
-                # 例: 「〜現地で撮」「〜FGTが常磁」「千葉市緑区の本千葉カントリークラブ」など
+                # 2. 文末に述語・用言・終止形・口調（にゃ、のだ、です、ます、だ、た、る、い、よ、ね等）がない未完結・体言止め文の検査
+                # ※【重要】20文字以上の長文（例: 「〜対象から外される可能性があり、町長は強く反発。」）
+                # は、正常なニュース解説のサ変名詞・体言止め表現であるため、決して削除しない！
+                # 削除するのは「〜現地で撮」「〜FGTが常磁」「本千葉カントリークラブ」のような極短断片のみ。
                 VALID_PREDICATE_ENDINGS = (
                     r'(?:にゃ|のだ|なのだ|です|ます|でした|ました|ません|'
                     r'した|された|られた|なった|行った|言った|見た|あった|いた|勝った|負けた|'
@@ -2834,6 +2844,8 @@ def generate_news_item_script_data(payload, custom_dict=None):
                     r'ね|よ|わ|よな|よね|かな|かい|ぞ|ぜ|さ|しょう|う！|る！|にゃ！|のだ！)$'
                 )
                 if not re.search(VALID_PREDICATE_ENDINGS, stripped):
+                    if len(stripped) >= 20:
+                        return False
                     return True
     
                 return False

@@ -551,6 +551,16 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 is_special = payload.get('categoryName', '') in ["コメント返信", "リスナーコメント"]
                 cached = None if is_special else _get_news_script_cache(cache_title)
                 if cached:
+                    c_items = cached.get('items', []) if isinstance(cached, dict) else []
+                    c_sents = cached.get('sentences', []) if isinstance(cached, dict) else []
+                    # 🛡️ 過去の古い2行以下の不完全原稿がキャッシュに残っている場合は即時破棄して再生成
+                    if len(c_items or c_sents) <= 2:
+                        tag_str = cache_title[:16] + ("..." if len(cache_title) > 16 else "")
+                        print(f"[ニュースAI {tag_str}] ⚠️ キャッシュされた原稿が2行以下のため、キャッシュを破棄して高品質に再生成します", flush=True)
+                        if cache_title in NEWS_SCRIPT_CACHE:
+                            del NEWS_SCRIPT_CACHE[cache_title]
+                        cached = None
+                if cached:
                     tag_str = cache_title[:16] + ("..." if len(cache_title) > 16 else "")
                     print(f"[ニュースAI {tag_str}] ⚡ サーバーキャッシュから即時返却 (重複処理を完全スキップ)", flush=True)
                     # ファイル側が消去・空だった場合、ファイル履歴にも確実に復元・追記保存

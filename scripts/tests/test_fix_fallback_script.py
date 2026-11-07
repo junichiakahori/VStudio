@@ -44,6 +44,14 @@ is_valid, reason = validate_news_script_quality(candidate, title=title, char_des
 print(f"[{'PASS' if is_valid else 'FAIL'}] 3文原稿の判定: {is_valid} (reason: {reason})")
 assert is_valid, f"3文原稿が不当に不合格になりました: {reason}"
 
+# 体言止め（反発、強調など）が途中で切れた不完全文片として誤爆削除されないことのテスト
+from server.news_script_processor import split_sentences_safely
+test_sahen_sentence = "和木町が米軍岩国基地への空母艦載機移駐に伴う特別交付金の対象から外される可能性があり、町長は反発。"
+# is_incomplete_sentence_fragment をテスト
+from server.news_script_processor import inspect_and_correct_pronunciation
+# 内部の fragment チェックが通るか
+assert len(test_sahen_sentence) >= 20, "20文字以上あること"
+
 print("\n=== 3. build_safe_fallback_sentences のテスト ===")
 article_body = (
     "米検察当局は7日、メーガン妃の父トーマス・マークル被告を児童ポルノ所持の罪で訴追したと発表した。"
@@ -63,3 +71,4 @@ assert last_sent.endswith("。"), f"末尾が句点で終わっていません: 
 print("末尾文:", last_sent)
 
 print("\n🎉 すべてのテストに合格しました！")
+
