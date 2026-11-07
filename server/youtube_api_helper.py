@@ -388,12 +388,57 @@ def update_live_broadcast(video_id, title=None, description=None, start_time_iso
             return up_req.execute()
         raise e
 
+def resolve_effective_video_id(video_id_input):
+    """
+    URL、11桁ID、またはチャンネルハンドル（@drone.akahori等）から、
+    有効な11桁のYouTube Video IDを自動解決・抽出する。
+    """
+    if not video_id_input:
+        target = ""
+    else:
+        target = str(video_id_input).strip()
+
+    # 1. URLから11桁IDを抽出
+    url_match = re.search(r'(?:v=|\/live\/|\/v\/|\/embed\/|youtu\.be\/|\/shorts\/)([a-zA-Z0-9_-]{11})', target)
+    if url_match:
+        logging.info(f"[YouTube VideoID解決] URLから動画IDを抽出: '{url_match.group(1)}'")
+        return url_match.group(1)
+
+    # 2. 既に11桁の英数字IDならそのまま採用
+    if re.match(r'^[a-zA-Z0-9_-]{11}$', target):
+        return target
+
+    # 3. チャンネルハンドル（@...）や空文字、または非11桁文字列の場合は自身の最新配信枠から検索
+    try:
+        logging.info(f"[YouTube VideoID解決] 指定値 '{target}' は11桁動画IDではないため、自身の最新配信枠から自動解決を試行中...")
+        broadcasts = list_my_broadcasts(max_results=5)
+        # まず現在配信中枠（live / ready / testStarting / liveStarting）
+        for b in broadcasts:
+            b_status = b.get("status", {}).get("lifeCycleStatus") or b.get("lifeCycleStatus")
+            if b_status in ["live", "ready", "testStarting", "liveStarting"]:
+                logging.info(f"[YouTube VideoID解決] 現在配信中のライブ枠を自動特定: '{b['id']}' ({b.get('title', '')})")
+                return b["id"]
+        # 次に最新の予約・作成済み枠
+        for b in broadcasts:
+            if b.get("id"):
+                logging.info(f"[YouTube VideoID解決] 最新の予約・作成済み配信枠を自動特定: '{b['id']}' ({b.get('title', '')})")
+                return b["id"]
+    except Exception as e:
+        logging.warning(f"[YouTube VideoID解決] 最新配信枠の自動取得に失敗: {e}")
+
+    return target
+
+
 def upload_thumbnail(video_id, image_data):
-    """配信枠にサムネイル画像をアップロード"""
+    """配信枠にサムネイル画像をアップロード（チャンネル名やURLからの自動Video ID解決付き）"""
     with _youtube_api_lock:
         service = get_authenticated_service()
         if not service:
             raise ValueError("YouTube API未認証です。Googleアカウント連携を行ってください。")
+
+        effective_vid = resolve_effective_video_id(video_id)
+        if not effective_vid or len(effective_vid) != 11:
+            raise ValueError(f"有効なYouTube動画ID（11桁）を特定できませんでした (指定値: '{video_id}')。配信枠を作成するか、正しい動画IDを入力してください。")
 
         if isinstance(image_data, str) and "," in image_data:
             image_data = image_data.split(",", 1)[1]
@@ -405,10 +450,13 @@ def upload_thumbnail(video_id, image_data):
 
         media = MediaIoBaseUpload(io.BytesIO(raw_bytes), mimetype='image/png', resumable=False)
         req = service.thumbnails().set(
-            videoId=video_id,
+            videoId=effective_vid,
             media_body=media
         )
-        return req.execute()
+        res = req.execute()
+        if isinstance(res, dict):
+            res["resolvedVideoId"] = effective_vid
+        return res
 
 def list_my_broadcasts(max_results=15):
     """自身のチャンネルの配信枠（upcoming/active/all）一覧を取得（自動リトライ付き）"""

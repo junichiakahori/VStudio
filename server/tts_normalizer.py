@@ -2532,11 +2532,13 @@ def heal_sentence_reading(display_text, speech_text, context_map=None):
         for rec in recs_with_wrong:
             surf = rec["surface"]
             correct_yomi = rec["reading"]
-            wrong_yomi = rec["wrong_reading"]
-            if wrong_yomi in speech_text and surf in display_text and wrong_yomi != correct_yomi:
-                print(f"[誤読自己修復] 🩹 台帳照合修復: '{surf}' に対する誤読 '{wrong_yomi}' を正読 '{correct_yomi}' へ自動修復", flush=True)
-                speech_text = speech_text.replace(wrong_yomi, correct_yomi)
-                healed_surfaces.add(surf)
+            raw_wrong = rec.get("wrong_reading", "")
+            wrong_yomis = [w.strip() for w in re.split(r'[,/、\n]+', raw_wrong) if w.strip()]
+            for wrong_yomi in wrong_yomis:
+                if wrong_yomi in speech_text and surf in display_text and wrong_yomi != correct_yomi:
+                    print(f"[誤読自己修復] 🩹 台帳照合修復: '{surf}' に対する誤読 '{wrong_yomi}' を正読 '{correct_yomi}' へ自動修復", flush=True)
+                    speech_text = speech_text.replace(wrong_yomi, correct_yomi)
+                    healed_surfaces.add(surf)
     except Exception as e:
         pass
 

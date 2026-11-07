@@ -641,14 +641,9 @@ document.addEventListener("DOMContentLoaded", () => {
         videoId = localStorage.getItem("savedYoutubeVideoId") || "";
       }
 
-      if (!videoId) {
-        showFeedback("⚠️ YouTube枠の動画IDが見つかりません。動画IDを入力してください。", false);
-        return;
-      }
-
       uploadYtBtn.disabled = true;
       uploadYtBtn.textContent = "⏳ 送信中...";
-      showFeedback("🖼️ サムネイル画像をYouTubeに送信中...", true);
+      showFeedback("🖼️ サムネイル画像をYouTubeに送信中 (配信枠を照合中)...", true);
 
       try {
         const base64Data = canvas.toDataURL("image/png");
@@ -662,7 +657,11 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         const data = await res.json();
         if (data.ok || data.success) {
-          showFeedback(`✅ サムネイル画像をYouTube枠 (${videoId}) に反映完了しました！🎉`, true);
+          const actualVid = data.videoId || videoId;
+          if (ytVideoIdInput && actualVid) {
+            ytVideoIdInput.value = actualVid;
+          }
+          showFeedback(`✅ サムネイル画像をYouTube枠 (${actualVid}) に反映完了しました！🎉`, true);
         } else {
           showFeedback(`❌ 反映エラー: ${data.error || "送信に失敗しました"}`, false);
         }

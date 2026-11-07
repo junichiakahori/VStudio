@@ -626,8 +626,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 img = p.get('imageData') or p.get('image_base64', '')
                 try:
                     res = youtube_api_helper.upload_thumbnail(vid, img)
-                    print(f"[YouTube Thumbnail] ✅ サムネイル画像をYouTube枠 ({vid}) に送信成功！", flush=True)
-                    return self._send_json({"success": True, "ok": True, "videoId": vid, "data": res})
+                    resolved_vid = res.get("resolvedVideoId", vid) if isinstance(res, dict) else vid
+                    print(f"[YouTube Thumbnail] ✅ サムネイル画像をYouTube枠 ({resolved_vid}) に送信成功！", flush=True)
+                    return self._send_json({"success": True, "ok": True, "videoId": resolved_vid, "data": res})
                 except Exception as e:
                     err_str = str(e)
                     if "quotaExceeded" in err_str:

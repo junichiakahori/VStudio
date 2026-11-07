@@ -17,12 +17,14 @@ PROD_DIR = "/Users/junichiakahori/Documents/Antigravity/VStudio"
 
 # 同期対象ファイル一覧（相対パス）
 SYNC_FILES = [
-    "js/news-mode.js",
-    "js/news/news-fetcher.js",
-    "views/live2d.html",
+    "server/youtube_api_helper.py",
+    "server/news_script_processor.py",
+    "server/local_api_server.py",
     "server/tts_normalizer.py",
     "data/pronunciation_memory.json",
-    "scripts/tests/test_all_historical_pronunciations.py",
+    "js/thumbnail-editor.js",
+    "views/thumbnail_editor.html",
+    "scripts/tests/test_fix_cash_and_thumb.py",
     "scripts/tools/auto_sync_on_stream_end.py"
 ]
 
@@ -69,7 +71,7 @@ def check_and_sync():
             print(f"Warning: {src} does not exist!")
 
     # 2. Git コミット & プッシュ
-    commit_msg = "fix(news & tts): 放送完了時のゾンビ復元完全防止および「一目で」誤読（ひとめ）恒久是正"
+    commit_msg = "fix(youtube/tts): サムネイル送信のVideo ID自動解決(HttpError 500根絶)および現金の誤読(げんかね)防止ガードを実装"
     try:
         for f in SYNC_FILES:
             subprocess.run(["git", "add", f], cwd=PROD_DIR, check=True)

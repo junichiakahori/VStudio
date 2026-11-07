@@ -3,6 +3,30 @@
   "description": "過去に誤読を起こした単語・表現の記憶台帳。記事文脈（context_keywords/scope）と記事トピック（article_topic）を記録し、同姓異名や地名とのバッティングによる誤読事故を恒久防止します。",
   "records": [
     {
+      "id": "genkin_cash",
+      "surface": "現金",
+      "reading": "げんきん",
+      "wrong_reading": "げんかね, 現かね",
+      "scope": "global",
+      "article_topic": "事件・社会・経済",
+      "sample_sentence": "現金を渡すように要求した容疑で逮捕されたにゃ。",
+      "category": "finance_crime",
+      "registered_date": "2026-11-08",
+      "note": "「現金を渡す」等が「現かね」と誤読されるのを恒久防止"
+    },
+    {
+      "id": "genkane_typo_fix",
+      "surface": "現かね",
+      "reading": "げんきん",
+      "wrong_reading": "げんかね",
+      "scope": "global",
+      "article_topic": "事件・社会・経済",
+      "sample_sentence": "現かねを渡す",
+      "category": "finance_crime",
+      "registered_date": "2026-11-08",
+      "note": "正規表現誤爆による「現かね」の自動正読修復"
+    },
+    {
       "id": "milk_vocal_group",
       "surface": "M!LK",
       "reading": "みるく",
