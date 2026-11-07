@@ -462,12 +462,12 @@ def extract_pronunciations_via_ai(text, title="", article_context="", provider="
 
 def is_title_duplicate_sentence(sentence, title):
     """
-    文が見出し（タイトル）の単なる復唱・重複であるかを高度に判定する。
-    例:
-      タイトル: 'みんなで大家さん、事実上の事業終了へ'
-      文: 'みんなで大家さん、事実上の事業終了へ。' ➔ True
-      文: 'みんなで大家さんが、事実上の事業終了となる見込みです。' ➔ True
-      文: 'みんなで大家さんについて、事実上の事業終了へ向かっているそうです。' ➔ True
+    文が見出し（タイトル）の単なるオウム返し・重複であるかを判定する。
+    ※【最重要・過剰誤爆防止】
+      ニュース解説の第1文（リード文）として、タイトルの重要事実を自然に要約・説明している文
+      （例: 「〇〇氏が〇〇容疑で訴追され、条件付き保釈となりました。」）を
+      「タイトル重複」と誤判定して削除することを100%防止する。
+      削除対象は「タイトルそのものの完全復唱」や「タイトル＋という話題です」等の無意味なオウム返しのみに厳格限定する。
     """
     if not sentence or not title:
         return False
@@ -478,32 +478,24 @@ def is_title_duplicate_sentence(sentence, title):
     if not norm_s or not norm_t:
         return False
 
-    # 1. 完全一致または前方一致
-    if norm_s == norm_t or norm_s.startswith(norm_t) or norm_t.startswith(norm_s):
-        if len(norm_s) <= len(norm_t) + 18:
+    # 末尾のキャラクター語尾・丁寧語尾・伝聞語尾を除去したコア文字列
+    core_s = re.sub(r'(?:にゃ|なのだ|のだ|です|ます|でした|ました|だ|た|ね|よ|よね|んだ|んです|という|とのこと|そうです|と報じられています|と伝えられています)+$', '', norm_s)
+    core_t = re.sub(r'(?:にゃ|なのだ|のだ|です|ます|でした|ました|だ|た|ね|よ|よね|んだ|んです|という|とのこと|そうです|と報じられています|と伝えられています)+$', '', norm_t)
+
+    # 1. コア文字列が完全一致（タイトルそのものに語尾だけを付けた完全復唱文）
+    if core_s == core_t or norm_s == norm_t:
+        return True
+
+    # 2. タイトルにオウム返しメタ表現が付いただけの文（例: 「〇〇という話題が入ってきました」「〇〇についてのニュースです」等）
+    if re.search(r'(?:という(?:話題|ニュース|出来事|情報|お話)|についての(?:話題|ニュース|出来事|お話)|についてお伝え|に関するニュース)', norm_s):
+        if core_t and (core_t in norm_s or norm_s.startswith(core_t)):
             return True
 
-    # 2. タイトルの主要キーワード（2文字以上の名詞・英数字・漢字カタカナ）の一致率チェック
-    title_tokens = set(re.findall(r'[一-鿿゠-ヿA-Za-z0-9]{2,}', norm_t))
-    if title_tokens:
-        matched_tokens = sum(1 for tok in title_tokens if tok in norm_s)
-        match_ratio = matched_tokens / len(title_tokens)
-        if match_ratio >= 0.70 and len(norm_s) <= len(norm_t) * 1.4 + 12:
-            return True
-
-    # 3. 2文字バイグラム類似度
-    s_bigrams = set(norm_s[i:i+2] for i in range(len(norm_s)-1))
-    t_bigrams = set(norm_t[i:i+2] for i in range(len(norm_t)-1))
-    if s_bigrams and t_bigrams:
-        intersection = len(s_bigrams & t_bigrams)
-        similarity = (2.0 * intersection) / (len(s_bigrams) + len(t_bigrams))
-        if similarity >= 0.60 and len(norm_s) <= len(norm_t) * 1.4 + 12:
-            return True
-
-    # 4. タイトルの後方に「〜についての話題をお伝え」「〜についてのニュース」等のメタ文言が付いている場合
-    if re.search(r'についての(?:話題|ニュース|出来事|お話)|についてお伝え|に関するニュース', norm_s):
-        if any(tok in norm_s for tok in title_tokens):
-            return True
+    # 3. 前方一致でタイトルがほぼ丸ごと入っており、後方が数文字のオウム返し語尾のみの場合
+    if norm_s.startswith(norm_t) and len(norm_s) <= len(norm_t) + 8:
+        return True
+    if norm_t.startswith(norm_s) and len(norm_t) <= len(norm_s) + 4:
+        return True
 
     return False
 
@@ -796,27 +788,16 @@ def build_safe_fallback_sentences(title, article_content, char_desc, custom_dict
                 "おすすめ", "注目", "解説", "特集", "舞台裏", "美術館", "閉じる",
                 "アフィリエイト", "ライター", "筆者", "執筆", "収益", "クローゼット", "出没", "PR", "プロモーション"
             ]
-            # 疑問文・見出し調（？で終わる）やNGワード、長さ不適合は除外
+            # 疑問文・見出し調（？で終わる）やNGワード、極端な長さ不適合は除外
             if s_clean.endswith("？") or s_clean.endswith("?"):
                 continue
-            if not (15 <= len(s_clean) <= 120):
+            if not (15 <= len(s_clean) <= 180):
                 continue
             if any(bad in s_clean for bad in NG_FALLBACK_WORDS):
                 continue
 
-            # 見出し（タイトル）そのものや、見出しの単なる復唱文は完全に除外
+            # 見出し（タイトル）そのものの単なるオウム返し復唱文は除外
             if is_title_duplicate_sentence(s_clean, title):
-                continue
-
-            # タイトル整合性チェック:
-            # 1) タイトル主要キーワードが1つでも含まれるか
-            # 2) またはタイトルとの2文字バイグラムが2つ以上一致するか
-            has_kw = any(kw in s_clean for kw in title_keywords) if title_keywords else False
-            norm_s = re.sub(r'[\s　、。！？!?,.\-ー…「」『』【】（）()★〈〉\[\]]+', '', s_clean)
-            s_bigrams = set(norm_s[i:i+2] for i in range(len(norm_s)-1))
-            has_bigrams = len(t_bigrams & s_bigrams) >= 2 if t_bigrams else False
-
-            if not has_kw and not has_bigrams:
                 continue
 
             # 伝聞表現（とのこと等）を付けず、自然なキャラクター文末に直接変換
@@ -831,15 +812,24 @@ def build_safe_fallback_sentences(title, article_content, char_desc, custom_dict
         clean_title = re.sub(r'[【\[（(][^】\]）)]*[】\]）)]', '', clean_title).strip()
         clean_title = clean_title.rstrip("。！？!? \t　")
         if clean_title.endswith("か"):
-            fact_sent = apply_character_speech_ending(f"{clean_title[:-1]}という情報が入ってきました", char_desc)
+            fact_sent = apply_character_speech_ending(f"{clean_title[:-1]}との情報が伝えられています", char_desc)
         elif clean_title.endswith("へ") or clean_title.endswith("に"):
-            fact_sent = apply_character_speech_ending(f"{clean_title}向けた動きが伝えられています", char_desc)
+            fact_sent = apply_character_speech_ending(f"{clean_title}向けた動きが報じられています", char_desc)
         else:
-            fact_sent = apply_character_speech_ending(f"{clean_title}という話題が入ってきました", char_desc)
+            fact_sent = apply_character_speech_ending(f"{clean_title}に関するニュースが伝えられています", char_desc)
         sentences.append(fact_sent)
 
-    # 結びの1文（感想・展望）
-    sentences.append(f"今後の詳しい情報や進展にもぜひ注目していきたい{suffix}！")
+    # 結びの1文（感想・展望）※固定フレーズを完全撤廃し、自然なバリエーション＋文末句点（。）で統一
+    import hashlib
+    fallback_conclusions = [
+        f"今後の動向や詳しい経緯をしっかり見守っていきたい{suffix}。",
+        f"これからの詳しい展開にも関心が集まりそう{suffix}。",
+        f"引き続き、新しい情報や変化をチェックしていきたい{suffix}。",
+        f"今後の詳しい影響や進展にも注目していきたいところ{suffix}。",
+        f"今後の詳しい発表や詳細にも期待が高まる{suffix}。",
+    ]
+    h_idx = int(hashlib.md5(title.encode('utf-8')).hexdigest(), 16) % len(fallback_conclusions)
+    sentences.append(fallback_conclusions[h_idx])
 
     items = []
     for s in sentences:
@@ -2031,7 +2021,8 @@ def validate_news_script_quality(raw_text, title="", article_context="", char_de
 
     split_sentences_check = split_sentences_safely(raw_text)
     raw_len = len(raw_text.strip())
-    if len(split_sentences_check) < 3 or (len(split_sentences_check) < 4 and raw_len < 160):
+    # 3文以上かつ最低限の文字数（3文で80文字以上、または全体で70文字以上）があれば合格
+    if len(split_sentences_check) < 3 or (len(split_sentences_check) == 3 and raw_len < 80) or raw_len < 70:
         return False, f"原稿の文数・文字数が不足しています ({len(split_sentences_check)}文, {raw_len}文字)。"
 
     if re.search(r'(?:だよですね|だねですね|よねですね|よですね|ねですね|だなにゃ|だなのだ|とろろにゃ|みんないゃ|いゃにゃ|ないゃ|てみんないゃ)', raw_text):
@@ -2518,10 +2509,10 @@ def generate_news_item_script_data(payload, custom_dict=None):
                 "sentences": [it["display"] for it in items]
             }
     
-        # 🛡️ 本文が情報量不足の場合（120文字未満）は、LLM妄想創作（市区町村名捏造等）を物理的に遮断して安全フォールバックへ直行
-        has_valid_body = (fetched_body and len(fetched_body) >= 120) or (full_article_content and len(full_article_content) >= 140)
+        # 🛡️ 本文が情報量不足の場合（50文字未満）は、LLM妄想創作（市区町村名捏造等）を物理的に遮断して安全フォールバックへ直行
+        has_valid_body = (fetched_body and len(fetched_body) >= 50) or (full_article_content and len(full_article_content) >= 70)
         if not has_valid_body:
-            print(f"{tag} 🛡️ 記事本文の情報量が不足しているため（{len(fetched_body) if fetched_body else 0}文字 < 120文字）、ハルシネーションを防止し安全な定型原稿を自動構築します", flush=True)
+            print(f"{tag} 🛡️ 記事本文の情報量が不足しているため（{len(fetched_body) if fetched_body else 0}文字 < 50文字）、ハルシネーションを防止し安全な定型原稿を自動構築します", flush=True)
             items = build_safe_fallback_sentences(title, full_article_content, char_desc, custom_dict=custom_dict)
             raw_text = "\n".join([it["display"] for it in items])
             headline_dict = {"display": title, "speech": title}
@@ -2551,7 +2542,7 @@ def generate_news_item_script_data(payload, custom_dict=None):
             cur_prompt = prompt
             if attempt > 1:
                 suffix_instruction = "語尾には必ず『にゃ』『にゃ！』を付けて発話してください。" if "にゃ" in char_desc else ("語尾には必ず『なのだ』『のだ』を付けて発話してください。" if "なのだ" in char_desc else "")
-                cur_prompt += f"\n\n【重要・品質修正指示（再生成 試行{attempt}回目）】直前の生成で品質基準の不備が検知されたため再生成します。必ず「{title}」の事件・出来事についてのみ解説してください。見出しをそのまま繰り返さず、記事本文の具体的な詳細から解説を始めてください。『こんにちは』『おはようございます』『こんばんは』『皆さんこんにちは』等の挨拶は重大な放送事故のため絶対に言わず、解説から直接始めてください。必ず【前半: 記事要約2〜3文】＋【後半: あなた自身の感想2〜3文】の【合計4〜6文】で作成してください。{suffix_instruction}"
+                cur_prompt += f"\n\n【重要・品質修正指示（再生成 試行{attempt}回目）】直前の生成で品質基準の不備が検知されたため再生成します。必ず「{title}」の事件・出来事についてのみ解説してください。見出しをそのまま繰り返さず、記事本文の具体的な詳細から解説を始めてください。『こんにちは』『おはようございます』『こんばんは』『皆さんこんにちは』等の挨拶は重大な放送事故のため絶対に言わず、解説から直接始めてください。必ず【前半: 記事要約2〜3文】＋【後半: あなた自身の感想2文】の【合計4〜5文】で作成してください。1文や2文で短縮終了することは絶対に禁止です。{suffix_instruction}"
                 print(f"{tag} 🔄 [試行 {attempt}] ダブルチェック再生成を実行中...", flush=True)
             else:
                 print(f"{tag} 🤖 [試行 1] LLMへ原稿生成リクエスト送信中...", flush=True)
@@ -3031,7 +3022,8 @@ def generate_news_item_script_data(payload, custom_dict=None):
                     candidate_items = candidate_items[:6]
     
             total_chars = sum(len(it["display"]) for it in candidate_items)
-            if len(candidate_items) < 3 or total_chars < 100 or (len(candidate_items) < 4 and total_chars < 150):
+            # 3文以上かつ合計80文字以上あれば合格（過剰なフィルター失格によるフォールバック落ちを防止）
+            if len(candidate_items) < 3 or total_chars < 80:
                 reason = f"フィルター適用後の文数・文字数不足 ({len(candidate_items)}文, {total_chars}文字)"
                 print(f"{tag} ⚠️ [試行 {attempt}] 原稿不足 (理由: {reason})", flush=True)
                 if attempt >= 3:

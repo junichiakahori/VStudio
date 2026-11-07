@@ -21,10 +21,12 @@ SYNC_FILES = [
     "server/news_script_processor.py",
     "server/local_api_server.py",
     "server/tts_normalizer.py",
+    "data/prompts.json",
     "data/pronunciation_memory.json",
     "js/thumbnail-editor.js",
     "views/thumbnail_editor.html",
     "scripts/tests/test_fix_cash_and_thumb.py",
+    "scripts/tests/test_fix_fallback_script.py",
     "scripts/tools/auto_sync_on_stream_end.py"
 ]
 
