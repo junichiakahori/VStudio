@@ -3,6 +3,30 @@
   "description": "過去に誤読を起こした単語・表現の記憶台帳。記事文脈（context_keywords/scope）と記事トピック（article_topic）を記録し、同姓異名や地名とのバッティングによる誤読事故を恒久防止します。",
   "records": [
     {
+      "id": "morishita_masato_baseball",
+      "surface": "森下暢仁",
+      "reading": "もりしたまさと",
+      "wrong_reading": "もりしたとおるじん, もりした とおるじん",
+      "scope": "global",
+      "article_topic": "スポーツ・野球・プロ野球",
+      "sample_sentence": "森下暢仁投手が登板したにゃ。",
+      "category": "sports_baseball",
+      "registered_date": "2026-11-10",
+      "note": "広島東洋カープの森下暢仁（もりしたまさと）投手が「とおるじん」と誤読されるのを恒久是正"
+    },
+    {
+      "id": "masato_kanji_baseball",
+      "surface": "暢仁",
+      "reading": "まさと",
+      "wrong_reading": "とおるじん",
+      "scope": "global",
+      "article_topic": "スポーツ・野球・プロ野球",
+      "sample_sentence": "暢仁投手が好投したにゃ。",
+      "category": "sports_baseball",
+      "registered_date": "2026-11-10",
+      "note": "人名「暢仁（まさと）」の誤読防止"
+    },
+    {
       "id": "tsuribito_angler",
       "surface": "釣り人",
       "reading": "つりびと",

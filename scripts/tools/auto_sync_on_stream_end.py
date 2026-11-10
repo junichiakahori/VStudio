@@ -23,11 +23,13 @@ SYNC_FILES = [
     "server/tts_normalizer.py",
     "data/prompts.json",
     "data/pronunciation_memory.json",
+    "data/tts_rules.json",
     "js/thumbnail-editor.js",
     "views/thumbnail_editor.html",
     "scripts/tests/test_fix_cash_and_thumb.py",
     "scripts/tests/test_fix_fallback_script.py",
     "scripts/tests/test_fix_tsuribito.py",
+    "scripts/tests/test_fix_morishita.py",
     "scripts/tools/auto_sync_on_stream_end.py"
 ]
 
