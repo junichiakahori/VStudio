@@ -3,6 +3,30 @@
   "description": "過去に誤読を起こした単語・表現の記憶台帳。記事文脈（context_keywords/scope）と記事トピック（article_topic）を記録し、同姓異名や地名とのバッティングによる誤読事故を恒久防止します。",
   "records": [
     {
+      "id": "tsuribito_angler",
+      "surface": "釣り人",
+      "reading": "つりびと",
+      "wrong_reading": "つりじん",
+      "scope": "global",
+      "article_topic": "一般・社会・事故・レジャー",
+      "sample_sentence": "海岸で釣り人が流される事故が発生したにゃ。",
+      "category": "common_noun",
+      "registered_date": "2026-11-10",
+      "note": "「釣り人」が「つりじん」と誤読されるのを恒久防止"
+    },
+    {
+      "id": "tsuribito_angler_kanji",
+      "surface": "釣人",
+      "reading": "つりびと",
+      "wrong_reading": "つりじん",
+      "scope": "global",
+      "article_topic": "一般・社会・事故・レジャー",
+      "sample_sentence": "防波堤の釣人が救助されたにゃ。",
+      "category": "common_noun",
+      "registered_date": "2026-11-10",
+      "note": "送り仮名なし「釣人」の誤読防止"
+    },
+    {
       "id": "genkin_cash",
       "surface": "現金",
       "reading": "げんきん",

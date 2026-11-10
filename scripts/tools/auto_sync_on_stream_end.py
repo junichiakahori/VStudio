@@ -27,6 +27,7 @@ SYNC_FILES = [
     "views/thumbnail_editor.html",
     "scripts/tests/test_fix_cash_and_thumb.py",
     "scripts/tests/test_fix_fallback_script.py",
+    "scripts/tests/test_fix_tsuribito.py",
     "scripts/tools/auto_sync_on_stream_end.py"
 ]
 

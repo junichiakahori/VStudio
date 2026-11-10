@@ -2147,6 +2147,7 @@ def apply_legal_and_general_rules(text: str) -> str:
     # 2. VOICEVOX形態素誤読の補正
     t = re.sub(r'入境', 'にゅうきょう', t)
     t = re.sub(r'裏日本', 'うらにほん', t)
+    t = re.sub(r'釣(?:り)?人', 'つりびと', t)
 
     # 3. 熟語「〜章」の人名誤読（章->あきら）防止
     # 「最終章」「序章」「第一章」「全○章」等の直後に助詞や読点が続く場合
