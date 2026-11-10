@@ -104,6 +104,15 @@ window.executeStreamEndProcess = function () {
   console.log(`[システム] 配信終了プロセスを開始します（直ちに配信終了画面へ切り替え、余韻: ${waitSec}秒）`);
 
   window.isStreamEndedState = true;
+  if (typeof window.updateStreamState === "function") {
+    window.updateStreamState({
+      is_streaming: false,
+      stream_type: "none",
+      obs_streaming: false,
+      news_running: false,
+      radio_running: false
+    });
+  }
   if (typeof clearIdleTimer === "function") clearIdleTimer();
 
   // 自動開始タイマー・自動終了タイマーを確実にOFFにする（次回意図しない自動起動を防止）
@@ -223,6 +232,16 @@ window.executeStreamEndProcess = function () {
         console.log("Sending StopStream to OBS...");
         obsWsClient.call("StopStream").catch((err) => {
           console.error("Failed to stop OBS stream:", err);
+        });
+      }
+
+      if (typeof window.updateStreamState === "function") {
+        window.updateStreamState({
+          is_streaming: false,
+          stream_type: "none",
+          obs_streaming: false,
+          news_running: false,
+          radio_running: false
         });
       }
     }

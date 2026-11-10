@@ -31,3 +31,4 @@ assert "もりしたまさと" in healed, f"修復に失敗: {healed}"
 assert "とおるじん" not in healed, f"誤読が残っています: {healed}"
 
 print("\n🎉 森下暢仁（もりしたまさと）投手の誤読是正テストに合格しました！")
+

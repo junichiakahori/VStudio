@@ -34,6 +34,9 @@
           radioModeState.currentPhase === "finished"
         ) {
           radioModeState.currentPhase = "playing";
+          if (typeof window.updateStreamState === "function") {
+            window.updateStreamState({ is_streaming: true, stream_type: "radio", radio_running: true });
+          }
 
           window.radioScriptStopBtn = document.getElementById(
             "radio-script-stop-btn",
@@ -81,6 +84,9 @@
   if (radioScriptStopBtn) {
     radioScriptStopBtn.addEventListener("click", () => {
       radioModeState.currentPhase = "none";
+      if (typeof window.updateStreamState === "function") {
+        window.updateStreamState({ radio_running: false });
+      }
       if (radioScriptPlayBtn) radioScriptPlayBtn.style.display = "block";
       if (radioScriptStopBtn) radioScriptStopBtn.style.display = "none";
 

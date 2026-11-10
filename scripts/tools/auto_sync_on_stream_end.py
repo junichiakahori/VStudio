@@ -24,17 +24,40 @@ SYNC_FILES = [
     "data/prompts.json",
     "data/pronunciation_memory.json",
     "data/tts_rules.json",
+    "data/stream_state.json",
     "js/thumbnail-editor.js",
+    "js/stream-state-client.js",
+    "js/news-mode.js",
+    "js/stream-automation.js",
+    "js/obs-websocket.js",
+    "js/radio-mode.js",
+    "js/idle-speech.js",
     "views/thumbnail_editor.html",
+    "views/live2d.html",
     "scripts/tests/test_fix_cash_and_thumb.py",
     "scripts/tests/test_fix_fallback_script.py",
     "scripts/tests/test_fix_tsuribito.py",
     "scripts/tests/test_fix_morishita.py",
+    "scripts/tests/test_stream_state.py",
+    "scripts/tools/check_stream_state.py",
     "scripts/tools/auto_sync_on_stream_end.py"
 ]
 
 def is_stream_active():
     try:
+        # 0. 【最優先】本番配信フラグ (stream_state.json) の検査
+        prod_state_path = os.path.join(PROD_DIR, "data", "stream_state.json")
+        if os.path.exists(prod_state_path):
+            try:
+                import json
+                with open(prod_state_path, "r", encoding="utf-8") as f:
+                    state_data = json.load(f)
+                if state_data.get("is_streaming", False):
+                    print(f"FLAG_CONFIRMS_STREAM_ACTIVE: stream_state.json is_streaming=True (type={state_data.get('stream_type')})")
+                    return True
+            except Exception as e:
+                print(f"Warning: Failed to parse prod stream_state.json: {e}")
+
         # 1. OBS プロセス自体が終了していれば配信終了
         res = subprocess.run(["pgrep", "-f", "OBS"], capture_output=True, text=True)
         if res.returncode != 0 or len(res.stdout.strip()) == 0:
@@ -76,7 +99,7 @@ def check_and_sync():
             print(f"Warning: {src} does not exist!")
 
     # 2. Git コミット & プッシュ
-    commit_msg = "fix(youtube/tts): サムネイル送信のVideo ID自動解決(HttpError 500根絶)および現金の誤読(げんかね)防止ガードを実装"
+    commit_msg = "feat(stream): 常駐アプリ対応の配信状態フラグ一元管理システム実装および誤読是正（釣り人/森下暢仁）"
     try:
         for f in SYNC_FILES:
             subprocess.run(["git", "add", f], cwd=PROD_DIR, check=True)

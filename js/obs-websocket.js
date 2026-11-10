@@ -72,6 +72,20 @@ window.isObsWsConnected = false;
       window.isObsWsConnected = false;
     });
 
+    window.obsWsClient.on("StreamStateChanged", (data) => {
+      if (data && typeof data.outputActive === "boolean") {
+        window.isObsStreaming = data.outputActive;
+        console.log(`[OBS] 📡 StreamStateChanged受信: outputActive = ${data.outputActive}`);
+        if (typeof window.updateStreamState === "function") {
+          window.updateStreamState({
+            is_streaming: data.outputActive,
+            stream_type: data.outputActive ? "obs" : "none",
+            obs_streaming: data.outputActive
+          });
+        }
+      }
+    });
+
     try {
       if (window.obsWsStatus) {
         window.obsWsStatus.textContent = "接続中...";
@@ -154,6 +168,9 @@ window.ensureObsStreamingStarted = async function (onProgress = null) {
         if (status && (status.outputActive || status.outputReconnecting)) {
           console.log("[OBS] OBSは既に配信中です（StartStreamをスキップ）");
           window.isObsStreaming = true;
+          if (typeof window.updateStreamState === "function") {
+            window.updateStreamState({ is_streaming: true, stream_type: "obs", obs_streaming: true });
+          }
           return true;
         }
       } catch (statusErr) {
@@ -184,6 +201,9 @@ window.ensureObsStreamingStarted = async function (onProgress = null) {
           if (curStatus && (curStatus.outputActive || curStatus.outputReconnecting)) {
             console.log("[OBS] OBSの配信開始を確認しました！");
             window.isObsStreaming = true;
+            if (typeof window.updateStreamState === "function") {
+              window.updateStreamState({ is_streaming: true, stream_type: "obs", obs_streaming: true });
+            }
             // バッファ安定のため1.5秒待機
             await new Promise((r) => setTimeout(r, 1500));
             return true;
@@ -224,6 +244,9 @@ window.ensureObsStreamingStopped = async function () {
         if (!status.outputActive && !status.outputReconnecting) {
           console.log("[OBS] ℹ️ OBSは現在配信中でないため（既に停止状態）、StopStream送信をスキップしました。");
           window.isObsStreaming = false;
+          if (typeof window.updateStreamState === "function") {
+            window.updateStreamState({ obs_streaming: false });
+          }
           return true;
         }
       }
@@ -234,6 +257,9 @@ window.ensureObsStreamingStopped = async function () {
     try {
       const res = await obsWsClient.call("StopStream");
       window.isObsStreaming = false;
+      if (typeof window.updateStreamState === "function") {
+        window.updateStreamState({ obs_streaming: false });
+      }
       console.log("[OBS] ✅ OBS配信停止コマンド (StopStream) の送信に成功しました！", res);
       return true;
     } catch (err) {

@@ -160,6 +160,26 @@ if "PORT" in os.environ:
 DATA_FILE = os.path.join(BASE_DIR, "data", "custom_idle_phrases.json")
 HIRAGANA_FILE = os.path.join(BASE_DIR, "data", "hiragana_data.json")
 PRONUNCIATION_MEMORY_FILE = os.path.join(BASE_DIR, "data", "pronunciation_memory.json")
+STREAM_STATE_FILE = os.path.join(BASE_DIR, "data", "stream_state.json")
+
+def load_stream_state():
+    default_state = {
+        "is_streaming": False,
+        "stream_type": "none",
+        "started_at": None,
+        "updated_at": datetime.datetime.now().isoformat(),
+        "details": {
+            "obs_streaming": False,
+            "news_running": False,
+            "radio_running": False,
+            "title": ""
+        }
+    }
+    return load_json(STREAM_STATE_FILE, default=default_state)
+
+def save_stream_state(state):
+    state["updated_at"] = datetime.datetime.now().isoformat()
+    save_json(STREAM_STATE_FILE, state)
 
 # ── ニュース原稿サーバーキャッシュ（重複リクエスト防止・10分保持・最大200件）──
 NEWS_SCRIPT_CACHE = {}  # { title_key: (result_dict, expire_timestamp) }
@@ -315,6 +335,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             '/api/youtube/auth_status': lambda: self._send_json(youtube_api_helper.get_oauth_status()),
             '/api/pronunciation_memory': lambda: self._send_json(load_json(PRONUNCIATION_MEMORY_FILE, default={"records": []})),
             '/api/pronunciation_audit/status': lambda: self._send_json(get_pronunciation_audit_service().get_status()),
+            '/api/stream_state': lambda: self._send_json(load_stream_state()),
         }
 
 
@@ -417,6 +438,41 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     "resolved_text": resolved,
                     "applied": (resolved != text)
                 })
+
+            # ── 📡 本番配信フラグ管理 API（配信中/非配信中の状態同期・永続化） ──
+            if self.path == '/api/stream_state':
+                payload = self._read_json()
+                current_state = load_stream_state()
+                details = current_state.setdefault("details", {})
+
+                if "obs_streaming" in payload:
+                    details["obs_streaming"] = bool(payload["obs_streaming"])
+                if "news_running" in payload:
+                    details["news_running"] = bool(payload["news_running"])
+                if "radio_running" in payload:
+                    details["radio_running"] = bool(payload["radio_running"])
+                if "title" in payload:
+                    details["title"] = str(payload["title"])
+
+                explicit_streaming = payload.get("is_streaming")
+                if explicit_streaming is not None:
+                    is_active = bool(explicit_streaming)
+                else:
+                    is_active = bool(details.get("obs_streaming") or details.get("news_running") or details.get("radio_running"))
+
+                current_state["is_streaming"] = is_active
+                if is_active:
+                    current_state["stream_type"] = payload.get("stream_type") or ("news" if details.get("news_running") else ("radio" if details.get("radio_running") else "obs"))
+                    if not current_state.get("started_at"):
+                        current_state["started_at"] = datetime.datetime.now().isoformat()
+                else:
+                    current_state["stream_type"] = "none"
+                    current_state["started_at"] = None
+
+                save_stream_state(current_state)
+                status_icon = "📡 [配信中]" if is_active else "🛑 [待機中/非配信]"
+                print(f"[配信フラグ管理] {status_icon} 状態更新: is_streaming={is_active} (type: {current_state['stream_type']})", flush=True)
+                return self._send_json({"success": True, "state": current_state})
 
             # ── 🤖 AIルールチューナー（読み上げルールの自然言語による即時追加・更新） ──
             if self.path == '/api/tune-tts-rule':

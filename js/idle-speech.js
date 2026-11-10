@@ -246,6 +246,9 @@ window.triggerIdleSpeech = async function () {
     const totalLines = radioModeState.scriptLines.length;
     if (radioModeState.currentScriptIndex >= totalLines) {
       radioModeState.currentPhase = "finished";
+      if (typeof window.updateStreamState === "function") {
+        window.updateStreamState({ radio_running: false });
+      }
       console.log("[ラジオモード] 台本の全行を読み終わりました");
 
       window.playBtn = document.getElementById("radio-script-play-btn");

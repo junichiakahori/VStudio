@@ -1092,6 +1092,9 @@ function getNewsConfig() {
 
       const isMidwayStart = (startIndex > 0);
       newsBroadcastState = { isRunning: true, currentIndex: startIndex, totalCount: sortedNews.length, lastCategory: "", isFromNewsList: !!isFromNewsList, newsList: sortedNews };
+      if (typeof window.updateStreamState === "function") {
+        window.updateStreamState({ is_streaming: true, stream_type: "news", news_running: true });
+      }
       if (startBtn) startBtn.style.display = "none";
       if (stopBtn) stopBtn.style.display = "block";
       if (progressEl) progressEl.style.display = "block";
@@ -1320,6 +1323,9 @@ function getNewsConfig() {
   window.startNewsBroadcast = _executeNewsBroadcast;
   function stopNewsBroadcast() {
     newsBroadcastState.isRunning = false;
+    if (typeof window.updateStreamState === "function") {
+      window.updateStreamState({ news_running: false });
+    }
     if (typeof window.stopVoicevoxPlayback === "function") {
       window.stopVoicevoxPlayback();
     }

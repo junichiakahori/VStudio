@@ -40,3 +40,4 @@ print(f"apply_pronunciation_memory('釣人がいた') ➔ '{res2}'")
 assert "つりびと" in res2
 
 print("\n🎉 「釣り人」「釣人」➔「つりびと」の全てのテストに合格しました！")
+
