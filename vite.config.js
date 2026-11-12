@@ -56,9 +56,9 @@ const killProcessOnPort = (port, serverFileName) => {
 };
 
 const scriptMap = {
-  'local_api_server': { file: 'server/local_api_server.py', port: 8002, logFile: 'logs/api_server.log' },
-  'youtube_comment_server': { file: 'server/youtube_comment_server.py', port: 8778, logFile: 'logs/youtube_server.log' },
-  'tiktok_comment_server': { file: 'server/tiktok_comment_server.py', port: 8777, logFile: 'logs/tiktok_server.log' }
+  'local_api_server': { file: 'server/local_api_server.py', port: 8001, logFile: 'logs/api_server.log' },
+  'youtube_comment_server': { file: 'server/youtube_comment_server.py', port: 8768, logFile: 'logs/youtube_server.log' },
+  'tiktok_comment_server': { file: 'server/tiktok_comment_server.py', port: 8767, logFile: 'logs/tiktok_server.log' }
 };
 
 const serverLogs = {
@@ -194,7 +194,7 @@ export default defineConfig({
       'Expires': '0'
     },
     host: '0.0.0.0',
-    port: 8444,
+    port: 8443,
     strictPort: true,
     hmr: false, // 配信中の勝手な画面強制リロード・エラーオーバーレイを完全防止
     watch: {
@@ -202,7 +202,7 @@ export default defineConfig({
     },
     proxy: {
       '^/(api|news_script|log(?:$|[/?])|update_hiragana_data|radio_script|radio_script_yomi|radio_script_config|custom_idle_phrases|hiragana_data|se_list|add_idle_phrase|convert_remaining_kanji|fetch_rss|get_youtube_video_info)': {
-        target: 'http://127.0.0.1:8002',
+        target: 'http://127.0.0.1:8001',
         changeOrigin: true,
         secure: false,
       }
